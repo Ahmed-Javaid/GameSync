@@ -32,7 +32,7 @@ dotnet test tests/GameSync.Core.Tests --filter "FullyQualifiedName~RealSaves" --
 The command line keeps its data in `%LOCALAPPDATA%\GameSync` unless `--data <folder>` says otherwise. Use a test folder while trying it out:
 
 ```powershell
-$gs = 'src\GameSync.App\bin\Debug\net10.0-windows\gamesync.exe'
+$gs = 'src\GameSync.App\bin\Debug\net10.0-windows10.0.19041.0\gamesync.exe'
 & $gs --data D:\gs-test\desktop init --remote D:\gs-test\cloud --name DESKTOP
 & $gs --data D:\gs-test\desktop add-game cuphead --title Cuphead --root saves=D:\gs-test\saves\Cuphead
 & $gs --data D:\gs-test\desktop sync

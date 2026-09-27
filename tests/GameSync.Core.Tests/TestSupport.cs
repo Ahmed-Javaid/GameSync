@@ -107,6 +107,9 @@ public sealed class TestPc : IDisposable
     /// <summary>This PC's registry, in memory.</summary>
     public FakeRegistry Registry { get; } = new();
 
+    /// <summary>The games whose programs run on this PC right now (BAK-10).</summary>
+    public HashSet<GameId> Running { get; } = [];
+
     public SyncOptions Options { get; set; } = new() { AppVersion = "test" };
 
     /// <summary>Makes cloud calls fail: given the call's name ("blobs.put", "log.append", "info", ...), the error to throw.</summary>
@@ -196,7 +199,7 @@ public sealed class TestPc : IDisposable
         Malware,
         Device,
         DataDir,
-        Options with { Registry = Options.Registry ?? Registry });
+        Options with { Registry = Options.Registry ?? Registry, IsRunning = Options.IsRunning ?? Running.Contains });
 
     public Task<IReadOnlyList<GameResult>> SyncAsync(string? cloud = null) => Service(cloud).SyncAsync(null, CancellationToken.None);
 

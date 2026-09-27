@@ -22,6 +22,9 @@
     <ProjectReference Include="..\..\src\GameSync.Core\GameSync.Core.csproj" />
     <ProjectReference Include="..\..\src\GameSync.Storage.Drive\GameSync.Storage.Drive.csproj" />
     <ProjectReference Include="..\..\src\GameSync.Windows\GameSync.Windows.csproj" />
+    <ProjectReference Include="..\..\src\GameSync.Host\GameSync.Host.csproj" />
+    <!-- The fake game the watcher tests run; its program is copied next to the tests. -->
+    <ProjectReference Include="..\GameSync.FakeGame\GameSync.FakeGame.csproj" />
   </ItemGroup>
 
 </Project>

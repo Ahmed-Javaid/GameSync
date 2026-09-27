@@ -32,6 +32,9 @@ public enum SyncAction
 
     /// <summary>Offline, and the cloud's side matters: this PC's changes are kept locally and the decision waits (PC-05).</summary>
     WaitForCloud,
+
+    /// <summary>The game is running: nothing is read, uploaded, downloaded or restored until it closes (BAK-10, BG-08).</summary>
+    Playing,
 }
 
 /// <summary>Before downloading, this PC's files are kept as a pinned version.</summary>

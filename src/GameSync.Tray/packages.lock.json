@@ -132,12 +132,6 @@
           "Google.Apis.Drive.v3": "[1.76.0.4273, )"
         }
       },
-      "gamesync.tray": {
-        "type": "Project",
-        "dependencies": {
-          "GameSync.Host": "[1.0.0, )"
-        }
-      },
       "gamesync.windows": {
         "type": "Project",
         "dependencies": {

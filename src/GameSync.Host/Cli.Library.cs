@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using System.Text.Json;
-using GameSync.App;
 using GameSync.Core.Discovery;
 using GameSync.Core.Games;
 using GameSync.Core.Model;
@@ -9,6 +8,8 @@ using GameSync.Core.Scanning;
 using GameSync.Core.State;
 using GameSync.Core.Sync;
 using GameSync.Windows;
+
+namespace GameSync.Host;
 
 /// <summary>This PC's side of the library: its settings, its library, its folders, and the checks every rule passes.</summary>
 internal sealed record ThisPc(string DataDir, StateStore State, LibraryStore Library, IReadOnlyDictionary<string, string> Folders, RootResolver Resolver,
@@ -19,16 +20,16 @@ internal sealed record ThisPc(string DataDir, StateStore State, LibraryStore Lib
 }
 
 /// <summary>Milestone 3's commands: scanning, the library, confirming, and the folders to scan (LIB, FIND, FOLD-07, FOLD-08).</summary>
-internal static partial class Cli
+public static partial class Cli
 {
     private const string GameFoldersKey = "library.gameFolders";
     private const string SaveFoldersKey = "library.saveFolders";
 
-    private static string LudusaviManifest =>
+    internal static string LudusaviManifest =>
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "ludusavi", "manifest.yaml");
 
     /// <summary>This PC's folders for the placeholders, with Steam's own folder for &lt;steamRoot&gt; when Steam is installed.</summary>
-    private static Dictionary<string, string> FoldersForThisPc()
+    internal static Dictionary<string, string> FoldersForThisPc()
     {
         var folders = new Dictionary<string, string>(KnownFolders.ForThisPc(), StringComparer.OrdinalIgnoreCase);
         if (StoreLocations.SteamRoot() is { } steam)
@@ -40,7 +41,7 @@ internal static partial class Cli
     }
 
     /// <summary>The library's confirmed games (FIND-06), each checked like any rule (R8); one that fails is left out and says why.</summary>
-    private static List<GameDefinition> LibraryGames(IReadOnlyList<LibraryEntry> entries, AppConfig config, ThisPc here)
+    internal static List<GameDefinition> LibraryGames(IReadOnlyList<LibraryEntry> entries, AppConfig config, ThisPc here)
     {
         var games = new List<GameDefinition>();
         foreach (var entry in entries.Where(e => e is { State: LibraryState.Synced, Confirmed: not null, MergedInto: null }))
@@ -771,7 +772,7 @@ internal static partial class Cli
         JsonSerializer.Deserialize<List<string>>(state.GetSetting(GameFoldersKey) ?? "[]") ?? [];
 
     /// <summary>FOLD-08: extra save folders and folders named by ID; this PC's own setting, never in the repo or the cloud.</summary>
-    private static List<ExtraSaveFolder> SaveFolders(StateStore state) =>
+    internal static List<ExtraSaveFolder> SaveFolders(StateStore state) =>
         JsonSerializer.Deserialize<List<ExtraSaveFolder>>(state.GetSetting(SaveFoldersKey) ?? "[]", Json.Options) ?? [];
 
     /// <summary>A folder as given, made full and without a trailing '\' (a drive's root keeps its own, "G:\").</summary>

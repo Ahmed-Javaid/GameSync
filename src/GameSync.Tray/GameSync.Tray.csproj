@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- GameSync's background app: no window for now; the tray icon and the UI join it in Milestone 5. -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <AssemblyName>GameSync.Tray</AssemblyName>
+    <RootNamespace>GameSync.Tray</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\GameSync.Host\GameSync.Host.csproj" />
+  </ItemGroup>
+
+</Project>

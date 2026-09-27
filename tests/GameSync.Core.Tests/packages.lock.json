@@ -202,11 +202,22 @@
         "resolved": "18.1.0",
         "contentHash": "5K+9KFg2TdTl7VXv88Qzi/0lqK6JFoNP3lRuImPYGRV7K/QYklDyTrj4+A+KAki1JsQi6qKY+hDyY7d6WRqjrw=="
       },
+      "FakeGame": {
+        "type": "Project"
+      },
       "gamesync.core": {
         "type": "Project",
         "dependencies": {
           "Microsoft.Data.Sqlite": "[10.0.12, )",
           "YamlDotNet": "[18.1.0, )"
+        }
+      },
+      "gamesync.host": {
+        "type": "Project",
+        "dependencies": {
+          "GameSync.Core": "[1.0.0, )",
+          "GameSync.Storage.Drive": "[1.0.0, )",
+          "GameSync.Windows": "[1.0.0, )"
         }
       },
       "gamesync.storage.drive": {

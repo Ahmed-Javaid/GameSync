@@ -4,7 +4,7 @@ A Windows app that backs up your game saves, syncs them between your PCs, launch
 
 ## Status
 
-Milestone 1 of 6 is done: the sync engine. Milestone 2, Google Drive and syncing between two PCs, is built and being tried out, along with named saves ("Before Lady Maria") you can restore in a step. Milestone 3 is built: GameSync finds your Steam, Epic, EA and loose games and where each keeps its saves (the PCGamingWiki list, engine rules, a name search, and the registry), and takes over from Ludusavi. It's all command line for now; there's no app to install yet.
+Milestone 1 of 6 is done: the sync engine. Milestone 2, Google Drive and syncing between two PCs, is built and being tried out, along with named saves ("Before Lady Maria") you can restore in a step. Milestone 3 is built: GameSync finds your Steam, Epic, EA and loose games and where each keeps its saves (the PCGamingWiki list, engine rules, a name search, and the registry), and takes over from Ludusavi. Milestone 4 is built: a background app notices when you play, however the game started, and syncs it after you quit; it launches games with a check for a newer save first, keeps a daily backup, and notifies you only when something needs you. There's no window yet (Milestone 5); the rest is command line.
 
 ## What it promises
 
@@ -32,5 +32,5 @@ dotnet test GameSync.sln
 
 - `docs/design.md`: the full design
 - `docs/requirements.md`: every requirement, each with an ID and a test
-- `docs/milestone-1.md`, `docs/milestone-2.md` and `docs/milestone-3.md`: what's built so far, how to try it, and its known limits
+- `docs/milestone-1.md` to `docs/milestone-4.md`: what's built so far, how to try it, and its known limits
 - `design/system/`: the UI design system (open `design/system/viewer.html`)

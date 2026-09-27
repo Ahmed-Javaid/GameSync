@@ -35,13 +35,13 @@ It's for the owner and a few friends: free, open source on GitHub, Windows first
 
 ## Architecture
 
-One exe runs as both the tray app and a command line; a small helper runs as admin only during learn mode.
+Two small programs share one engine: the tray app, which has no window until you open it, and the command line. A small helper runs as admin only during learn mode.
 
 ```mermaid
 flowchart TB
   tracer["Learn-mode tracer<br/>admin, one session at a time<br/>reads file events only"]
   tray["Tray app<br/>UI, library, launcher<br/>process watcher, sync queue"]
-  cli["Command line (same exe)<br/>daily job, launch shortcuts<br/>runs alone if the app is closed"]
+  cli["Command line (gamesync.exe)<br/>scripts, shortcuts, trying things<br/>runs alone if the app is closed"]
   core["GameSync.Core, the shared library<br/>detection · save rules · sync engine · restore checks · storage interfaces"]
   local["Local store<br/>SQLite state and job queue<br/>snapshot history per game"]
   cloud["Cloud storage<br/>Google Drive first<br/>later S3/R2 or own server"]
@@ -57,11 +57,11 @@ flowchart TB
   class tracer admin
 ```
 
-The command line hands its work to the tray app when that's running, so only one engine ever touches saves at a time. The highlighted tracer is the only part that runs as admin.
+Only one engine ever touches saves at a time. The tray app and the command line take the same lock, a file in the data folder that Windows lets go of if its program dies. A command waits while the tray app finishes a sync, and says so. The daily run and "I'm done playing" are handed to the tray app when it's running. The highlighted tracer is the only part that runs as admin.
 
-- **GameSync.Core**: all the logic and no UI: game detection, save rules, sync decisions, safety checks, storage interfaces. Testable without Windows or a cloud.
-- **Tray app**: Avalonia UI, library and launcher, process watcher, job queue and notifications. Starts with Windows.
-- **Command line**: the same exe with verbs (`sync --all`, `plan`, `launch <game>`, `restore <game> <version>`), used by Task Scheduler and shortcuts.
+- **GameSync.Core**: all the logic and no UI: game detection, save rules, sync decisions, sessions, safety checks, storage interfaces. Testable without Windows or a cloud.
+- **Tray app** (`GameSync.Tray.exe`): Avalonia UI, library and launcher, process watcher, job queue and notifications. Starts at sign-in. It also runs single jobs with no window, such as the daily run from Task Scheduler and launches from Steam's launch options.
+- **Command line** (`gamesync.exe`): the same verbs in a terminal (`sync --all`, `plan`, `launch <game>`, `restore <game> <version>`). It's a second program because a Windows program either opens with no window or prints to a terminal, not both.
 - **Learn-mode tracer**: a separate small exe, started as admin only for a learn session. It streams file events to the tray app and writes nothing.
 - **Local store**: `%LOCALAPPDATA%\GameSync\` holds `state.db`, `history\`, `art\` (cached cover art) and `logs\`. You can move `history\`, the backup folder, anywhere on your PC (Settings, Storage and folders).
 - **Cloud storage**: behind two small interfaces, so Drive, S3/R2 and a future server are interchangeable (see Storage backends).
@@ -190,18 +190,21 @@ Only launches through GameSync can pull a newer save first. Games started elsewh
 - Only processes named like one of the game's exes are opened, once each, with query-limited access (what Task Manager uses) to confirm the path and start time.
 - The session starts at the process's real start time minus 2 seconds, because games write saves the moment they start.
 - Launchers, crash reporters and anti-cheat services are ignored. An "I'm done playing" button ends a stuck session.
+- If the watcher stops mid-session (a crash, a power cut), the session is recorded up to the last save written, and the game syncs when the watcher starts again.
 
 **Launch routes**
 
 - Store games start through the store's own link, so its DRM and anti-cheat start normally.
 - Loose games start from their main exe, with the game folder as working directory, never as admin.
 - Swap-mode games must start through GameSync; the watcher warns if one starts elsewhere.
-- Shortcuts and Steam launch options call `gamesync launch <game>`, so they get the pre-launch check too.
+- Shortcuts call `gamesync launch <game>`, so they get the pre-launch check too. Steam's launch options call `GameSync.Tray.exe launch <game> -- %command%`, which runs Steam's command itself with no window.
+- GameSync never stands between you and the game. From Steam's launch options, the game starts even when the check can't run, and you're told why. A launch waits up to 2 minutes for a sync in the background, then starts without the check.
 
 **Now-playing marker**
 
 - A small cloud file per game, written at launch with the device and start time, and cleared after the exit upload.
 - A marker older than 12 hours with no upload reads "DESKTOP never synced back". You can play anyway; if both PCs then change the save, the conflict rules apply.
+- Each PC notes the markers it put up, so one it couldn't clear (offline at the game's exit) is cleared at a later sync.
 
 **Long sessions**: optional local-only snapshots every 30 minutes guard against in-game corruption. They're never uploaded before the session ends.
 
@@ -390,12 +393,13 @@ Each PC is a named device with its own base per game, and paths travel in portab
 
 The tray app does the work while it runs, a daily backup covers the rest, and neither ever interrupts a fullscreen game.
 
-- **Tray app**: starts with Windows for your user, runs as a single instance, and holds the watcher, the job queue and the UI.
-- **Daily backup**: each person picks the time in Settings; setup suggests an evening hour when the PC is usually on. A Task Scheduler entry runs `gamesync sync --all` with no window, or hands the job to the tray app when it's running.
-- **Missed runs catch up**: if the PC was off at that time, the backup runs about 10 minutes after the next sign-in. Most syncing happens at game exit anyway; the daily run is the safety net.
+- **Tray app**: starts at sign-in for your user through a Task Scheduler entry, runs as a single instance (a lock file of its own), and holds the watcher, the job queue and the UI.
+- **Between sessions**: every game syncs every 15 minutes and when the tray app starts, so what another PC played comes down without a click. Each synced game's build is read every minute, so its save is kept before an update runs.
+- **Daily backup**: each person picks the time in Settings; setup suggests an evening hour when the PC is usually on. A Task Scheduler entry runs `GameSync.Tray.exe daily` with no window, or hands the job to the tray app when it's running. It runs as you, without admin rights, at below-normal priority, and never wakes the PC.
+- **Missed runs catch up**: if the PC was off at that time, the backup runs about 10 minutes after the next sign-in (a second entry, which runs only then). Most syncing happens at game exit anyway; the daily run is the safety net.
 - **What the daily run does**: skips games that are running, backs up and uploads changed games, checks for game updates, refreshes the save list weekly, and writes one line per game to the activity log.
 - **Retries**: failed jobs wait 1 minute, then double the wait each time, up to 1 hour. Jobs survive restarts.
-- **Notifications**: Windows toasts only for things that need you (a conflict needing a decision, an expired sign-in, saves not found, a blocked file), plus an optional daily summary. They're held while a fullscreen game runs (checked with `SHQueryUserNotificationState`) and shown after it closes.
+- **Notifications**: Windows toasts only for things that need you (a conflict needing a decision, an expired sign-in, saves not found, a blocked file, saves that may have moved), plus an optional daily summary. They're held while a fullscreen game runs (checked with `SHQueryUserNotificationState`) and shown after it closes. Each shows once while its problem lasts, an expired sign-in is one toast for all games, and more than three at once become one.
 - **Tray icon**: green when everything is synced, blue while working, amber when something needs you, grey when offline. Hovering shows the counts.
 - **No disk work during play**: hashing and uploads wait for the session to end. Only the watcher, and learn mode when you start it, run while you play.
 
@@ -560,7 +564,8 @@ GameSync is C# on .NET 10 with an Avalonia UI, shipped as one signed installer, 
 | Google Drive | Google.Apis.Drive.v3 |
 | S3, R2, B2 | AWSSDK.S3 |
 | Learn-mode tracing | Microsoft.Diagnostics.Tracing.TraceEvent |
-| Daily backup | Task Scheduler, through the TaskScheduler NuGet package |
+| Daily backup | Task Scheduler, through `schtasks` and a task definition (no extra package) |
+| Notifications | Windows' own toast API, no extra package |
 | Save list | YamlDotNet, cached as a compact local index |
 | Hashing and encryption | System.Security.Cryptography (SHA-256, AES-GCM, HMAC) |
 | Code signing | SignPath, free for open source |
@@ -568,15 +573,18 @@ GameSync is C# on .NET 10 with an Avalonia UI, shipped as one signed installer, 
 ```
 GameSync.sln
   src/
-    GameSync.Core/            detection, save rules, sync engine, safety checks, storage interfaces
+    GameSync.Core/            detection, save rules, sync engine, sessions, safety checks, storage interfaces
     GameSync.Storage.Drive/   Google Drive backend
     GameSync.Storage.S3/      S3/R2 backend (v2)
-    GameSync.Windows/         process watcher, Task Scheduler, toasts, registry, AMSI, DPAPI
-    GameSync.App/             Avalonia UI, tray and command-line verbs: the exe
+    GameSync.Windows/         process watcher, known folders, registry, AMSI, DPAPI, the fullscreen check
+    GameSync.Host/            the engine as a program: verbs, the agent, the daily run, Task Scheduler entries
+    GameSync.Tray/            GameSync.Tray.exe: the agent with no window, toasts; the Avalonia UI and tray icon join it
+    GameSync.App/             gamesync.exe: the command line
     GameSync.Tracer/          the learn-mode helper
     GameSync.Server/          later
   tests/
     GameSync.Core.Tests/      decision table, guardrails, portable paths, safety rules
+    GameSync.FakeGame/        a stand-in game for the watcher and session timing
     GameSync.Integration/     real folders, a fake cloud, two simulated PCs, crash and resume
   spikes/                     Find-GameSaves.ps1
   docs/

@@ -25,6 +25,12 @@ public sealed record SyncOptions
 
     /// <summary>Where registry saves are read and written (FIND-10); without it, registry exports already on disk still sync.</summary>
     public IRegistryStore? Registry { get; init; }
+
+    /// <summary>Whether any of a game's programs runs now (BAK-10); without it, no game counts as running.</summary>
+    public Func<GameId, bool>? IsRunning { get; init; }
+
+    /// <summary>This PC's clock, which a test can move on.</summary>
+    public Func<DateTime> UtcNow { get; init; } = () => DateTime.UtcNow;
 }
 
 /// <summary>
@@ -129,6 +135,16 @@ public sealed partial class SyncService
                 if (plan.Error is not null)
                 {
                     throw plan.Error;
+                }
+
+                // BG-08: while the game runs, not even its outbox uploads.
+                if (plan.Decision?.Action == SyncAction.Playing || IsRunning(plan.Stream.Game.Id))
+                {
+                    var playing = new GameResult(plan.Stream.Id, plan.Title, SyncAction.Playing, GameStatus.Playing, "Playing: it syncs once the game closes.");
+                    _state.SetStatus(plan.Stream.Id, GameStatus.Playing, playing.Message);
+                    _state.FinishJob(job);
+                    results.Add(playing);
+                    continue;
                 }
 
                 // Whatever earlier runs left in the outbox goes first.
@@ -249,6 +265,7 @@ public sealed partial class SyncService
     {
         var shown = name is null ? version.Value : $"'{name}'";
         var stream = Find(streamId);
+        ThrowIfRunning(stream, $"restoring {shown}");
         if (SharedSaves().TryGetValue(stream.Game.Id, out var clash))
         {
             throw new InvalidGameDefinitionException($"{stream.Game.Title}: {clash} Nothing was restored.");
@@ -309,6 +326,7 @@ public sealed partial class SyncService
     public async Task<GameResult> ResolveAsync(GameId game, bool keepThisPc, VersionId? chosenCloudVersion, CancellationToken ct)
     {
         var stream = Main(game);
+        ThrowIfRunning(stream, "settling the conflict");
         await TryPullAsync(stream, ct);
         var (versions, _) = await LoadVersionsAsync(stream, ct);
         var heads = VersionGraph.Heads(versions);
@@ -564,6 +582,11 @@ public sealed partial class SyncService
                     {
                         warnings.Add($"The cloud was missing {pulled.Requeued} versions this PC has; they upload again from the backup folder.");
                     }
+
+                    if (!stream.PerDevice && await PlayingElsewhereAsync(stream.Game.Id, ct) is { } elsewhere)
+                    {
+                        warnings.Add(elsewhere);
+                    }
                 }
                 catch (CloudException e)
                 {
@@ -781,6 +804,20 @@ public sealed partial class SyncService
 
     private async Task<GamePlan> PlanStreamAsync(SyncStream stream, bool treatAsInSession, CloudView view, IReadOnlyList<string> warnings, CancellationToken ct)
     {
+        // BAK-10, BG-08: a running game's files aren't even read until it closes.
+        if (IsRunning(stream.Game.Id))
+        {
+            return new GamePlan
+            {
+                Stream = stream,
+                Decision = new SyncDecision { Action = SyncAction.Playing, Reason = "Playing: it syncs once the game closes." },
+                Warnings = warnings,
+                TreatAsInSession = treatAsInSession,
+                Cloud = view,
+                Fingerprint = "playing",
+            };
+        }
+
         var state = _state.GetState(stream.Id);
         ExportRegistry(stream.Game);
         var snapshot = _scanner.Scan(stream.Definition, stream.Includes);
@@ -908,6 +945,9 @@ public sealed partial class SyncService
         switch (decision.Action)
         {
             case SyncAction.None:
+                break;
+            case SyncAction.Playing:
+                status = GameStatus.Playing;
                 break;
             case SyncAction.AdoptHead:
                 _state.SetBase(stream.Id, decision.Head!);

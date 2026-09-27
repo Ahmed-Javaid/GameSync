@@ -45,6 +45,9 @@ public enum VersionOrigin
 
     /// <summary>A save folder someone kept by hand, brought in as a named save (BAK-19).</summary>
     Imported,
+
+    /// <summary>The save as it was before a new build of the game ran (BAK-06).</summary>
+    BeforeUpdate,
 }
 
 public sealed record DeviceInfo(DeviceId Id, string Name);

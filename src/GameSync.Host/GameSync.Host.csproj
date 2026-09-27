@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- What gamesync.exe and the background app share: the command line's verbs, and the agent that watches games. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="GameSync.Core.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\GameSync.Core\GameSync.Core.csproj" />
+    <ProjectReference Include="..\GameSync.Storage.Drive\GameSync.Storage.Drive.csproj" />
+    <ProjectReference Include="..\GameSync.Windows\GameSync.Windows.csproj" />
+  </ItemGroup>
+
+</Project>

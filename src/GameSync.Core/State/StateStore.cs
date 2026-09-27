@@ -23,6 +23,9 @@ public enum GameStatus
 
     /// <summary>The cloud has a newer save that couldn't be downloaded yet.</summary>
     NewerInCloud,
+
+    /// <summary>A session is running; the game syncs once it closes.</summary>
+    Playing,
 }
 
 public sealed record GameState(GameId Game, VersionRecord? Base, GameStatus? Status, string? Detail, bool Reinstalled, DateTime? UpdatedUtc);
@@ -83,6 +86,20 @@ public sealed class StateStore : IDisposable
 
     public void SetSetting(string key, string value) =>
         Execute("INSERT INTO settings (key, value) VALUES ($k, $v) ON CONFLICT(key) DO UPDATE SET value = $v", ("$k", key), ("$v", value));
+
+    /// <summary>Every setting whose key starts with <paramref name="prefix"/> and whose value isn't empty.</summary>
+    public IReadOnlyDictionary<string, string> GetSettings(string prefix)
+    {
+        using var cmd = Command("SELECT key, value FROM settings WHERE substr(key, 1, length($p)) = $p AND value <> ''", ("$p", prefix));
+        using var reader = cmd.ExecuteReader();
+        var settings = new Dictionary<string, string>(StringComparer.Ordinal);
+        while (reader.Read())
+        {
+            settings[reader.GetString(0)] = reader.GetString(1);
+        }
+
+        return settings;
+    }
 
     // ---- per-game sync state ----
 

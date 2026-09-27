@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 using GameSync.Core.Games;
 using GameSync.Core.Model;
 
-namespace GameSync.App;
+namespace GameSync.Host;
 
 /// <summary>
 /// <c>games.json</c> in the data folder: where the cloud is and which games to sync. Save folders can start with

@@ -226,7 +226,7 @@ First run takes four steps; after that the tray app works quietly and speaks up 
 | SET-03 | Settings shows the last daily run: time, games checked, uploads. | Must | The line matches the log. |  |
 | SET-04 | Safety settings: allow learn mode to ask for admin, and later, encrypt everything in the cloud. | Must | Each setting survives a restart. |  |
 | BG-01 | The tray app starts with Windows for your user and runs as a single instance. | Must | Sign in: one tray icon. Start the exe again: the open window comes forward. |  |
-| BG-02 | A Task Scheduler entry runs `gamesync sync --all` with no window, or hands the job to the tray app when it's running. | Must | The task exists and its last run shows in the log. |  |
+| BG-02 | A Task Scheduler entry runs the daily backup (`GameSync.Tray.exe daily`) with no window, or hands the job to the tray app when it's running. | Must | The task exists and its last run shows in the log. |  |
 | BG-03 | The daily run skips running games, backs up and uploads changed games, checks for game updates, refreshes the save list weekly, and logs one line per game. | Must | Read the log after a daily run. |  |
 | BG-04 | Failed jobs retry after 1 minute, doubling up to 1 hour, and survive restarts. | Must | Go offline: retries back off. Reboot: the job resumes. |  |
 | BG-05 | Windows notifications only for what needs you (a conflict, an expired sign-in, saves not found, a blocked file), plus an optional daily summary. | Must | A healthy sync shows no notification. |  |

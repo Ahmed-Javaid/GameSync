@@ -80,7 +80,7 @@ Tried on a copy of that folder:
 ## Try it now, with a folder as the cloud
 
 ```powershell
-$gs = 'src\GameSync.App\bin\Debug\net10.0-windows\gamesync.exe'
+$gs = 'src\GameSync.App\bin\Debug\net10.0-windows10.0.19041.0\gamesync.exe'
 & $gs --data D:\gs-test\desktop init --remote D:\gs-test\cloud --name DESKTOP
 & $gs --data D:\gs-test\desktop add-game wukong --title "Black Myth: Wukong" --root "saves=<installDir>/b1/Saved/SaveGames"
 & $gs --data D:\gs-test\desktop set install-dir wukong D:\gs-test\games\Wukong

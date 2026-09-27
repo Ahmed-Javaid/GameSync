@@ -135,6 +135,20 @@ public sealed partial class Discoverer(SaveList? saveList, IReadOnlyDictionary<s
         };
     }
 
+    /// <summary>FIND-07: every place any layer finds for the game, not only the first layer's, to spot saves that moved.</summary>
+    public IReadOnlyList<Proposal> EveryLayer(InstalledGame game)
+    {
+        var print = Fingerprinter.Read(game.InstallDir);
+        var listed = Match(game, print);
+        var all = (listed is null ? [] : FromSaveList(listed, game.Store, game.StoreId, game.InstallDir))
+            .Concat(FromIdFolders(game, listed))
+            .Concat(FromEngine(game, print))
+            .Concat(FromNames(game, listed, print))
+            .DistinctBy(p => (p.Root, p.Include))
+            .ToList();
+        return Allowed(all, game.InstallDir);
+    }
+
     public static bool OnlySettings(IReadOnlyList<Proposal> files, IReadOnlyList<RegistryProposal> registry) =>
         files.Count + registry.Count > 0 && files.All(p => p.Category == SaveCategory.Config) && registry.All(r => r.Category == SaveCategory.Config);
 
