@@ -1,0 +1,7 @@
+Showcase of a game's page: its status and Play in a `HeroBanner`, named saves, where the saves are, and every version across PCs as a Console pane with the game's own log. Built only from the components above.
+
+- The hero carries the game's one status and a sentence about the save. Play is the primary button while the game is fine. When the game needs you, the status's own action takes its place as the primary (Resolve, Review, Add a place) and Play becomes secondary.
+- **Named saves** list newest first, each with Restore. Save as… asks for a name; "Import kept saves" (from the card's menu) brings folders kept by hand in as named saves.
+- **Where the saves are** shows each rule as the portable path in `mono`, the folder it resolves to on this PC in `ink-muted` (the folder icon opens it in Explorer), and the evidence in `caption`: how it was found, when it was confirmed, files, size, newest date. Add a place picks a folder or file by hand; Learn mode is left out, with the reason, for games with an anti-cheat.
+- **History** is a `ConsoleTable` of every version from every PC: when it was saved, the PC in uppercase `mono`, a note (Current on `secondary-soft`; a pin and the label for named, before-update and conflict versions), and the size. Every row but the current one has Restore; every row has Export. The bar says how many versions there are and how much space the history takes, with Back up now.
+- The game's log sits under the history in a `ConsoleLog`, one plain line per event.

@@ -1,0 +1,149 @@
+<!-- The Launcher register: game tiles, the hero banner and its chip (design/system/components/bundle.css). -->
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:c="using:GameSync.UI.Controls">
+
+  <!-- GameTile: 2:3 art, a status badge unless synced, the name and a meta line; a title cover when there's no art -->
+  <ControlTheme x:Key="{x:Type c:GsGameTile}" TargetType="c:GsGameTile">
+    <Setter Property="Width" Value="160" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Cursor" Value="Hand" />
+    <Setter Property="HorizontalAlignment" Value="Left" />
+    <Setter Property="VerticalAlignment" Value="Top" />
+    <Setter Property="FocusAdorner" Value="{DynamicResource RoundedFocus}" />
+    <Setter Property="Template">
+      <ControlTemplate>
+        <StackPanel Spacing="8" Background="{TemplateBinding Background}">
+          <c:AspectPanel Ratio="1.5">
+            <Border Name="PART_Art" CornerRadius="16" ClipToBounds="True" Background="{DynamicResource bg-300}" BorderBrush="Transparent" BorderThickness="2">
+              <Panel>
+                <c:GsCoverImage Source="{TemplateBinding Art}" />
+                <Panel Name="PART_TitleCover">
+                  <TextBlock Text="{TemplateBinding Initial}" FontSize="128" LineHeight="128" FontWeight="Bold" Foreground="{DynamicResource bg-400}"
+                             HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,-4,-18" />
+                  <TextBlock Text="{TemplateBinding Title}" Margin="10" FontSize="15" LineHeight="19" FontWeight="SemiBold" TextWrapping="Wrap"
+                             MaxLines="4" TextTrimming="CharacterEllipsis" Foreground="{DynamicResource ink}" />
+                </Panel>
+                <c:GsStatusBadge Status="{TemplateBinding Status}" IsVisible="{TemplateBinding ShowsStatus}"
+                                 HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="6" />
+              </Panel>
+            </Border>
+          </c:AspectPanel>
+          <TextBlock Name="PART_Name" Text="{TemplateBinding Title}" FontSize="13" LineHeight="18" FontWeight="Medium" TextTrimming="CharacterEllipsis" />
+          <TextBlock Name="PART_Meta" Text="{TemplateBinding Meta}" FontSize="12" LineHeight="16" Foreground="{DynamicResource ink-faint}" Margin="0,-4,0,0"
+                     IsVisible="{Binding $parent[c:GsGameTile].Meta, Converter={x:Static ObjectConverters.IsNotNull}}" />
+        </StackPanel>
+      </ControlTemplate>
+    </Setter>
+    <Style Selector="^:art /template/ Panel#PART_TitleCover">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <Style Selector="^.compact /template/ TextBlock#PART_Name">
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="LineHeight" Value="16" />
+    </Style>
+    <Style Selector="^:pointerover /template/ Border#PART_Art">
+      <Setter Property="BorderBrush" Value="{DynamicResource bg-400}" />
+    </Style>
+  </ControlTheme>
+
+  <!-- Chip: on cover art, the same in every theme -->
+  <ControlTheme x:Key="{x:Type c:GsChip}" TargetType="c:GsChip">
+    <Setter Property="HorizontalAlignment" Value="Left" />
+    <Setter Property="Foreground" Value="{DynamicResource on-art}" />
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border Background="{DynamicResource glass}" CornerRadius="999" Height="26" Padding="10,0">
+          <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+            <c:GsIcon Icon="{TemplateBinding Icon}" Size="14" VerticalAlignment="Center"
+                      IsVisible="{Binding $parent[c:GsChip].Icon, Converter={x:Static ObjectConverters.IsNotNull}}" />
+            <TextBlock Text="{TemplateBinding Text}" FontSize="12" LineHeight="16" FontWeight="Medium" VerticalAlignment="Center" />
+          </StackPanel>
+        </Border>
+      </ControlTemplate>
+    </Setter>
+  </ControlTheme>
+
+  <!-- HeroBanner: text sits on the art, so it uses on-art over the art-scrim fade in every theme -->
+  <ControlTheme x:Key="{x:Type c:GsHeroBanner}" TargetType="c:GsHeroBanner">
+    <Setter Property="MinHeight" Value="280" />
+    <Setter Property="Foreground" Value="{DynamicResource on-art}" />
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border CornerRadius="16" ClipToBounds="True" Background="{DynamicResource glass}">
+          <Panel>
+            <c:GsCoverImage Source="{TemplateBinding Art}" />
+            <Grid RowDefinitions="35*,30*,35*" IsHitTestVisible="False">
+              <Border Grid.Row="0">
+                <Border.Background>
+                  <LinearGradientBrush StartPoint="0%,0%" EndPoint="0%,100%">
+                    <GradientStop Color="#73050608" Offset="0" />
+                    <GradientStop Color="#00050608" Offset="1" />
+                  </LinearGradientBrush>
+                </Border.Background>
+              </Border>
+              <Border Grid.Row="1" Grid.RowSpan="2">
+                <Border.Background>
+                  <LinearGradientBrush StartPoint="0%,100%" EndPoint="0%,0%">
+                    <GradientStop Color="#B8050608" Offset="0" />
+                    <GradientStop Color="#00050608" Offset="1" />
+                  </LinearGradientBrush>
+                </Border.Background>
+              </Border>
+            </Grid>
+            <DockPanel Margin="20">
+              <TextBlock DockPanel.Dock="Top" Text="{TemplateBinding Eyebrow}" TextTrimming="CharacterEllipsis" />
+              <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Bottom">
+                <StackPanel Spacing="8" MaxWidth="560" HorizontalAlignment="Left" VerticalAlignment="Bottom">
+                  <c:GsChip Icon="clock" Text="{TemplateBinding Chip}"
+                            IsVisible="{Binding $parent[c:GsHeroBanner].Chip, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                  <Image Name="PART_Logo" Source="{TemplateBinding Logo}" MaxWidth="380" MaxHeight="112" Stretch="Uniform" HorizontalAlignment="Left" IsVisible="False" />
+                  <TextBlock Name="PART_Title" Classes="hero-title" Text="{TemplateBinding Title}" TextWrapping="Wrap" />
+                  <c:GsStatusBadge Status="{TemplateBinding Status}" Label="{TemplateBinding StatusLabel}" />
+                  <TextBlock Text="{TemplateBinding Blurb}" FontSize="13" LineHeight="19" Opacity="0.88" TextWrapping="Wrap"
+                             IsVisible="{Binding $parent[c:GsHeroBanner].Blurb, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                </StackPanel>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Bottom" Margin="20,0,0,0">
+                  <c:GsIconButton Classes="glass" Icon="saves" Label="Manage saves" Command="{TemplateBinding SavesCommand}" />
+                  <c:GsIconButton Classes="glass" Icon="settings" Label="Game settings" Command="{TemplateBinding SettingsCommand}" />
+                  <c:GsButton Classes="primary" Icon="play" Content="{TemplateBinding PlayLabel}" Command="{TemplateBinding PlayCommand}" />
+                </StackPanel>
+              </Grid>
+            </DockPanel>
+          </Panel>
+        </Border>
+      </ControlTemplate>
+    </Setter>
+    <Style Selector="^:logo /template/ Image#PART_Logo">
+      <Setter Property="IsVisible" Value="True" />
+    </Style>
+    <Style Selector="^:logo /template/ TextBlock#PART_Title">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+  </ControlTheme>
+  <!-- ActivityGrid: the legend, a cell a day, and the weekday names -->
+  <ControlTheme x:Key="{x:Type c:GsActivity}" TargetType="c:GsActivity">
+    <Setter Property="Template">
+      <ControlTemplate>
+        <StackPanel Spacing="12">
+          <StackPanel Orientation="Horizontal" Spacing="16" TextElement.Foreground="{DynamicResource ink-muted}" TextElement.FontSize="12">
+            <StackPanel Orientation="Horizontal" Spacing="6"><c:GsLevelDot Level="0" VerticalAlignment="Center" /><TextBlock Text="0h" /></StackPanel>
+            <StackPanel Orientation="Horizontal" Spacing="6"><c:GsLevelDot Level="1" VerticalAlignment="Center" /><TextBlock Text="&lt; 2h" /></StackPanel>
+            <StackPanel Orientation="Horizontal" Spacing="6"><c:GsLevelDot Level="2" VerticalAlignment="Center" /><TextBlock Text="2–4h" /></StackPanel>
+            <StackPanel Orientation="Horizontal" Spacing="6"><c:GsLevelDot Level="3" VerticalAlignment="Center" /><TextBlock Text="&gt; 4h" /></StackPanel>
+          </StackPanel>
+          <c:GsActivityGrid Days="{TemplateBinding Days}" StartWeekday="{TemplateBinding StartWeekday}" />
+          <UniformGrid Columns="7" TextElement.Foreground="{DynamicResource ink-faint}" TextElement.FontSize="11">
+            <TextBlock Text="Mon" HorizontalAlignment="Center" />
+            <TextBlock Text="Tue" HorizontalAlignment="Center" />
+            <TextBlock Text="Wed" HorizontalAlignment="Center" />
+            <TextBlock Text="Thu" HorizontalAlignment="Center" />
+            <TextBlock Text="Fri" HorizontalAlignment="Center" />
+            <TextBlock Text="Sat" HorizontalAlignment="Center" />
+            <TextBlock Text="Sun" HorizontalAlignment="Center" />
+          </UniformGrid>
+        </StackPanel>
+      </ControlTemplate>
+    </Setter>
+  </ControlTheme>
+</ResourceDictionary>

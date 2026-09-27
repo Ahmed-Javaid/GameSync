@@ -1,0 +1,131 @@
+<!-- The Console register: panes on bg-000, table rows and the log (design/system/components/bundle.css). -->
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:c="using:GameSync.UI.Controls">
+
+  <ControlTheme x:Key="{x:Type c:GsConsole}" TargetType="c:GsConsole">
+    <Setter Property="Background" Value="{DynamicResource bg-000}" />
+    <Setter Property="FontFamily" Value="{DynamicResource font-mono}" />
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border Background="{TemplateBinding Background}" CornerRadius="16" ClipToBounds="True">
+          <DockPanel>
+            <Border Name="PART_Bar" DockPanel.Dock="Top" BorderBrush="{DynamicResource line-100}" BorderThickness="0,0,0,1" Padding="16,12" IsVisible="False">
+              <Grid ColumnDefinitions="*,Auto">
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                  <TextBlock Text="&gt; " FontSize="12" Foreground="{DynamicResource primary}" />
+                  <TextBlock Text="{TemplateBinding Command}" FontSize="12" Foreground="{DynamicResource ink-muted}" TextTrimming="CharacterEllipsis" />
+                </StackPanel>
+                <ContentPresenter Grid.Column="1" Content="{TemplateBinding Toolbar}" VerticalAlignment="Center" Margin="12,0,0,0"
+                                  Foreground="{DynamicResource ink-muted}" FontSize="12" />
+              </Grid>
+            </Border>
+            <ContentPresenter Content="{TemplateBinding Content}" ContentTemplate="{TemplateBinding ContentTemplate}" />
+          </DockPanel>
+        </Border>
+      </ControlTemplate>
+    </Setter>
+    <Style Selector="^:bar /template/ Border#PART_Bar">
+      <Setter Property="IsVisible" Value="True" />
+    </Style>
+  </ControlTheme>
+
+  <!-- Rows: 36px, a hairline between, bg-200 on hover, secondary-soft when selected -->
+  <ControlTheme x:Key="ConsoleRow" TargetType="ListBoxItem">
+    <Setter Property="MinHeight" Value="{DynamicResource row-height}" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderBrush" Value="{DynamicResource line-100}" />
+    <Setter Property="BorderThickness" Value="0,0,0,1" />
+    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}"
+                MinHeight="{TemplateBinding MinHeight}">
+          <ContentPresenter Content="{TemplateBinding Content}" ContentTemplate="{TemplateBinding ContentTemplate}"
+                            HorizontalContentAlignment="Stretch" VerticalAlignment="Center" />
+        </Border>
+      </ControlTemplate>
+    </Setter>
+    <Style Selector="^:pointerover">
+      <Setter Property="Background" Value="{DynamicResource bg-200}" />
+    </Style>
+    <Style Selector="^:selected">
+      <Setter Property="Background" Value="{DynamicResource secondary-soft}" />
+    </Style>
+    <Style Selector="^:nth-last-child(1)">
+      <Setter Property="BorderThickness" Value="0" />
+    </Style>
+  </ControlTheme>
+  <ControlTheme x:Key="{x:Type c:GsConsoleRows}" TargetType="c:GsConsoleRows">
+    <Setter Property="ItemContainerTheme" Value="{StaticResource ConsoleRow}" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="ItemsPanel">
+      <ItemsPanelTemplate>
+        <VirtualizingStackPanel />
+      </ItemsPanelTemplate>
+    </Setter>
+    <Setter Property="Template">
+      <ControlTemplate>
+        <ScrollViewer Background="{TemplateBinding Background}" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+          <ItemsPresenter Name="PART_ItemsPresenter" ItemsPanel="{TemplateBinding ItemsPanel}" />
+        </ScrollViewer>
+      </ControlTemplate>
+    </Setter>
+  </ControlTheme>
+
+  <!-- Log -->
+  <ControlTheme x:Key="{x:Type c:GsLogLineView}" TargetType="c:GsLogLineView">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border Background="{TemplateBinding Background}" Padding="16,1">
+          <Grid ColumnDefinitions="Auto,84,*">
+            <TextBlock Text="{Binding $parent[c:GsLogLineView].Line.Time}" MinWidth="{TemplateBinding TimeWidth}" Foreground="{DynamicResource ink-faint}" Margin="0,0,12,0" />
+            <TextBlock Name="PART_Tag" Grid.Column="1" Text="{Binding $parent[c:GsLogLineView].Line.TagText}" FontWeight="Medium" Foreground="{DynamicResource ink-muted}" />
+            <TextBlock Grid.Column="2" Text="{Binding $parent[c:GsLogLineView].Line.Message}" TextWrapping="Wrap" Foreground="{DynamicResource ink}" Margin="12,0,0,0" />
+          </Grid>
+        </Border>
+      </ControlTemplate>
+    </Setter>
+    <Style Selector="^:ok /template/ TextBlock#PART_Tag">
+      <Setter Property="Foreground" Value="{DynamicResource ok}" />
+    </Style>
+    <Style Selector="^:warn /template/ TextBlock#PART_Tag">
+      <Setter Property="Foreground" Value="{DynamicResource warn}" />
+    </Style>
+    <Style Selector="^:error">
+      <Setter Property="Background" Value="{DynamicResource danger-soft}" />
+    </Style>
+    <Style Selector="^:error /template/ TextBlock#PART_Tag">
+      <Setter Property="Foreground" Value="{DynamicResource danger}" />
+    </Style>
+  </ControlTheme>
+  <ControlTheme x:Key="{x:Type c:GsConsoleLog}" TargetType="c:GsConsoleLog">
+    <Setter Property="Background" Value="{DynamicResource bg-000}" />
+    <Setter Property="FontFamily" Value="{DynamicResource font-mono}" />
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border Background="{TemplateBinding Background}" CornerRadius="16" Padding="0,12" ClipToBounds="True">
+          <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+            <ItemsControl ItemsSource="{TemplateBinding Lines}">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                  <VirtualizingStackPanel />
+                </ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="c:LogLine">
+                  <c:GsLogLineView Line="{Binding}" TimeWidth="{Binding $parent[c:GsConsoleLog].TimeWidth}" />
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+        </Border>
+      </ControlTemplate>
+    </Setter>
+  </ControlTheme>
+</ResourceDictionary>

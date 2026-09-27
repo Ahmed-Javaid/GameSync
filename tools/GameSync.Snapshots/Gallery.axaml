@@ -1,0 +1,124 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="using:GameSync.UI.Controls"
+             x:Class="GameSync.Snapshots.Gallery">
+  <DockPanel>
+    <c:GsSideRail Name="Rail" DockPanel.Dock="Left" Current="saves" />
+    <ScrollViewer>
+      <StackPanel Margin="24,20" Spacing="16">
+        <Grid ColumnDefinitions="Auto,*,Auto">
+          <StackPanel VerticalAlignment="Center">
+            <TextBlock Text="Component gallery" FontSize="15" FontWeight="SemiBold" />
+            <TextBlock Classes="caption faint" Text="Every component in the current theme" />
+          </StackPanel>
+          <c:GsPillTabs Name="Tabs" Grid.Column="1" HorizontalAlignment="Center" SelectedId="plan" />
+          <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8">
+            <c:GsIconButton Icon="sync" Label="Sync now" />
+            <c:GsIconButton Icon="cloud" Label="Google Drive connected" />
+            <c:GsButton Classes="primary" Icon="chevronsRight">Run 3 changes</c:GsButton>
+          </StackPanel>
+        </Grid>
+
+        <Grid ColumnDefinitions="*,16,*">
+          <c:GsCard Title="Buttons" Subtitle="Primary, secondary, ghost, danger; small and disabled.">
+            <StackPanel Spacing="12">
+              <WrapPanel ItemSpacing="8" LineSpacing="8">
+                <c:GsButton Classes="primary" Icon="play">Continue playing</c:GsButton>
+                <c:GsButton Icon="share">Share 2 selected</c:GsButton>
+                <c:GsButton Classes="ghost">Cancel</c:GsButton>
+                <c:GsButton Classes="danger">Delete version</c:GsButton>
+              </WrapPanel>
+              <WrapPanel ItemSpacing="8" LineSpacing="8">
+                <c:GsButton Classes="primary sm" Icon="check">Keep DESKTOP’s</c:GsButton>
+                <c:GsButton Classes="sm" Icon="plus">Save as…</c:GsButton>
+                <c:GsButton Classes="ghost sm" IconAfter="chevronDown">Show 16 more</c:GsButton>
+                <c:GsButton Classes="sm" IsEnabled="False">Share selected</c:GsButton>
+                <c:GsIconButton Classes="sm" Icon="folder" Label="Open the save folder" />
+              </WrapPanel>
+            </StackPanel>
+          </c:GsCard>
+          <c:GsCard Grid.Column="2" Title="Statuses" Subtitle="An icon and a word, in colours that never follow the theme.">
+            <WrapPanel ItemSpacing="8" LineSpacing="8">
+              <c:GsStatusBadge Status="Synced" />
+              <c:GsStatusBadge Status="Playing" />
+              <c:GsStatusBadge Status="UploadPending" />
+              <c:GsStatusBadge Status="NewerInCloud" />
+              <c:GsStatusBadge Status="Conflict" />
+              <c:GsStatusBadge Status="HeldForReview" />
+              <c:GsStatusBadge Status="FilesInUse" />
+              <c:GsStatusBadge Status="SavesMissing" />
+              <c:GsStatusBadge Status="NotAvailable" />
+              <c:GsStatusBadge Status="Blocked" />
+              <c:GsStatusBadge Status="BackupOnly" />
+              <c:GsStatusBadge Status="Conflict" Plain="True" Label="Conflict · plain, for tables" />
+            </WrapPanel>
+          </c:GsCard>
+        </Grid>
+
+        <Grid ColumnDefinitions="*,16,*">
+          <c:GsCard Title="Settings rows">
+            <c:GsCard.Action>
+              <c:GsButton Classes="ghost sm" Icon="reset">Reset to default</c:GsButton>
+            </c:GsCard.Action>
+            <StackPanel>
+              <c:GsSettingsRow Title="Start GameSync when you sign in" Description="It notices games however you start them, and syncs each one after you play.">
+                <c:GsSwitch IsChecked="True" />
+              </c:GsSettingsRow>
+              <c:GsSettingsRow Title="Hold notifications while a game is fullscreen" Description="Shown after you quit.">
+                <c:GsSwitch IsChecked="False" />
+              </c:GsSettingsRow>
+              <c:GsSettingsRow Title="Encrypt everything in the cloud" TagText="Later" Description="No readable copy in Drive." IsEnabled="False">
+                <c:GsSwitch IsEnabled="False" />
+              </c:GsSettingsRow>
+            </StackPanel>
+          </c:GsCard>
+          <c:GsCard Grid.Column="2" Title="Selection and progress">
+            <StackPanel Spacing="14">
+              <WrapPanel ItemSpacing="20" LineSpacing="8">
+                <CheckBox IsChecked="True">Terraria</CheckBox>
+                <CheckBox IsChecked="False">Apex Legends</CheckBox>
+                <CheckBox IsChecked="{x:Null}" IsThreeState="True">Sync (some)</CheckBox>
+                <CheckBox IsChecked="True" IsEnabled="False">Locked</CheckBox>
+              </WrapPanel>
+              <c:GsProgress Value="83" Label="10 of 12 games synced" Right="83%" />
+              <c:GsProgress Value="7" Label="Drive storage, shared with Gmail and Photos" Right="1.04 of 15 GB" />
+              <WrapPanel ItemSpacing="8" LineSpacing="8">
+                <c:GsTag Text="Saves" />
+                <c:GsTag Text="By game ID" />
+                <c:GsTag Text="Later" />
+              </WrapPanel>
+              <c:GsNote Icon="shield" Text="Both run as you, without admin rights, so Windows won’t ask for permission." />
+            </StackPanel>
+          </c:GsCard>
+        </Grid>
+
+        <Grid ColumnDefinitions="248,16,*">
+          <c:GsCard Title="Settings sections">
+            <c:GsSettingsNav Name="Sections" SelectedId="storage" />
+          </c:GsCard>
+          <c:GsCard Grid.Column="2" Title="Type" Subtitle="Onest for the launcher and prose, JetBrains Mono for the console.">
+            <StackPanel Spacing="6">
+              <TextBlock Classes="hero-title" Text="Black Myth: Wukong" />
+              <TextBlock Classes="page-title" Text="Sekiro changed on two PCs" />
+              <TextBlock Classes="card-title" Text="Where the saves are" />
+              <TextBlock Text="DESKTOP saved at 21:04 and LAPTOP at 19:30, both after the last sync." />
+              <TextBlock Classes="caption muted" Text="Found by the Unreal engine rule, confirmed 27 Sep." />
+              <TextBlock Classes="overline faint" Text="THIS PC" />
+              <StackPanel Orientation="Horizontal" Spacing="48">
+                <StackPanel>
+                  <TextBlock Classes="mono-small faint" Text="VERSIONS" />
+                  <TextBlock Classes="mono-stat" Text="214" />
+                </StackPanel>
+                <StackPanel>
+                  <TextBlock Classes="mono-small faint" Text="SAVE FOLDER" />
+                  <TextBlock Classes="mono-stat" Text="1.04 GB" />
+                </StackPanel>
+              </StackPanel>
+              <TextBlock Classes="mono" Text="&lt;installDir&gt;/b1/Saved/SaveGames" />
+            </StackPanel>
+          </c:GsCard>
+        </Grid>
+      </StackPanel>
+    </ScrollViewer>
+  </DockPanel>
+</UserControl>

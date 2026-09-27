@@ -15,7 +15,7 @@ Milestone 1 of 6 is done: the sync engine. Milestone 2, Google Drive and syncing
 
 ## Privacy
 
-GameSync keeps your saves on your PC and in your own Google Drive, and it can see only the files it made there. Apart from a weekly check for a new save list on GitHub, it talks to nothing else. The details are in the [privacy policy](PRIVACY.md).
+GameSync keeps your saves on your PC and in your own Google Drive, and it can see only the files it made there. Apart from a weekly check for a new save list on GitHub, and fetching your games' cover art from Steam by their app IDs, it talks to nothing else. The details are in the [privacy policy](PRIVACY.md).
 
 ## Build and test
 

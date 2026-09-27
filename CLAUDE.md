@@ -9,22 +9,23 @@ A Windows app that keeps game saves backed up and synced across a person's PCs, 
 - **Milestone 2**, Google Drive and the laptop, with Drive unencrypted (decided 2026-09-27). Built, and passing live on the owner's Drive since 2026-09-28 (the whole two-PC scenario, crash recovery included): local-first sync with an outbox, the Drive backend, sign-in, devices, portable folders, the clock check, the restore kit, named saves. Left: publishing the Google app. The week on both PCs waits until the whole app is built (owner's choice, 2026-09-28). Status, results and the owner's steps: `docs/milestone-2.md`. The owner's OAuth client JSON and sign-in live in `%LOCALAPPDATA%\GameSync` and `notes\`, never in the repo.
 - **Milestone 3 is built (2026-09-28):** detection (Steam, Epic, EA, loose folders), the save list, engine rules, name search, saves of games not installed, registry saves, the library with fixes that stick, rules that travel with each version (R8, PC-04), shared-save errors (FOLD-11), and the Ludusavi import. Its done-when check passes in a read-only scan of the owner's PC. `docs/milestone-3.md` has how to try it, the results and the known limits.
 - **Milestone 4 is built (2026-09-28):** sessions and launching. The agent watches for games however they start, syncs each after you play, and brings other PCs' saves down every 15 minutes. It adds launch routes with the pre-launch check and Steam launch options, the now-playing marker, the save before a game update, the daily backup with its sign-in catch-up, and notifications held during fullscreen. Its done-when passes in simulation. The background app is `GameSync.Tray.exe` (no window yet), next to `gamesync.exe`. `docs/milestone-4.md` has how to try it, the results, and what to try on the real PCs. Nothing was scheduled or installed on the owner's PC: `gamesync schedule ...` is theirs to run.
-- **Next: Milestone 5**, the UI, then 6; the two-PC week comes after.
+- **Now: Milestone 5** (started 2026-09-28), the UI: `GameSync.Tray.exe` becomes the Avalonia app with the tray icon, the windows and the agent inside; the screens live in `GameSync.UI`. Built so far: the theme engine, the components, cover art and Steam's play record, and the Home and Library pages, rendered from the owner's real library. Next: the app window, tray and agent. **Resume from `docs/handoff.md`**; plan and build order in `docs/milestone-5.md`. Then 6; the two-PC week comes after.
 - **Look chosen (2026-09-27):** the launcher follows `Design inspirations/`, the save manager uses the Console look, and both live in the GameSync design system with preset themes (Dark, Light, pure black; Arcade, Moss, Tidal, Sakura, Citrus, Mono, Windows accent).
-- **Before Milestone 5 (the UI):** design Game detail, Conflict, Plan and Onboarding from the design system's components; they are still wireframes. Include named saves (added 2026-09-27): Save as… with a name prompt and the named-save list with Restore, on the launcher and in Game detail.
+- **Every screen is designed (2026-09-28):** Game detail (with named saves), Conflict, Plan (a tab of the save manager) and First run joined the Launcher, Save manager and Settings in the design system, built from its components.
 
 ## Where things are
 
 | What | Where |
 | --- | --- |
 | Full design, the source of truth | `docs/design.md` |
-| Build handoff: what to build first, PC setup, where the design is | `docs/handoff.md` |
-| Code: `GameSync.sln`, engine in `src/GameSync.Core`, Google Drive in `src/GameSync.Storage.Drive`, AMSI, DPAPI, known folders and the process watcher in `src/GameSync.Windows`, verbs, agent and daily run in `src/GameSync.Host`, `gamesync.exe` in `src/GameSync.App`, the background app `GameSync.Tray.exe` in `src/GameSync.Tray` | `src/`, tests in `tests/` (the stand-in game in `tests/GameSync.FakeGame`) |
+| Build handoff: where things stand, what's next, how to work, decisions, gotchas | `docs/handoff.md` |
+| Code: `GameSync.sln`, engine in `src/GameSync.Core`, Google Drive in `src/GameSync.Storage.Drive`, AMSI, DPAPI, known folders and the process watcher in `src/GameSync.Windows`, verbs, agent, daily run and the launcher's data in `src/GameSync.Host`, `gamesync.exe` in `src/GameSync.App`, the background app `GameSync.Tray.exe` in `src/GameSync.Tray`, the screens, theme engine and components in `src/GameSync.UI` | `src/`, tests in `tests/` (the stand-in game in `tests/GameSync.FakeGame`), the headless screen renderer in `tools/GameSync.Snapshots` |
 | GitHub repository (public; commit or push only when the owner asks) | https://github.com/Ahmed-Javaid/GameSync |
 | Milestone 1 report: what was built, how to try it, requirement results, known limits | `docs/milestone-1.md` |
 | Milestone 2 plan: local-first history, Drive, two PCs, the owner's Google Cloud steps | `docs/milestone-2.md` |
 | Milestone 3 report: detection, save discovery, registry saves, the Ludusavi import, the done-when check | `docs/milestone-3.md` |
 | Milestone 4 report: sessions, launching, the agent, the daily backup, notifications, what to try on the real PCs | `docs/milestone-4.md` |
+| Milestone 5 plan: the UI, the tray app, themes, cover art, the command line handing off | `docs/milestone-5.md` |
 | Requirements with IDs and tests (copy of the live doc) | `docs/requirements.md` |
 | Design system copy: tokens, theming, component specs, offline viewer | `design/system/` (open `design/system/viewer.html`) |
 | Same design as a Claude Doc with drawn diagrams (snapshot 2026-09-27, not kept in sync) | https://claude.ai/code/artifact/4eae149b-1a37-41b5-a498-cd15c81b6aa1 |
@@ -53,7 +54,9 @@ A Windows app that keeps game saves backed up and synced across a person's PCs, 
 - **Rules travel with the saves (2026-09-28):** each version records its portable rules, so a PC without the game is offered them and one whose rules differ is told and asked (PC-04, R8). Registry keys are exported into a folder of GameSync's own that joins the game as a root (FIND-10).
 - **Ludusavi import (2026-09-28):** ignore list, custom games, and each game's latest backup as a named save kept aside, never current by itself (ONB-04, reworded).
 - **Achievements (2026-09-28):** wanted, after v1: Steam's first, read from Steam's own files with no key; ACH-01 to ACH-04, design.md → Achievements.
-- **Launcher:** own UI, replacing Playnite.
+- **Launcher:** own UI, replacing Playnite. Home and the game library are about games (art, play time, later achievements); saves live in the save manager, folders in Settings (the owner, 2026-09-28). Steam software (Wallpaper Engine) goes under the library's Software tab, and any game can be hidden from the launcher on a PC without changing its sync.
+- **Art and play from Steam, with as little contact as possible (2026-09-28):** art comes from the Steam client's own cache on the PC first; Steam's store is asked once per new game, by app ID only, for its type and any art the client doesn't have. Last played and hours come from Steam's local record. The fonts (Onest, JetBrains Mono, OFL) ship inside the app.
+- **Windows:** 11 and 10 22H2 (decided 2026-09-28).
 - **Look and theming:** launcher from the reference images, Console-style save manager; presets with a primary and a secondary colour, Dark, Light or Match Windows, pure black; status colours never follow the theme. Custom colours come later.
 - **Folders:** you choose the backup folder (moved with hash checks), how much history stays on the PC, game folders to scan, extra save folders, and where shared zips go.
 - **Sharing:** Share selected or Share all into one zip; Import saves adds pinned versions only; online and anti-cheat games can't be shared.

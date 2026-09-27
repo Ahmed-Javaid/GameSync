@@ -1,0 +1,103 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="using:GameSync.UI.Controls"
+             xmlns:vm="using:GameSync.UI.ViewModels"
+             x:Class="GameSync.UI.Views.HomePage"
+             x:DataType="vm:HomeViewModel">
+  <!-- The launcher home (design system → Launcher home): the top bar, the last-played game, then Needs you, Jump back in and Activity. -->
+  <Grid RowDefinitions="Auto,Auto,*" RowSpacing="16" Margin="24,20">
+    <Grid ColumnDefinitions="*,Auto,*">
+      <StackPanel VerticalAlignment="Center">
+        <TextBlock Text="{Binding Greeting}" FontSize="15" LineHeight="20" FontWeight="SemiBold" />
+        <TextBlock Classes="caption faint" Text="{Binding Subtitle}" TextTrimming="CharacterEllipsis" />
+      </StackPanel>
+      <c:GsPillTabs Grid.Column="1" ItemsSource="{Binding Tabs}" SelectedId="recent" />
+      <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+        <c:GsIconButton Icon="sync" Label="Sync now" />
+        <c:GsIconButton Icon="cloud" Label="Google Drive" />
+        <c:GsIconButton Icon="monitor" Label="This PC" />
+      </StackPanel>
+    </Grid>
+
+    <c:GsHeroBanner Grid.Row="1" MinHeight="340" Art="{Binding HeroArt}" Logo="{Binding HeroLogo}" Title="{Binding HeroTitle}"
+                    Eyebrow="{Binding HeroEyebrow}" Chip="{Binding HeroChip}" Status="{Binding HeroStatus}" StatusLabel="{Binding HeroStatusLabel}"
+                    Blurb="{Binding HeroBlurb}" PlayLabel="{Binding HeroPlayLabel}" />
+
+    <Grid Grid.Row="2" ColumnDefinitions="0.95*,1.5*,0.95*" ColumnSpacing="16">
+      <c:GsCard Title="Needs you">
+        <c:GsCard.Action>
+          <c:GsIconButton Icon="chevronRight" Label="Open the save manager" />
+        </c:GsCard.Action>
+        <DockPanel>
+          <c:GsProgress DockPanel.Dock="Bottom" Value="{Binding SyncedPercent}" Label="{Binding SyncedLabel}" Right="{Binding SyncedRight}" Margin="0,12,0,0"
+                        IsVisible="{Binding AnySyncing}" />
+          <StackPanel DockPanel.Dock="Bottom" Spacing="12" IsVisible="{Binding NoneSyncing}">
+            <TextBlock Classes="mono-small muted" Text="{Binding SyncedLabel}" />
+            <c:GsButton Classes="sm" Icon="check" Content="Choose games to sync" />
+          </StackPanel>
+          <Panel>
+            <c:GsNote Icon="check" Text="Nothing needs you. Every game that syncs is fine." IsVisible="{Binding AllFine}" VerticalAlignment="Top" />
+            <c:GsNote Icon="info" Text="No game syncs yet. Pick the ones whose saves you want backed up and kept in step between your PCs."
+                      IsVisible="{Binding NoneSyncing}" VerticalAlignment="Top" />
+            <ItemsControl ItemsSource="{Binding NeedsYou}">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                  <StackPanel Spacing="12" />
+                </ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:NeedsYouItem">
+                  <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                    <Border Width="36" Height="48" CornerRadius="8" ClipToBounds="True" Background="{DynamicResource bg-300}">
+                      <Panel>
+                        <TextBlock Text="{Binding Initial}" FontWeight="SemiBold" FontSize="13" Foreground="{DynamicResource ink-muted}"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        <c:GsCoverImage Source="{Binding Art}" />
+                      </Panel>
+                    </Border>
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                      <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                      <c:GsStatusBadge Status="{Binding Status}" Plain="True" />
+                    </StackPanel>
+                    <c:GsButton Grid.Column="2" Classes="sm" Content="{Binding Action}" VerticalAlignment="Center" />
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </Panel>
+        </DockPanel>
+      </c:GsCard>
+
+      <c:GsCard Grid.Column="1" Title="Jump back in">
+        <c:GsCard.Action>
+          <c:GsIconButton Icon="chevronRight" Label="All games" />
+        </c:GsCard.Action>
+        <ItemsControl ItemsSource="{Binding JumpBackIn}">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate>
+              <c:ColumnsPanel Columns="3" Gap="12" />
+            </ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:TileItem">
+              <c:GsGameTile Classes="compact" Width="NaN" Title="{Binding Title}" Art="{Binding Art}" Status="{Binding Status}" Meta="{Binding Meta}">
+              <c:GsGameTile.ContextMenu>
+                <ContextMenu IsVisible="{Binding ToggleHidden, Converter={x:Static ObjectConverters.IsNotNull}}">
+                  <MenuItem Header="{Binding HideLabel}" Command="{Binding ToggleHidden}" />
+                </ContextMenu>
+              </c:GsGameTile.ContextMenu>
+            </c:GsGameTile>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </c:GsCard>
+
+      <c:GsCard Grid.Column="2" Title="{Binding ActivityTitle}">
+        <StackPanel Spacing="12">
+          <c:GsActivity Days="{Binding Days}" StartWeekday="{Binding StartWeekday}" />
+          <c:GsNote Icon="clock" Text="Your play shows here, day by day, from your first session with GameSync." IsVisible="{Binding NoActivity}" />
+        </StackPanel>
+      </c:GsCard>
+    </Grid>
+  </Grid>
+</UserControl>

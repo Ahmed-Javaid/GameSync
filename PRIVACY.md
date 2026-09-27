@@ -7,6 +7,8 @@ GameSync is a free, open-source Windows app that backs up your game saves and sy
 ## On your PC
 
 - To find your games and where they save, GameSync reads your game stores' records (Steam, Epic and EA), the game folders you add, and the usual places games keep saves. It skips folders that hold passwords, keys or other apps' sign-ins.
+- To show when you last played each Steam game and for how long, it reads Steam's own record of that on your PC. It reads nothing else from that record, and this stays on your PC.
+- For cover art, it first uses the art Steam has already saved on your PC.
 - It backs up the save folders and registry keys of the games you confirm, and nothing else. It never backs up programs.
 - It keeps its settings, an activity log and a backup copy of your saves in `%LOCALAPPDATA%\GameSync`, or in the backup folder you pick.
 
@@ -21,6 +23,7 @@ GameSync is a free, open-source Windows app that backs up your game saves and sy
 
 - GameSync talks to Google, to sign in and to use your Drive.
 - About once a week it downloads the list of where games keep their saves, the [Ludusavi manifest](https://github.com/mtkennerly/ludusavi-manifest), from GitHub (`raw.githubusercontent.com`), and only when the list has changed. The request carries nothing about you or your games.
+- Once for each game it finds, it asks Steam's public store API (`api.steampowered.com`) whether the app is a game or software, and which images belong to it, by its Steam app ID. It downloads from Steam's image server (`shared.steamstatic.com`) only the images Steam hasn't already saved on your PC, and checks art it downloaded about once a month in case Steam changed it. The requests carry app IDs and nothing else, and use no Steam account. The images stay on your PC and never go to your Drive.
 - It talks to nothing else, and sends no usage data or crash reports anywhere.
 
 ## Your Google sign-in

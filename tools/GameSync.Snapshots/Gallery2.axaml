@@ -1,0 +1,74 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="using:GameSync.UI.Controls"
+             xmlns:s="using:GameSync.Snapshots"
+             x:Class="GameSync.Snapshots.Gallery2">
+  <DockPanel>
+    <c:GsSideRail Name="Rail" DockPanel.Dock="Left" Current="home" />
+    <StackPanel Margin="24,20" Spacing="16">
+      <c:GsHeroBanner Name="Hero" Eyebrow="Last played today, 21:04" Chip="61 hrs played" Title="Sekiro: Shadows Die Twice"
+                      Status="Synced" StatusLabel="Save synced · 21:06" MinHeight="250"
+                      Blurb="Your save at Ashina Castle is backed up and matches the laptop. 14 versions kept." />
+
+      <Grid ColumnDefinitions="1.5*,16,*">
+        <c:GsCard Title="Jump back in">
+          <c:GsCard.Action>
+            <c:GsIconButton Icon="chevronRight" Label="All games" />
+          </c:GsCard.Action>
+          <c:ColumnsPanel Columns="4" Gap="12">
+            <c:GsGameTile Name="Tile1" Title="Terraria" Meta="214 h · Yesterday" Width="NaN" />
+            <c:GsGameTile Name="Tile2" Title="Slay the Spire 2" Status="Playing" Meta="38 h · Now" Width="NaN" />
+            <c:GsGameTile Name="Tile3" Title="Cuphead" Status="NewerInCloud" Meta="22 h · 20 Sep" Width="NaN" />
+            <c:GsGameTile Title="Friday Night Funkin'" Status="Conflict" Meta="9 h · 2 Sep" Width="NaN" />
+          </c:ColumnsPanel>
+        </c:GsCard>
+        <c:GsCard Grid.Column="2" Title="Activity in September">
+          <c:GsActivity Name="Activity" StartWeekday="0" />
+        </c:GsCard>
+      </Grid>
+
+      <Grid ColumnDefinitions="1.5*,16,*">
+        <c:GsConsole Command="saves --pc DESKTOP --sort last-played">
+          <c:GsConsole.Toolbar>
+            <TextBlock Text="2 of 3 selected" />
+          </c:GsConsole.Toolbar>
+          <DockPanel>
+            <Border DockPanel.Dock="Top" BorderBrush="{DynamicResource line-100}" BorderThickness="0,0,0,1">
+              <Grid ColumnDefinitions="44,*,160,100">
+                <CheckBox Margin="12,0,0,0" IsChecked="{x:Null}" IsThreeState="True" />
+                <TextBlock Grid.Column="1" Classes="th" Text="GAME" />
+                <TextBlock Grid.Column="2" Classes="th" Text="STATUS" />
+                <TextBlock Grid.Column="3" Classes="th num" Text="SIZE" />
+              </Grid>
+            </Border>
+            <c:GsConsoleRows Name="Rows" SelectionMode="Multiple,Toggle">
+              <c:GsConsoleRows.ItemTemplate>
+                <DataTemplate x:DataType="s:SampleRow">
+                  <Grid ColumnDefinitions="44,*,160,100">
+                    <CheckBox Margin="12,0,0,0" IsChecked="{Binding $parent[ListBoxItem].IsSelected}" />
+                    <TextBlock Grid.Column="1" Classes="td" Text="{Binding Name}" />
+                    <c:GsStatusBadge Grid.Column="2" Status="{Binding Status}" Plain="True" Margin="12,0" />
+                    <TextBlock Grid.Column="3" Classes="td num" Text="{Binding Size}" />
+                  </Grid>
+                </DataTemplate>
+              </c:GsConsoleRows.ItemTemplate>
+            </c:GsConsoleRows>
+          </DockPanel>
+        </c:GsConsole>
+        <c:GsConsoleLog Name="Log" Grid.Column="2" />
+      </Grid>
+
+      <Grid ColumnDefinitions="*,16,*">
+        <c:GsCard Title="Backup folder" Subtitle="Your saves’ history on this PC.">
+          <StackPanel Spacing="16">
+            <c:GsFolderField Path="E:\Saves and Backups\Games\GameSync" Meta="1.04 GB · 214 versions · 312 GB free on E:" />
+            <c:GsFolderField Path="F:\GameSync" State="Missing" Message="Drive F: isn’t connected. Backups are paused, and nothing was deleted." />
+          </StackPanel>
+        </c:GsCard>
+        <c:GsCard Grid.Column="2" Title="Game folders to scan" Subtitle="For games outside Steam, Epic and EA.">
+          <c:GsFolderList Name="Folders" />
+        </c:GsCard>
+      </Grid>
+    </StackPanel>
+  </DockPanel>
+</UserControl>

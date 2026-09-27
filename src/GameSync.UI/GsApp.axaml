@@ -1,0 +1,31 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:GameSync.UI.ViewModels"
+             xmlns:v="using:GameSync.UI.Views"
+             x:Class="GameSync.UI.GsApp"
+             Name="GameSync"
+             RequestedThemeVariant="Dark">
+  <Application.DataTemplates>
+    <DataTemplate DataType="vm:HomeViewModel">
+      <v:HomePage />
+    </DataTemplate>
+    <DataTemplate DataType="vm:LibraryViewModel">
+      <v:LibraryPage />
+    </DataTemplate>
+  </Application.DataTemplates>
+  <Application.Resources>
+    <ResourceDictionary>
+      <ResourceDictionary.MergedDictionaries>
+        <ResourceInclude Source="avares://GameSync.UI/Styles/Tokens.axaml" />
+        <ResourceInclude Source="avares://GameSync.UI/Styles/Controls.axaml" />
+        <ResourceInclude Source="avares://GameSync.UI/Styles/Launcher.axaml" />
+        <ResourceInclude Source="avares://GameSync.UI/Styles/Console.axaml" />
+        <ResourceInclude Source="avares://GameSync.UI/Styles/Settings.axaml" />
+      </ResourceDictionary.MergedDictionaries>
+    </ResourceDictionary>
+  </Application.Resources>
+  <Application.Styles>
+    <FluentTheme />
+    <StyleInclude Source="avares://GameSync.UI/Styles/Type.axaml" />
+  </Application.Styles>
+</Application>

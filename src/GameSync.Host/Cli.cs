@@ -108,6 +108,10 @@ public static partial class Cli
           schedule daily <20:00|off> the daily backup, and a catch-up after sign-in when the PC was off then
           schedule background on|off starts the background app (GameSync.Tray.exe) when you sign in
           daily [--if-missed]        the daily backup now; the background app runs it when it's running
+          art [--refresh]            each game's cover, hero and logo for the launcher: from Steam's own cache on
+                                     this PC first, and from Steam's store only for new games and missing art
+          hide <game>... / unhide <game>...
+                                     hides games from Home and the game library on this PC; they sync as before
 
         By hand
           session <game> <start> <end>   records a play session, times in local time (2026-09-27T19:12)
@@ -148,6 +152,8 @@ public static partial class Cli
                     return await DailyAsync(dataDir, rest, new ConsoleAgentOutput());
                 case "schedule":
                     return ScheduleCommand(dataDir, rest);
+                case "art":
+                    return await ArtAsync(dataDir, rest);
             }
 
             if (command == "add-game")

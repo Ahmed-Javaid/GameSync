@@ -45,7 +45,7 @@ function App(){
   rail('saves'),
   h('main',{style:{flex:1,minWidth:0,padding:'20px 24px',display:'flex',flexDirection:'column',gap:16}},
    topbar('Save manager','DESKTOP \u00b7 daily backup 20:00',
-     h(G.PillTabs,{label:'Save manager view',items:[{id:'saves',label:'Saves',icon:'saves'},{id:'versions',label:'Versions',icon:'clock'},{id:'log',label:'Log',icon:'terminal'}]}),
+     h(G.PillTabs,{label:'Save manager view',items:[{id:'saves',label:'Saves',icon:'saves'},{id:'plan',label:'Plan',icon:'chevronsRight'},{id:'versions',label:'Versions',icon:'clock'},{id:'log',label:'Log',icon:'terminal'}]}),
      [h(G.Button,{key:1,variant:'secondary',icon:'share',disabled:!s[0].length,onClick:function(){d[1]('pick')}},s[0].length?'Share '+s[0].length+' selected':'Share selected'),
       h(G.Button,{key:2,variant:'secondary',icon:'zip',onClick:function(){d[1]('all')}},'Share all'),
       h(G.IconButton,{key:4,icon:'download',label:'Import saves',onClick:function(){d[1]('import')}}),

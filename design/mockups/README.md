@@ -19,7 +19,7 @@ Row 1 is the three candidate looks for the library. Rows 2 and 3 are unstyled wi
 
 ## Status
 
-The look was chosen on 2026-09-27 and now lives in the design system (`design/system/`). These files are kept as history, and as the only drafts of Game detail, Conflict, Plan and Onboarding until those are designed in the new look. The Settings wireframe is replaced by the design system's Settings screen.
+The look was chosen on 2026-09-27 and now lives in the design system (`design/system/`). Since 2026-09-28 every screen is designed there, Game detail, Conflict, Plan and First run included, so these files are kept only as history.
 
 ## Editing the canvas
 

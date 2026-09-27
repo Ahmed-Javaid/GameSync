@@ -281,22 +281,20 @@ GameSync must be usable without colour or a mouse, stay light while games run, a
 | PKG-03 | The updater checks GitHub Releases, downloads the signed installer and verifies it before running it. | Must | Publish a test release: it installs. A tampered one is refused (R19). |  |
 | PKG-04 | A portable zip runs without installing, with the admin tracer turned off. | Should | Run it from a USB folder: learn mode works without the tracer. |  |
 | PKG-05 | *New.* Uninstalling removes the app, its startup entry and the scheduled task, but never the backup folder or the cloud copy. | Must | Uninstall: the backups and the Drive files remain. |  |
-| PKG-06 | Runs on Windows 11. Windows 10 support is undecided. | Must | The full test pass on Windows 11. |  |
+| PKG-06 | Runs on Windows 11 and Windows 10 22H2 (decided 28 Sep 2026). | Must | The full test pass on Windows 11, and first run, a sync and a launch on Windows 10 22H2. |  |
 
 ## Gaps
 
-Sixteen things are not designed or decided yet; each row names the requirements it affects.
+Fourteen things are not designed or decided yet; each row names the requirements it affects.
 
 | Gap | Affects | Suggested next step |
 | --- | --- | --- |
 | The Import saves window is designed, but not how a zip reaches it (file picker, drag and drop, opening the zip from Explorer). | SHARE-10 to SHARE-13 | File picker and drag and drop in v1; opening a zip from Explorer later. |
-| Game detail, Conflict, Plan and Onboarding are still wireframes in the old look. | BAK-14, SYNC-10, SYNC-14, ONB-01 to ONB-05 | Rebuild them from the design system's components. |
 | `design.md` gives the tray icon green, blue, amber and grey, but in the app Synced is cyan and status colours never change with the theme. | BG-07, LOOK-08 | Use the app's status colours for the tray icon too. |
 | Choosing your own backup folder and keeping full history on this PC are new; `design.md` treats local history as a 10-version, 2 GB cache. | FOLD-02, FOLD-06, BAK-17 | Confirm both. |
 | Share all packs the backup folder, which only holds what this PC keeps; older versions that are only in the cloud are left out. | SHARE-04, SHARE-05 | Decide: the folder as it is, or download the missing versions first. |
 | Sharing moves single-player saves between people's accounts; R16 only forbids that for online games. | SHARE-07, SHARE-12, R16 | Confirm single-player sharing is fine and add it to R16's wording. |
 | No performance targets exist. | PERF-01 to PERF-03 | Accept or change the proposed numbers. |
-| Windows 10 support is undecided. | PKG-06 | Decide before Milestone 5. |
 | Uninstall behaviour isn't in `design.md`. | PKG-05 | Add it. |
 | Friends have no way to send logs with a bug report. | none yet | Add Copy diagnostics in Settings: logs and version lists, never tokens. |
 | More than one Google account, or switching accounts, isn't covered. | CLOUD-02, CLOUD-07 | One account per PC for v1. |

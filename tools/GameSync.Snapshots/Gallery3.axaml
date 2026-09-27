@@ -1,0 +1,51 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="using:GameSync.UI.Controls"
+             x:Class="GameSync.Snapshots.Gallery3">
+  <Panel>
+    <DockPanel>
+      <c:GsSideRail Name="Rail" DockPanel.Dock="Left" Current="settings" />
+      <StackPanel Margin="32,24" Spacing="16" MaxWidth="920" HorizontalAlignment="Left">
+        <StackPanel>
+          <TextBlock Classes="page-title" Text="Appearance" />
+          <TextBlock Classes="muted" Text="Changes apply straight away and are saved on this PC only." Margin="0,4,0,0" />
+        </StackPanel>
+        <c:GsCard Title="Theme" Subtitle="The default: cyan on cool greys.">
+          <c:GsCard.Action>
+            <c:GsPillTabs Name="Mode" SelectedId="dark" />
+          </c:GsCard.Action>
+          <StackPanel>
+            <c:GsThemePicker Name="Themes" SelectedId="arcade" />
+            <c:GsSettingsRow Title="Pure black backgrounds" Description="For OLED screens: the page and side rail turn fully black." Margin="0,12,0,0">
+              <c:GsSwitch />
+            </c:GsSettingsRow>
+          </StackPanel>
+        </c:GsCard>
+        <c:GsCard Title="Colours" Subtitle="Each theme sets both; change either one here.">
+          <StackPanel>
+            <c:GsSettingsRow Title="Primary" Description="Main buttons, progress, focus rings and your busiest days.">
+              <c:GsSwatchPicker Name="Primary" SelectedId="cyan" MaxWidth="480" />
+            </c:GsSettingsRow>
+            <c:GsSettingsRow Title="Secondary" Description="Selection, the page you’re on and tab counts.">
+              <c:GsSwatchPicker Name="Secondary" SelectedId="steel" MaxWidth="480" />
+            </c:GsSettingsRow>
+          </StackPanel>
+        </c:GsCard>
+      </StackPanel>
+    </DockPanel>
+    <Border Background="{DynamicResource scrim}">
+      <c:GsDialog Title="Name this save" Subtitle="It stays in Black Myth: Wukong’s history on every PC, and you can restore it in a step.">
+        <StackPanel Spacing="8">
+          <TextBox Text="Before Erlang Shen" />
+          <c:GsNote Icon="pin" Text="Named saves are pinned, so thinning the history never removes them." />
+        </StackPanel>
+        <c:GsDialog.Footer>
+          <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+            <c:GsButton Classes="ghost" Content="Cancel" />
+            <c:GsButton Classes="primary" Icon="pin" Content="Keep this save" />
+          </StackPanel>
+        </c:GsDialog.Footer>
+      </c:GsDialog>
+    </Border>
+  </Panel>
+</UserControl>

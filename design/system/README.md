@@ -1,6 +1,6 @@
 # GameSync design system
 
-> Snapshot of the [online design system](https://claude.ai/code/artifact/6a117b31-dc9a-4cd7-be46-037c91f1f074), 27 Sep 2026. Designs are edited there; copy changed files here afterwards, as with `design/mockups/`. Open `viewer.html` in a browser to see every component and screen offline, in all eight themes.
+> Snapshot of the [online design system](https://claude.ai/code/artifact/6a117b31-dc9a-4cd7-be46-037c91f1f074), 28 Sep 2026. Designs are edited there; copy changed files here afterwards, as with `design/mockups/`. Open `viewer.html` in a browser to see every component and screen offline, in all eight themes.
 >
 > For building: `tokens.json` holds every colour, type style, spacing and radius, per theme; `Theming.md` says how themes are generated; each `components/<Name>/README.md` is that component's spec. `components/bundle.js` and `bundle.css` are a React reference implementation for the previews, not app code; the app itself is Avalonia.
 
@@ -49,6 +49,10 @@ GameSync is a Windows game launcher that also keeps every game's saves backed up
 - **Sharing**: both share buttons open `ShareSavesDialog`. From a selection it opens on "Choose saves" with those games ticked; Share all opens on "Share all", which packages the whole save folder, optionally latest saves only. Games with an anti-cheat or an online mode are shown locked, with the reason, and left out. The result is one zip with a path the person can copy or show in Explorer.
 - **Importing**: the download icon button in the save manager opens `ImportSavesDialog`. Imported saves become pinned versions, never current ones; unknown games can't be imported.
 - **Settings**: the rail's Settings button opens a two-column screen: `SettingsNav` on the left (Appearance, Storage and folders, Backup and sync, Cloud, Devices, Notifications, Safety), `Card`s of `SettingsRow`s on the right. Appearance holds `ThemePicker` and `ColorSwatchPicker`; Storage and folders holds the backup folder (`FolderField`), history to keep, game folders to scan and extra save folders (`FolderList`), and where shared zips go.
+- **Game detail**: a breadcrumb in the top bar; a shorter `HeroBanner` with the game's status and Play (the status's own action takes the primary when the game needs you); then Named saves and Where the saves are as `Card`s on the left, and the version history as a `ConsoleTable` over the game's `ConsoleLog` on the right.
+- **Conflict**: the game's name and what happened as the title, a suggestion `Card` that says why GameSync asked, the two sides as `Card`s with the suggested side's Keep button as the primary, Compare files opening a `ConsoleTable`, and Decide later.
+- **Plan**: a tab of the save manager. Run N changes replaces Sync now; one `ConsoleTable` of the changes, each ticked, and one of the games that won't run, each with its status and button.
+- **First run**: no rail; a `SettingsNav` of the four steps (Scan this PC, Choose games, Connect the cloud, Backups and startup) with a `check` on finished steps, one primary button per step, and grouped game `Card`s with a checkbox per group and per game.
 
 ## Iconography
 

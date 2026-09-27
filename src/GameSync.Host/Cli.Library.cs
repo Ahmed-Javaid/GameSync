@@ -101,6 +101,23 @@ public static partial class Cli
                 return 0;
             }
 
+            case "hide":
+            case "unhide":
+            {
+                // Only the launcher: a hidden game that syncs keeps syncing, on this PC alone.
+                var hide = command == "hide";
+                foreach (var id in Games(rest, "game id"))
+                {
+                    var title = here.Library.All().FirstOrDefault(e => e.Id == id)?.DisplayTitle ?? id.Value;
+                    here.State.SetSetting(Launcher.HiddenKey(id), hide ? "1" : "");
+                    Console.WriteLine(hide
+                        ? $"{title} is hidden from Home and the game library on this PC. Its saves sync as before. Bring it back with: gamesync unhide {id}"
+                        : $"{title} shows in the launcher again.");
+                }
+
+                return 0;
+            }
+
             case "rename":
             {
                 var entry = Entry(here, Game(rest, 0));

@@ -1,0 +1,11 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="using:GameSync.UI.Controls"
+             xmlns:vm="using:GameSync.UI.ViewModels"
+             x:Class="GameSync.UI.Views.Shell"
+             x:DataType="vm:ShellViewModel">
+  <DockPanel>
+    <c:GsSideRail DockPanel.Dock="Left" Items="{Binding Rail}" Current="{Binding Current}" NavigateCommand="{Binding NavigateCommand}" />
+    <ContentControl Content="{Binding Page}" />
+  </DockPanel>
+</UserControl>

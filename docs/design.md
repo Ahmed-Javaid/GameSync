@@ -595,6 +595,7 @@ GameSync.sln
 
 - A per-machine installer (Inno Setup) puts GameSync under Program Files, so other programs can't swap out the tracer. It costs one admin prompt at install.
 - Self-contained .NET publish, so friends don't need .NET installed.
+- Runs on Windows 11 and Windows 10 22H2 (decided 28 Sep 2026). Nothing in it needs Windows 11: the fonts ship inside the app, and notifications, Task Scheduler and the process watcher all work on Windows 10.
 - The updater checks GitHub Releases, downloads the signed installer, and verifies the signature before running it.
 - A portable zip for people who want no installer, with the admin tracer disabled.
 

@@ -1,0 +1,60 @@
+<!-- @dsCard group="Screens" height=800 width=1280 page=true subtitle="Plan, in the save manager: what the next sync would do for each game and why; untick to skip one" -->
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>preview</title>
+<style>html,body{margin:0;background:var(--bg-100);} .pl-why{white-space:normal;display:block;padding:8px 0;max-width:640px}</style>
+</head>
+<body class="gs-root">
+<div id="root"></div>
+<script>
+var G = window.GameSync, h = React.createElement;
+
+function rail(cur){return h(G.SideRail,{current:cur,items:[
+  {id:'search',icon:'search',label:'Search'},
+  {id:'home',icon:'home',label:'Home',sep:true},
+  {id:'library',icon:'library',label:'Game library',dot:'play',dotLabel:'Ghost of Tsushima is running'},
+  {id:'saves',icon:'saves',label:'Save manager',sep:true,dot:'warn',dotLabel:'1 game needs you'},
+  {id:'log',icon:'terminal',label:'Console'},
+  {id:'settings',icon:'settings',label:'Settings',bottom:true}]})}
+function topbar(title,sub,tabs,right){return h('header',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',gap:16}},h('div',null,h('div',{style:{font:'600 15px/20px var(--font-sans)'}},title),h('div',{className:'gs-faint',style:{fontSize:12}},sub)),tabs,h('div',{className:'gs-row',style:{flexWrap:'nowrap'}},right));}
+function Stat(p){return h('div',{style:{display:'flex',flexDirection:'column',gap:2}},h('span',{className:'gs-faint',style:{font:'500 11px/14px var(--font-mono)',letterSpacing:'.08em',textTransform:'uppercase'}},p.k),h('span',{style:{font:'500 28px/32px var(--font-mono)'}},p.v))}
+
+var ACT={upload:['upload','Upload'],download:['download','Download'],backup:['archive','Back up']};
+var RUN=[
+  {id:'ron',name:'Ready or Not',action:'upload',why:'Changed here on 22 Sep. The upload waited because this PC was offline.',size:14155776},
+  {id:'sts2',name:'Slay the Spire 2',action:'download',why:'LAPTOP uploaded a newer save on 26 Sep and this PC’s is unchanged. This PC’s copy goes into history first.',size:913408},
+  {id:'cp',name:'Cyberpunk 2077',action:'backup',why:'Steam Cloud syncs this game, so GameSync only adds this save to its history.',size:16777216}];
+var WAIT=[
+  {id:'sekiro',name:'Sekiro: Shadows Die Twice',status:'conflict',why:'Changed on DESKTOP and LAPTOP since the last sync. Nothing moves until you choose.',act:'Resolve'},
+  {id:'ghost',name:'Ghost of Tsushima',status:'playing',why:'Being played now. It syncs a few seconds after you quit.'},
+  {id:'rounds',name:'ROUNDS',status:'not-found',why:'No save folder found yet. Learn mode can find it during your next session.',act:'Learn mode'}];
+
+function why(r){return h('span',{className:'pl-why'},r.why);}
+function App(){
+ var sel=React.useState(RUN.map(function(r){return r.id})), n=sel[0].length;
+ return h('div',{style:{width:1280,height:800,display:'flex',background:'var(--bg-100)'}},
+  rail('saves'),
+  h('main',{style:{flex:1,minWidth:0,padding:'20px 24px',display:'flex',flexDirection:'column',gap:16}},
+   topbar('Save manager','DESKTOP · syncs after each game, every 15 minutes, and daily at 20:00',
+     h(G.PillTabs,{label:'Save manager view',value:'plan',items:[{id:'saves',label:'Saves',icon:'saves'},{id:'plan',label:'Plan',icon:'chevronsRight'},{id:'versions',label:'Versions',icon:'clock'},{id:'log',label:'Log',icon:'terminal'}]}),
+     [h(G.Button,{key:1,variant:'secondary',icon:'sync'},'Check again'),
+      h(G.Button,{key:2,variant:'primary',icon:'chevronsRight',disabled:!n},n?'Run '+n+(n===1?' change':' changes'):'Nothing to run')]),
+   h('div',{style:{display:'flex',gap:48,padding:'4px 4px 0'}},h(Stat,{k:'Will run',v:String(n)}),h(Stat,{k:'Needs you',v:'1'}),h(Stat,{k:'Waiting',v:'2'}),h(Stat,{k:'In sync',v:'6'}),h(Stat,{k:'To move',v:G.formatBytes(RUN.filter(function(r){return sel[0].indexOf(r.id)>=0}).reduce(function(a,r){return a+r.size},0))})),
+   h(G.ConsoleTable,{command:'plan',toolbar:h('span',null,n+' of '+RUN.length+' will run · untick a game to skip it this time'),selected:sel[0],onSelect:sel[1],rows:RUN,columns:[
+     {key:'name',label:'Game'},
+     {key:'action',label:'Action',render:function(r){return h('span',{className:'gs-row',style:{gap:6,flexWrap:'nowrap'}},h(G.Icon,{name:ACT[r.action][0],size:14}),ACT[r.action][1]);}},
+     {key:'why',label:'Why',render:why},
+     {key:'size',label:'Size',align:'right',render:function(r){return G.formatBytes(r.size)}}]}),
+   h(G.ConsoleTable,{command:'plan --not-running',toolbar:h('span',null,'3 games won’t run this time'),rows:WAIT,columns:[
+     {key:'name',label:'Game'},
+     {key:'status',label:'Status'},
+     {key:'why',label:'Why',render:why},
+     {key:'act',label:'',align:'right',render:function(r){return r.act?h(G.Button,{size:'sm',variant:'secondary'},r.act):null}}]}),
+   h('div',{className:'gs-row',style:{justifyContent:'space-between',marginTop:'auto'}},
+     h(G.Button,{size:'sm',variant:'ghost',icon:'chevronRight'},'Show the 6 games already in sync'),
+     h('span',{className:'gs-faint',style:{fontSize:12}},'Nothing changes until you run it. The daily backup and the sync after each game follow the same rules.'))));
+}
+ReactDOM.createRoot(document.getElementById('root')).render(h(App));
+</script>
+</body>
+</html>

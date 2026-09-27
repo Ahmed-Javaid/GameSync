@@ -1,0 +1,79 @@
+<!-- @dsCard group="Screens" height=800 width=1280 page=true subtitle="Game detail: status and Play, named saves, where the saves are, every version across PCs" -->
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>preview</title>
+<style>html,body{margin:0;background:var(--bg-100);} .gd-log .gs-log-line{grid-template-columns:92px 72px 1fr} .gd-hist .gs-ctable td{height:34px}</style>
+</head>
+<body class="gs-root">
+<div id="root"></div>
+<script>
+var G = window.GameSync, h = React.createElement;
+
+var ART = "data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%201200%20500%27%20preserveAspectRatio%3D%27xMidYMid%20slice%27%3E%3Crect%20width%3D%271200%27%20height%3D%27500%27%20fill%3D%27%232c2519%27/%3E%3Ccircle%20cx%3D%27860%27%20cy%3D%27150%27%20r%3D%2770%27%20fill%3D%27%23f2b544%27%20opacity%3D%27.3%27/%3E%3Cpath%20d%3D%27M0%20330%20L180%20200%20L330%20300%20L520%20150%20L700%20290%20L880%20190%20L1200%20320%20V500%20H0Z%27%20fill%3D%27%233a2f1e%27/%3E%3Cpath%20d%3D%27M0%20400%20L220%20290%20L420%20380%20L640%20270%20L860%20370%20L1040%20300%20L1200%20360%20V500%20H0Z%27%20fill%3D%27%23261f14%27/%3E%3Cpath%20d%3D%27M0%20460%20L300%20390%20L600%20450%20L900%20380%20L1200%20440%20V500%20H0Z%27%20fill%3D%27%2317130c%27/%3E%3C/svg%3E";
+
+function rail(cur){return h(G.SideRail,{current:cur,items:[
+  {id:'search',icon:'search',label:'Search'},
+  {id:'home',icon:'home',label:'Home',sep:true},
+  {id:'library',icon:'library',label:'Game library'},
+  {id:'saves',icon:'saves',label:'Save manager',sep:true,dot:'warn',dotLabel:'1 game needs you'},
+  {id:'log',icon:'terminal',label:'Console'},
+  {id:'settings',icon:'settings',label:'Settings',bottom:true}]})}
+function crumb(parent,here){return h('nav',{'aria-label':'Breadcrumb',className:'gs-row',style:{gap:6,font:'500 13px/20px var(--font-sans)'}},h('a',{href:'#',className:'gs-muted',style:{textDecoration:'none'}},parent),h(G.Icon,{name:'chevronRight',size:14}),h('span',{'aria-current':'page'},here));}
+function topbar(left,right){return h('header',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',gap:16}},left,h('div',{className:'gs-row',style:{flexWrap:'nowrap'}},right));}
+
+var NAMED=[
+  {name:'Before Erlang Shen',when:'23 Sep 21:02',pc:'DESKTOP'},
+  {name:'Chapter 5 start',when:'20 Sep 18:10',pc:'LAPTOP'},
+  {name:'Ludusavi backup (14 Sep)',when:'14 Sep 12:00',pc:'DESKTOP'}];
+var VERSIONS=[
+  {id:'v17',saved:'23 Sep 21:10',pc:'DESKTOP',note:'current',size:524288},
+  {id:'v16',saved:'23 Sep 21:02',pc:'DESKTOP',note:'Before Erlang Shen',size:522240},
+  {id:'v15',saved:'21 Sep 22:47',pc:'LAPTOP',size:519168},
+  {id:'v14',saved:'20 Sep 18:05',pc:'DESKTOP',note:'Before update to build 19870412',size:511000},
+  {id:'v13',saved:'18 Sep 23:31',pc:'DESKTOP',size:508000},
+  {id:'v12',saved:'16 Sep 20:12',pc:'LAPTOP',size:503808}];
+
+function Note(r){
+  if(r.note==='current')return h('span',{className:'gs-tag',style:{background:'var(--secondary-soft)',color:'var(--ink)'}},'Current');
+  if(!r.note)return null;
+  return h('span',{className:'gs-row',style:{gap:6,flexWrap:'nowrap',color:'var(--ink-muted)'}},h(G.Icon,{name:'pin',size:14}),r.note);
+}
+function Actions(r){return h('span',{className:'gs-row',style:{gap:4,flexWrap:'nowrap',justifyContent:'flex-end'}},
+  r.note==='current'?null:h(G.Button,{size:'sm',variant:'ghost'},'Restore'),
+  h(G.Button,{size:'sm',variant:'ghost'},'Export'));}
+
+function App(){
+ return h('div',{style:{width:1280,height:800,display:'flex',background:'var(--bg-100)'}},
+  rail('library'),
+  h('main',{style:{flex:1,minWidth:0,padding:'20px 24px',display:'flex',flexDirection:'column',gap:16}},
+   topbar(crumb('Game library','Black Myth: Wukong'),
+     [h(G.IconButton,{key:1,icon:'sync',label:'Sync now'}),h(G.IconButton,{key:2,icon:'cloud',label:'Google Drive connected'}),h(G.IconButton,{key:3,icon:'monitor',label:'This PC: DESKTOP'})]),
+   h(G.HeroBanner,{art:ART,eyebrow:'Loose game in G:\\Black Myth Wukong \u00b7 Unreal Engine',chip:'74 hrs played',title:'Black Myth: Wukong',status:'synced',statusLabel:'Synced \u00b7 DESKTOP and LAPTOP match',blurb:'Last played 23 Sep 21:10 on DESKTOP. Every version is kept: 17 in the cloud, the last 10 on this PC.',playLabel:'Play',style:{minHeight:212}}),
+   h('div',{style:{display:'grid',gridTemplateColumns:'376px minmax(0,1fr)',gap:16,flex:1,minHeight:0}},
+    h('div',{style:{display:'flex',flexDirection:'column',gap:16,minHeight:0}},
+     h(G.Card,{title:'Named saves',subtitle:'On every PC, and back in one step.',action:h(G.Button,{size:'sm',variant:'secondary',icon:'plus'},'Save as\u2026')},
+       NAMED.map(function(n){return h('div',{key:n.name,style:{display:'flex',alignItems:'center',gap:12}},
+         h(G.Icon,{name:'pin',size:16}),
+         h('div',{style:{flex:1,minWidth:0}},h('div',{style:{fontWeight:600,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}},n.name),h('div',{className:'gs-faint gs-mono',style:{fontSize:12,lineHeight:'16px'}},n.when+' \u00b7 '+n.pc)),
+         h(G.Button,{size:'sm',variant:'ghost',icon:'reset'},'Restore'))})),
+     h(G.Card,{title:'Where the saves are',subtitle:'Found by the Unreal engine rule, confirmed 27 Sep.',style:{flex:1}},
+       h('div',{style:{background:'var(--bg-300)',borderRadius:'var(--radius-md)',padding:'10px 8px 10px 12px',display:'flex',alignItems:'center',gap:8}},
+         h('div',{style:{flex:1,minWidth:0,display:'flex',flexDirection:'column',gap:2}},
+           h('div',{className:'gs-row',style:{flexWrap:'nowrap'}},h('span',{className:'gs-mono',style:{fontSize:13}},'<installDir>/b1/Saved/SaveGames'),h('span',{className:'gs-tag',style:{background:'var(--bg-400)'}},'Saves')),
+           h('div',{className:'gs-mono gs-muted',style:{fontSize:12,lineHeight:'18px',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'},title:'G:\\Black Myth Wukong\\b1\\Saved\\SaveGames'},'G:\\Black Myth Wukong\\b1\\Saved\\SaveGames'),
+           h('div',{className:'gs-faint',style:{fontSize:12,lineHeight:'16px'}},'3 files \u00b7 0.5 MB \u00b7 newest 23 Sep 21:09')),
+         h(G.IconButton,{size:'sm',icon:'folder',label:'Open the save folder'})),
+       h('div',{className:'gs-row'},h(G.Button,{size:'sm',variant:'secondary',icon:'plus'},'Add a place'),h(G.Button,{size:'sm',variant:'ghost',icon:'search'},'Learn mode')))),
+    h('div',{style:{display:'flex',flexDirection:'column',gap:12,minWidth:0,minHeight:0}},
+     h('div',{className:'gd-hist'},h(G.ConsoleTable,{command:'history black-myth-wukong',toolbar:h('span',{className:'gs-row',style:{gap:12,flexWrap:'nowrap'}},h('span',null,'17 versions \u00b7 31.4 MB'),h(G.Button,{size:'sm',variant:'secondary',icon:'upload'},'Back up now')),
+       rows:VERSIONS,columns:[{key:'saved',label:'Saved'},{key:'pc',label:'PC'},{key:'note',label:'Note',render:Note},{key:'size',label:'Size',align:'right',render:function(r){return G.formatBytes(r.size)}},{key:'act',label:'',align:'right',render:Actions}]})),
+     h('div',{className:'gd-log',style:{flex:1,minHeight:0,display:'flex'}},h(G.ConsoleLog,{grow:true,label:'Black Myth: Wukong activity',lines:[
+       {time:'23 Sep 21:10',level:'ok',tag:'upload',msg:'Session over after 3 h 08 min. Uploaded 1 changed file, 0.5 MB.'},
+       {time:'23 Sep 21:02',level:'info',tag:'named',msg:'Saved as \u201cBefore Erlang Shen\u201d, pinned on every PC.'},
+       {time:'23 Sep 18:02',level:'info',tag:'play',msg:'Started from GameSync. The cloud had nothing newer.'},
+       {time:'20 Sep 18:05',level:'info',tag:'update',msg:'Build 19870412 found. Kept the save before it ran.'}]}))))));
+}
+ReactDOM.createRoot(document.getElementById('root')).render(h(App));
+</script>
+</body>
+</html>
