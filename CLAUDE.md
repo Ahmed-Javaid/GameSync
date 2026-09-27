@@ -2,11 +2,13 @@
 
 A Windows app that keeps game saves backed up and synced across a person's PCs, launches their games, and shows every problem on the game it belongs to. It replaces Ludusavi for the owner, whose main complaint was a folder-wide cloud "conflict" that never said which game. Free and open source (GitHub), for the owner and a few friends.
 
-## Status (2026-09-27)
+## Status (2026-09-28)
 
 - **Phase: building.** The design is done and saved in the repo: `docs/design.md`, `docs/requirements.md` and `design/system/`.
 - **Milestone 1 is done (2026-09-27):** the sync engine as a command-line tool. Every decision and crash scenario passes on copies of all 44 of the owner's games that have file saves. `docs/milestone-1.md` has what was built, how to try it, the results to record in the live requirements doc, and the known limits. The code is on GitHub (link below).
-- **Now: Milestone 2**, Google Drive and the laptop, with Drive unencrypted (decided 2026-09-27). Built, and passing live on the owner's Drive since 2026-09-28 (the whole two-PC scenario, crash recovery included): local-first sync with an outbox, the Drive backend, sign-in, devices, portable folders, the clock check, the restore kit, named saves. Left: publishing the Google app. The week on both PCs waits until the whole app is built (owner's choice, 2026-09-28), so building carries on with Milestone 3. Status, results and the owner's steps: `docs/milestone-2.md`. The owner's OAuth client JSON and sign-in live in `%LOCALAPPDATA%\GameSync` and `notes\`, never in the repo.
+- **Milestone 2**, Google Drive and the laptop, with Drive unencrypted (decided 2026-09-27). Built, and passing live on the owner's Drive since 2026-09-28 (the whole two-PC scenario, crash recovery included): local-first sync with an outbox, the Drive backend, sign-in, devices, portable folders, the clock check, the restore kit, named saves. Left: publishing the Google app. The week on both PCs waits until the whole app is built (owner's choice, 2026-09-28). Status, results and the owner's steps: `docs/milestone-2.md`. The owner's OAuth client JSON and sign-in live in `%LOCALAPPDATA%\GameSync` and `notes\`, never in the repo.
+- **Milestone 3 is built (2026-09-28):** detection (Steam, Epic, EA, loose folders), the save list, engine rules, name search, saves of games not installed, registry saves, the library with fixes that stick, rules that travel with each version (R8, PC-04), shared-save errors (FOLD-11), and the Ludusavi import. Its done-when check passes in a read-only scan of the owner's PC. `docs/milestone-3.md` has how to try it, the results and the known limits.
+- **Now: Milestone 4** (started 2026-09-28), sessions and launching: the process watcher, launch routes, the daily backup and notifications. Then 5 (the UI) and 6; the two-PC week comes after.
 - **Look chosen (2026-09-27):** the launcher follows `Design inspirations/`, the save manager uses the Console look, and both live in the GameSync design system with preset themes (Dark, Light, pure black; Arcade, Moss, Tidal, Sakura, Citrus, Mono, Windows accent).
 - **Before Milestone 5 (the UI):** design Game detail, Conflict, Plan and Onboarding from the design system's components; they are still wireframes. Include named saves (added 2026-09-27): Save as… with a name prompt and the named-save list with Restore, on the launcher and in Game detail.
 
@@ -20,6 +22,7 @@ A Windows app that keeps game saves backed up and synced across a person's PCs, 
 | GitHub repository (public; commit or push only when the owner asks) | https://github.com/Ahmed-Javaid/GameSync |
 | Milestone 1 report: what was built, how to try it, requirement results, known limits | `docs/milestone-1.md` |
 | Milestone 2 plan: local-first history, Drive, two PCs, the owner's Google Cloud steps | `docs/milestone-2.md` |
+| Milestone 3 report: detection, save discovery, registry saves, the Ludusavi import, the done-when check | `docs/milestone-3.md` |
 | Requirements with IDs and tests (copy of the live doc) | `docs/requirements.md` |
 | Design system copy: tokens, theming, component specs, offline viewer | `design/system/` (open `design/system/viewer.html`) |
 | Same design as a Claude Doc with drawn diagrams (snapshot 2026-09-27, not kept in sync) | https://claude.ai/code/artifact/4eae149b-1a37-41b5-a498-cd15c81b6aa1 |
@@ -44,7 +47,10 @@ A Windows app that keeps game saves backed up and synced across a person's PCs, 
 - **Named saves (2026-09-27):** Save as… keeps the save under a name ("Before Lady Maria") as a pinned version on every PC, restorable in a step; folders the owner kept by hand (Bloodborne on shadPS4: `CUSA00207\<name>\SPRJ0005` beside the live `CUSA00207\SPRJ0005`) import as named saves without being touched. BAK-18, BAK-19; design.md → Sync engine → Named saves.
 - **Game updates:** when a game's build changes, the current save is snapshotted and pinned before the new build runs.
 - **Daily backup:** the user sets the time; a missed run catches up about 10 minutes after the next sign-in.
-- **Save discovery:** PCGamingWiki list (Ludusavi manifest), then engine rules, then name search, then learn mode (folder watcher, optional admin ETW tracer).
+- **Save discovery:** PCGamingWiki list (Ludusavi manifest), then engine rules, then name search, then learn mode (folder watcher, optional admin ETW tracer). Saves of games that aren't installed are found from the list too. Nothing syncs until confirmed; later finds are suggestions.
+- **Rules travel with the saves (2026-09-28):** each version records its portable rules, so a PC without the game is offered them and one whose rules differ is told and asked (PC-04, R8). Registry keys are exported into a folder of GameSync's own that joins the game as a root (FIND-10).
+- **Ludusavi import (2026-09-28):** ignore list, custom games, and each game's latest backup as a named save kept aside, never current by itself (ONB-04, reworded).
+- **Achievements (2026-09-28):** wanted, after v1: Steam's first, read from Steam's own files with no key; ACH-01 to ACH-04, design.md → Achievements.
 - **Launcher:** own UI, replacing Playnite.
 - **Look and theming:** launcher from the reference images, Console-style save manager; presets with a primary and a secondary colour, Dark, Light or Match Windows, pure black; status colours never follow the theme. Custom colours come later.
 - **Folders:** you choose the backup folder (moved with hash checks), how much history stays on the PC, game folders to scan, extra save folders, and where shared zips go.

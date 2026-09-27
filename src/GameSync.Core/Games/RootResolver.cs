@@ -17,7 +17,8 @@ public sealed class RootResolver(
     /// <summary>Folders every Windows user has; one may start a save folder.</summary>
     public static readonly IReadOnlyList<string> FolderPlaceholders =
     [
-        "<home>", "<documents>", "<publicDocuments>", "<roaming>", "<localAppData>", "<localLow>", "<savedGames>", "<programData>",
+        "<home>", "<documents>", "<public>", "<publicDocuments>", "<roaming>", "<localAppData>", "<localLow>", "<savedGames>", "<programData>",
+        "<steamRoot>",
     ];
 
     /// <summary>Account IDs, which may appear anywhere in a save folder and are recorded with each version (PC-03).</summary>
@@ -33,7 +34,29 @@ public sealed class RootResolver(
             roots[key] = ResolveFolder(game.Id, folder, used);
         }
 
-        return game with { Roots = roots, Accounts = used };
+        return game with { Roots = roots, Accounts = used, PortableRoots = game.PortableRoots ?? game.Roots };
+    }
+
+    /// <summary>
+    /// A full path in portable form when it's under one of this PC's folders, the most specific one winning:
+    /// <c>C:\Users\you\AppData\Roaming\Game</c> is <c>&lt;roaming&gt;/Game</c>. Anything else stays a full path.
+    /// </summary>
+    public static string ToPortable(string path, IReadOnlyDictionary<string, string> folders)
+    {
+        var full = Path.TrimEndingDirectorySeparator(Path.GetFullPath(path));
+        var best = folders
+            .Where(f => !string.IsNullOrEmpty(f.Value))
+            .Select(f => (f.Key, Value: Path.TrimEndingDirectorySeparator(Path.GetFullPath(f.Value))))
+            .Where(f => full.Equals(f.Value, StringComparison.OrdinalIgnoreCase) || full.StartsWith(f.Value + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(f => f.Value.Length)
+            .FirstOrDefault();
+        if (best.Key is null)
+        {
+            return full;
+        }
+
+        var rest = full[best.Value.Length..].TrimStart(Path.DirectorySeparatorChar).Replace(Path.DirectorySeparatorChar, '/');
+        return rest.Length == 0 ? best.Key : $"{best.Key}/{rest}";
     }
 
     /// <summary>A path Windows could never have: it still holds a placeholder this PC couldn't fill.</summary>
@@ -45,6 +68,11 @@ public sealed class RootResolver(
         if (folder.Contains(InstallDir, StringComparison.OrdinalIgnoreCase))
         {
             return $"{title} isn't installed on this PC: no install folder is set for it";
+        }
+
+        if (folder.Contains("<steamRoot>", StringComparison.OrdinalIgnoreCase))
+        {
+            return $"Steam isn't installed on this PC, and {title} keeps saves in Steam's folder";
         }
 
         foreach (var placeholder in AccountPlaceholders)

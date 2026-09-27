@@ -104,6 +104,9 @@ public sealed class TestPc : IDisposable
 
     public FakeMalwareScanner Malware { get; } = new();
 
+    /// <summary>This PC's registry, in memory.</summary>
+    public FakeRegistry Registry { get; } = new();
+
     public SyncOptions Options { get; set; } = new() { AppVersion = "test" };
 
     /// <summary>Makes cloud calls fail: given the call's name ("blobs.put", "log.append", "info", ...), the error to throw.</summary>
@@ -150,6 +153,14 @@ public sealed class TestPc : IDisposable
         return game;
     }
 
+    /// <summary>A game a scan found and confirmed (FIND-06), resolved with the folders that scan used.</summary>
+    public GameDefinition AddResolvedGame(GameDefinition portable, IReadOnlyDictionary<string, string> folders)
+    {
+        var game = new RootResolver(folders, Accounts, InstallDirs).Resolve(portable);
+        _games.Add(game);
+        return game;
+    }
+
     public GameDefinition AddGame(
         string id,
         GameMode mode = GameMode.Sync,
@@ -185,7 +196,7 @@ public sealed class TestPc : IDisposable
         Malware,
         Device,
         DataDir,
-        Options);
+        Options with { Registry = Options.Registry ?? Registry });
 
     public Task<IReadOnlyList<GameResult>> SyncAsync(string? cloud = null) => Service(cloud).SyncAsync(null, CancellationToken.None);
 
@@ -230,6 +241,35 @@ public sealed class TestPc : IDisposable
     public void Dispose() => State.Dispose();
 }
 
+/// <summary>A registry in memory: keys by name, and a count of every key written, so a test can tell nothing else changed.</summary>
+public sealed class FakeRegistry : IRegistryStore
+{
+    private readonly Dictionary<string, (RegistryNode Node, DateTime ChangedUtc)> _keys = new(StringComparer.OrdinalIgnoreCase);
+
+    public List<string> Written { get; } = [];
+
+    public void Set(string key, RegistryNode node, DateTime changedUtc) => _keys[Name(key)] = (Copy(node), changedUtc);
+
+    public void Remove(string key) => _keys.Remove(Name(key));
+
+    public RegistryNode? Get(string key) => _keys.TryGetValue(Name(key), out var entry) ? entry.Node : null;
+
+    public IReadOnlyCollection<string> Keys => _keys.Keys;
+
+    public (RegistryNode Node, DateTime ChangedUtc)? Export(string key) =>
+        _keys.TryGetValue(Name(key), out var entry) ? (Copy(entry.Node), entry.ChangedUtc) : null;
+
+    public void Import(string key, RegistryNode node)
+    {
+        Written.Add(Name(key));
+        _keys[Name(key)] = (Copy(node), DateTime.UtcNow);
+    }
+
+    private static string Name(string key) => key.Replace('\\', '/').Replace("HKCU/", "HKEY_CURRENT_USER/", StringComparison.OrdinalIgnoreCase).Trim('/');
+
+    private static RegistryNode Copy(RegistryNode node) => RegistryFile.Read(RegistryFile.Write("x", node)).Node;
+}
+
 /// <summary>A cloud a test can take offline, fill up, or give a clock and a quota, through its <see cref="TestPc"/>.</summary>
 public sealed class FaultyCloud(ICloud inner, TestPc pc) : ICloud
 {
@@ -248,6 +288,8 @@ public sealed class FaultyCloud(ICloud inner, TestPc pc) : ICloud
             TotalBytes = pc.Storage?.Total,
         };
     }
+
+    public Task<IReadOnlyList<GameId>> ListGamesAsync(CancellationToken ct) => Check(pc, "games.list", () => inner.ListGamesAsync(ct));
 
     public Task<IReadOnlyList<DeviceRecord>> ListDevicesAsync(CancellationToken ct) => Check(pc, "devices.list", () => inner.ListDevicesAsync(ct));
 

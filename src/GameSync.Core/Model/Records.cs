@@ -89,6 +89,12 @@ public sealed record VersionRecord
     /// <summary>Account IDs the save folders used, such as <c>steamUser</c>, so another PC can warn when its own differ (PC-03).</summary>
     public IReadOnlyDictionary<string, string>? Accounts { get; init; }
 
+    /// <summary>
+    /// The save rules this version was taken with, portable. Untrusted like everything from the cloud: another PC only
+    /// offers them, after the same checks as any rule (R8). Null in versions from before Milestone 3.
+    /// </summary>
+    public Games.PortableRules? Rules { get; init; }
+
     public required IReadOnlyList<FileEntry> Files { get; init; }
 }
 

@@ -31,6 +31,16 @@ public sealed class FolderCloud : ICloud
         return Task.FromResult(new CloudInfo(_root, null, null, null, null));
     }
 
+    public Task<IReadOnlyList<GameId>> ListGamesAsync(CancellationToken ct)
+    {
+        EnsureReachable();
+        var folder = Path.Combine(_root, "games");
+        IReadOnlyList<GameId> games = Directory.Exists(folder)
+            ? Directory.EnumerateDirectories(folder).Select(d => GameId.TryParse(Path.GetFileName(d), out var id) ? id : (GameId?)null).OfType<GameId>().ToList()
+            : [];
+        return Task.FromResult(games);
+    }
+
     public Task<IReadOnlyList<DeviceRecord>> ListDevicesAsync(CancellationToken ct)
     {
         EnsureReachable();

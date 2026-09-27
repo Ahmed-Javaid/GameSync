@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Globalization;
 using GameSync.App;
+using GameSync.Core.Discovery;
 using GameSync.Core.Games;
 using GameSync.Core.Model;
 using GameSync.Core.Safety;
@@ -13,10 +14,10 @@ using GameSync.Windows;
 
 return await Cli.RunAsync(args);
 
-internal static class Cli
+internal static partial class Cli
 {
     private const string Usage = """
-        GameSync (Milestone 2: Google Drive and a second PC, from the command line)
+        GameSync (Milestone 3: finding games and their saves, from the command line)
 
         gamesync [--data <folder>] <command> ...
 
@@ -27,20 +28,46 @@ internal static class Cli
                                       OAuth client JSON you downloaded from Google Cloud.
           signout                     cancels GameSync's access at Google
           account                     where the cloud is, who's signed in, and how full it is
-          add-game <id> --title <title> --root <key>=<folder> [--root ...] [--include <pattern>]
-                   [--mode sync|backup-only] [--policy newest-wins|always-ask|this-pc-wins]
-                   A folder may start with <documents>, <publicDocuments>, <roaming>, <localAppData>,
-                   <localLow>, <savedGames>, <home>, <programData> or <installDir>, and may hold
-                   <steamUser> or <epicUser>, so the same games.json works on every PC.
-          games
+          games                       the games that sync, and how each one is doing
           devices                     every PC that syncs, its GameSync version and when it was last seen
           rename-device <name>
+
+        Finding games and saves
+          scan [--refresh-list]       finds installed games (Steam, Epic, EA and your game folders) and where
+                                      each keeps its saves. Nothing syncs until you confirm it.
+          library [--ignored]         what the last scan found, grouped by what's next
+          show <game>                 where a game's saves were found and why, and the rules it syncs with
+          confirm <game>... | --all   syncs the game with the places found. A game another PC already syncs
+                                      takes up that PC's rules. Confirming again adds new places a scan found.
+                  [--mine|--theirs]   use this PC's findings, or the rules another PC's newest save used
+          ignore <game>...  /  unignore <game>...
+          rename <game> <title>       the title GameSync shows; rescans keep it
+          merge <game> <into>         makes two entries one game for good, like Spacewar into its real game
+          folders                     the game folders scanned and the save folders you added
+          add-folder <folder>  /  remove-folder <folder>
+                                      game folders to scan, like E:\Games or G:\; each subfolder with a game
+                                      program in it is a game
+          add-save-folder <folder> [--by-id]  /  remove-save-folder <folder>
+                                      extra places saves live; --by-id for a folder holding one folder per
+                                      Steam app ID. These stay in this PC's settings.
+          savelist update [--file <manifest.yaml>]
+                                      refreshes the save list (the Ludusavi manifest) from GitHub, or a file
+          import-ludusavi [--apply] [--config <file>]
+                                      takes over Ludusavi's ignore list and the games you added to it, and
+                                      brings each synced game's latest Ludusavi backup into its history as a
+                                      named save. Previews by default; Ludusavi's files are never changed.
+          add-game <id> --title <title> --root <key>=<folder> [--root ...] [--include <pattern>]
+                   [--mode sync|backup-only] [--policy newest-wins|always-ask|this-pc-wins]
+                   a game by hand, in games.json. A folder may start with <documents>, <publicDocuments>,
+                   <roaming>, <localAppData>, <localLow>, <savedGames>, <home>, <programData>, <steamRoot>
+                   or <installDir>, and may hold <steamUser> or <epicUser>.
 
         Settings on this PC
           set history-folder <folder>          moves the backup folder, checking every file before switching
           set history-keep all|recent          keep every version's files here, or the last 10 per game within 2 GB
           set install-dir <game> <folder>      where a game is installed on this PC, for <installDir>
           set account steamUser|epicUser <id>  this PC's account IDs, for <steamUser> and <epicUser>
+          set anti-cheat <game> yes|no|auto    marks a game as shipping an anti-cheat, or not, or as found
 
         Sync
           plan [<game>...]           what the next sync would do for each game, and why
@@ -113,18 +140,28 @@ internal static class Cli
             }
 
             var device = state.GetOrCreateDevice(Environment.MachineName);
-            var guard = SensitivePathGuard.ForThisPc(dataDir);
-            var installDirs = InstallDirs(state, config);
-            var resolver = new RootResolver(KnownFolders.ForThisPc(), Accounts(state), installDirs);
+            var folders = FoldersForThisPc();
+            var guard = SensitivePathGuard.ForThisPc(dataDir, folders.GetValueOrDefault("<steamRoot>"));
+            using var library = new LibraryStore(dataDir);
+            var entries = library.All();
+            var installDirs = InstallDirs(state, config, entries);
+            var resolver = new RootResolver(folders, Accounts(state), installDirs);
             var games = config.Games.Select(resolver.Resolve).ToList();
             foreach (var problem in config.Games.Concat(games).SelectMany(g => GameValidator.Problems(g, guard)).Distinct())
             {
                 throw new UsageException($"games.json: {problem}");
             }
 
+            var here = new ThisPc(dataDir, state, library, folders, resolver, guard, new WindowsRegistry());
+            games.AddRange(LibraryGames(entries, config, here));
             if (command == "set")
             {
-                return Set(dataDir, state, games, installDirs.Values, rest);
+                return Set(here, games, installDirs.Values, rest);
+            }
+
+            if (await RunLibraryCommandAsync(command, rest, here) is { } done)
+            {
+                return done;
             }
 
             using var amsi = new AmsiScanner();
@@ -141,7 +178,7 @@ internal static class Cli
                 amsi,
                 device,
                 dataDir,
-                new SyncOptions { AppVersion = AppVersion, HistoryLimits = KeepLimits(state), Progress = new ConsoleProgress(Title) });
+                new SyncOptions { AppVersion = AppVersion, HistoryLimits = KeepLimits(state), Progress = new ConsoleProgress(Title), Registry = here.Registry });
 
             // Anything a crash or reboot interrupted is finished before anything new starts (BAK-08, BAK-13).
             var recovered = await service.RecoverAsync(CancellationToken.None);
@@ -152,7 +189,7 @@ internal static class Cli
                 Console.WriteLine();
             }
 
-            return await RunCommandAsync(command, rest, service, state, cloud, config.UsesDrive);
+            return await RunCommandAsync(command, rest, service, here, cloud, config.UsesDrive);
         }
         catch (UsageException e)
         {
@@ -171,11 +208,33 @@ internal static class Cli
         }
     }
 
-    private static async Task<int> RunCommandAsync(string command, List<string> rest, SyncService service, StateStore state, ICloud cloud, bool usesDrive)
+    private static async Task<int> RunCommandAsync(string command, List<string> rest, SyncService service, ThisPc here, ICloud cloud, bool usesDrive)
     {
         var ct = CancellationToken.None;
+        var state = here.State;
+        if (command is "games" or "plan" or "sync")
+        {
+            PrintSkipped(here);
+        }
+
         switch (command)
         {
+            case "scan":
+                return await ScanAsync(rest, service, here, ct);
+
+            case "library":
+                PrintLibrary(here.Library.All(), await service.OtherGamesAsync(ct), rest.Contains("--ignored"));
+                return 0;
+
+            case "show":
+                return await ShowAsync(Game(rest, 0), service, here, ct);
+
+            case "confirm":
+                return await ConfirmAsync(rest, service, here, ct);
+
+            case "import-ludusavi":
+                return await ImportLudusaviAsync(rest, service, here, ct);
+
             case "games":
                 foreach (var stream in service.Streams)
                 {
@@ -215,8 +274,8 @@ internal static class Cli
             case "rename-device":
                 foreach (var d in await service.DevicesAsync(ct))
                 {
-                    var here = d.Id == service.Device.Id ? "(this PC)" : "";
-                    Console.WriteLine($"{d.Name,-16} {here,-10} last seen {d.LastSeenUtc.ToLocalTime():yyyy-MM-dd HH:mm}   GameSync {d.AppVersion}");
+                    var thisPc = d.Id == service.Device.Id ? "(this PC)" : "";
+                    Console.WriteLine($"{d.Name,-16} {thisPc,-10} last seen {d.LastSeenUtc.ToLocalTime():yyyy-MM-dd HH:mm}   GameSync {d.AppVersion}");
                 }
 
                 if (command == "rename-device")
@@ -543,12 +602,33 @@ internal static class Cli
         }
     }
 
-    private static int Set(string dataDir, StateStore state, IReadOnlyList<GameDefinition> games, IEnumerable<string> installDirs, List<string> rest)
+    private static int Set(ThisPc here, IReadOnlyList<GameDefinition> games, IEnumerable<string> installDirs, List<string> rest)
     {
+        var (dataDir, state) = (here.DataDir, here.State);
         switch (Arg(rest, 0, "setting"))
         {
             case "history-folder":
                 return MoveHistory(dataDir, state, games, installDirs, Path.GetFullPath(Arg(rest, 1, "folder")));
+
+            case "anti-cheat":
+            {
+                var entry = Entry(here, Game(rest, 1));
+                bool? value = Arg(rest, 2, "yes, no or auto") switch
+                {
+                    "yes" => true,
+                    "no" => false,
+                    "auto" => null,
+                    _ => throw new UsageException("Choose yes, no or auto."),
+                };
+                here.Library.SaveAll([entry with { AntiCheatByHand = value }]);
+                Console.WriteLine(value switch
+                {
+                    true => $"{entry.DisplayTitle} is marked as shipping an anti-cheat: official launch only, and no learn mode.",
+                    false => $"{entry.DisplayTitle} is marked as having no anti-cheat.",
+                    null => $"{entry.DisplayTitle} goes by what its folder shows: {entry.AntiCheat ?? "no anti-cheat"}.",
+                });
+                return 0;
+            }
 
             case "history-keep":
                 var keep = Arg(rest, 1, "all or recent");
@@ -597,7 +677,7 @@ internal static class Cli
             }
 
             default:
-                throw new UsageException("Settings: history-folder, history-keep, install-dir, account. Run 'gamesync help'.");
+                throw new UsageException("Settings: history-folder, history-keep, install-dir, account, anti-cheat. Run 'gamesync help'.");
         }
     }
 
@@ -832,15 +912,23 @@ internal static class Cli
         return accounts;
     }
 
-    /// <summary>Where each game is installed on this PC, for &lt;installDir&gt;; set with 'gamesync set install-dir'.</summary>
-    private static Dictionary<GameId, string> InstallDirs(StateStore state, AppConfig config)
+    /// <summary>
+    /// Where each game is installed on this PC, for &lt;installDir&gt;: where the last scan found it, unless one was set
+    /// with 'gamesync set install-dir'.
+    /// </summary>
+    private static Dictionary<GameId, string> InstallDirs(StateStore state, AppConfig config, IReadOnlyList<LibraryEntry> library)
     {
         var dirs = new Dictionary<GameId, string>();
-        foreach (var game in config.Games)
+        foreach (var entry in library.Where(e => e.Installed && e.InstallDir is { Length: > 0 }))
         {
-            if (state.GetSetting($"installDir.{game.Id}") is { Length: > 0 } folder)
+            dirs[entry.Id] = entry.InstallDir!;
+        }
+
+        foreach (var id in config.Games.Select(g => g.Id).Concat(library.Select(e => e.Id)))
+        {
+            if (state.GetSetting($"installDir.{id}") is { Length: > 0 } folder)
             {
-                dirs[game.Id] = folder;
+                dirs[id] = folder;
             }
         }
 

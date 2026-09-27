@@ -18,9 +18,17 @@ public static class GameValidator
             problems.Add($"'{game.Id}' has no title.");
         }
 
-        if (game.Rules.Count == 0)
+        if (game.Rules.Count == 0 && game.Registry.Count == 0)
         {
             problems.Add($"{game.Title} has no save rules.");
+        }
+
+        foreach (var rule in game.Registry)
+        {
+            if (RegistryGuard.Check(rule.Key, [rule.Key]) is { } refusal)
+            {
+                problems.Add($"{game.Title}: {refusal}");
+            }
         }
 
         foreach (var (key, folder) in game.Roots)
@@ -28,6 +36,11 @@ public static class GameValidator
             if (!RestorePathGuard.IsSafeRootKey(key))
             {
                 problems.Add($"{game.Title}: '{key}' isn't a valid root name (letters, digits, '-' and '_').");
+            }
+
+            if (key == GameDefinition.RegistryRoot)
+            {
+                problems.Add($"{game.Title}: '{key}' is kept for registry saves; give the folder another root name.");
             }
 
             if (RootResolver.IsUnresolved(folder))

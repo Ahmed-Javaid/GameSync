@@ -14,6 +14,7 @@ public static class KnownFolders
         {
             ["<home>"] = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
             ["<documents>"] = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
+            ["<public>"] = Environment.GetEnvironmentVariable("PUBLIC"),
             ["<publicDocuments>"] = Environment.GetFolderPath(Environment.SpecialFolder.CommonDocuments),
             ["<roaming>"] = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
             ["<localAppData>"] = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),

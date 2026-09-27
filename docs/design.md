@@ -108,6 +108,10 @@ Each game keeps every ID it has (GameSync ID, store IDs, manifest title, install
 | Saves found, game not installed | yes | keeps history until you decide |
 | Installed, no saves found yet | watching | the first session may reveal them |
 
+"Saves found, game not installed" comes from checking every game in the save list for saves on this PC, from its paths that don't need an install folder (built in Milestone 3; Cyberpunk 2077, The Witcher 3 and Forza Horizon 6 on the owner's PC). In the command line, `confirm --all` also leaves out games only the name search found, since it goes by names alone.
+
+**Moving from Ludusavi** (ONB-04, decided 28 Sep 2026): the import takes over Ludusavi's ignore list (games already confirmed in GameSync stay synced) and the games added by hand in it, and brings each game's latest Ludusavi backup into its history as a named save, "Ludusavi backup (date)": kept aside and pinned, never current by itself. An older backup as a game's first current version would win that game's first sync over the live save, so it isn't one. A game no longer installed gets its backup as history under the save list's rules. Ludusavi's own files are never changed.
+
 ## Save discovery
 
 Four layers look for save locations in order. The first answer you confirm is pinned to the game, so later list updates can't silently change what's synced.
@@ -135,7 +139,8 @@ rules:
 found: name search, confirmed 2026-09-27
 ```
 
-- **Roots** are placeholders each PC resolves for itself: `<documents>`, `<savedGames>`, `<roaming>`, `<local>`, `<localLow>`, `<publicDocuments>`, `<programData>`, `<installDir>`, `<steamUserData>`. User IDs are `<steamUser>` and `<epicUser>`.
+- **Roots** are placeholders each PC resolves for itself: `<documents>`, `<savedGames>`, `<roaming>`, `<localAppData>`, `<localLow>`, `<public>`, `<publicDocuments>`, `<programData>`, `<home>`, `<installDir>`, and `<steamRoot>` (Steam's own folder, where `userdata` is). User IDs are `<steamUser>` and `<epicUser>`; in paths from the save list, an account folder is a `*`, so each PC's own matches.
+- **A rule's root key** comes from its portable root (`<documents>/My Games/Terraria` is `documents-my-games-terraria`), so both PCs give the same folder the same key.
 - **Categories**: `save` syncs. `config` is backed up but stays per PC unless you opt in. `screenshots` is off by default.
 - **Excludes**: logs, crash dumps, shader and web caches by default, plus the fixed safety blocklist (see Safety rules).
 
@@ -147,6 +152,12 @@ found: name search, confirmed 2026-09-27
 - **Session attribution**: files written into a shared folder while a game runs are proposed for that game. That's how Spacewar's screenshots get matched to the game that actually took them.
 
 **Registry saves** are exported per key to JSON (value names, types, data) and restored only under that game's approved key.
+
+- Each key is exported, before each scan of the game, into GameSync's own folder (`%LOCALAPPDATA%\GameSync\registry\<game>`), which joins the game as one more root, so versions, history and crash-safe restores treat the export like a save file. The export takes the key's own last-change time, so a change made during play counts as in-session.
+- A restored export is checked before anything is written (it must name one of the game's own keys, never a startup key, R7), then written back once the files are in place. Values keep their exact type and bytes, including Unity's 8-byte REG_DWORD floats.
+- A key that vanishes leaves its last export: missing isn't deleted.
+
+**Rules travel with the saves.** Each version records the portable rules it was taken with. A PC that doesn't sync the game yet is offered those rules and the save (PC-04); a PC whose rules differ is told, and keeps its own until you confirm the other PC's (R8). A restore leaves alone the files outside the rules its version was taken with.
 
 **Confirm once, then pinned**
 
@@ -193,6 +204,16 @@ Only launches through GameSync can pull a newer save first. Games started elsewh
 - A marker older than 12 hours with no upload reads "DESKTOP never synced back". You can play anyway; if both PCs then change the save, the conflict rules apply.
 
 **Long sessions**: optional local-only snapshots every 30 minutes guard against in-game corruption. They're never uploaded before the session ends.
+
+## Achievements (later)
+
+*Added 28 Sep 2026, for after v1 (the owner's request).* Each game shows its achievements the way Steam does: which ones you've unlocked and when, how rare each is, and your progress on the game's tile.
+
+- **Steam games first.** Steam keeps a copy of each account's achievement progress on the PC (`appcache\stats`), so GameSync can read it there with no key, offline too; a spike confirms the format before building. Names, descriptions and icons come from the game's achievement list, and rarity from Steam's public global percentages, which need no key. A Steam Web API key the person adds in Settings, like the SteamGridDB key, fills in whatever the local files miss.
+- **Where they show**: game detail (progress, then unlocked ones with their dates, then locked ones, with hidden ones blurred until unlocked), a progress ring on library tiles, and recent unlocks in the home screen's activity.
+- **Only what a store tracks.** A loose copy of a game has no store tracking its achievements, so it shows none.
+- **Safety and privacy**: read only. Icons are untrusted images, cached and checked like cover art (ART-07, ART-08). Nothing is uploaded, and achievements don't sync between PCs, since the store already keeps them per account.
+- **Other stores** (Epic, Xbox, GOG) come after Steam, each through its own records or API.
 
 ## Sync engine
 
@@ -523,6 +544,7 @@ A version record, as stored in the cloud (the shape built in Milestone 1):
 
 - **Kinds**: `Normal` versions form the history line; the current save is the Normal version nothing replaced, by `parent` or `supersedes`. Two such versions mean a fork. `Held` versions are out-of-session changes waiting for approval. `Kept` versions are copies set aside, such as a conflict's losing side or a PC's files before its first sync. Neither Held nor Kept ever becomes current by itself.
 - **Paths**: a file's path starts with its rule's root key (`saves/…`), and each PC maps that key to its own folder, through placeholders such as `<roaming>`. A version records the account IDs its folders used (`"accounts": { "steamUser": "7656…" }`), so another PC can warn when its own differ (PC-03). `<steamUser>` will also record the form the game used (SteamID64, SteamID3 or hex), so each PC writes its own ID the same way.
+- **Rules** (from Milestone 3): `"rules": { "title", "mode", "roots", "rules", "registry" }`, the portable save rules the version was taken with (see Save discovery → Rules travel with the saves). Records from before Milestone 3 have none.
 - **Settings and screenshots** go into a per-PC stream of the game (`<game>--pc-<device>`), backed up only and never downloaded by another PC.
 - The now-playing marker, `playing.json`, holds just the device and start time.
 
@@ -588,7 +610,7 @@ Six milestones, riskiest first: the sync engine is proven on copies of real save
 | 4 | Sessions and launching | watcher, launch routes, daily backup, notifications | play, quit, and the laptop has it without a single click |
 | 5 | The UI | launcher, library, save manager, game detail, plan, conflict screen, settings with appearance and folders, share and import, tray | a friend installs and syncs without help |
 | 6 | Learn mode and release | tracer, safety audit, signing, installer, updater | every safety test green; signed v1.0 on GitHub |
-| later | | S3/R2, own server, co-op worlds, Steam Deck | |
+| later | | achievements, S3/R2, own server, co-op worlds, Steam Deck | |
 
 Milestone 1 can use the owner's Ludusavi backup folder (about 1 GB across 46 games) as test data from day one.
 

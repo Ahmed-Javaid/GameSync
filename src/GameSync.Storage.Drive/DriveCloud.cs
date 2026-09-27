@@ -60,6 +60,25 @@ public sealed class DriveCloud : ICloud
         return new CloudInfo(_drive.FolderLink(root), about.Email, about.UsedBytes, about.LimitBytes, about.ServerTimeUtc);
     }
 
+    public async Task<IReadOnlyList<GameId>> ListGamesAsync(CancellationToken ct)
+    {
+        var games = await FolderAsync(null, "games", ct);
+        await _layout.WaitAsync(ct);
+        try
+        {
+            return (await ChildrenAsync(games, ct))
+                .Where(c => c.IsFolder)
+                .Select(c => GameId.TryParse(c.AppProperties.GetValueOrDefault(GameKey), out var id) ? id : (GameId?)null)
+                .OfType<GameId>()
+                .Distinct()
+                .ToList();
+        }
+        finally
+        {
+            _layout.Release();
+        }
+    }
+
     public async Task<IReadOnlyList<DeviceRecord>> ListDevicesAsync(CancellationToken ct)
     {
         var folder = await FolderAsync(null, "devices", ct);

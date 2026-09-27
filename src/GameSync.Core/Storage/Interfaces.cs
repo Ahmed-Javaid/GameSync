@@ -59,6 +59,9 @@ public interface ICloud
     /// <summary>Where the cloud folder is, who is signed in, how full it is, and the server's clock when it has one.</summary>
     Task<CloudInfo> GetInfoAsync(CancellationToken ct);
 
+    /// <summary>Every game with a folder in the cloud, including ones this PC doesn't sync (PC-04).</summary>
+    Task<IReadOnlyList<GameId>> ListGamesAsync(CancellationToken ct);
+
     Task<IReadOnlyList<DeviceRecord>> ListDevicesAsync(CancellationToken ct);
 
     Task SaveDeviceAsync(DeviceRecord device, CancellationToken ct);

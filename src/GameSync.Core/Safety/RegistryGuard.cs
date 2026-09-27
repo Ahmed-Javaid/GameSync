@@ -34,6 +34,9 @@ public static class RegistryGuard
         return approved.Any(a => IsSameOrInside(key, a)) ? null : $"'{keyPath}' isn't one of this game's approved keys.";
     }
 
+    /// <summary>Whether two spellings name the same key under HKEY_CURRENT_USER\Software, like "HKCU\Software\X" and "HKEY_CURRENT_USER/Software/x".</summary>
+    public static bool SameKey(string a, string b) => Normalize(a) is { } first && first == Normalize(b);
+
     /// <summary>"HKCU\Software\X" or "HKEY_CURRENT_USER\Software\X" as "SOFTWARE\X"; null for anything else.</summary>
     private static string? Normalize(string keyPath)
     {

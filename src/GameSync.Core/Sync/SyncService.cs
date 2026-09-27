@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
 using GameSync.Core.Games;
@@ -21,6 +22,9 @@ public sealed record SyncOptions
     public TimeSpan ClockTolerance { get; init; } = TimeSpan.FromMinutes(2);
 
     public IProgress<TransferProgress>? Progress { get; init; }
+
+    /// <summary>Where registry saves are read and written (FIND-10); without it, registry exports already on disk still sync.</summary>
+    public IRegistryStore? Registry { get; init; }
 }
 
 /// <summary>
@@ -86,10 +90,16 @@ public sealed partial class SyncService
     {
         var streams = Select(only).ToList();
         var views = await PrepareAsync(streams, ct);
+        var shared = SharedSaves();
         var plans = new List<GamePlan>();
         foreach (var stream in streams)
         {
             var (view, warnings, problem) = views[stream.Id];
+            if (problem is null && shared.TryGetValue(stream.Game.Id, out var clash))
+            {
+                problem = new InvalidGameDefinitionException($"{stream.Game.Title}: {clash}");
+            }
+
             plans.Add(problem is not null
                 ? new GamePlan { Stream = stream, Error = problem, Cloud = view }
                 : await TryPlanAsync(stream, treatAsInSession: false, view, warnings, ct));
@@ -239,6 +249,11 @@ public sealed partial class SyncService
     {
         var shown = name is null ? version.Value : $"'{name}'";
         var stream = Find(streamId);
+        if (SharedSaves().TryGetValue(stream.Game.Id, out var clash))
+        {
+            throw new InvalidGameDefinitionException($"{stream.Game.Title}: {clash} Nothing was restored.");
+        }
+
         await TryPullAsync(stream, ct);
         var (versions, _) = await LoadVersionsAsync(stream, ct);
         var thinned = await _log.ListThinnedAsync(stream.Id, ct);
@@ -395,6 +410,73 @@ public sealed partial class SyncService
     {
         await TryAnnounceDeviceAsync(ct);
         return _history.LoadDevices().OrderByDescending(d => d.LastSeenUtc).ToList();
+    }
+
+    /// <summary>
+    /// PC-04: games with saves in the cloud that this PC doesn't sync, such as one installed only on the other PC so far.
+    /// Their records are copied into the backup folder on the way, so offline the last known list answers.
+    /// </summary>
+    public async Task<IReadOnlyList<CloudGame>> OtherGamesAsync(CancellationToken ct)
+    {
+        IReadOnlySet<GameId> inCloud;
+        try
+        {
+            inCloud = (await _cloud.ListGamesAsync(ct)).ToHashSet();
+        }
+        catch (CloudException)
+        {
+            inCloud = new HashSet<GameId>();
+        }
+
+        var mine = _streams.Select(s => s.Id).ToHashSet();
+        var others = _history.Games().Concat(inCloud).Distinct()
+            .Where(id => !mine.Contains(id) && !id.Value.Contains("--pc-", StringComparison.Ordinal))
+            .ToList();
+        var games = new ConcurrentBag<CloudGame>();
+        await Parallel.ForEachAsync(others, new ParallelOptions { MaxDegreeOfParallelism = Parallelism, CancellationToken = ct }, async (id, token) =>
+        {
+            if (inCloud.Contains(id))
+            {
+                try
+                {
+                    await _store.PullAsync(id, token);
+                }
+                catch (CloudException)
+                {
+                    // This one stays as the backup folder knows it.
+                }
+            }
+
+            var versions = await _log.ListAsync(id, token);
+            if ((VersionGraph.Heads(versions).FirstOrDefault() ?? versions.MaxBy(v => v.CreatedUtc)) is { } newest)
+            {
+                var rules = versions.Where(v => v.Rules is not null).MaxBy(v => v.CreatedUtc)?.Rules;
+                games.Add(new CloudGame(id, rules?.Title ?? id.Value, newest, rules));
+            }
+        });
+
+        return games.OrderBy(g => g.Title, StringComparer.OrdinalIgnoreCase).ToList();
+    }
+
+    /// <summary>R8: the save rules the newest save from another PC used, and that PC; null when no other PC's save recorded any.</summary>
+    public async Task<(PortableRules Rules, DeviceInfo Device)?> OtherRulesAsync(GameId game, CancellationToken ct)
+    {
+        try
+        {
+            if ((await _cloud.ListGamesAsync(ct)).Contains(game))
+            {
+                await _store.PullAsync(game, ct);
+            }
+        }
+        catch (CloudException)
+        {
+            // Offline: what the backup folder knows.
+        }
+
+        var newest = (await _log.ListAsync(game, ct))
+            .Where(v => v.Rules is not null && v.Device is not null && v.Device.Id != Device.Id)
+            .MaxBy(v => v.CreatedUtc);
+        return newest is null ? null : (newest.Rules!, newest.Device);
     }
 
     /// <summary>BAK-05: what thinning would remove, keeping the newest <paramref name="keepNewest"/> and everything pinned (BAK-04).</summary>
@@ -700,6 +782,7 @@ public sealed partial class SyncService
     private async Task<GamePlan> PlanStreamAsync(SyncStream stream, bool treatAsInSession, CloudView view, IReadOnlyList<string> warnings, CancellationToken ct)
     {
         var state = _state.GetState(stream.Id);
+        ExportRegistry(stream.Game);
         var snapshot = _scanner.Scan(stream.Definition, stream.Includes);
         var (versions, problems) = await LoadVersionsAsync(stream, ct);
         var decision = DecisionEngine.Decide(new SyncInputs
@@ -738,7 +821,8 @@ public sealed partial class SyncService
     {
         var valid = new List<VersionRecord>();
         var problems = new List<string>();
-        foreach (var version in await _log.ListAsync(stream.Id, ct))
+        var all = await _log.ListAsync(stream.Id, ct);
+        foreach (var version in all)
         {
             if (Validate(stream, version) is { } problem)
             {
@@ -750,7 +834,28 @@ public sealed partial class SyncService
             }
         }
 
+        if (!stream.PerDevice && OtherRules(stream, all) is { } other)
+        {
+            problems.Insert(0, other);
+        }
+
         return (valid, problems);
+    }
+
+    /// <summary>
+    /// R8: the newest save another PC made used other save rules. This PC never takes them up by itself: it keeps its
+    /// own until someone confirms theirs here.
+    /// </summary>
+    private string? OtherRules(SyncStream stream, IReadOnlyList<VersionRecord> versions)
+    {
+        var newest = versions.Where(v => v.Rules is not null && v.Device is not null && v.Device.Id != Device.Id).MaxBy(v => v.CreatedUtc);
+        if (newest?.Rules is not { } theirs || theirs.SameFilesAs(PortableRules.From(stream.Game)))
+        {
+            return null;
+        }
+
+        return $"{newest.Device.Name} saves this game with other save rules ({string.Join("; ", theirs.Describe())}). " +
+            "This PC keeps its own until you confirm theirs here.";
     }
 
     private static string? Validate(SyncStream stream, VersionRecord version)
@@ -991,6 +1096,7 @@ public sealed partial class SyncService
             Pinned = pinned,
             Label = label,
             Accounts = stream.Definition.Accounts.Count > 0 ? stream.Definition.Accounts : null,
+            Rules = PortableRules.From(stream.Game),
             Files = files,
         };
         await _log.AppendAsync(stream.Id, version, ct);
@@ -1029,7 +1135,8 @@ public sealed partial class SyncService
             ops.Add(new JournalOp("replace", full, $"{full}.gs-new-{suffix}", Path.Combine(aside, $"{n++}-{Path.GetFileName(full)}")));
         }
 
-        foreach (var file in currentLocal.Where(f => stream.Includes(f.Category)))
+        // A version taken with fewer rules than this PC's knows nothing about the other files, so they stay (R8).
+        foreach (var file in currentLocal.Where(f => stream.Includes(f.Category) && (target.Rules is null || target.Rules.Takes(f.Path))))
         {
             var full = LocalPath(definition, file);
             if (!targetPaths.Contains(full))
@@ -1047,6 +1154,11 @@ public sealed partial class SyncService
                 Directory.CreateDirectory(Path.GetDirectoryName(full)!);
                 await StageAsync(stream.Id, file, $"{full}.gs-new-{suffix}", ct);
             }
+
+            foreach (var (file, full) in plannedTargets.Where(p => IsRegistryExport(p.File)))
+            {
+                CheckRegistryExport(stream.Game, file, $"{full}.gs-new-{suffix}");
+            }
         }
         catch (Exception e) when (e is not SimulatedCrashException)
         {
@@ -1055,12 +1167,31 @@ public sealed partial class SyncService
             throw;
         }
 
+        // Set before the swap, so a restore cut off after it still writes its registry keys back next time.
+        var registryKeys = plannedTargets.Any(p => IsRegistryExport(p.File));
+        if (registryKeys)
+        {
+            _state.SetSetting(RegistryPending(stream.Game.Id), "1");
+        }
+
         journal = journal with { Ready = true };
         journal.Save(_dataDir);
         CrashPoints.Hit(CrashPoints.AfterStagingBeforeSwap);
         journal.Commit();
         _state.SetBase(stream.Id, target);
         journal.Delete(_dataDir);
+        if (registryKeys)
+        {
+            try
+            {
+                ApplyPendingRegistry(stream.Game);
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException or FormatException or System.Security.SecurityException)
+            {
+                // The files are restored; the keys are written back before the game's next scan.
+                _state.Log(stream.Id, "warn", $"Couldn't write the restored registry keys back yet: {e.Message}");
+            }
+        }
     }
 
     private async Task StageAsync(GameId game, FileEntry file, string staged, CancellationToken ct)
@@ -1150,6 +1281,7 @@ public sealed partial class SyncService
             throw new InvalidOperationException(unavailable);
         }
 
+        ExportRegistry(stream.Game);
         var snapshot = _scanner.Scan(stream.Definition, stream.Includes);
         if (snapshot.Problems.Count > 0)
         {
@@ -1163,6 +1295,26 @@ public sealed partial class SyncService
 
     private IEnumerable<SyncStream> StreamsFor(GameDefinition game)
     {
+        // FIND-10: registry keys are exported into a folder of this PC's own, which joins the game as one more root.
+        if (game.Registry.Count > 0 && !game.Roots.ContainsKey(GameDefinition.RegistryRoot))
+        {
+            game = game with
+            {
+                Roots = new Dictionary<string, string>(game.Roots, StringComparer.Ordinal) { [GameDefinition.RegistryRoot] = RegistryFolder(game.Id) },
+                Rules =
+                [
+                    .. game.Rules,
+                    .. game.Registry.Select(r => new SaveRule
+                    {
+                        Root = GameDefinition.RegistryRoot,
+                        Include = RegistryFile.FileName(r.Key),
+                        Category = r.Category,
+                        UseDefaultExcludes = false,
+                    }),
+                ],
+            };
+        }
+
         var shared = new HashSet<SaveCategory> { SaveCategory.Save };
         if (game.SyncConfig)
         {
@@ -1189,6 +1341,9 @@ public sealed partial class SyncService
             yield return new SyncStream(perDevice, game, own, PerDevice: true);
         }
     }
+
+    /// <summary>FOLD-11: games that share a save file or registry key with another, and what they share.</summary>
+    private IReadOnlyDictionary<GameId, string> SharedSaves() => RuleOverlap.Find(_streams.Where(s => !s.PerDevice).Select(s => s.Game).ToList());
 
     private IEnumerable<SyncStream> Select(IReadOnlyCollection<GameId>? only) =>
         only is null ? _streams : _streams.Where(s => only.Contains(s.Id) || only.Contains(s.Game.Id));

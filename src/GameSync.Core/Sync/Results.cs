@@ -69,4 +69,10 @@ public sealed class BackupFolderUnavailableException(string message) : Exception
 /// <param name="Uploaded">False while the version waits in this PC's outbox.</param>
 public sealed record HistoryEntry(VersionRecord Version, bool IsCurrent, bool IsBase, bool Pinned, string? PinLabel, string DeviceName, bool Uploaded);
 
+/// <summary>
+/// PC-04: a game with saves in the cloud that this PC doesn't sync, with its newest save, and the save rules the newest
+/// save that recorded any used. Those rules are only an offer: they pass the usual checks and need confirming (R8).
+/// </summary>
+public sealed record CloudGame(GameId Id, string Title, VersionRecord Newest, PortableRules? Rules);
+
 public sealed record ThinPreview(GameId Game, IReadOnlyList<VersionRecord> Versions, IReadOnlyList<BlobId> Blobs, long Bytes, string Fingerprint);

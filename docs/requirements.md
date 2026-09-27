@@ -41,6 +41,10 @@ GameSync builds its library from each store's records plus the game folders you 
 | PLAY-08 | Shortcuts and Steam launch options can run `gamesync launch <game>` and get the pre-launch check. | Should | Add the launch option in Steam: a newer cloud save loads first. |  |
 | PLAY-09 | Playtime and last played are recorded per game and shown on tiles and the activity calendar. | Should | Play for 20 minutes: the tile and today's calendar cell update. |  |
 | PLAY-10 | Optional local snapshots every 30 minutes in long sessions, never uploaded before the session ends. | Should | A 65-minute session leaves 2 local snapshots and 1 upload. |  |
+| ACH-01 | *New.* Steam games show their achievements: name, description, icon, and unlocked or locked with the date, from Steam's own files on this PC, with no key. | Later | Unlock an achievement in Terraria: after the session, its game detail shows it with the time. |  |
+| ACH-02 | *New.* Each achievement shows its global rarity, and library tiles show progress (12 of 45). | Later | Open Sekiro: rarity percentages show, and its tile shows the count. |  |
+| ACH-03 | *New.* Achievement icons are cached, shown offline and checked like cover art; nothing about achievements is uploaded or synced. | Later | Go offline and restart: the icons still show, and Drive holds nothing about achievements. |  |
+| ACH-04 | *New.* Epic, Xbox and GOG achievements, each through its store's own records or API. | Later | An Epic game with achievements shows them. |  |
 
 ### Cover art
 
@@ -215,7 +219,7 @@ First run takes four steps; after that the tray app works quietly and speaks up 
 | ONB-01 | First run has four steps: scan this PC, choose games, connect cloud, daily backup time. | Must | A fresh install walks through all four and ends on the launcher. |  |
 | ONB-02 | Found games are grouped: Sync, Back up only, Probably online-only (unticked), Saves found but game not installed, and No saves found yet (watched on first play). | Must | The owner's PC shows each group with the games from the onboarding mockup. |  |
 | ONB-03 | Each game shows its save path and how it was found (save list, engine rule, name search). | Must | Wukong shows "engine rule". |  |
-| ONB-04 | The Ludusavi import brings custom games, the ignore list, and backups as each game's first version. | Should | The 46 Ludusavi backups become first versions; the 32 ignored games stay ignored. |  |
+| ONB-04 | The Ludusavi import brings custom games, the ignore list, and each game's latest backup into its history as a named save kept aside, never current by itself. | Should | The Ludusavi backups of synced games show as "Ludusavi backup (date)" in each game's saves; the 32 ignored games stay ignored. |  |
 | ONB-05 | Anti-cheat games are explained up front: no learn mode, and they launch through their own launcher. | Must | The note names the flagged games. |  |
 | SET-01 | *New.* Settings has sections for Appearance, Storage and folders, Backup and sync, Cloud, Devices, Notifications and Safety. | Must | Every section opens, by mouse and by keyboard. |  |
 | SET-02 | You set the daily backup time; a missed run catches up about 10 minutes after the next sign-in. | Must | Set 20:00 with the PC off at 20:00: the backup runs about 10 minutes after sign-in. |  |
@@ -300,3 +304,4 @@ Sixteen things are not designed or decided yet; each row names the requirements 
 | The "GameSync" name isn't checked on GitHub yet. | none | Check before the repo goes public. |
 | English only is assumed. | none | Confirm. |
 | SteamGridDB needs an API key, and a key built into an open-source app would be public. | ART-04, ART-06 | Each person pastes their own free key in Settings, optional; later the GameSync server can fetch art for everyone. |
+| Reading achievements from Steam's local files (`appcache\stats`) is unproven. | ACH-01, ACH-02 | A spike on three games before building; the person's own Steam Web API key is the fallback. |

@@ -6,18 +6,22 @@ GameSync is a free, open-source Windows app that backs up your game saves and sy
 
 ## On your PC
 
-- GameSync reads the save folders of the games you choose, and nothing else. It never backs up programs.
+- To find your games and where they save, GameSync reads your game stores' records (Steam, Epic and EA), the game folders you add, and the usual places games keep saves. It skips folders that hold passwords, keys or other apps' sign-ins.
+- It backs up the save folders and registry keys of the games you confirm, and nothing else. It never backs up programs.
 - It keeps its settings, an activity log and a backup copy of your saves in `%LOCALAPPDATA%\GameSync`, or in the backup folder you pick.
 
 ## In your Google Drive
 
 - GameSync asks Google for one permission, `drive.file`. With it, GameSync can see and change only the files it created itself, in a folder called GameSync. Your other Drive files stay invisible to it.
 - In that folder it keeps your game saves and their history, a plain copy of each game's newest save, a guide to restoring saves without GameSync, and a list of your PCs: the name you gave each one, its GameSync version and when it last synced.
+- Each saved version also records where the game keeps its saves, so your other PCs can find them. Those are folder names like `<documents>/My Games/Terraria`; a folder you chose outside Windows' usual folders is recorded as its full path.
 - It reads your Google account's email address and how full your Drive is, to show them to you and to warn you before your Drive fills up. Neither leaves your PC.
 
 ## Anywhere else
 
-- GameSync talks to Google, to sign in and to use your Drive, and to nothing else. It sends no usage data or crash reports anywhere.
+- GameSync talks to Google, to sign in and to use your Drive.
+- About once a week it downloads the list of where games keep their saves, the [Ludusavi manifest](https://github.com/mtkennerly/ludusavi-manifest), from GitHub (`raw.githubusercontent.com`), and only when the list has changed. The request carries nothing about you or your games.
+- It talks to nothing else, and sends no usage data or crash reports anywhere.
 
 ## Your Google sign-in
 
