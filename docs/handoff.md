@@ -47,6 +47,6 @@ The UI is Milestone 5, but the design is final enough to build against.
 
 None of these blocks Milestone 1.
 
-- **Encrypted mode on Drive**: decide before Milestone 2, because it changes how files are named and stored in the cloud. Keep `IBlobStore` able to take an encrypting wrapper.
+- **Encrypted mode on Drive**: decided 27 Sep 2026: off. It may come later as an opt-in, so keep `IBlobStore` able to take an encrypting wrapper.
 - The other open questions in design.md: the name, the installer, screenshots, friends' setups, the server, sharing between friends, what Share all includes, tray icon colours and the SteamGridDB key.
 - The Gaps section of `docs/requirements.md`: Windows 10 support, performance targets, uninstall, diagnostics for bug reports, more than one Google account, and language.

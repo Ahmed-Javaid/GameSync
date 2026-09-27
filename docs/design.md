@@ -314,8 +314,9 @@ GameSync/
     playing.json                             now-playing marker
 ```
 
-**Encrypted mode** (optional on Drive, the default on a shared server)
+**Encrypted mode** (off on Drive, and perhaps a later opt-in there; the default on a shared server)
 
+- Decided 27 Sep 2026: Drive stays unencrypted, so the `latest/` copy and `restore.ps1` get saves back without GameSync, and `drive.file` already keeps the app out of your other files. `IBlobStore` still takes an encrypting wrapper; turning encryption on later means one re-upload into the new layout.
 - A sync key, shown once as a recovery code and entered on each PC, encrypts every file and version record with AES-256-GCM. Anything altered without the key fails to decrypt.
 - File IDs become an HMAC-SHA256 of the content keyed with the sync key, so hashes don't reveal which files you have.
 - The cost: no readable `latest/` copy, and losing the key makes the cloud copy unreadable. Local history still works.
@@ -569,13 +570,13 @@ Milestone 1 can use the owner's Ludusavi backup folder (about 1 GB across 46 gam
 
 ## Open questions
 
-Ten decisions are still open; three are settled. Until chosen, the design assumes the first option in each. The requirements doc (link in `CLAUDE.md`) lists every testable requirement and the remaining gaps.
+Nine decisions are still open; four are settled. Until chosen, the design assumes the first option in each. The requirements doc (link in `CLAUDE.md`) lists every testable requirement and the remaining gaps.
 
 - [x] **UI look**: the reference-image launcher plus the Console save manager, with preset themes (see UI).
 - [ ] **Name**: keep "GameSync" (check it isn't taken on GitHub first), or pick another?
 - [x] **Daily backup time**: each person sets it; missed runs catch up after the next sign-in.
 - [ ] **Installer**: per-machine with one admin prompt, or portable by default?
-- [ ] **Encrypted mode on Drive**: off (a readable `latest/` folder you can browse), or on (private, but no manual fallback)?
+- [x] **Encrypted mode on Drive**: off, so the `latest/` folder stays readable and you can restore without GameSync. It may come later as an opt-in (see Storage backends).
 - [x] **Retention**: every version is kept forever; thinning is a manual, per-game choice.
 - [ ] **Screenshots**: ignore them, back them up, or sync them?
 - [ ] **Friends' setups**: Windows only, or does anyone need Steam Deck or Linux early?

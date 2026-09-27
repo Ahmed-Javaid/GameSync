@@ -5,8 +5,8 @@ A Windows app that keeps game saves backed up and synced across a person's PCs, 
 ## Status (2026-09-27)
 
 - **Phase: building.** The design is done and saved in the repo: `docs/design.md`, `docs/requirements.md` and `design/system/`.
-- **Milestone 1 is done (2026-09-27):** the sync engine as a command-line tool. Every decision and crash scenario passes on copies of all 44 of the owner's games that have file saves. `docs/milestone-1.md` has what was built, how to try it, the results to record in the live requirements doc, and the known limits. Nothing is committed yet.
-- **Next: Milestone 2**, Google Drive and the laptop. First decide encrypted mode on Drive, since it changes how files are named in the cloud; the recommendation is off, keeping a readable `latest/` folder as the manual fallback. The owner needs a Google Cloud project with an OAuth client for it.
+- **Milestone 1 is done (2026-09-27):** the sync engine as a command-line tool. Every decision and crash scenario passes on copies of all 44 of the owner's games that have file saves. `docs/milestone-1.md` has what was built, how to try it, the results to record in the live requirements doc, and the known limits. The code is on GitHub (link below).
+- **Next: Milestone 2**, Google Drive and the laptop, with Drive unencrypted (decided 2026-09-27). The owner needs a Google Cloud project with a "Desktop app" OAuth client for it.
 - **Look chosen (2026-09-27):** the launcher follows `Design inspirations/`, the save manager uses the Console look, and both live in the GameSync design system with preset themes (Dark, Light, pure black; Arcade, Moss, Tidal, Sakura, Citrus, Mono, Windows accent).
 - **Before Milestone 5 (the UI):** design Game detail, Conflict, Plan and Onboarding from the design system's components; they are still wireframes.
 
@@ -17,6 +17,7 @@ A Windows app that keeps game saves backed up and synced across a person's PCs, 
 | Full design, the source of truth | `docs/design.md` |
 | Build handoff: what to build first, PC setup, where the design is | `docs/handoff.md` |
 | Code: `GameSync.sln`, engine in `src/GameSync.Core`, AMSI in `src/GameSync.Windows`, command line in `src/GameSync.App` | `src/`, tests in `tests/` |
+| GitHub repository (public; commit or push only when the owner asks) | https://github.com/Ahmed-Javaid/GameSync |
 | Milestone 1 report: what was built, how to try it, requirement results, known limits | `docs/milestone-1.md` |
 | Requirements with IDs and tests (copy of the live doc) | `docs/requirements.md` |
 | Design system copy: tokens, theming, component specs, offline viewer | `design/system/` (open `design/system/viewer.html`) |
@@ -34,6 +35,7 @@ A Windows app that keeps game saves backed up and synced across a person's PCs, 
 
 - **Stack:** C# on .NET 10, Avalonia UI in the owner's own style (dark first), SQLite, one self-contained exe, per-machine installer. Chosen over Tauri/Rust because the owner knows .NET and wants a future ASP.NET Core server to share code.
 - **Cloud:** Google Drive first with the `drive.file` scope, through Google's official .NET client, not rclone (rclone's errors were opaque). Storage sits behind `IBlobStore` + `IVersionLog`, so S3/R2 and a later server plug in.
+- **Encryption on Drive:** off (decided 2026-09-27), so the readable `latest/` folder and `restore.ps1` get saves back without GameSync. It may come later as an opt-in; `IBlobStore` stays able to take an encrypting wrapper.
 - **Sync model:** per game, three-way (this PC vs cloud vs last synced base). Immutable versions with parents; a fork is a conflict. Files stored once by hash.
 - **Multiple PCs:** yes (desktop and laptop). Portable paths, device IDs, now-playing marker in the cloud.
 - **Conflicts:** newest save wins automatically and the loser is pinned with a Swap button. Never automatic on a first sync on a PC, when the newer side shrank by over half or is empty, when it changed outside a play session, or when the clock is off.

@@ -152,7 +152,7 @@ v1 keeps everything in your own Google Drive, in one GameSync folder that the ap
 | CLOUD-07 | Sign out revokes the token at Google. | Must | After signing out, the old token is rejected. |  |
 | CLOUD-08 | Settings shows the signed-in account and opens the GameSync folder in Drive. | Should | Open folder in Drive lands in the right folder. |  |
 | CLOUD-09 | The first big upload shows progress and survives restarts; later uploads send only changed files. | Must | Import the Ludusavi backups: progress shows, and the next sync uploads only changes. |  |
-| CLOUD-10 | Encrypted mode: a recovery code, AES-256-GCM on every file and record, HMAC file IDs, and no readable `latest` copy. Still an open question in `design.md`. | Later | Turn it on: Drive shows no readable save files, and LAPTOP works after entering the code. |  |
+| CLOUD-10 | Encrypted mode, as a later opt-in: a recovery code, AES-256-GCM on every file and record, HMAC file IDs, and no readable `latest` copy. Shared saves are decrypted on this PC before packing. Drive stays unencrypted until then (decided 27 Sep 2026). | Later | Turn it on: Drive shows no readable save files, and LAPTOP works after entering the code. |  |
 | CLOUD-11 | S3-style buckets (R2, B2) and the GameSync server plug in behind the same two interfaces. | Later | The same sync tests pass against each backend. |  |
 
 ## Save manager and sharing saves
@@ -289,7 +289,6 @@ Sixteen things are not designed or decided yet; each row names the requirements 
 | Choosing your own backup folder and keeping full history on this PC are new; `design.md` treats local history as a 10-version, 2 GB cache. | FOLD-02, FOLD-06, BAK-17 | Confirm both. |
 | Share all packs the backup folder, which only holds what this PC keeps; older versions that are only in the cloud are left out. | SHARE-04, SHARE-05 | Decide: the folder as it is, or download the missing versions first. |
 | Sharing moves single-player saves between people's accounts; R16 only forbids that for online games. | SHARE-07, SHARE-12, R16 | Confirm single-player sharing is fine and add it to R16's wording. |
-| Encrypted mode is undecided; with it on, shared saves must be decrypted on this PC before packing. | CLOUD-10, SHARE-04 | Decide it with the open question in `design.md`. |
 | No performance targets exist. | PERF-01 to PERF-03 | Accept or change the proposed numbers. |
 | Windows 10 support is undecided. | PKG-06 | Decide before Milestone 5. |
 | Uninstall behaviour isn't in `design.md`. | PKG-05 | Add it. |
