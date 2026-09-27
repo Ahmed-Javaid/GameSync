@@ -1,0 +1,100 @@
+{
+  "v": 3,
+  "attachments": {},
+  "boards": {
+    "Conflict.dc.html": {
+      "h": 800,
+      "title": "Conflict",
+      "w": 1280,
+      "x": 1360,
+      "y": 1200
+    },
+    "GameDetail.dc.html": {
+      "h": 800,
+      "title": "Game detail",
+      "w": 1280,
+      "x": 0,
+      "y": 1200
+    },
+    "Logbook.dc.html": {
+      "h": 800,
+      "title": "C · Logbook",
+      "w": 1280,
+      "x": 2720,
+      "y": 0
+    },
+    "Main.dc.html": {
+      "h": 800,
+      "title": "A · Console",
+      "w": 1280,
+      "x": 0,
+      "y": 0
+    },
+    "Onboarding.dc.html": {
+      "h": 800,
+      "title": "First run",
+      "w": 1280,
+      "x": 2720,
+      "y": 1200
+    },
+    "Plan.dc.html": {
+      "h": 800,
+      "title": "Plan",
+      "w": 1280,
+      "x": 0,
+      "y": 2120
+    },
+    "Settings.dc.html": {
+      "h": 800,
+      "title": "Settings",
+      "w": 1280,
+      "x": 1360,
+      "y": 2120
+    },
+    "Shelf.dc.html": {
+      "h": 800,
+      "title": "B · Shelf",
+      "w": 1280,
+      "x": 1360,
+      "y": 0
+    }
+  },
+  "createdOnFiles": {
+    "at": "2026-09-27T13:15:00Z",
+    "v": 1
+  },
+  "designSystems": [],
+  "launch": {
+    "view": "canvas"
+  },
+  "notes": {
+    "looks": {
+      "kind": "title1",
+      "maxW": 4000,
+      "text": "Pick a look: the library in three directions",
+      "w": 240,
+      "x": 0,
+      "y": -260
+    },
+    "screens": {
+      "kind": "title1",
+      "maxW": 4000,
+      "text": "The other screens, as wireframes",
+      "w": 240,
+      "x": 0,
+      "y": 940
+    }
+  },
+  "order": [
+    "Main.dc.html",
+    "Shelf.dc.html",
+    "Logbook.dc.html",
+    "GameDetail.dc.html",
+    "Conflict.dc.html",
+    "Onboarding.dc.html",
+    "Plan.dc.html",
+    "Settings.dc.html"
+  ],
+  "pages": [],
+  "title": "GameSync UI mockups"
+}

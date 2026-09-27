@@ -1,0 +1,88 @@
+<!-- @dsCard height=288 -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>GameSync</title>
+<style>
+  html, body { margin:0; height:100%; }
+  body { background:var(--bg-100); color:var(--ink); font-family:var(--font-sans); overflow:hidden; }
+  .cover { position:relative; height:288px; overflow:hidden; }
+  .art { position:absolute; top:0; left:480px; width:480px; height:288px; overflow:hidden; }
+  .art svg { display:block; width:480px; height:288px; }
+  .brand { fill:var(--primary); }
+  .card { fill:var(--bg-200); }
+  .warn { fill:var(--warn); }
+  .play { fill:var(--play); }
+  .blk { rx:var(--radius-lg); }
+  .cell { rx:var(--radius-md); }
+  .c0, .c1 { fill:var(--bg-300); }
+  .c2 { fill:var(--secondary); fill-opacity:.6; }
+  .c3 { fill:var(--primary); }
+  .hatch { fill:url(#hatch); }
+  .hatch-line { stroke:var(--bg-400); stroke-width:3; }
+  .track { fill:var(--bg-400); }
+  .fill { fill:var(--primary); }
+  .words { position:absolute; left:var(--space-6); bottom:var(--space-6); max-width:440px; }
+  .name { margin:0; font-size:76px; line-height:.92; font-weight:600; letter-spacing:-.02em; color:var(--ink); }
+  .tag { margin:var(--space-3) 0 0 4px; font-size:14px; line-height:20px; color:var(--ink-muted); }
+</style>
+</head>
+<body>
+<div class="cover">
+<div class="art" aria-hidden="true">
+<svg viewBox="0 0 480 288" width="480" height="288">
+<!--
+  blocks      primary 128x248 slab bled off the top (the theme's first colour, biggest) · bg-200 card 352x240 bleeding off the right · warn 56x40 and play 56x32 pills, small, because they only ever mean a status
+  arrangement one tall primary slab with a card beside it, satellites under the slab, bottoms on one line space-4 above the edge
+  pattern     the ActivityGrid: 6x4 cells at a 48/36 pitch in bg-300, hatched bg-400, secondary and primary, chosen because the play-time calendar with hatched light days is the most GameSync-specific shape; plus one ProgressBar pill. Every fill is a token, so the cover repaints in every theme
+  scales      slab and card corners radius-lg (16); cells radius-md (10); pills half their height; gaps space-4 (16) and space-2 (8)
+-->
+<defs><pattern id="hatch" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line class="hatch-line" x1="0" y1="0" x2="0" y2="7"/></pattern></defs>
+<rect class="brand blk" x="0" y="-16" width="128" height="232" rx="16"/>
+<rect class="warn" x="0" y="232" width="56" height="40" rx="20"/>
+<rect class="play" x="72" y="240" width="56" height="32" rx="16"/>
+<rect class="card blk" x="144" y="32" width="352" height="240" rx="16"/>
+<rect class="cell c0" x="168" y="64" width="40" height="28" rx="10"/>
+<rect class="cell c1" x="216" y="64" width="40" height="28" rx="10"/>
+<rect class="cell hatch" x="216" y="64" width="40" height="28" rx="10"/>
+<rect class="cell c3" x="264" y="64" width="40" height="28" rx="10"/>
+<rect class="cell c2" x="312" y="64" width="40" height="28" rx="10"/>
+<rect class="cell c1" x="360" y="64" width="40" height="28" rx="10"/>
+<rect class="cell hatch" x="360" y="64" width="40" height="28" rx="10"/>
+<rect class="cell c0" x="408" y="64" width="40" height="28" rx="10"/>
+<rect class="cell c1" x="168" y="100" width="40" height="28" rx="10"/>
+<rect class="cell hatch" x="168" y="100" width="40" height="28" rx="10"/>
+<rect class="cell c2" x="216" y="100" width="40" height="28" rx="10"/>
+<rect class="cell c0" x="264" y="100" width="40" height="28" rx="10"/>
+<rect class="cell c3" x="312" y="100" width="40" height="28" rx="10"/>
+<rect class="cell c3" x="360" y="100" width="40" height="28" rx="10"/>
+<rect class="cell c1" x="408" y="100" width="40" height="28" rx="10"/>
+<rect class="cell hatch" x="408" y="100" width="40" height="28" rx="10"/>
+<rect class="cell c3" x="168" y="136" width="40" height="28" rx="10"/>
+<rect class="cell c1" x="216" y="136" width="40" height="28" rx="10"/>
+<rect class="cell hatch" x="216" y="136" width="40" height="28" rx="10"/>
+<rect class="cell c2" x="264" y="136" width="40" height="28" rx="10"/>
+<rect class="cell c1" x="312" y="136" width="40" height="28" rx="10"/>
+<rect class="cell hatch" x="312" y="136" width="40" height="28" rx="10"/>
+<rect class="cell c0" x="360" y="136" width="40" height="28" rx="10"/>
+<rect class="cell c2" x="408" y="136" width="40" height="28" rx="10"/>
+<rect class="cell c0" x="168" y="172" width="40" height="28" rx="10"/>
+<rect class="cell c3" x="216" y="172" width="40" height="28" rx="10"/>
+<rect class="cell c1" x="264" y="172" width="40" height="28" rx="10"/>
+<rect class="cell hatch" x="264" y="172" width="40" height="28" rx="10"/>
+<rect class="cell c2" x="312" y="172" width="40" height="28" rx="10"/>
+<rect class="cell c3" x="360" y="172" width="40" height="28" rx="10"/>
+<rect class="cell c1" x="408" y="172" width="40" height="28" rx="10"/>
+<rect class="cell hatch" x="408" y="172" width="40" height="28" rx="10"/>
+<rect class="track" x="168" y="232" width="280" height="8" rx="4"/>
+<rect class="fill" x="168" y="232" width="184" height="8" rx="4"/>
+</svg>
+</div>
+<div class="words">
+<h1 class="name">GameSync</h1>
+<p class="tag">Play your games. Keep every save, on every PC.</p>
+</div>
+</div>
+</body>
+</html>

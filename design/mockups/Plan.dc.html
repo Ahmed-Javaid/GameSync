@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Plan wireframe</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#EFEFEC}
+a{color:#1F1F1F}a:hover{color:#000000}
+</style>
+</helmet>
+<div style="width: 1280px; height: 800px; box-sizing: border-box; display: flex; flex-direction: column; background: #EFEFEC; color: #1F1F1F; font-family: 'IBM Plex Sans', system-ui, sans-serif; font-size: 14px;">
+
+<header style="height: 56px; flex-shrink: 0; box-sizing: border-box; padding: 0 28px; display: flex; align-items: center; gap: 32px; background: #FFFFFF; border-bottom: 1px solid #C9C9C3;">
+<span style="font-weight: 600; font-size: 17px;">GameSync</span>
+<nav aria-label="Main" style="display: flex; gap: 24px;">
+<a href="#" style="color: #5C5C57; text-decoration: none;">Library</a>
+<a href="#" aria-current="page" style="font-weight: 600; text-underline-offset: 6px;">Plan</a>
+<a href="#" style="color: #5C5C57; text-decoration: none;">Activity</a>
+<a href="#" style="color: #5C5C57; text-decoration: none;">Settings</a>
+</nav>
+</header>
+
+<div style="flex-grow: 1; min-height: 0; box-sizing: border-box; padding: 28px; display: flex; flex-direction: column; gap: 20px;">
+<div style="display: flex; align-items: flex-end; gap: 16px;">
+<div style="flex-grow: 1; display: flex; flex-direction: column; gap: 6px;">
+<h1 style="margin: 0; font-size: 28px; font-weight: 600;">Plan</h1>
+<p style="margin: 0; color: #5C5C57; font-size: 15px;">What the next sync would do. Nothing changes until you run it.</p>
+</div>
+<button type="button" style="height: 44px; padding: 0 16px; border-radius: 6px; border: 1px solid #8E8E88; background: #FFFFFF; color: #1F1F1F; font: inherit; cursor: pointer;">Check again</button>
+<button type="button" style="height: 44px; padding: 0 22px; border-radius: 6px; border: 0; background: #1F1F1F; color: #FFFFFF; font: inherit; font-weight: 600; cursor: pointer;">Run 3 changes</button>
+</div>
+
+<div style="display: flex; gap: 10px; flex-wrap: wrap;">
+<span style="padding: 6px 12px; border: 1px solid #8E8E88; border-radius: 999px; background: #FFFFFF;">1 upload</span>
+<span style="padding: 6px 12px; border: 1px solid #8E8E88; border-radius: 999px; background: #FFFFFF;">1 download</span>
+<span style="padding: 6px 12px; border: 1px solid #8E8E88; border-radius: 999px; background: #FFFFFF;">1 backup</span>
+<span style="padding: 6px 12px; border: 1px solid #1F1F1F; border-radius: 999px; background: #FFFFFF; font-weight: 600;">1 waiting for you</span>
+<span style="padding: 6px 12px; border: 1px solid #8E8E88; border-radius: 999px; background: #FFFFFF;">2 skipped</span>
+<span style="padding: 6px 12px; border: 1px solid #8E8E88; border-radius: 999px; background: #FFFFFF;">6 already in sync</span>
+</div>
+
+<div style="background: #FFFFFF; border: 1px solid #C9C9C3; border-radius: 6px;">
+<table style="width: 100%; border-collapse: collapse;">
+<thead>
+<tr style="text-align: left; color: #5C5C57;">
+<th scope="col" style="width: 64px; padding: 12px 16px; font-weight: 500;">Include</th>
+<th scope="col" style="width: 260px; padding: 12px 16px; font-weight: 500;">Game</th>
+<th scope="col" style="width: 170px; padding: 12px 16px; font-weight: 500;">Action</th>
+<th scope="col" style="padding: 12px 16px; font-weight: 500;">Why</th>
+</tr>
+</thead>
+<tbody>
+<tr style="border-top: 1px solid #DDDDD8;">
+<td style="padding: 10px 16px;"><input type="checkbox" checked aria-label="Include Ready or Not" style="width: 18px; height: 18px; margin: 0; accent-color: #1F1F1F;"></td>
+<td style="padding: 10px 16px; font-weight: 500;">Ready or Not</td>
+<td style="padding: 10px 16px;">Upload</td>
+<td style="padding: 10px 16px; color: #3A3A36;">Changed here on Sep 22. The last upload failed while offline.</td>
+</tr>
+<tr style="border-top: 1px solid #DDDDD8;">
+<td style="padding: 10px 16px;"><input type="checkbox" checked aria-label="Include Slay the Spire 2" style="width: 18px; height: 18px; margin: 0; accent-color: #1F1F1F;"></td>
+<td style="padding: 10px 16px; font-weight: 500;">Slay the Spire 2</td>
+<td style="padding: 10px 16px;">Download</td>
+<td style="padding: 10px 16px; color: #3A3A36;">LAPTOP uploaded a newer save on Sep 26. This PC's copy is archived first.</td>
+</tr>
+<tr style="border-top: 1px solid #DDDDD8;">
+<td style="padding: 10px 16px;"><input type="checkbox" checked aria-label="Include Cyberpunk 2077" style="width: 18px; height: 18px; margin: 0; accent-color: #1F1F1F;"></td>
+<td style="padding: 10px 16px; font-weight: 500;">Cyberpunk 2077</td>
+<td style="padding: 10px 16px;">Back up</td>
+<td style="padding: 10px 16px; color: #3A3A36;">The store's cloud syncs this game, so GameSync only adds it to history.</td>
+</tr>
+<tr style="border-top: 1px solid #DDDDD8; background: #F4F4F1;">
+<td style="padding: 10px 16px;"><input type="checkbox" disabled aria-label="Include Sekiro: Shadows Die Twice" style="width: 18px; height: 18px; margin: 0;"></td>
+<td style="padding: 10px 16px; font-weight: 500;">Sekiro: Shadows Die Twice</td>
+<td style="padding: 10px 16px; font-weight: 600;">Waiting for you</td>
+<td style="padding: 10px 16px; color: #3A3A36;">Changed on both PCs. <a href="#">Resolve the conflict</a> first.</td>
+</tr>
+<tr style="border-top: 1px solid #DDDDD8;">
+<td style="padding: 10px 16px;"><input type="checkbox" disabled aria-label="Include Ghost of Tsushima DIRECTOR'S CUT" style="width: 18px; height: 18px; margin: 0;"></td>
+<td style="padding: 10px 16px; font-weight: 500;">Ghost of Tsushima DIRECTOR'S CUT</td>
+<td style="padding: 10px 16px;">Skip</td>
+<td style="padding: 10px 16px; color: #3A3A36;">Being played right now. It syncs when you quit.</td>
+</tr>
+<tr style="border-top: 1px solid #DDDDD8;">
+<td style="padding: 10px 16px;"><input type="checkbox" disabled aria-label="Include ROUNDS" style="width: 18px; height: 18px; margin: 0;"></td>
+<td style="padding: 10px 16px; font-weight: 500;">ROUNDS</td>
+<td style="padding: 10px 16px;">Skip</td>
+<td style="padding: 10px 16px; color: #3A3A36;">No save folder found yet. <a href="#">Try learn mode</a>.</td>
+</tr>
+<tr style="border-top: 1px solid #DDDDD8;">
+<td style="padding: 10px 16px;"></td>
+<td colspan="3" style="padding: 10px 16px;"><a href="#">Show 6 games already in sync</a></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p style="margin: 0; color: #5C5C57;">The daily backup at 20:00 runs this same plan by itself.</p>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":800}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

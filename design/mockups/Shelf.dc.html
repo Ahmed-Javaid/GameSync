@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Library, Shelf direction</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&amp;family=Bricolage+Grotesque:opsz,wght@12..96,600..800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#14110F}
+a{color:#56D4E8}a:hover{color:#8FE6F2}
+</style>
+</helmet>
+<div style="width: 1280px; height: 800px; box-sizing: border-box; display: flex; flex-direction: column; background: #14110F; color: #F3EEE8; font-family: 'Atkinson Hyperlegible', system-ui, sans-serif; font-size: 14px;">
+
+<header style="height: 64px; flex-shrink: 0; box-sizing: border-box; padding: 0 32px; display: flex; align-items: center; gap: 36px; border-bottom: 1px solid #2A2420;">
+<div style="display: flex; align-items: center; gap: 10px;">
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#56D4E8" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="12" height="12" rx="3"></rect><rect x="9" y="9" width="12" height="12" rx="3"></rect></svg>
+<span style="font-family: 'Bricolage Grotesque', sans-serif; font-weight: 800; font-size: 22px;">GameSync</span>
+</div>
+<nav aria-label="Main" style="display: flex; align-items: stretch; gap: 24px; height: 100%;">
+<a href="#" aria-current="page" style="display: flex; align-items: center; color: #F3EEE8; text-decoration: none; font-weight: 700; border-bottom: 2px solid #56D4E8;">Library</a>
+<a href="#" style="display: flex; align-items: center; color: #B3AAA0; text-decoration: none;">Plan</a>
+<a href="#" style="display: flex; align-items: center; color: #B3AAA0; text-decoration: none;">Activity</a>
+<a href="#" style="display: flex; align-items: center; color: #B3AAA0; text-decoration: none;">Settings</a>
+</nav>
+<div style="margin-left: auto; display: flex; align-items: center; gap: 12px;">
+<label style="display: flex; align-items: center; gap: 8px; height: 40px; box-sizing: border-box; padding: 0 14px; border-radius: 999px; background: #221D1A; color: #B3AAA0;">
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-4-4"></path></svg>
+<input type="search" aria-label="Search games" placeholder="Search your games" style="width: 180px; border: 0; outline: none; background: transparent; color: #F3EEE8; font: inherit;">
+</label>
+<span style="display: flex; align-items: center; gap: 8px; height: 40px; box-sizing: border-box; padding: 0 14px; border: 1px solid #2E2723; border-radius: 999px; font-size: 13px; color: #D8D0C6;"><span aria-hidden="true" style="width: 7px; height: 7px; border-radius: 50%; background: #56D4E8;"></span>DESKTOP</span>
+<button type="button" style="height: 40px; padding: 0 18px; display: flex; align-items: center; gap: 8px; border-radius: 999px; border: 0; background: #56D4E8; color: #0B1416; font: inherit; font-weight: 700; cursor: pointer;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M4 12a8 8 0 0 1 14-5.3L20 9"></path><path d="M20 4v5h-5"></path><path d="M20 12a8 8 0 0 1-14 5.3L4 15"></path><path d="M4 20v-5h5"></path></svg>Sync now</button>
+</div>
+</header>
+
+<section aria-labelledby="attention-title" style="padding: 24px 32px 0; display: flex; flex-direction: column; gap: 12px;">
+<h2 id="attention-title" style="margin: 0; font-family: 'Bricolage Grotesque', sans-serif; font-weight: 700; font-size: 20px;">Needs attention</h2>
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px;">
+<div style="display: flex; align-items: center; gap: 14px; padding: 14px; border: 1px solid #7A4A2C; border-radius: 12px; background: #2A1E17;">
+<div aria-hidden="true" style="width: 44px; height: 58px; flex-shrink: 0; border-radius: 6px; background: #4E3F33;"></div>
+<div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px;">
+<div style="font-weight: 700; font-size: 15px;">Sekiro: Shadows Die Twice</div>
+<div style="font-size: 13px; color: #E2C3AE;">Changed on DESKTOP and LAPTOP</div>
+</div>
+<button type="button" style="height: 36px; padding: 0 14px; border-radius: 999px; border: 0; background: #F4A06B; color: #1C0F07; font: inherit; font-weight: 700; cursor: pointer;">Resolve</button>
+</div>
+<div style="display: flex; align-items: center; gap: 14px; padding: 14px; border: 1px solid #2E2723; border-radius: 12px; background: #1E1A17;">
+<div aria-hidden="true" style="width: 44px; height: 58px; flex-shrink: 0; border-radius: 6px; background: #34505C;"></div>
+<div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px;">
+<div style="font-weight: 700; font-size: 15px;">Slay the Spire 2</div>
+<div style="font-size: 13px; color: #B3AAA0;">Newer save from LAPTOP</div>
+</div>
+<button type="button" style="height: 36px; padding: 0 14px; border-radius: 999px; border: 1px solid #4A413B; background: transparent; color: #F3EEE8; font: inherit; font-weight: 700; cursor: pointer;">Download</button>
+</div>
+<div style="display: flex; align-items: center; gap: 14px; padding: 14px; border: 1px solid #2E2723; border-radius: 12px; background: #1E1A17;">
+<div aria-hidden="true" style="width: 44px; height: 58px; flex-shrink: 0; border-radius: 6px; background: #353C44;"></div>
+<div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px;">
+<div style="font-weight: 700; font-size: 15px;">Ready or Not</div>
+<div style="font-size: 13px; color: #B3AAA0;">Upload waiting: offline</div>
+</div>
+<button type="button" style="height: 36px; padding: 0 14px; border-radius: 999px; border: 1px solid #4A413B; background: transparent; color: #F3EEE8; font: inherit; font-weight: 700; cursor: pointer;">Retry</button>
+</div>
+</div>
+</section>
+
+<section aria-labelledby="library-title" style="padding: 28px 32px 24px; display: flex; flex-direction: column; gap: 16px;">
+<div style="display: flex; align-items: center; gap: 20px;">
+<h2 id="library-title" style="margin: 0; font-family: 'Bricolage Grotesque', sans-serif; font-weight: 700; font-size: 20px;">Library</h2>
+<div role="group" aria-label="Filter by status" style="display: flex; gap: 8px;">
+<button type="button" aria-pressed="true" style="height: 32px; padding: 0 12px; border-radius: 999px; border: 0; background: #F3EEE8; color: #14110F; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">All 12</button>
+<button type="button" aria-pressed="false" style="height: 32px; padding: 0 12px; border-radius: 999px; border: 1px solid #3A322D; background: transparent; color: #D8D0C6; font: inherit; font-size: 13px; cursor: pointer;">Needs you 1</button>
+<button type="button" aria-pressed="false" style="height: 32px; padding: 0 12px; border-radius: 999px; border: 1px solid #3A322D; background: transparent; color: #D8D0C6; font: inherit; font-size: 13px; cursor: pointer;">Playing 1</button>
+<button type="button" aria-pressed="false" style="height: 32px; padding: 0 12px; border-radius: 999px; border: 1px solid #3A322D; background: transparent; color: #D8D0C6; font: inherit; font-size: 13px; cursor: pointer;">Synced 6</button>
+<button type="button" aria-pressed="false" style="height: 32px; padding: 0 12px; border-radius: 999px; border: 1px solid #3A322D; background: transparent; color: #D8D0C6; font: inherit; font-size: 13px; cursor: pointer;">Waiting 2</button>
+<button type="button" aria-pressed="false" style="height: 32px; padding: 0 12px; border-radius: 999px; border: 1px solid #3A322D; background: transparent; color: #D8D0C6; font: inherit; font-size: 13px; cursor: pointer;">Backup only 1</button>
+<button type="button" aria-pressed="false" style="height: 32px; padding: 0 12px; border-radius: 999px; border: 1px solid #3A322D; background: transparent; color: #D8D0C6; font: inherit; font-size: 13px; cursor: pointer;">Not found 1</button>
+</div>
+<label style="margin-left: auto; display: flex; align-items: center; gap: 8px; font-size: 13px; color: #B3AAA0;">Sort
+<select style="height: 32px; padding: 0 10px; border-radius: 8px; border: 1px solid #3A322D; background: #1E1A17; color: #F3EEE8; font: inherit;"><option>Last played</option><option>Name</option><option>Status</option></select>
+</label>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 16px;">
+<article style="display: flex; flex-direction: column; gap: 8px;">
+<div style="position: relative; height: 184px; box-sizing: border-box; padding: 10px; display: flex; align-items: flex-end; border-radius: 8px; background: #6B3A3A;">
+<span style="position: absolute; top: 8px; left: 8px; display: flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: 999px; background: rgba(14,11,9,0.82); font-size: 12px;"><svg width="8" height="8" viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5L9 5L1 9.5Z" fill="#C3A6FF"></path></svg>Playing</span>
+<span style="font-family: 'Bricolage Grotesque', sans-serif; font-weight: 700; font-size: 17px; line-height: 1.1;">Ghost of Tsushima DIRECTOR'S CUT</span>
+</div>
+<div style="font-size: 12px; color: #B3AAA0;">Today · 5.3 MB</div>
+</article>
+<article style="display: flex; flex-direction: column; gap: 8px;">
+<div style="position: relative; height: 184px; box-sizing: border-box; padding: 10px; display: flex; align-items: flex-end; border-radius: 8px; background: #4E3F33;">
+<span style="position: absolute; top: 8px; left: 8px; display: flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: 999px; background: rgba(14,11,9,0.82); font-size: 12px;"><span aria-hidden="true" style="width: 7px; height: 7px; border-radius: 50%; background: #F4A06B;"></span>Needs you</span>
+<span style="font-family: 'Bricolage Grotesque', sans-serif; font-weight: 700; font-size: 17px; line-height: 1.1;">Sekiro: Shadows Die Twice</span>
+</div>
+<div style="font-size: 12px; color: #B3AAA0;">Today · 11.4 MB</div>
+</article>
+<article style="display: flex; flex-direction: column; gap: 8px;">
+<div style="position: relative; height: 184px; box-sizing: border-box; padding: 10px; display: flex; align-items: flex-end; border-radius: 8px; background: #34505C;">
+<span style="position: absolute; top: 8px; left: 8px; display: flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: 999px; background: rgba(14,11,9,0.82); font-size: 12px;"><span aria-hidden="true" style="width: 7px; height: 7px; box-sizing: border-box; border-radius: 50%; border: 2px solid #56D4E8;"></span>Newer in cloud</span>
+<span style="font-family: 'Bricolage Grotesque', sans-serif; font-weight: 700; font-size: 17px; line-height: 1.1;">Slay the Spire 2</span>
+</div>
+<div style="font-size: 12px; color: #B3AAA0;">Sep 26 · 27.7 MB</div>
+</article>
+<article style="display: flex; flex-direction: column; gap: 8px;">
+<div style="position: relative; height: 184px; box-sizing: border-box; padding: 10px; display: flex; align-items: flex-end; border-radius: 8px; background: #5E5134;">
+<span style="position: absolute; top: 8px; left: 8px; display: flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: 999px; background: rgba(14,11,9,0.82); font-size: 12px;"><span aria-hidden="true" style="width: 7px; height: 7px; border-radius: 50%; background: #56D4E8;"></span>Synced</span>
+<span style="font-family: 'Bricolage Grotesque', sans-serif; font-weight: 700; font-size: 17px; line-height: 1.1;">Black Myth: Wukong</span>
+</div>
+<div style="font-size: 12px; color: #B3AAA0;">Sep 23 · 2.4 MB</div>
+</article>
+<article style="display: flex; flex-direction: column; gap: 8px;">
+<div style="position: relative; height: 184px; box-sizing: border-box; padding: 10px; display: flex; align-items: flex-end; border-radius: 8px; background: #36486E;">
+<span style="position: absolute; top: 8px; left: 8px; display: flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: 999px; background: rgba(14,11,9,0.82); font-size: 12px;"><span aria-hidden="true" style="width: 7px; height: 7px; border-radius: 50%; background: #56D4E8;"></span>Synced</span>
+<span style="font-family: 'Bricolage Grotesque', sans-serif; font-weight: 700; font-size: 17px; line-height: 1.1;">Child of Light</span>
+</div>
+<div style="font-size: 12px; color: #B3AAA0;">Sep 23 · 40 KB</div>
+</article>
+<article style="display: flex; flex-direction: column; gap: 8px;">
+<div style="position: relative; height: 184px; box-sizing: border-box; padding: 10px; display: flex; align-items: flex-end; border-radius: 8px; background: #353C44;">
+<span style="position: absolute; top: 8px; left: 8px; display: flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: 999px; background: rgba(14,11,9,0.82); font-size: 12px;"><span aria-hidden="true" style="width: 7px; height: 7px; box-sizing: border-box; border-radius: 50%; border: 2px solid #56D4E8;"></span>Upload pending</span>
+<span style="font-family: 'Bricolage Grotesque', sans-serif; font-weight: 700; font-size: 17px; line-height: 1.1;">Ready or Not</span>
+</div>
+<div style="font-size: 12px; color: #B3AAA0;">Sep 22 · 5.3 MB</div>
+</article>
+<article style="display: flex; flex-direction: column; gap: 8px;">
+<div style="position: relative; height: 184px; box-sizing: border-box; padding: 10px; display: flex; align-items: flex-end; border-radius: 8px; background: #5C5A2A;">
+<span style="position: absolute; top: 8px; left: 8px; display: flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: 999px; background: rgba(14,11,9,0.82); font-size: 12px;"><span aria-hidden="true" style="width: 7px; height: 7px; border-radius: 50%; background: #8F877E;"></span>Backup only</span>
+<span style="font-family: 'Bricolage Grotesque', sans-serif; font-weight: 700; font-size: 17px; line-height: 1.1;">Cyberpunk 2077</span>
+</div>
+<div style="font-size: 12px; color: #B3AAA0;">Sep 10 · 131.2 MB</div>
+</article>
+<article style="display: flex; flex-direction: column; gap: 8px;">
+<div style="position: relative; height: 184px; box-sizing: border-box; padding: 10px; display: flex; align-items: flex-end; border-radius: 8px; background: #433C4B;">
+<span style="position: absolute; top: 8px; left: 8px; display: flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: 999px; background: rgba(14,11,9,0.82); font-size: 12px;"><span aria-hidden="true" style="width: 7px; height: 7px; border-radius: 50%; background: #56D4E8;"></span>Synced</span>
+<span style="font-family: 'Bricolage Grotesque', sans-serif; font-weight: 700; font-size: 17px; line-height: 1.1;">Dark Souls III</span>
+</div>
+<div style="font-size: 12px; color: #B3AAA0;">Sep 8 · 17.8 MB</div>
+</article>
+<article style="display: flex; flex-direction: column; gap: 8px;">
+<div style="position: relative; height: 184px; box-sizing: border-box; padding: 10px; display: flex; align-items: flex-end; border-radius: 8px; background: #6E4C2C;">
+<span style="position: absolute; top: 8px; left: 8px; display: flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: 999px; background: rgba(14,11,9,0.82); font-size: 12px;"><span aria-hidden="true" style="width: 7px; height: 7px; border-radius: 50%; background: #56D4E8;"></span>Synced</span>
+<span style="font-family: 'Bricolage Grotesque', sans-serif; font-weight: 700; font-size: 17px; line-height: 1.1;">Cuphead</span>
+</div>
+<div style="font-size: 12px; color: #B3AAA0;">Sep 5 · 0.2 MB</div>
+</article>
+<article style="display: flex; flex-direction: column; gap: 8px;">
+<div style="position: relative; height: 184px; box-sizing: border-box; padding: 10px; display: flex; align-items: flex-end; border-radius: 8px; background: #3C5C45; outline: 2px solid #56D4E8; outline-offset: 2px;">
+<span style="position: absolute; top: 8px; left: 8px; display: flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: 999px; background: rgba(14,11,9,0.82); font-size: 12px;"><span aria-hidden="true" style="width: 7px; height: 7px; border-radius: 50%; background: #56D4E8;"></span>Synced</span>
+<div style="position: absolute; left: 0; right: 0; top: 64px; display: flex; justify-content: center;">
+<button type="button" style="height: 40px; padding: 0 18px; display: flex; align-items: center; gap: 8px; border-radius: 999px; border: 0; background: #56D4E8; color: #0B1416; font: inherit; font-weight: 700; cursor: pointer;"><svg width="12" height="12" viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5L9 5L1 9.5Z" fill="currentColor"></path></svg>Play</button>
+</div>
+<span style="font-family: 'Bricolage Grotesque', sans-serif; font-weight: 700; font-size: 17px; line-height: 1.1;">Terraria</span>
+</div>
+<div style="font-size: 12px; color: #B3AAA0;">Jun 21 · 325.7 MB</div>
+</article>
+<article style="display: flex; flex-direction: column; gap: 8px;">
+<div style="position: relative; height: 184px; box-sizing: border-box; padding: 10px; display: flex; align-items: flex-end; border-radius: 8px; background: #6C3A57;">
+<span style="position: absolute; top: 8px; left: 8px; display: flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: 999px; background: rgba(14,11,9,0.82); font-size: 12px;"><span aria-hidden="true" style="width: 7px; height: 7px; border-radius: 50%; background: #56D4E8;"></span>Synced</span>
+<span style="font-family: 'Bricolage Grotesque', sans-serif; font-weight: 700; font-size: 16px; line-height: 1.1;">Guacamelee! Super Turbo Championship Edition</span>
+</div>
+<div style="font-size: 12px; color: #B3AAA0;">Mar 28 · 0.3 MB</div>
+</article>
+<article style="display: flex; flex-direction: column; gap: 8px;">
+<div style="position: relative; height: 184px; box-sizing: border-box; padding: 10px; display: flex; align-items: flex-end; border-radius: 8px; background: #4A3760;">
+<span style="position: absolute; top: 8px; left: 8px; display: flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: 999px; background: rgba(14,11,9,0.82); font-size: 12px;"><span aria-hidden="true" style="width: 7px; height: 7px; box-sizing: border-box; border-radius: 50%; border: 2px solid #F4A06B;"></span>Not found</span>
+<span style="font-family: 'Bricolage Grotesque', sans-serif; font-weight: 700; font-size: 17px; line-height: 1.1;">ROUNDS</span>
+</div>
+<div style="font-size: 12px; color: #B3AAA0;">Try learn mode</div>
+</article>
+</div>
+</section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":800}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

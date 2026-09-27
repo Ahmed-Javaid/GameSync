@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Game detail wireframe</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#EFEFEC}
+a{color:#1F1F1F}a:hover{color:#000000}
+</style>
+</helmet>
+<div style="width: 1280px; height: 800px; box-sizing: border-box; display: flex; flex-direction: column; background: #EFEFEC; color: #1F1F1F; font-family: 'IBM Plex Sans', system-ui, sans-serif; font-size: 14px;">
+
+<header style="height: 56px; flex-shrink: 0; box-sizing: border-box; padding: 0 28px; display: flex; align-items: center; gap: 32px; background: #FFFFFF; border-bottom: 1px solid #C9C9C3;">
+<span style="font-weight: 600; font-size: 17px;">GameSync</span>
+<nav aria-label="Main" style="display: flex; gap: 24px;">
+<a href="#" aria-current="page" style="font-weight: 600; text-underline-offset: 6px;">Library</a>
+<a href="#" style="color: #5C5C57; text-decoration: none;">Plan</a>
+<a href="#" style="color: #5C5C57; text-decoration: none;">Activity</a>
+<a href="#" style="color: #5C5C57; text-decoration: none;">Settings</a>
+</nav>
+<button type="button" style="margin-left: auto; height: 36px; padding: 0 14px; border-radius: 6px; border: 1px solid #8E8E88; background: #FFFFFF; color: #1F1F1F; font: inherit; cursor: pointer;">Sync now</button>
+</header>
+
+<div style="flex-grow: 1; min-height: 0; box-sizing: border-box; padding: 20px 28px 24px; display: flex; flex-direction: column; gap: 20px;">
+<a href="#" style="font-size: 13px; color: #5C5C57;">Library / Black Myth: Wukong</a>
+
+<div style="display: flex; align-items: center; gap: 20px;">
+<div aria-hidden="true" style="width: 72px; height: 96px; flex-shrink: 0; border: 1px dashed #8E8E88; border-radius: 6px; background: repeating-linear-gradient(45deg, #FFFFFF 0 8px, #E4E4E0 8px 16px);"></div>
+<div style="flex-grow: 1; display: flex; flex-direction: column; gap: 6px;">
+<h1 style="margin: 0; font-size: 28px; font-weight: 600;">Black Myth: Wukong</h1>
+<div style="color: #5C5C57;">Loose game in G:\Black Myth Wukong · Unreal Engine</div>
+<div style="display: flex; align-items: center; gap: 8px;"><span aria-hidden="true" style="width: 9px; height: 9px; border-radius: 50%; background: #1F1F1F;"></span><span style="font-weight: 500;">Synced</span><span style="color: #5C5C57;">DESKTOP and LAPTOP match</span></div>
+</div>
+<div style="display: flex; gap: 10px;">
+<button type="button" style="height: 40px; padding: 0 20px; border-radius: 6px; border: 0; background: #1F1F1F; color: #FFFFFF; font: inherit; font-weight: 600; cursor: pointer;">Play</button>
+<button type="button" style="height: 40px; padding: 0 16px; border-radius: 6px; border: 1px solid #8E8E88; background: #FFFFFF; color: #1F1F1F; font: inherit; cursor: pointer;">Back up now</button>
+<button type="button" aria-label="More actions" style="width: 40px; height: 40px; border-radius: 6px; border: 1px solid #8E8E88; background: #FFFFFF; color: #1F1F1F; display: flex; align-items: center; justify-content: center; cursor: pointer;"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"></circle><circle cx="12" cy="12" r="1.8"></circle><circle cx="19" cy="12" r="1.8"></circle></svg></button>
+</div>
+</div>
+
+<div style="flex-grow: 1; min-height: 0; display: grid; grid-template-columns: 520px minmax(0, 1fr); gap: 20px;">
+
+<div style="display: flex; flex-direction: column; gap: 20px;">
+<section aria-labelledby="loc-title" style="padding: 18px; display: flex; flex-direction: column; gap: 12px; background: #FFFFFF; border: 1px solid #C9C9C3; border-radius: 6px;">
+<h2 id="loc-title" style="margin: 0; font-size: 16px; font-weight: 600;">Save locations</h2>
+<div style="padding: 12px; display: flex; flex-direction: column; gap: 6px; border: 1px solid #DDDDD8; border-radius: 6px;">
+<div style="display: flex; justify-content: space-between; gap: 12px;"><span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px;">&lt;installDir&gt;/b1/Saved/SaveGames/**</span><span style="font-size: 12px; padding: 2px 8px; border: 1px solid #8E8E88; border-radius: 999px;">Save</span></div>
+<div style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #5C5C57;">G:\Black Myth Wukong\b1\Saved\SaveGames</div>
+<div style="font-size: 13px; color: #5C5C57;">3 files · 0.5 MB · found by engine rule (Unreal project b1) · confirmed Sep 27</div>
+</div>
+<div style="display: flex; gap: 10px;">
+<button type="button" style="height: 36px; padding: 0 14px; border-radius: 6px; border: 1px solid #8E8E88; background: #FFFFFF; color: #1F1F1F; font: inherit; cursor: pointer;">Open folder</button>
+<button type="button" style="height: 36px; padding: 0 14px; border-radius: 6px; border: 1px solid #8E8E88; background: #FFFFFF; color: #1F1F1F; font: inherit; cursor: pointer;">Add path</button>
+<button type="button" style="height: 36px; padding: 0 14px; border-radius: 6px; border: 1px solid #8E8E88; background: #FFFFFF; color: #1F1F1F; font: inherit; cursor: pointer;">Learn mode</button>
+</div>
+</section>
+
+<section aria-labelledby="act-title" style="flex-grow: 1; padding: 18px; display: flex; flex-direction: column; gap: 10px; background: #FFFFFF; border: 1px solid #C9C9C3; border-radius: 6px;">
+<h2 id="act-title" style="margin: 0; font-size: 16px; font-weight: 600;">Activity</h2>
+<div style="display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 8px 12px; font-size: 13px;">
+<span style="font-family: 'IBM Plex Mono', monospace; color: #5C5C57;">Sep 23 21:10</span><span>Uploaded the new version to Google Drive</span>
+<span style="font-family: 'IBM Plex Mono', monospace; color: #5C5C57;">Sep 23 21:09</span><span>Session ended; save files settled</span>
+<span style="font-family: 'IBM Plex Mono', monospace; color: #5C5C57;">Sep 23 18:02</span><span>Started from GameSync; cloud was up to date</span>
+<span style="font-family: 'IBM Plex Mono', monospace; color: #5C5C57;">Sep 20 18:05</span><span>Game update found; kept the old save first</span>
+</div>
+</section>
+</div>
+
+<section aria-labelledby="hist-title" style="padding: 18px; display: flex; flex-direction: column; gap: 12px; background: #FFFFFF; border: 1px solid #C9C9C3; border-radius: 6px;">
+<div style="display: flex; align-items: baseline; justify-content: space-between;">
+<h2 id="hist-title" style="margin: 0; font-size: 16px; font-weight: 600;">History</h2>
+<span style="font-size: 13px; color: #5C5C57;">Every version is kept</span>
+</div>
+<table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+<thead>
+<tr style="text-align: left; color: #5C5C57;">
+<th scope="col" style="padding: 8px 10px; font-weight: 500;">Saved</th>
+<th scope="col" style="padding: 8px 10px; font-weight: 500;">PC</th>
+<th scope="col" style="padding: 8px 10px; font-weight: 500;">Note</th>
+<th scope="col" style="padding: 8px 10px; font-weight: 500; text-align: right;">Actions</th>
+</tr>
+</thead>
+<tbody>
+<tr style="border-top: 1px solid #DDDDD8;">
+<td style="padding: 8px 10px; font-family: 'IBM Plex Mono', monospace;">Sep 23 21:10</td>
+<td style="padding: 8px 10px;">DESKTOP</td>
+<td style="padding: 8px 10px;"><span style="padding: 2px 8px; border-radius: 999px; background: #1F1F1F; color: #FFFFFF; font-size: 12px;">Current</span></td>
+<td style="padding: 8px 10px; text-align: right;"><button type="button" style="height: 30px; padding: 0 12px; border-radius: 6px; border: 1px solid #8E8E88; background: #FFFFFF; color: #1F1F1F; font: inherit; font-size: 13px; cursor: pointer;">Export</button></td>
+</tr>
+<tr style="border-top: 1px solid #DDDDD8;">
+<td style="padding: 8px 10px; font-family: 'IBM Plex Mono', monospace;">Sep 21 22:47</td>
+<td style="padding: 8px 10px;">LAPTOP</td>
+<td style="padding: 8px 10px; color: #5C5C57;"></td>
+<td style="padding: 8px 10px; text-align: right;"><div style="display: flex; justify-content: flex-end; gap: 8px;"><button type="button" style="height: 30px; padding: 0 12px; border-radius: 6px; border: 1px solid #8E8E88; background: #FFFFFF; color: #1F1F1F; font: inherit; font-size: 13px; cursor: pointer;">Restore</button><button type="button" style="height: 30px; padding: 0 12px; border-radius: 6px; border: 1px solid #8E8E88; background: #FFFFFF; color: #1F1F1F; font: inherit; font-size: 13px; cursor: pointer;">Export</button></div></td>
+</tr>
+<tr style="border-top: 1px solid #DDDDD8; background: #F4F4F1;">
+<td style="padding: 8px 10px; font-family: 'IBM Plex Mono', monospace;">Sep 20 18:05</td>
+<td style="padding: 8px 10px;">DESKTOP</td>
+<td style="padding: 8px 10px;"><span style="display: inline-flex; align-items: center; gap: 6px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M12 2l3 7h7l-5.5 4.5L18.5 21 12 16.5 5.5 21l2-7.5L2 9h7z"></path></svg>Pinned: before game update</span></td>
+<td style="padding: 8px 10px; text-align: right;"><div style="display: flex; justify-content: flex-end; gap: 8px;"><button type="button" style="height: 30px; padding: 0 12px; border-radius: 6px; border: 1px solid #8E8E88; background: #FFFFFF; color: #1F1F1F; font: inherit; font-size: 13px; cursor: pointer;">Restore</button><button type="button" style="height: 30px; padding: 0 12px; border-radius: 6px; border: 1px solid #8E8E88; background: #FFFFFF; color: #1F1F1F; font: inherit; font-size: 13px; cursor: pointer;">Export</button></div></td>
+</tr>
+<tr style="border-top: 1px solid #DDDDD8;">
+<td style="padding: 8px 10px; font-family: 'IBM Plex Mono', monospace;">Sep 18 23:31</td>
+<td style="padding: 8px 10px;">DESKTOP</td>
+<td style="padding: 8px 10px; color: #5C5C57;"></td>
+<td style="padding: 8px 10px; text-align: right;"><div style="display: flex; justify-content: flex-end; gap: 8px;"><button type="button" style="height: 30px; padding: 0 12px; border-radius: 6px; border: 1px solid #8E8E88; background: #FFFFFF; color: #1F1F1F; font: inherit; font-size: 13px; cursor: pointer;">Restore</button><button type="button" style="height: 30px; padding: 0 12px; border-radius: 6px; border: 1px solid #8E8E88; background: #FFFFFF; color: #1F1F1F; font: inherit; font-size: 13px; cursor: pointer;">Export</button></div></td>
+</tr>
+<tr style="border-top: 1px solid #DDDDD8;">
+<td style="padding: 8px 10px; font-family: 'IBM Plex Mono', monospace;">Sep 16 20:12</td>
+<td style="padding: 8px 10px;">LAPTOP</td>
+<td style="padding: 8px 10px; color: #5C5C57;"></td>
+<td style="padding: 8px 10px; text-align: right;"><div style="display: flex; justify-content: flex-end; gap: 8px;"><button type="button" style="height: 30px; padding: 0 12px; border-radius: 6px; border: 1px solid #8E8E88; background: #FFFFFF; color: #1F1F1F; font: inherit; font-size: 13px; cursor: pointer;">Restore</button><button type="button" style="height: 30px; padding: 0 12px; border-radius: 6px; border: 1px solid #8E8E88; background: #FFFFFF; color: #1F1F1F; font: inherit; font-size: 13px; cursor: pointer;">Export</button></div></td>
+</tr>
+</tbody>
+</table>
+<p style="margin: 0; font-size: 13px; color: #5C5C57;">Restoring archives the current files first, so it can always be undone.</p>
+</section>
+</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":800}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

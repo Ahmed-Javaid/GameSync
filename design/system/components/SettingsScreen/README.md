@@ -1,0 +1,1 @@
+Showcase of Settings. Appearance re-themes the whole screen live as you pick a mode, preset or colour; Storage and folders shows the backup folder (press Change… to watch a move), history to keep, game folders, extra save folders and where shared zips go. The other sections cover backup time, conflicts, cloud, devices, notifications and safety.

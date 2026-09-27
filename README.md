@@ -1,0 +1,32 @@
+# GameSync
+
+A Windows app that backs up your game saves, syncs them between your PCs, launches your games, and shows every problem on the game it belongs to. Built to replace Ludusavi and Playnite for its author and a few friends.
+
+## Status
+
+Milestone 1 of 6 is done: the sync engine, as a command-line tool, with a local folder standing in for the cloud. Google Drive and syncing between two PCs come next. There's no app to install yet.
+
+## What it promises
+
+- Every version of a save is kept forever, unless you thin a game's history yourself.
+- Between PCs, the newest save wins and the other one is pinned, ready to swap back. It never picks by itself on a PC's first sync, when a save lost more than half its files or size, or when a save changed while the game wasn't running.
+- Only save data moves. Program files are never backed up or restored, and restores write only inside the game's own save folders.
+- It never touches a running game beyond checking that it runs: no injection, overlays or drivers.
+
+## Build and test
+
+You need Windows and the .NET 10 SDK.
+
+```powershell
+dotnet build GameSync.sln
+dotnet test GameSync.sln
+```
+
+`docs/milestone-1.md` shows how to try the command line, and how to run every test on copies of real saves.
+
+## Docs
+
+- `docs/design.md`: the full design
+- `docs/requirements.md`: every requirement, each with an ID and a test
+- `docs/milestone-1.md`: what's built so far, and its known limits
+- `design/system/`: the UI design system (open `design/system/viewer.html`)

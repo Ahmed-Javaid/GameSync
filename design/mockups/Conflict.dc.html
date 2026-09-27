@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Conflict wireframe</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#EFEFEC}
+a{color:#1F1F1F}a:hover{color:#000000}
+</style>
+</helmet>
+<div style="width: 1280px; height: 800px; box-sizing: border-box; display: flex; flex-direction: column; background: #EFEFEC; color: #1F1F1F; font-family: 'IBM Plex Sans', system-ui, sans-serif; font-size: 14px;">
+
+<header style="height: 56px; flex-shrink: 0; box-sizing: border-box; padding: 0 28px; display: flex; align-items: center; gap: 32px; background: #FFFFFF; border-bottom: 1px solid #C9C9C3;">
+<span style="font-weight: 600; font-size: 17px;">GameSync</span>
+<nav aria-label="Main" style="display: flex; gap: 24px;">
+<a href="#" aria-current="page" style="font-weight: 600; text-underline-offset: 6px;">Library</a>
+<a href="#" style="color: #5C5C57; text-decoration: none;">Plan</a>
+<a href="#" style="color: #5C5C57; text-decoration: none;">Activity</a>
+<a href="#" style="color: #5C5C57; text-decoration: none;">Settings</a>
+</nav>
+<button type="button" style="margin-left: auto; height: 36px; padding: 0 14px; border-radius: 6px; border: 1px solid #8E8E88; background: #FFFFFF; color: #1F1F1F; font: inherit; cursor: pointer;">Sync now</button>
+</header>
+
+<div style="flex-grow: 1; min-height: 0; box-sizing: border-box; padding: 24px 28px; display: flex; flex-direction: column; gap: 20px;">
+<a href="#" style="font-size: 13px; color: #5C5C57;">Library / Sekiro: Shadows Die Twice / Conflict</a>
+<div style="display: flex; flex-direction: column; gap: 6px;">
+<h1 style="margin: 0; font-size: 28px; font-weight: 600;">Sekiro: Shadows Die Twice changed on two PCs</h1>
+<p style="margin: 0; color: #5C5C57; font-size: 15px;">Both copies are safe. Choose which one continues; the other stays in history and can be swapped back later.</p>
+</div>
+
+<div style="padding: 14px 16px; display: flex; align-items: center; gap: 12px; background: #FFFFFF; border: 1px dashed #8E8E88; border-radius: 6px;">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v5"></path><path d="M12 16h.01"></path></svg>
+<span style="flex-grow: 1;"><strong style="font-weight: 600;">Suggested: keep DESKTOP's.</strong> It has the newest save. You're asked because this game is set to "always ask".</span>
+<a href="#" style="font-size: 13px;">Change for this game</a>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px;">
+<section aria-labelledby="desk-title" style="padding: 20px; display: flex; flex-direction: column; gap: 14px; background: #FFFFFF; border: 2px solid #1F1F1F; border-radius: 6px;">
+<div style="display: flex; align-items: baseline; justify-content: space-between;">
+<h2 id="desk-title" style="margin: 0; font-size: 18px; font-weight: 600;">This PC: DESKTOP</h2>
+<span style="font-size: 12px; padding: 2px 8px; border-radius: 999px; background: #1F1F1F; color: #FFFFFF;">Newest</span>
+</div>
+<dl style="margin: 0; display: grid; grid-template-columns: 140px minmax(0, 1fr); gap: 8px 12px;">
+<dt style="color: #5C5C57;">Saved</dt><dd style="margin: 0;">Today, 21:04</dd>
+<dt style="color: #5C5C57;">Session</dt><dd style="margin: 0;">1 h 52 min, started from GameSync</dd>
+<dt style="color: #5C5C57;">Size</dt><dd style="margin: 0;">11.4 MB</dd>
+<dt style="color: #5C5C57;">Changed files</dt><dd style="margin: 0; font-family: 'IBM Plex Mono', monospace; font-size: 13px;">S0000.sl2</dd>
+</dl>
+<button type="button" style="align-self: flex-start; height: 44px; padding: 0 20px; border-radius: 6px; border: 0; background: #1F1F1F; color: #FFFFFF; font: inherit; font-weight: 600; cursor: pointer;">Keep DESKTOP's</button>
+</section>
+
+<section aria-labelledby="lap-title" style="padding: 20px; display: flex; flex-direction: column; gap: 14px; background: #FFFFFF; border: 1px solid #C9C9C3; border-radius: 6px;">
+<div style="display: flex; align-items: baseline; justify-content: space-between;">
+<h2 id="lap-title" style="margin: 0; font-size: 18px; font-weight: 600;">Cloud: LAPTOP</h2>
+<span style="font-size: 12px; padding: 2px 8px; border: 1px solid #8E8E88; border-radius: 999px;">Uploaded 19:31</span>
+</div>
+<dl style="margin: 0; display: grid; grid-template-columns: 140px minmax(0, 1fr); gap: 8px 12px;">
+<dt style="color: #5C5C57;">Saved</dt><dd style="margin: 0;">Today, 19:30</dd>
+<dt style="color: #5C5C57;">Session</dt><dd style="margin: 0;">47 min, started from Steam</dd>
+<dt style="color: #5C5C57;">Size</dt><dd style="margin: 0;">11.4 MB</dd>
+<dt style="color: #5C5C57;">Changed files</dt><dd style="margin: 0; font-family: 'IBM Plex Mono', monospace; font-size: 13px;">S0000.sl2</dd>
+</dl>
+<button type="button" style="align-self: flex-start; height: 44px; padding: 0 20px; border-radius: 6px; border: 1px solid #8E8E88; background: #FFFFFF; color: #1F1F1F; font: inherit; font-weight: 600; cursor: pointer;">Keep LAPTOP's</button>
+</section>
+</div>
+
+<div style="display: flex; align-items: center; gap: 16px;">
+<button type="button" style="height: 40px; padding: 0 16px; border-radius: 6px; border: 1px solid #8E8E88; background: #FFFFFF; color: #1F1F1F; font: inherit; cursor: pointer;">Compare files</button>
+<button type="button" style="height: 40px; padding: 0 16px; border-radius: 6px; border: 1px solid #8E8E88; background: #FFFFFF; color: #1F1F1F; font: inherit; cursor: pointer;">Decide later</button>
+<span style="color: #5C5C57; font-size: 13px;">Until you decide, this game won't upload or download, and each PC keeps playing its own copy.</span>
+</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":800}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <AssemblyName>gamesync</AssemblyName>
+    <RootNamespace>GameSync.App</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\GameSync.Core\GameSync.Core.csproj" />
+    <ProjectReference Include="..\GameSync.Windows\GameSync.Windows.csproj" />
+  </ItemGroup>
+
+</Project>

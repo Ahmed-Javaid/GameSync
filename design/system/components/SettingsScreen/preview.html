@@ -1,0 +1,116 @@
+<!-- @dsCard group="Screens" height=800 width=1280 page=true subtitle="Settings: Appearance re-themes the whole screen live; Storage and folders" -->
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>preview</title>
+<style>html,body{margin:0;background:var(--bg-100);} .pv{padding:24px;} </style>
+</head>
+<body class="gs-root">
+<div id="root"></div>
+<script>
+var G = window.GameSync, h = React.createElement;
+
+var ART = "data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%201200%20500%27%20preserveAspectRatio%3D%27xMidYMid%20slice%27%3E%3Crect%20width%3D%271200%27%20height%3D%27500%27%20fill%3D%27%231b2a33%27/%3E%3Ccircle%20cx%3D%27860%27%20cy%3D%27150%27%20r%3D%2770%27%20fill%3D%27%237fe6f2%27%20opacity%3D%27.35%27/%3E%3Cpath%20d%3D%27M0%20330%20L180%20200%20L330%20300%20L520%20150%20L700%20290%20L880%20190%20L1200%20320%20V500%20H0Z%27%20fill%3D%27%23223640%27/%3E%3Cpath%20d%3D%27M0%20400%20L220%20290%20L420%20380%20L640%20270%20L860%20370%20L1040%20300%20L1200%20360%20V500%20H0Z%27%20fill%3D%27%23182730%27/%3E%3Cpath%20d%3D%27M0%20460%20L300%20390%20L600%20450%20L900%20380%20L1200%20440%20V500%20H0Z%27%20fill%3D%27%2310191f%27/%3E%3C/svg%3E";
+var COVERS = ["data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%20200%20300%27%3E%3Crect%20width%3D%27200%27%20height%3D%27300%27%20fill%3D%27%232b2220%27/%3E%3Ccircle%20cx%3D%27140%27%20cy%3D%2790%27%20r%3D%2738%27%20fill%3D%27%23e0b36a%27%20opacity%3D%27.5%27/%3E%3Cpath%20d%3D%27M0%20220%20L70%20160%20L130%20210%20L200%20150%20V300%20H0Z%27%20fill%3D%27%23e0b36a%27%20opacity%3D%27.35%27/%3E%3C/svg%3E", "data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%20200%20300%27%3E%3Crect%20width%3D%27200%27%20height%3D%27300%27%20fill%3D%27%231d2a24%27/%3E%3Ccircle%20cx%3D%27140%27%20cy%3D%2790%27%20r%3D%2738%27%20fill%3D%27%237fd1a6%27%20opacity%3D%27.5%27/%3E%3Cpath%20d%3D%27M0%20220%20L70%20160%20L130%20210%20L200%20150%20V300%20H0Z%27%20fill%3D%27%237fd1a6%27%20opacity%3D%27.35%27/%3E%3C/svg%3E", "data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%20200%20300%27%3E%3Crect%20width%3D%27200%27%20height%3D%27300%27%20fill%3D%27%23221f33%27/%3E%3Ccircle%20cx%3D%27140%27%20cy%3D%2790%27%20r%3D%2738%27%20fill%3D%27%23b9a3ff%27%20opacity%3D%27.5%27/%3E%3Cpath%20d%3D%27M0%20220%20L70%20160%20L130%20210%20L200%20150%20V300%20H0Z%27%20fill%3D%27%23b9a3ff%27%20opacity%3D%27.35%27/%3E%3C/svg%3E", "data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%20200%20300%27%3E%3Crect%20width%3D%27200%27%20height%3D%27300%27%20fill%3D%27%231d2630%27/%3E%3Ccircle%20cx%3D%27140%27%20cy%3D%2790%27%20r%3D%2738%27%20fill%3D%27%237fe6f2%27%20opacity%3D%27.5%27/%3E%3Cpath%20d%3D%27M0%20220%20L70%20160%20L130%20210%20L200%20150%20V300%20H0Z%27%20fill%3D%27%237fe6f2%27%20opacity%3D%27.35%27/%3E%3C/svg%3E", "data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%20200%20300%27%3E%3Crect%20width%3D%27200%27%20height%3D%27300%27%20fill%3D%27%232c2519%27/%3E%3Ccircle%20cx%3D%27140%27%20cy%3D%2790%27%20r%3D%2738%27%20fill%3D%27%23f2b544%27%20opacity%3D%27.5%27/%3E%3Cpath%20d%3D%27M0%20220%20L70%20160%20L130%20210%20L200%20150%20V300%20H0Z%27%20fill%3D%27%23f2b544%27%20opacity%3D%27.35%27/%3E%3C/svg%3E", "data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%20200%20300%27%3E%3Crect%20width%3D%27200%27%20height%3D%27300%27%20fill%3D%27%2322262b%27/%3E%3Ccircle%20cx%3D%27140%27%20cy%3D%2790%27%20r%3D%2738%27%20fill%3D%27%23a4abb3%27%20opacity%3D%27.5%27/%3E%3Cpath%20d%3D%27M0%20220%20L70%20160%20L130%20210%20L200%20150%20V300%20H0Z%27%20fill%3D%27%23a4abb3%27%20opacity%3D%27.35%27/%3E%3C/svg%3E", "data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%20200%20300%27%3E%3Crect%20width%3D%27200%27%20height%3D%27300%27%20fill%3D%27%232a1f24%27/%3E%3Ccircle%20cx%3D%27140%27%20cy%3D%2790%27%20r%3D%2738%27%20fill%3D%27%23ff8a7d%27%20opacity%3D%27.5%27/%3E%3Cpath%20d%3D%27M0%20220%20L70%20160%20L130%20210%20L200%20150%20V300%20H0Z%27%20fill%3D%27%23ff8a7d%27%20opacity%3D%27.35%27/%3E%3C/svg%3E"];
+var GAMES = [
+  {id:'sekiro', name:'Sekiro: Shadows Die Twice', art:COVERS[0], status:'conflict', play:'61 h', last:'Today 21:04', path:'%APPDATA%\\Sekiro\\76561198\\S0000.sl2', size:2202009, versions:14, backup:'21:04 today'},
+  {id:'terraria', name:'Terraria', art:COVERS[1], status:'synced', play:'214 h', last:'Yesterday', path:'Documents\\My Games\\Terraria\\', size:341835776, versions:52, backup:'20:00 today'},
+  {id:'sts2', name:'Slay the Spire 2', art:COVERS[2], status:'playing', play:'38 h', last:'Now', path:'%APPDATA%\\SlayTheSpire2\\saves', size:913408, versions:23, backup:'18:40 today'},
+  {id:'cuphead', name:'Cuphead', art:COVERS[3], status:'newer-in-cloud', play:'22 h', last:'20 Sep', path:'LocalLow\\StudioMDHR\\Cuphead', size:48128, versions:9, backup:'20 Sep'},
+  {id:'wukong', name:'Black Myth: Wukong', art:COVERS[4], status:'held', play:'74 h', last:'18 Sep', path:'G:\\Black Myth Wukong\\b1\\Saved\\SaveGames', size:31457280, versions:17, backup:'18 Sep'},
+  {id:'ds3', name:'Dark Souls III', art:COVERS[5], status:'backup-only', play:'96 h', last:'2 Sep', path:'%APPDATA%\\DarkSoulsIII\\0110000', size:6815744, versions:31, backup:'2 Sep'},
+  {id:'gtav', name:'GTA V Enhanced', art:COVERS[6], status:'synced', play:'40 h', last:'29 Aug', path:'Documents\\Rockstar Games\\GTAV Enhanced\\Profiles', size:12582912, versions:11, backup:'29 Aug', blocked:'Ships an anti-cheat and has an online mode, so it can\u2019t be shared.'}
+];
+function shareGames(){ return GAMES.map(function(g){var vs=[{id:'latest',label:'Latest',when:g.backup,pc:'DESKTOP',size:g.size},{id:'prev',label:'Previous',when:'1 day earlier',pc:'LAPTOP',size:Math.round(g.size*0.97)}];if(g.id==='sekiro')vs.push({id:'pin',label:'Before update 1.06',when:'12 Sep',pc:'DESKTOP',size:2097152,pinned:true});return {id:g.id,name:g.name,art:g.art,size:g.size,totalSize:Math.round(g.size*Math.min(g.versions,10)*0.35),versionCount:Math.min(g.versions,10),versions:vs,blocked:g.blocked};}); }
+var IMPORT_ITEMS = [
+  {id:'terraria', name:'Terraria', art:COVERS[1], match:'matched', versions:1, size:338000000},
+  {id:'sekiro', name:'Sekiro: Shadows Die Twice', art:COVERS[0], match:'matched', versions:2, size:4299161, warn:'Made on another Steam account. FromSoftware saves check the account, so it may not load.'},
+  {id:'hk', name:'Hollow Knight', art:null, match:'not-installed', versions:1, size:1153434, removed:'1 program file (launcher.dll) was left out.'},
+  {id:'mystery', name:'Unknown game (a friend’s custom entry)', art:null, match:'unknown', versions:1, size:524288}
+];
+
+
+function rail(cur){return h(G.SideRail,{current:cur,items:[
+  {id:'search',icon:'search',label:'Search'},
+  {id:'home',icon:'home',label:'Home',sep:true},
+  {id:'library',icon:'library',label:'Game library',dot:'play',dotLabel:'Slay the Spire 2 is running'},
+  {id:'saves',icon:'saves',label:'Save manager',sep:true,dot:'warn',dotLabel:'2 games need you'},
+  {id:'log',icon:'terminal',label:'Console'},
+  {id:'settings',icon:'settings',label:'Settings',bottom:true}]})}
+function topbar(title,sub,tabs,right){return h('header',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',gap:16}},h('div',null,h('div',{style:{font:'600 15px/20px var(--font-sans)'}},title),h('div',{className:'gs-faint',style:{fontSize:12}},sub)),tabs,h('div',{className:'gs-row',style:{flexWrap:'nowrap'}},right));}
+
+var SECTIONS=[{id:'appearance',label:'Appearance',icon:'palette'},{id:'storage',label:'Storage and folders',icon:'drive'},{id:'backup',label:'Backup and sync',icon:'sync'},{id:'cloud',label:'Cloud',icon:'cloud'},{id:'devices',label:'Devices',icon:'monitor'},{id:'notifications',label:'Notifications',icon:'bell'},{id:'safety',label:'Safety',icon:'shield'}];
+function currentId(){return document.documentElement.getAttribute('data-theme')||'dark';}
+function fresh(){return Object.assign({primary:null,secondary:null,system:false},G.theme.fromThemeId(currentId()));}
+function Page(p){return h('div',{style:{display:'flex',flexDirection:'column',gap:16,maxWidth:920}},h('header',{style:{marginBottom:4}},h('h1',{style:{margin:0,font:'600 24px/30px var(--font-sans)'}},p.title),h('p',{className:'gs-muted',style:{margin:'4px 0 0'}},p.sub)),p.children);}
+function App(){
+ var t=React.useState(fresh), th=t[0];
+ function set(x){t[1](Object.assign({},th,x));}
+ React.useEffect(function(){var mo=new MutationObserver(function(){t[1](fresh())});mo.observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});return function(){mo.disconnect()}},[]);
+ var sec=React.useState('appearance');
+ var mode=th.system?(window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches?'light':'dark'):th.mode;
+ var opts={preset:th.preset,mode:mode,pureBlack:th.pureBlack&&mode==='dark',primary:th.primary,secondary:th.secondary,accent:'#0078d4'};
+ var pre=G.theme.preset(th.preset);
+ var pv=th.primary||pre.primary, sv=th.secondary||pre.secondary;
+ var backup=React.useState({path:'E:\\Saves and Backups\\Games\\GameSync',state:'ok',progress:0});
+ var bk=backup[0];
+ function moveBackups(){var p=0;backup[1]({path:'F:\\GameSync',state:'moving',progress:0});var iv=setInterval(function(){p+=9;if(p>=100){clearInterval(iv);backup[1]({path:'F:\\GameSync',state:'ok',progress:100,moved:true});}else backup[1]({path:'F:\\GameSync',state:'moving',progress:p});},180);}
+ var keep=React.useState('recent');
+ var scan=React.useState([{path:'E:\\Games',meta:'16 games'},{path:'G:\\',meta:'3 games'}]);
+ var extra=React.useState([{path:'D:\\Portable Games\\Saves',meta:'Watched for saves'},{path:'D:\\OldPC\\userdata',tag:'By game ID',meta:'Subfolders are Steam app IDs'}]);
+ var ask=React.useState(false), hold=React.useState(true), daily=React.useState(false), snaps=React.useState(true), admin=React.useState(false), policy=React.useState('newest');
+ var views={
+  appearance:function(){return h(Page,{title:'Appearance',sub:'Changes apply straight away and are saved on this PC only.'},
+    h(G.Card,{title:'Theme',subtitle:pre.dynamic?'Follows your Windows accent colour.':pre.note,action:h(G.PillTabs,{label:'Mode',value:th.system?'system':th.mode,onChange:function(v){set(v==='system'?{system:true}:{system:false,mode:v})},items:[{id:'dark',label:'Dark',icon:'moon'},{id:'light',label:'Light',icon:'sun'},{id:'system',label:'Match Windows',icon:'monitor'}]})},
+      h(G.ThemePicker,{value:th.preset,mode:mode,pureBlack:opts.pureBlack,accent:opts.accent,onChange:function(id){set({preset:id,primary:null,secondary:null})}}),
+      h(G.SettingsRow,{title:'Pure black backgrounds',description:mode==='light'?'Dark mode only.':'For OLED screens: the page and side rail turn fully black.',disabled:mode==='light'},h(G.Switch,{label:'Pure black backgrounds',checked:opts.pureBlack,disabled:mode==='light',onChange:function(v){set({pureBlack:v})}}))),
+    h(G.Card,{title:'Colours',subtitle:'Each theme sets both; change either one here.',action:h(G.Button,{size:'sm',variant:'ghost',icon:'reset',onClick:function(){t[1]({preset:'arcade',mode:'dark',pureBlack:false,primary:null,secondary:null,system:false})}},'Reset to default')},
+      h(G.SettingsRow,{title:'Primary',description:'Main buttons, progress, focus rings and your busiest days.'},h(G.ColorSwatchPicker,{role:'primary',value:pv,theme:opts,onChange:function(id){set({primary:id})}})),
+      h(G.SettingsRow,{title:'Secondary',description:'Selection, the page you\u2019re on and tab counts.'},h(G.ColorSwatchPicker,{role:'secondary',value:sv,theme:opts,onChange:function(id){set({secondary:id})}})),
+      h('div',{className:'gs-note'},h(G.Icon,{name:'info',size:16}),'Status colours never change: Synced, Needs you, Playing and Blocked keep their colours in every theme, with an icon and a word. Custom colours come later.')));},
+  storage:function(){return h(Page,{title:'Storage and folders',sub:'Where GameSync keeps backups on this PC, and where it looks for games and saves.'},
+    h(G.Card,{title:'Backup folder',subtitle:'Your saves\u2019 history on this PC. The cloud keeps every version either way.'},
+      h(G.FolderField,{path:bk.path,state:bk.state,progress:bk.progress,message:'Moving 1,340 files, checking each hash before removing the old copy',meta:bk.moved?'Moved and checked. The old folder was removed.':'1.04 GB \u00b7 214 versions \u00b7 312 GB free on '+bk.path.slice(0,2),onChange:moveBackups}),
+      h(G.SettingsRow,{title:'History to keep on this PC',description:keep[0]==='recent'?'The last 10 versions of each game, up to 2 GB in total.':'A full copy of every version, as in the cloud. Needs about 3.8 GB now.'},h(G.PillTabs,{label:'History to keep',value:keep[0],onChange:keep[1],items:[{id:'recent',label:'Recent'},{id:'all',label:'Everything'}]}))),
+    h('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16}},
+      h(G.Card,{title:'Game folders to scan',subtitle:'For games outside Steam, Epic, EA and Xbox.'},h(G.FolderList,{items:scan[0],onRemove:function(it){scan[1](scan[0].filter(function(x){return x!==it}))},onAdd:function(){scan[1](scan[0].concat([{path:'F:\\Games',meta:'Scanning\u2026'}]))}})),
+      h(G.Card,{title:'Extra save folders',subtitle:'Saves outside the usual places. Kept on this PC only.'},h(G.FolderList,{items:extra[0],onRemove:function(it){extra[1](extra[0].filter(function(x){return x!==it}))},onAdd:function(){extra[1](extra[0].concat([{path:'E:\\Emulated\\saves',meta:'Watched for saves'}]))}}))),
+    h(G.Card,{title:'Shared zips'},
+      h(G.FolderField,{path:'C:\\Users\\You\\Downloads',meta:'Where Share saves puts its zip files'}),
+      h(G.SettingsRow,{title:'Ask where to save each time'},h(G.Switch,{label:'Ask where to save each time',checked:ask[0],onChange:ask[1]}))));},
+  backup:function(){return h(Page,{title:'Backup and sync',sub:'Most syncing happens when you quit a game. The daily backup is the safety net.'},
+    h(G.Card,{title:'Daily backup'},
+      h(G.SettingsRow,{title:'Time',description:'Pick a time your PC is usually on. If it\u2019s off then, the backup runs about 10 minutes after the next sign-in.'},h('span',{className:'gs-mono',style:{fontSize:15}},'20:00'),h(G.Button,{size:'sm',variant:'secondary',icon:'clock'},'Change')),
+      h(G.SettingsRow,{title:'Last run',description:'Today 20:00 \u00b7 12 games checked \u00b7 1 uploaded \u00b7 running games are always skipped'},h(G.Button,{size:'sm',variant:'secondary',icon:'sync'},'Run now'))),
+    h(G.Card,{title:'When two PCs disagree'},
+      h(G.SettingsRow,{title:'Default for every game',description:'Newest wins keeps the other side pinned, with a Swap button. GameSync always asks on a first sync, a save that shrank by half, changes outside a session, or a wrong clock.'},h(G.PillTabs,{label:'Conflict default',value:policy[0],onChange:policy[1],items:[{id:'newest',label:'Newest wins'},{id:'ask',label:'Always ask'}]})),
+      h(G.SettingsRow,{title:'Snapshot long sessions',description:'A local copy every 30 minutes, never uploaded before you quit.'},h(G.Switch,{label:'Snapshot long sessions',checked:snaps[0],onChange:snaps[1]}))));},
+  cloud:function(){return h(Page,{title:'Cloud',sub:'Your saves live in your own Google Drive.'},
+    h(G.Card,{title:'Google Drive'},
+      h(G.SettingsRow,{title:'Signed in',description:'GameSync can only see the folder it made, not the rest of your Drive.'},h(G.Button,{size:'sm',variant:'secondary',icon:'folder'},'Open folder in Drive'),h(G.Button,{size:'sm',variant:'ghost'},'Sign out')),
+      h(G.ProgressBar,{value:7,label:'Drive storage, shared with Gmail and Photos',right:'1.04 of 15 GB'})),
+    h(G.Card,{title:'Encryption'},h(G.SettingsRow,{title:'Encrypt everything in the cloud',tag:'Later',description:'Private, but no readable copy in Drive, and losing the recovery code locks the cloud copy.',disabled:true},h(G.Switch,{label:'Encrypt everything in the cloud',disabled:true}))));},
+  devices:function(){return h(Page,{title:'Devices',sub:'Every PC that syncs with this Google account.'},
+    h(G.Card,{title:'PCs'},
+      h(G.SettingsRow,{title:h('span',{className:'gs-mono'},'DESKTOP'),description:'This PC \u00b7 GameSync 1.0'},h(G.Button,{size:'sm',variant:'secondary',icon:'pencil'},'Rename')),
+      h(G.SettingsRow,{title:h('span',{className:'gs-mono'},'LAPTOP'),description:'Last seen today 19:31 \u00b7 GameSync 1.0'},h(G.Button,{size:'sm',variant:'secondary',icon:'pencil'},'Rename'))));},
+  notifications:function(){return h(Page,{title:'Notifications',sub:'Only for things that need you: a conflict, an expired sign-in, saves not found, a blocked file.'},
+    h(G.Card,{title:'Windows notifications'},
+      h(G.SettingsRow,{title:'Hold while a fullscreen game runs',description:'Shown after you quit, so nothing pops up mid-game.'},h(G.Switch,{label:'Hold while a fullscreen game runs',checked:hold[0],onChange:hold[1]})),
+      h(G.SettingsRow,{title:'Daily summary',description:'One line after the daily backup: what was checked and what changed.'},h(G.Switch,{label:'Daily summary',checked:daily[0],onChange:daily[1]}))));},
+  safety:function(){return h(Page,{title:'Safety',sub:'Only save data ever moves, and nothing touches a running game beyond watching it.'},
+    h(G.Card,{title:'Learn mode'},
+      h(G.SettingsRow,{title:'Let learn mode ask for admin',description:'One session at a time, to find saves the folder watcher can\u2019t see. Never for games with an anti-cheat.'},h(G.Switch,{label:'Let learn mode ask for admin',checked:admin[0],onChange:admin[1]}))),
+    h(G.Card,{title:'Games with an anti-cheat',subtitle:'No learn mode and no sharing; they launch only through their own launcher.'},
+      h(G.FolderList,{items:[{path:'Apex Legends',icon:'shield',tag:'EasyAntiCheat'},{path:'Helldivers 2',icon:'shield',tag:'GameGuard'},{path:'Rocket League',icon:'shield',tag:'EasyAntiCheat'},{path:'GTA V Enhanced',icon:'shield',tag:'BattlEye'}]})));}
+ };
+ return h(G.ThemeScope,{theme:opts,style:{width:1280,height:800,display:'flex',overflow:'hidden'}},
+  rail('settings'),
+  h('div',{style:{width:248,flexShrink:0,padding:'24px 12px',borderRight:'1px solid var(--line-100)',display:'flex',flexDirection:'column',gap:16}},
+    h('div',{style:{font:'600 15px/20px var(--font-sans)',padding:'0 12px'}},'Settings'),
+    h(G.SettingsNav,{items:SECTIONS,current:sec[0],onChange:sec[1]})),
+  h('main',{style:{flex:1,minWidth:0,padding:'24px 32px',overflow:'auto'}},views[sec[0]]()));
+}
+ReactDOM.createRoot(document.getElementById('root')).render(h(App));
+</script>
+</body>
+</html>

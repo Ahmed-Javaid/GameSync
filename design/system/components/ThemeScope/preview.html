@@ -1,0 +1,44 @@
+<!-- @dsCard group="Appearance" height=300 subtitle="The same components under four themes" -->
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>preview</title>
+<style>html,body{margin:0;background:var(--bg-100);} .pv{padding:24px;} </style>
+</head>
+<body class="gs-root">
+<div id="root" class="pv"></div>
+<script>
+var G = window.GameSync, h = React.createElement;
+
+var ART = "data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%201200%20500%27%20preserveAspectRatio%3D%27xMidYMid%20slice%27%3E%3Crect%20width%3D%271200%27%20height%3D%27500%27%20fill%3D%27%231b2a33%27/%3E%3Ccircle%20cx%3D%27860%27%20cy%3D%27150%27%20r%3D%2770%27%20fill%3D%27%237fe6f2%27%20opacity%3D%27.35%27/%3E%3Cpath%20d%3D%27M0%20330%20L180%20200%20L330%20300%20L520%20150%20L700%20290%20L880%20190%20L1200%20320%20V500%20H0Z%27%20fill%3D%27%23223640%27/%3E%3Cpath%20d%3D%27M0%20400%20L220%20290%20L420%20380%20L640%20270%20L860%20370%20L1040%20300%20L1200%20360%20V500%20H0Z%27%20fill%3D%27%23182730%27/%3E%3Cpath%20d%3D%27M0%20460%20L300%20390%20L600%20450%20L900%20380%20L1200%20440%20V500%20H0Z%27%20fill%3D%27%2310191f%27/%3E%3C/svg%3E";
+var COVERS = ["data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%20200%20300%27%3E%3Crect%20width%3D%27200%27%20height%3D%27300%27%20fill%3D%27%232b2220%27/%3E%3Ccircle%20cx%3D%27140%27%20cy%3D%2790%27%20r%3D%2738%27%20fill%3D%27%23e0b36a%27%20opacity%3D%27.5%27/%3E%3Cpath%20d%3D%27M0%20220%20L70%20160%20L130%20210%20L200%20150%20V300%20H0Z%27%20fill%3D%27%23e0b36a%27%20opacity%3D%27.35%27/%3E%3C/svg%3E", "data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%20200%20300%27%3E%3Crect%20width%3D%27200%27%20height%3D%27300%27%20fill%3D%27%231d2a24%27/%3E%3Ccircle%20cx%3D%27140%27%20cy%3D%2790%27%20r%3D%2738%27%20fill%3D%27%237fd1a6%27%20opacity%3D%27.5%27/%3E%3Cpath%20d%3D%27M0%20220%20L70%20160%20L130%20210%20L200%20150%20V300%20H0Z%27%20fill%3D%27%237fd1a6%27%20opacity%3D%27.35%27/%3E%3C/svg%3E", "data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%20200%20300%27%3E%3Crect%20width%3D%27200%27%20height%3D%27300%27%20fill%3D%27%23221f33%27/%3E%3Ccircle%20cx%3D%27140%27%20cy%3D%2790%27%20r%3D%2738%27%20fill%3D%27%23b9a3ff%27%20opacity%3D%27.5%27/%3E%3Cpath%20d%3D%27M0%20220%20L70%20160%20L130%20210%20L200%20150%20V300%20H0Z%27%20fill%3D%27%23b9a3ff%27%20opacity%3D%27.35%27/%3E%3C/svg%3E", "data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%20200%20300%27%3E%3Crect%20width%3D%27200%27%20height%3D%27300%27%20fill%3D%27%231d2630%27/%3E%3Ccircle%20cx%3D%27140%27%20cy%3D%2790%27%20r%3D%2738%27%20fill%3D%27%237fe6f2%27%20opacity%3D%27.5%27/%3E%3Cpath%20d%3D%27M0%20220%20L70%20160%20L130%20210%20L200%20150%20V300%20H0Z%27%20fill%3D%27%237fe6f2%27%20opacity%3D%27.35%27/%3E%3C/svg%3E", "data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%20200%20300%27%3E%3Crect%20width%3D%27200%27%20height%3D%27300%27%20fill%3D%27%232c2519%27/%3E%3Ccircle%20cx%3D%27140%27%20cy%3D%2790%27%20r%3D%2738%27%20fill%3D%27%23f2b544%27%20opacity%3D%27.5%27/%3E%3Cpath%20d%3D%27M0%20220%20L70%20160%20L130%20210%20L200%20150%20V300%20H0Z%27%20fill%3D%27%23f2b544%27%20opacity%3D%27.35%27/%3E%3C/svg%3E", "data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%20200%20300%27%3E%3Crect%20width%3D%27200%27%20height%3D%27300%27%20fill%3D%27%2322262b%27/%3E%3Ccircle%20cx%3D%27140%27%20cy%3D%2790%27%20r%3D%2738%27%20fill%3D%27%23a4abb3%27%20opacity%3D%27.5%27/%3E%3Cpath%20d%3D%27M0%20220%20L70%20160%20L130%20210%20L200%20150%20V300%20H0Z%27%20fill%3D%27%23a4abb3%27%20opacity%3D%27.35%27/%3E%3C/svg%3E", "data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%20200%20300%27%3E%3Crect%20width%3D%27200%27%20height%3D%27300%27%20fill%3D%27%232a1f24%27/%3E%3Ccircle%20cx%3D%27140%27%20cy%3D%2790%27%20r%3D%2738%27%20fill%3D%27%23ff8a7d%27%20opacity%3D%27.5%27/%3E%3Cpath%20d%3D%27M0%20220%20L70%20160%20L130%20210%20L200%20150%20V300%20H0Z%27%20fill%3D%27%23ff8a7d%27%20opacity%3D%27.35%27/%3E%3C/svg%3E"];
+var GAMES = [
+  {id:'sekiro', name:'Sekiro: Shadows Die Twice', art:COVERS[0], status:'conflict', play:'61 h', last:'Today 21:04', path:'%APPDATA%\\Sekiro\\76561198\\S0000.sl2', size:2202009, versions:14, backup:'21:04 today'},
+  {id:'terraria', name:'Terraria', art:COVERS[1], status:'synced', play:'214 h', last:'Yesterday', path:'Documents\\My Games\\Terraria\\', size:341835776, versions:52, backup:'20:00 today'},
+  {id:'sts2', name:'Slay the Spire 2', art:COVERS[2], status:'playing', play:'38 h', last:'Now', path:'%APPDATA%\\SlayTheSpire2\\saves', size:913408, versions:23, backup:'18:40 today'},
+  {id:'cuphead', name:'Cuphead', art:COVERS[3], status:'newer-in-cloud', play:'22 h', last:'20 Sep', path:'LocalLow\\StudioMDHR\\Cuphead', size:48128, versions:9, backup:'20 Sep'},
+  {id:'wukong', name:'Black Myth: Wukong', art:COVERS[4], status:'held', play:'74 h', last:'18 Sep', path:'G:\\Black Myth Wukong\\b1\\Saved\\SaveGames', size:31457280, versions:17, backup:'18 Sep'},
+  {id:'ds3', name:'Dark Souls III', art:COVERS[5], status:'backup-only', play:'96 h', last:'2 Sep', path:'%APPDATA%\\DarkSoulsIII\\0110000', size:6815744, versions:31, backup:'2 Sep'},
+  {id:'gtav', name:'GTA V Enhanced', art:COVERS[6], status:'synced', play:'40 h', last:'29 Aug', path:'Documents\\Rockstar Games\\GTAV Enhanced\\Profiles', size:12582912, versions:11, backup:'29 Aug', blocked:'Ships an anti-cheat and has an online mode, so it can\u2019t be shared.'}
+];
+function shareGames(){ return GAMES.map(function(g){var vs=[{id:'latest',label:'Latest',when:g.backup,pc:'DESKTOP',size:g.size},{id:'prev',label:'Previous',when:'1 day earlier',pc:'LAPTOP',size:Math.round(g.size*0.97)}];if(g.id==='sekiro')vs.push({id:'pin',label:'Before update 1.06',when:'12 Sep',pc:'DESKTOP',size:2097152,pinned:true});return {id:g.id,name:g.name,art:g.art,size:g.size,totalSize:Math.round(g.size*Math.min(g.versions,10)*0.35),versionCount:Math.min(g.versions,10),versions:vs,blocked:g.blocked};}); }
+var IMPORT_ITEMS = [
+  {id:'terraria', name:'Terraria', art:COVERS[1], match:'matched', versions:1, size:338000000},
+  {id:'sekiro', name:'Sekiro: Shadows Die Twice', art:COVERS[0], match:'matched', versions:2, size:4299161, warn:'Made on another Steam account. FromSoftware saves check the account, so it may not load.'},
+  {id:'hk', name:'Hollow Knight', art:null, match:'not-installed', versions:1, size:1153434, removed:'1 program file (launcher.dll) was left out.'},
+  {id:'mystery', name:'Unknown game (a friend’s custom entry)', art:null, match:'unknown', versions:1, size:524288}
+];
+
+function Sample(p){return h(G.ThemeScope,{theme:p.t,style:{padding:16,borderRadius:16,display:'flex',flexDirection:'column',gap:12,minWidth:0}},
+  h('div',{style:{font:'600 13px/18px var(--font-sans)'}},p.name),
+  h(G.PillTabs,{label:'View',items:[{id:'a',label:'Saves'},{id:'b',label:'Log',count:2}],value:'a'}),
+  h('div',{className:'gs-row'},h(G.StatusBadge,{status:'synced'}),h(G.StatusBadge,{status:'conflict'})),
+  h(G.ProgressBar,{value:62,label:'Packing',right:'62%'}),
+  h('div',{className:'gs-row'},h(G.Button,{variant:'primary',size:'sm',icon:'play'},'Play'),h(G.Checkbox,{label:'Picked',checked:true}),h(G.Switch,{label:'On',checked:true})));}
+ReactDOM.createRoot(document.getElementById('root')).render(h('div',{style:{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:12}},
+  h(Sample,{name:'Arcade · Dark',t:{preset:'arcade',mode:'dark'}}),
+  h(Sample,{name:'Sakura · Light',t:{preset:'sakura',mode:'light'}}),
+  h(Sample,{name:'Tidal · Pure black',t:{preset:'tidal',mode:'dark',pureBlack:true}}),
+  h(Sample,{name:'Mono · Light',t:{preset:'mono',mode:'light'}})));
+</script>
+</body>
+</html>

@@ -1,0 +1,52 @@
+{
+  "v": 3,
+  "assetGroups": {
+    "Logos": {
+      "files": {
+        "gamesync-mark.svg": {
+          "blob": "0491a22c253558ae75b84682c6920587",
+          "name": "gamesync-mark.svg",
+          "size": 269,
+          "type": "image/svg+xml"
+        }
+      },
+      "name": "Logos",
+      "order": [
+        "gamesync-mark.svg"
+      ],
+      "tile": "s"
+    }
+  },
+  "blobs": {},
+  "createdOnFiles": {
+    "at": "2026-09-27T13:50:32Z",
+    "v": 1
+  },
+  "docs": {
+    "readme": "project/README.md",
+    "sections": []
+  },
+  "groups": [
+    "Logos"
+  ],
+  "lastChange": {
+    "by": "Vulsight",
+    "at": "2026-09-27T14:53:12Z",
+    "via": "Claude (Cowork)",
+    "note": "Cover art: which Steam image fills each slot and the fallback order, hero logo over hero art, title covers instead of empty tiles."
+  },
+  "layout": "files",
+  "libraries": [
+    {
+      "name": "react",
+      "version": "18"
+    },
+    {
+      "name": "react-dom",
+      "version": "18"
+    }
+  ],
+  "namespace": "GameSync",
+  "sections": {},
+  "title": "GameSync"
+}

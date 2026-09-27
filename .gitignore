@@ -1,0 +1,22 @@
+# Owner's private notes (machine details, local setup)
+notes/
+
+# Reference images saved from other sites; not ours to publish
+Design inspirations/
+
+# Spike scratch output
+spikes/_watchtest/
+
+# .NET build output
+bin/
+obj/
+.vs/
+*.user
+*.suo
+TestResults/
+publish/
+artifacts/
+
+# OS clutter
+Thumbs.db
+desktop.ini

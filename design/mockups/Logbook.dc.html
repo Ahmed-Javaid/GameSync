@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Library, Logbook direction</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&amp;family=Instrument+Serif:ital@0;1&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F6F2EA}
+a{color:#2F5AA8}a:hover{color:#1F3F7A}
+</style>
+</helmet>
+<div style="width: 1280px; height: 800px; box-sizing: border-box; padding: 0 48px; display: flex; flex-direction: column; background: #F6F2EA; color: #1D1B18; font-family: 'Instrument Sans', system-ui, sans-serif; font-size: 14px;">
+
+<header style="padding-top: 26px; display: flex; align-items: center; gap: 40px;">
+<span style="font-family: 'Instrument Serif', Georgia, serif; font-style: italic; font-size: 28px;">GameSync</span>
+<nav aria-label="Main" style="display: flex; gap: 28px;">
+<a href="#" aria-current="page" style="color: #1D1B18; text-decoration: underline; text-underline-offset: 6px; text-decoration-thickness: 2px; font-weight: 600;">Library</a>
+<a href="#" style="color: #5F5A52; text-decoration: none;">Plan</a>
+<a href="#" style="color: #5F5A52; text-decoration: none;">Activity</a>
+<a href="#" style="color: #5F5A52; text-decoration: none;">Settings</a>
+</nav>
+<div style="margin-left: auto; display: flex; align-items: center; gap: 16px;">
+<span style="color: #5F5A52;">DESKTOP · Google Drive</span>
+<button type="button" style="height: 40px; padding: 0 18px; border-radius: 6px; border: 0; background: #2F5AA8; color: #FFFFFF; font: inherit; font-weight: 600; cursor: pointer;">Sync now</button>
+</div>
+</header>
+
+<div style="padding-top: 22px; display: flex; flex-direction: column; gap: 4px;">
+<h1 style="margin: 0; font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; font-size: 46px; line-height: 1.1;">Your saves</h1>
+<p style="margin: 0; font-size: 16px; color: #3D3932;">12 games. Six in sync, one needs you, and one is being played right now.</p>
+</div>
+
+<div style="padding-top: 18px; display: flex; gap: 40px; flex-grow: 1; min-height: 0;">
+
+<div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column;">
+<div style="display: grid; grid-template-columns: 280px 140px 280px 76px; gap: 16px; align-items: end; padding-bottom: 8px; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: #6E675D;">
+<span>Game</span>
+<span>Status</span>
+<span style="display: flex; justify-content: space-between;"><span>Sep 14</span><span>Today</span></span>
+<span style="text-align: right;">Saves</span>
+</div>
+
+<div style="display: grid; grid-template-columns: 280px 140px 280px 76px; gap: 16px; align-items: center; padding: 6px 0; border-top: 1px solid #DDD5C7;">
+<span style="font-family: 'Instrument Serif', Georgia, serif; font-size: 19px;">Ghost of Tsushima DIRECTOR'S CUT</span>
+<span style="display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #2F5AA8;"><svg width="9" height="9" viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5L9 5L1 9.5Z" fill="#2F5AA8"></path></svg>Playing</span>
+<svg width="280" height="24" viewBox="0 0 280 24" role="img" aria-label="Saved on DESKTOP Sep 23; session in progress today"><line x1="0" y1="12" x2="280" y2="12" stroke="#D2C9B8"></line><circle cx="190" cy="12" r="4" fill="#2F5AA8"></circle><circle cx="270" cy="12" r="4" fill="#F6F2EA" stroke="#2F5AA8" stroke-width="1.5"></circle></svg>
+<span style="text-align: right; font-size: 13px; color: #3D3932;">5.3 MB</span>
+</div>
+
+<div style="display: grid; grid-template-columns: 280px 140px 280px 76px; gap: 16px; align-items: center; padding: 6px 0; border-top: 1px solid #DDD5C7; background: #F1E6D9;">
+<span style="font-family: 'Instrument Serif', Georgia, serif; font-size: 19px;">Sekiro: Shadows Die Twice</span>
+<span style="display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #A84E1B;"><span aria-hidden="true" style="width: 8px; height: 8px; border-radius: 50%; background: #A84E1B;"></span>Needs you</span>
+<svg width="280" height="24" viewBox="0 0 280 24" role="img" aria-label="Saved on DESKTOP Sep 25, then on both LAPTOP and DESKTOP today"><line x1="0" y1="12" x2="230" y2="12" stroke="#D2C9B8"></line><path d="M230 12L262 5M230 12L272 19" stroke="#8A8378" fill="none"></path><circle cx="230" cy="12" r="4" fill="#2F5AA8"></circle><rect x="258" y="1" width="8" height="8" fill="#A84E1B"></rect><circle cx="272" cy="19" r="4" fill="#2F5AA8"></circle></svg>
+<span style="text-align: right; font-size: 13px; color: #3D3932;">11.4 MB</span>
+</div>
+
+<div style="display: grid; grid-template-columns: 280px 140px 280px 76px; gap: 16px; align-items: center; padding: 6px 0; border-top: 1px solid #DDD5C7;">
+<span style="font-family: 'Instrument Serif', Georgia, serif; font-size: 19px;">Slay the Spire 2</span>
+<span style="display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #2F5AA8;"><span aria-hidden="true" style="width: 8px; height: 8px; box-sizing: border-box; border-radius: 50%; border: 2px solid #2F5AA8;"></span>Newer in cloud</span>
+<svg width="280" height="24" viewBox="0 0 280 24" role="img" aria-label="Saved on LAPTOP Sep 26"><line x1="0" y1="12" x2="280" y2="12" stroke="#D2C9B8"></line><rect x="246" y="8" width="8" height="8" fill="#A84E1B"></rect></svg>
+<span style="text-align: right; font-size: 13px; color: #3D3932;">27.7 MB</span>
+</div>
+
+<div style="display: grid; grid-template-columns: 280px 140px 280px 76px; gap: 16px; align-items: center; padding: 6px 0; border-top: 1px solid #DDD5C7;">
+<span style="font-family: 'Instrument Serif', Georgia, serif; font-size: 19px;">Ready or Not</span>
+<span style="display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #2F5AA8;"><span aria-hidden="true" style="width: 8px; height: 8px; box-sizing: border-box; border-radius: 50%; border: 2px solid #2F5AA8;"></span>Upload pending</span>
+<svg width="280" height="24" viewBox="0 0 280 24" role="img" aria-label="Saved on DESKTOP Sep 22, not uploaded yet"><line x1="0" y1="12" x2="280" y2="12" stroke="#D2C9B8"></line><circle cx="170" cy="12" r="4" fill="#F6F2EA" stroke="#2F5AA8" stroke-width="1.5"></circle></svg>
+<span style="text-align: right; font-size: 13px; color: #3D3932;">5.3 MB</span>
+</div>
+
+<div style="display: grid; grid-template-columns: 280px 140px 280px 76px; gap: 16px; align-items: center; padding: 6px 0; border-top: 1px solid #DDD5C7;">
+<span style="font-family: 'Instrument Serif', Georgia, serif; font-size: 19px;">Black Myth: Wukong</span>
+<span style="display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #2F5AA8;"><span aria-hidden="true" style="width: 8px; height: 8px; border-radius: 50%; background: #2F5AA8;"></span>Synced</span>
+<svg width="280" height="24" viewBox="0 0 280 24" role="img" aria-label="Saved before a game update Sep 20, then on DESKTOP Sep 23"><line x1="0" y1="12" x2="280" y2="12" stroke="#D2C9B8"></line><path d="M130 6L136 12L130 18L124 12Z" fill="#F6F2EA" stroke="#1D1B18" stroke-width="1.5"></path><circle cx="190" cy="12" r="4" fill="#2F5AA8"></circle></svg>
+<span style="text-align: right; font-size: 13px; color: #3D3932;">2.4 MB</span>
+</div>
+
+<div style="display: grid; grid-template-columns: 280px 140px 280px 76px; gap: 16px; align-items: center; padding: 6px 0; border-top: 1px solid #DDD5C7;">
+<span style="font-family: 'Instrument Serif', Georgia, serif; font-size: 19px;">Child of Light</span>
+<span style="display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #2F5AA8;"><span aria-hidden="true" style="width: 8px; height: 8px; border-radius: 50%; background: #2F5AA8;"></span>Synced</span>
+<svg width="280" height="24" viewBox="0 0 280 24" role="img" aria-label="Saved on DESKTOP Sep 23"><line x1="0" y1="12" x2="280" y2="12" stroke="#D2C9B8"></line><circle cx="190" cy="12" r="4" fill="#2F5AA8"></circle></svg>
+<span style="text-align: right; font-size: 13px; color: #3D3932;">40 KB</span>
+</div>
+
+<div style="display: grid; grid-template-columns: 280px 140px 280px 76px; gap: 16px; align-items: center; padding: 6px 0; border-top: 1px solid #DDD5C7;">
+<span style="font-family: 'Instrument Serif', Georgia, serif; font-size: 19px;">Dark Souls III</span>
+<span style="display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #2F5AA8;"><span aria-hidden="true" style="width: 8px; height: 8px; border-radius: 50%; background: #2F5AA8;"></span>Synced</span>
+<span style="font-size: 13px; font-style: italic; color: #6E675D;">Last change Sep 8</span>
+<span style="text-align: right; font-size: 13px; color: #3D3932;">17.8 MB</span>
+</div>
+
+<div style="display: grid; grid-template-columns: 280px 140px 280px 76px; gap: 16px; align-items: center; padding: 6px 0; border-top: 1px solid #DDD5C7;">
+<span style="font-family: 'Instrument Serif', Georgia, serif; font-size: 19px;">Cuphead</span>
+<span style="display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #2F5AA8;"><span aria-hidden="true" style="width: 8px; height: 8px; border-radius: 50%; background: #2F5AA8;"></span>Synced</span>
+<span style="font-size: 13px; font-style: italic; color: #6E675D;">Last change Sep 5</span>
+<span style="text-align: right; font-size: 13px; color: #3D3932;">0.2 MB</span>
+</div>
+
+<div style="display: grid; grid-template-columns: 280px 140px 280px 76px; gap: 16px; align-items: center; padding: 6px 0; border-top: 1px solid #DDD5C7;">
+<span style="font-family: 'Instrument Serif', Georgia, serif; font-size: 19px;">Terraria</span>
+<span style="display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #2F5AA8;"><span aria-hidden="true" style="width: 8px; height: 8px; border-radius: 50%; background: #2F5AA8;"></span>Synced</span>
+<span style="font-size: 13px; font-style: italic; color: #6E675D;">Last change Jun 21</span>
+<span style="text-align: right; font-size: 13px; color: #3D3932;">325.7 MB</span>
+</div>
+
+<div style="display: grid; grid-template-columns: 280px 140px 280px 76px; gap: 16px; align-items: center; padding: 6px 0; border-top: 1px solid #DDD5C7;">
+<span style="font-family: 'Instrument Serif', Georgia, serif; font-size: 19px; line-height: 1.15;">Guacamelee! Super Turbo Championship Edition</span>
+<span style="display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #2F5AA8;"><span aria-hidden="true" style="width: 8px; height: 8px; border-radius: 50%; background: #2F5AA8;"></span>Synced</span>
+<span style="font-size: 13px; font-style: italic; color: #6E675D;">Last change Mar 28</span>
+<span style="text-align: right; font-size: 13px; color: #3D3932;">0.3 MB</span>
+</div>
+
+<div style="display: grid; grid-template-columns: 280px 140px 280px 76px; gap: 16px; align-items: center; padding: 6px 0; border-top: 1px solid #DDD5C7;">
+<span style="font-family: 'Instrument Serif', Georgia, serif; font-size: 19px;">Cyberpunk 2077</span>
+<span style="display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #6E675D;"><span aria-hidden="true" style="width: 8px; height: 8px; border-radius: 50%; background: #8A8378;"></span>Backup only</span>
+<span style="font-size: 13px; font-style: italic; color: #6E675D;">Last change Sep 10 · store cloud syncs it</span>
+<span style="text-align: right; font-size: 13px; color: #3D3932;">131.2 MB</span>
+</div>
+
+<div style="display: grid; grid-template-columns: 280px 140px 280px 76px; gap: 16px; align-items: center; padding: 6px 0; border-top: 1px solid #DDD5C7; border-bottom: 1px solid #DDD5C7;">
+<span style="font-family: 'Instrument Serif', Georgia, serif; font-size: 19px;">ROUNDS</span>
+<span style="display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #A84E1B;"><span aria-hidden="true" style="width: 8px; height: 8px; box-sizing: border-box; border-radius: 50%; border: 2px solid #A84E1B;"></span>Not found</span>
+<span style="font-size: 13px; font-style: italic; color: #6E675D;">No saves found yet: <a href="#">try learn mode</a></span>
+<span style="text-align: right; font-size: 13px; color: #6E675D;">none</span>
+</div>
+</div>
+
+<aside style="width: 320px; flex-shrink: 0; display: flex; flex-direction: column; gap: 20px;">
+<section aria-labelledby="needs-title" style="padding: 20px; display: flex; flex-direction: column; gap: 14px; border: 1px solid #DCC3AE; border-radius: 12px; background: #FFFDF8;">
+<span style="font-size: 11px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: #A84E1B;">Needs you</span>
+<h2 id="needs-title" style="margin: 0; font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; font-size: 26px; line-height: 1.1;">Sekiro: Shadows Die Twice</h2>
+<p style="margin: 0; color: #3D3932; line-height: 1.45;">Both PCs saved today. Pick which one continues; the other stays in history either way.</p>
+<div role="radiogroup" aria-label="Which save continues" style="display: flex; flex-direction: column; gap: 8px;">
+<label style="display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 0 14px; border: 2px solid #2F5AA8; border-radius: 8px; cursor: pointer;">
+<input type="radio" name="keep" checked style="accent-color: #2F5AA8; margin: 0;">
+<span style="display: flex; flex-direction: column;"><span style="font-weight: 600;">DESKTOP</span><span style="font-size: 13px; color: #5F5A52;">Saved 21:04, the newest</span></span>
+</label>
+<label style="display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 0 14px; border: 1px solid #D2C9B8; border-radius: 8px; cursor: pointer;">
+<input type="radio" name="keep" style="accent-color: #2F5AA8; margin: 0;">
+<span style="display: flex; flex-direction: column;"><span style="font-weight: 600;">LAPTOP</span><span style="font-size: 13px; color: #5F5A52;">Saved 19:30</span></span>
+</label>
+</div>
+<div style="display: flex; align-items: center; gap: 16px;">
+<button type="button" style="height: 40px; padding: 0 16px; border-radius: 6px; border: 0; background: #2F5AA8; color: #FFFFFF; font: inherit; font-weight: 600; cursor: pointer;">Keep DESKTOP's</button>
+<a href="#" style="font-weight: 500;">Compare files</a>
+</div>
+</section>
+
+<section aria-labelledby="legend-title" style="display: flex; flex-direction: column; gap: 10px; color: #3D3932;">
+<h2 id="legend-title" style="margin: 0; font-size: 11px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: #6E675D;">Reading the timeline</h2>
+<div style="display: flex; align-items: center; gap: 10px;"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="4" fill="#2F5AA8"></circle></svg>Saved on DESKTOP</div>
+<div style="display: flex; align-items: center; gap: 10px;"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><rect x="2" y="2" width="8" height="8" fill="#A84E1B"></rect></svg>Saved on LAPTOP</div>
+<div style="display: flex; align-items: center; gap: 10px;"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="4" fill="#F6F2EA" stroke="#2F5AA8" stroke-width="1.5"></circle></svg>Not uploaded yet</div>
+<div style="display: flex; align-items: center; gap: 10px;"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M6 1L11 6L6 11L1 6Z" fill="#F6F2EA" stroke="#1D1B18" stroke-width="1.5"></path></svg>Kept before a game update</div>
+</section>
+
+<p style="margin: auto 0 24px; font-size: 13px; color: #5F5A52; line-height: 1.45;">Daily backup at 20:00. If the PC is off then, it runs after the next sign-in.</p>
+</aside>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":800}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Settings wireframe</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#EFEFEC}
+a{color:#1F1F1F}a:hover{color:#000000}
+</style>
+</helmet>
+<div style="width: 1280px; height: 800px; box-sizing: border-box; display: flex; flex-direction: column; background: #EFEFEC; color: #1F1F1F; font-family: 'IBM Plex Sans', system-ui, sans-serif; font-size: 14px;">
+
+<header style="height: 56px; flex-shrink: 0; box-sizing: border-box; padding: 0 28px; display: flex; align-items: center; gap: 32px; background: #FFFFFF; border-bottom: 1px solid #C9C9C3;">
+<span style="font-weight: 600; font-size: 17px;">GameSync</span>
+<nav aria-label="Main" style="display: flex; gap: 24px;">
+<a href="#" style="color: #5C5C57; text-decoration: none;">Library</a>
+<a href="#" style="color: #5C5C57; text-decoration: none;">Plan</a>
+<a href="#" style="color: #5C5C57; text-decoration: none;">Activity</a>
+<a href="#" aria-current="page" style="font-weight: 600; text-underline-offset: 6px;">Settings</a>
+</nav>
+</header>
+
+<div style="flex-grow: 1; min-height: 0; display: flex;">
+<nav aria-label="Settings sections" style="width: 220px; flex-shrink: 0; box-sizing: border-box; padding: 28px 16px; display: flex; flex-direction: column; gap: 2px; border-right: 1px solid #C9C9C3;">
+<a href="#" style="display: flex; align-items: center; height: 38px; padding: 0 12px; border-radius: 6px; color: #3A3A36; text-decoration: none;">Cloud</a>
+<a href="#" style="display: flex; align-items: center; height: 38px; padding: 0 12px; border-radius: 6px; color: #3A3A36; text-decoration: none;">Devices</a>
+<a href="#" aria-current="page" style="display: flex; align-items: center; height: 38px; padding: 0 12px; border-radius: 6px; background: #FFFFFF; border: 1px solid #C9C9C3; color: #1F1F1F; text-decoration: none; font-weight: 600;">Daily backup</a>
+<a href="#" style="display: flex; align-items: center; height: 38px; padding: 0 12px; border-radius: 6px; color: #3A3A36; text-decoration: none;">Save folders</a>
+<a href="#" style="display: flex; align-items: center; height: 38px; padding: 0 12px; border-radius: 6px; color: #3A3A36; text-decoration: none;">Notifications</a>
+<a href="#" style="display: flex; align-items: center; height: 38px; padding: 0 12px; border-radius: 6px; color: #3A3A36; text-decoration: none;">Safety</a>
+</nav>
+
+<div style="flex-grow: 1; min-width: 0; box-sizing: border-box; padding: 28px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; align-content: start;">
+
+<div style="display: flex; flex-direction: column; gap: 20px;">
+<section aria-labelledby="daily-title" style="padding: 20px; display: flex; flex-direction: column; gap: 14px; background: #FFFFFF; border: 2px solid #1F1F1F; border-radius: 6px;">
+<h2 id="daily-title" style="margin: 0; font-size: 18px; font-weight: 600;">Daily backup</h2>
+<p style="margin: 0; color: #5C5C57; line-height: 1.5;">Most syncing happens when you quit a game. The daily backup is the safety net for everything else.</p>
+<div style="display: flex; align-items: center; gap: 12px;">
+<label for="backup-time" style="width: 60px; font-weight: 500;">Time</label>
+<input id="backup-time" type="time" value="20:00" style="height: 40px; box-sizing: border-box; padding: 0 10px; border: 1px solid #8E8E88; border-radius: 6px; background: #FFFFFF; color: #1F1F1F; font: inherit;">
+<span style="color: #5C5C57; font-size: 13px;">Pick a time your PC is usually on</span>
+</div>
+<label style="display: flex; align-items: center; gap: 10px; min-height: 32px;"><input type="checkbox" checked style="width: 18px; height: 18px; margin: 0; accent-color: #1F1F1F;">If the PC is off then, run about 10 minutes after the next sign-in</label>
+<p style="margin: 0; font-size: 13px; color: #5C5C57;">Games that are running are always skipped and sync when you quit.</p>
+<div style="padding-top: 10px; border-top: 1px solid #DDDDD8; font-size: 13px; color: #5C5C57;">Last run: today 20:00 · 12 games checked · 1 uploaded</div>
+</section>
+
+<section aria-labelledby="folders-title" style="padding: 20px; display: flex; flex-direction: column; gap: 12px; background: #FFFFFF; border: 1px solid #C9C9C3; border-radius: 6px;">
+<h2 id="folders-title" style="margin: 0; font-size: 18px; font-weight: 600;">Save folders</h2>
+<div style="font-weight: 500;">Game folders to scan</div>
+<div style="display: flex; flex-direction: column; gap: 6px;">
+<div style="display: flex; align-items: center; justify-content: space-between; min-height: 36px; padding: 0 12px; border: 1px solid #DDDDD8; border-radius: 6px;"><span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px;">E:\Games</span><button type="button" style="height: 28px; padding: 0 10px; border-radius: 6px; border: 1px solid #8E8E88; background: #FFFFFF; color: #1F1F1F; font: inherit; font-size: 13px; cursor: pointer;">Remove</button></div>
+<div style="display: flex; align-items: center; justify-content: space-between; min-height: 36px; padding: 0 12px; border: 1px solid #DDDDD8; border-radius: 6px;"><span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px;">G:\</span><button type="button" style="height: 28px; padding: 0 10px; border-radius: 6px; border: 1px solid #8E8E88; background: #FFFFFF; color: #1F1F1F; font: inherit; font-size: 13px; cursor: pointer;">Remove</button></div>
+</div>
+<div style="display: flex; align-items: center; justify-content: space-between;"><span style="font-weight: 500;">Folders named by game ID</span><span style="color: #5C5C57; font-size: 13px;">None yet</span></div>
+<button type="button" style="align-self: flex-start; height: 36px; padding: 0 14px; border-radius: 6px; border: 1px solid #8E8E88; background: #FFFFFF; color: #1F1F1F; font: inherit; cursor: pointer;">Add folder</button>
+</section>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 20px;">
+<section aria-labelledby="cloud-title" style="padding: 20px; display: flex; flex-direction: column; gap: 12px; background: #FFFFFF; border: 1px solid #C9C9C3; border-radius: 6px;">
+<h2 id="cloud-title" style="margin: 0; font-size: 18px; font-weight: 600;">Cloud</h2>
+<div style="display: flex; flex-direction: column; gap: 4px;">
+<span style="font-weight: 500;">Google Drive</span>
+<span style="color: #5C5C57;">Signed in as [your Google account]. GameSync can only see its own folder.</span>
+</div>
+<div style="display: flex; gap: 10px;">
+<button type="button" style="height: 36px; padding: 0 14px; border-radius: 6px; border: 1px solid #8E8E88; background: #FFFFFF; color: #1F1F1F; font: inherit; cursor: pointer;">Open folder in Drive</button>
+<button type="button" style="height: 36px; padding: 0 14px; border-radius: 6px; border: 1px solid #8E8E88; background: #FFFFFF; color: #1F1F1F; font: inherit; cursor: pointer;">Sign out</button>
+</div>
+</section>
+
+<section aria-labelledby="dev-title" style="padding: 20px; display: flex; flex-direction: column; gap: 10px; background: #FFFFFF; border: 1px solid #C9C9C3; border-radius: 6px;">
+<h2 id="dev-title" style="margin: 0; font-size: 18px; font-weight: 600;">Devices</h2>
+<div style="display: flex; align-items: center; gap: 12px; min-height: 40px; border-bottom: 1px solid #DDDDD8;">
+<span style="font-weight: 500; font-family: 'IBM Plex Mono', monospace;">DESKTOP</span><span style="color: #5C5C57; flex-grow: 1;">This PC</span>
+<button type="button" style="height: 30px; padding: 0 12px; border-radius: 6px; border: 1px solid #8E8E88; background: #FFFFFF; color: #1F1F1F; font: inherit; font-size: 13px; cursor: pointer;">Rename</button>
+</div>
+<div style="display: flex; align-items: center; gap: 12px; min-height: 40px;">
+<span style="font-weight: 500; font-family: 'IBM Plex Mono', monospace;">LAPTOP</span><span style="color: #5C5C57; flex-grow: 1;">Last seen today 19:31</span>
+<button type="button" style="height: 30px; padding: 0 12px; border-radius: 6px; border: 1px solid #8E8E88; background: #FFFFFF; color: #1F1F1F; font: inherit; font-size: 13px; cursor: pointer;">Rename</button>
+</div>
+</section>
+
+<section aria-labelledby="note-title" style="padding: 20px; display: flex; flex-direction: column; gap: 10px; background: #FFFFFF; border: 1px solid #C9C9C3; border-radius: 6px;">
+<h2 id="note-title" style="margin: 0; font-size: 18px; font-weight: 600;">Notifications and safety</h2>
+<label style="display: flex; align-items: center; gap: 10px; min-height: 32px;"><input type="checkbox" checked style="width: 18px; height: 18px; margin: 0; accent-color: #1F1F1F;">Hold notifications while a fullscreen game runs</label>
+<label style="display: flex; align-items: center; gap: 10px; min-height: 32px;"><input type="checkbox" style="width: 18px; height: 18px; margin: 0; accent-color: #1F1F1F;">Send a daily summary</label>
+<label style="display: flex; align-items: center; gap: 10px; min-height: 32px;"><input type="checkbox" checked style="width: 18px; height: 18px; margin: 0; accent-color: #1F1F1F;">Allow learn mode to ask for admin, one session at a time</label>
+<label style="display: flex; align-items: center; gap: 10px; min-height: 32px;"><input type="checkbox" style="width: 18px; height: 18px; margin: 0; accent-color: #1F1F1F;">Encrypt everything in the cloud</label>
+</section>
+</div>
+</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":800}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>
