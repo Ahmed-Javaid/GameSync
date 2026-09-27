@@ -17,6 +17,12 @@ public enum GameStatus
     NoSaves,
     Blocked,
     Error,
+
+    /// <summary>Saved in the backup folder on this PC; the upload waits (offline, Drive full, sign-in expired).</summary>
+    UploadPending,
+
+    /// <summary>The cloud has a newer save that couldn't be downloaded yet.</summary>
+    NewerInCloud,
 }
 
 public sealed record GameState(GameId Game, VersionRecord? Base, GameStatus? Status, string? Detail, bool Reinstalled, DateTime? UpdatedUtc);

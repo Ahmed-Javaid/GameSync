@@ -65,6 +65,27 @@ public sealed class FolderBlobStore(string root) : IBlobStore
         return Task.CompletedTask;
     }
 
+    /// <summary>Every blob of the game with its stored (compressed) size.</summary>
+    public IEnumerable<(BlobId Id, long StoredBytes)> List(GameId game)
+    {
+        var folder = Path.Combine(root, "games", game.Value, "blobs");
+        if (!Directory.Exists(folder))
+        {
+            yield break;
+        }
+
+        foreach (var file in Directory.EnumerateFiles(folder, "*.gz", SearchOption.AllDirectories))
+        {
+            if (BlobId.TryParse(Path.GetFileNameWithoutExtension(file), out var id))
+            {
+                yield return (id, new FileInfo(file).Length);
+            }
+        }
+    }
+
+    /// <summary>Deletes a blob outright. Only the backup folder does this, for files the cloud also has.</summary>
+    public void Delete(GameId game, BlobId id) => File.Delete(PathFor(game, id));
+
     private string PathFor(GameId game, BlobId id) =>
         Path.Combine(root, "games", game.Value, "blobs", id.Value[..2], id.Value + ".gz");
 }

@@ -238,6 +238,15 @@ Two uploads from the same parent show up as two newest versions (a fork), which 
 - A fresh download or reinstall that writes a new save into an existing slot hits the first-sync rule: your existing save wins, and the new one is kept as an old version.
 - Nothing is ever deleted, so the last version before any update stays in history even if that snapshot is missed.
 
+**Named saves** (added 27 Sep 2026, BAK-18 and BAK-19)
+
+- **Save as…** keeps the save as it is now under a name you give, like "Before Lady Maria". It's a version with a named pin, so it's never thinned, syncs to every PC, and stays in this PC's backup folder while it fits in the size limit.
+- When nothing else changed, the named save is also the new current save. Asking for it counts as your say-so, so a change made outside play isn't held. When the other PC changed the game too, it's set aside with its name, and the next sync decides as usual.
+- Named saves are listed by when the save was made, and one restores in a step like any version: your current files are kept first. A name can be changed or removed; removing it leaves the save in history.
+- **Import kept saves** brings in folders you made by hand next to the live save folder, like Bloodborne's `CUSA00207\Before Orphan\SPRJ0005` next to the live `CUSA00207\SPRJ0005`. A folder holding a copy of the live folder, the save's files directly, or a `.zip` of one becomes a named save, named after the folder. The folders are never changed, files a copy shares with another are stored once, and `.rar` files are listed as skipped. The same checks as any import apply (R1, R6).
+- For a game like that, the save rule points at the live folder (`SPRJ0005`), never the folder around it, or every kept copy would count as part of the live save.
+- Save as… works while the game runs: it reads the save files as they are, so save in the game first (or quit to the title screen) for a clean copy. Restoring waits until the game closes (BAK-10).
+
 **Crash safety**
 
 - Upload file contents first and the version record last, so a version exists only once it's complete.
@@ -260,7 +269,7 @@ Two uploads from the same parent show up as two newest versions (a fork), which 
 
 The sync engine needs only a file store and a per-game version log, so Google Drive, S3-style buckets and a future server are interchangeable.
 
-As built in Milestone 1 (`src/GameSync.Core/Storage/Interfaces.cs`), with a folder backend standing in for Drive:
+As built (`src/GameSync.Core/Storage/Interfaces.cs`). A folder backend (another drive, a NAS, the tests) and the Drive backend implement both, bundled in `ICloud` with devices, the `latest/` copy, the restore kit and account info:
 
 ```csharp
 public interface IBlobStore
@@ -275,6 +284,9 @@ public interface IBlobStore
 public interface IVersionLog
 {
     Task<IReadOnlyList<VersionRecord>> ListAsync(GameId game, CancellationToken ct);
+    // Ids alone, cheaply, so a pull downloads only records it hasn't seen.
+    Task<IReadOnlySet<VersionId>> ListIdsAsync(GameId game, CancellationToken ct);
+    Task<VersionRecord?> GetAsync(GameId game, VersionId id, CancellationToken ct);
     // Appending an existing id throws. A server or S3 backend also rejects it when `parent` is no longer the newest version.
     Task AppendAsync(GameId game, VersionRecord version, CancellationToken ct);
     Task<IReadOnlyList<PinRecord>> ListPinsAsync(GameId game, CancellationToken ct);
@@ -294,9 +306,20 @@ public interface IVersionLog
 | S3-style bucket (Cloudflare R2, Backblaze B2) | the owner; R2 is free to 10 GB, then $0.015 per GB-month | conditional write on a head file; the second PC pulls first | v2 |
 | GameSync server (ASP.NET Core, files in R2) | the owner | the server accepts one; the other pulls first | v3 |
 
+**Local first** (built in Milestone 2)
+
+- Every sync writes to the backup folder on this PC first, then uploads from there: new versions and pins go into an outbox, and a push sends each version's files first and its record last. Before planning, a pull copies the records this PC hasn't seen, so decisions read local files.
+- Offline, a sync still snapshots this PC and queues the upload; downloads and conflicts wait for the cloud, with this PC's changes kept meanwhile (PC-05).
+- The backup folder keeps every record, plus the files of the last 10 versions per game within 2 GB and anything not uploaded yet (BAK-17). Older files come back from the cloud when a restore needs them.
+- If the cloud loses versions this PC has (its folder was deleted, or it's a new account), they go back in the outbox and upload again.
+- A cloud folder that can't be reached is offline, never empty.
+
 **Google Drive**
 
 - Scope `drive.file`: the app sees only files it created. Your other Drive files are invisible to it, and to anyone holding its token.
+- Folders are found by app properties, not names, so you can rename or move the GameSync folder. When two PCs create the same folder at once, the older one wins and the other's contents move into it. The emptied copy is renamed and unmarked, then trashed.
+- Other apps can put files into GameSync's folders, such as a Drive sync client on another PC. `drive.file` hides those files from GameSync, and Drive then won't let GameSync trash the folder. Nothing in normal syncing trashes a folder, and a merged copy that can't be trashed just stays, renamed and unmarked.
+- Each upload is checked against the MD5 Drive reports; a mismatch is thrown away and tried again.
 - Sign-in: a "Desktop app" OAuth client with PKCE and a redirect to 127.0.0.1. The Google project is set to "In production", because "Testing" expires sign-ins after 7 days.
 - Errors are typed (quota full, sign-in expired, rate limited, offline), retried with backoff where that helps, and shown on the game's status.
 - Files Google flags as malware are never downloaded. The app doesn't set `acknowledgeAbuse`; it shows the error on the game.
@@ -308,9 +331,10 @@ GameSync/
   restore.ps1
   devices/<device-id>.json
   games/<game-id> <title>/
-    latest/                                  plain copy of the newest version
+    latest/                                  plain copy of the newest version, plus VERSION.txt
     versions/2026-09-27T21-04Z_DESKTOP_3f2a.json
-    blobs/ab/ab12…                           each unique file, stored once
+    blobs/ab12….gz                           each unique file, stored once (in ab/ subfolders on a folder backend)
+    pins/  thinned/                          pins added later; marks left by thinning
     playing.json                             now-playing marker
 ```
 
@@ -333,7 +357,7 @@ GameSync/
 Each PC is a named device with its own base per game, and paths travel in portable form, so one save lands in the right place on every PC.
 
 - **Device identity**: a random ID plus a name you pick (DESKTOP, LAPTOP), created at first run and recorded in `devices/<id>.json` with the app version and last-seen time.
-- **Portable paths**: versions store `<documents>/My Games/Terraria/…` or `<installDir>/b1/Saved/…`, never `C:\Users\<you>\…`. Each PC fills in its own folders and install paths, so Wukong's saves move from `G:\Black Myth Wukong` to wherever the laptop installed it.
+- **Portable paths**: versions store `<documents>/My Games/Terraria/…` or `<installDir>/b1/Saved/…`, never `C:\Users\<you>\…`. Each PC fills in its own folders and install paths, so Wukong's saves move from `G:\Black Myth Wukong` to wherever the laptop installed it. The placeholders: `<home>`, `<documents>`, `<publicDocuments>`, `<roaming>`, `<localAppData>`, `<localLow>`, `<savedGames>`, `<programData>` and `<installDir>` start a folder; `<steamUser>` and `<epicUser>` can sit anywhere in it. One a PC can't fill makes the game Not available there, never empty.
 - **Account IDs**: `<steamUser>` and `<epicUser>` resolve per PC. If they differ (another account), the game warns that some saves, like FromSoftware's, embed the ID and won't load.
 - **Game not installed here**: its saves wait in the cloud, and a restore is offered once the game is detected. Install-folder saves need the game installed first.
 - **First sync on a new PC**: the cloud wins and the local files are archived. That blocks the "fresh install overwrote 100 hours" disaster.
@@ -362,11 +386,11 @@ Eight screens share one idea: every game shows exactly one status, and every sta
 | --- | --- | --- |
 | Onboarding | detected games in their groups, save paths found, Ludusavi import, cloud sign-in, daily backup time | tick or untick, confirm paths, connect Google Drive |
 | Library | cover grid or list, with a status badge, playtime and last played per game | Play, filter by status, Sync now |
-| Game detail | save rules and resolved paths, a version timeline across PCs, the activity log | Back up, Upload, Download, Restore a version, Export, Open folder, Learn mode |
+| Game detail | save rules and resolved paths, named saves by date, a version timeline across PCs, the activity log | Save as… (asks for a name), Restore a named save, Rename, Import kept saves, Back up, Upload, Download, Restore a version, Export, Open folder, Learn mode |
 | Plan | what the next sync would do for each game, and why | Run, skip a game |
 | Conflict | both sides: changed files, sizes, save times, PCs, playtime | Keep this PC's, Keep the cloud's, Compare files, Decide later |
 | Settings | appearance, storage and folders (backup folder, history to keep, game folders to scan, extra and ID-named save folders, where shared zips go), daily backup time and conflict default, cloud, devices, notifications, safety | pick a theme and colours, change or move a folder, add or remove a folder, rename a device, sign out |
-| Launcher home | the last-played game as a hero with its save status, Needs you, Jump back in, play activity by day | Continue playing, Manage saves, Resolve or Review |
+| Launcher home | the last-played game as a hero with its save status and newest named save, Needs you, Jump back in, play activity by day | Continue playing, Save as…, Restore a named save, Manage saves, Resolve or Review |
 | Save manager | every game's saves in a dense console-style table (status, path, versions, size, last backup), a stats strip, the live log | select, Share selected, Share all, Import saves, Sync now |
 
 **Statuses**
@@ -467,7 +491,7 @@ Local state lives in one SQLite database; the cloud holds immutable JSON version
 | events | id, game_id, at, level, message | each game's activity log |
 | settings | key, value | folders, schedule, backend config |
 
-On disk, `%LOCALAPPDATA%\GameSync\` holds `state.db`, local history in `history\<game>\<version>\`, cached cover art in `art\`, and `logs\`.
+On disk, `%LOCALAPPDATA%\GameSync\` holds `state.db`, the backup folder in `history\` (the cloud's layout, plus `outbox\` per game for what hasn't uploaded yet; it can move, FOLD-02), cached cover art in `art\`, and `logs\`. A Drive sign-in adds `google-client.json` and `google-token.bin`, the token encrypted with DPAPI (R10).
 
 A version record, as stored in the cloud (the shape built in Milestone 1):
 
@@ -498,7 +522,7 @@ A version record, as stored in the cloud (the shape built in Milestone 1):
 ```
 
 - **Kinds**: `Normal` versions form the history line; the current save is the Normal version nothing replaced, by `parent` or `supersedes`. Two such versions mean a fork. `Held` versions are out-of-session changes waiting for approval. `Kept` versions are copies set aside, such as a conflict's losing side or a PC's files before its first sync. Neither Held nor Kept ever becomes current by itself.
-- **Paths**: a file's path starts with its rule's root key (`saves/…`), and each PC maps that key to its own folder. From Milestone 2, root keys resolve through placeholders such as `<roaming>`. `<steamUser>` will record the form the game used (SteamID64, SteamID3 or hex), so each PC writes its own ID the same way.
+- **Paths**: a file's path starts with its rule's root key (`saves/…`), and each PC maps that key to its own folder, through placeholders such as `<roaming>`. A version records the account IDs its folders used (`"accounts": { "steamUser": "7656…" }`), so another PC can warn when its own differ (PC-03). `<steamUser>` will also record the form the game used (SteamID64, SteamID3 or hex), so each PC writes its own ID the same way.
 - **Settings and screenshots** go into a per-PC stream of the game (`<game>--pc-<device>`), backed up only and never downloaded by another PC.
 - The now-playing marker, `playing.json`, holds just the device and start time.
 

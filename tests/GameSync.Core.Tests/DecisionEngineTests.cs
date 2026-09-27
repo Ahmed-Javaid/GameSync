@@ -248,6 +248,70 @@ public class DecisionEngineTests
         Assert.Equal(SyncAction.Upload, Decide(Inputs([F("a.sav", "mine", 30)], V1, V1, laptops) with { Game = backupOnly }).Action);
     }
 
+    [Theory]
+    [InlineData(5, "5 minutes ahead of")]
+    [InlineData(-3, "3 minutes behind")]
+    public void SYNC_08_a_clock_more_than_2_minutes_off_turns_newest_wins_off(int minutes, string expected)
+    {
+        var v2 = V("v2", V1, Laptop, 20, F("a.sav", "laptop", 10));
+
+        var decision = Decide(Inputs([F("a.sav", "desktop", 30)], V1, V1, v2) with { ClockSkew = TimeSpan.FromMinutes(minutes) });
+
+        Assert.Equal(SyncAction.NeedsYou, decision.Action);
+        Assert.Contains(expected, decision.Reason);
+    }
+
+    [Fact]
+    public void SYNC_08_a_clock_within_2_minutes_keeps_newest_wins()
+    {
+        var v2 = V("v2", V1, Laptop, 20, F("a.sav", "laptop", 10));
+
+        var decision = Decide(Inputs([F("a.sav", "desktop", 30)], V1, V1, v2) with { ClockSkew = TimeSpan.FromSeconds(90) });
+
+        Assert.Equal(SyncAction.Upload, decision.Action);
+    }
+
+    [Fact]
+    public void PC_05_offline_a_change_made_during_play_is_still_snapshotted()
+    {
+        var decision = Decide(Inputs([F("a.sav", "two", 10)], V1, V1) with { CloudReachable = false });
+
+        Assert.Equal(SyncAction.Upload, decision.Action);
+        Assert.Contains("Offline", decision.Reason);
+    }
+
+    [Fact]
+    public void PC_05_offline_a_first_sync_keeps_this_pcs_files_and_waits_for_the_first_sync_rule()
+    {
+        var decision = Decide(Inputs([F("a.sav", "fresh", 10)], null) with { CloudReachable = false });
+
+        Assert.Equal(SyncAction.WaitForCloud, decision.Action);
+        Assert.Equal(VersionOrigin.KeptAtFirstSync, decision.KeepLocalFirst!.Origin);
+    }
+
+    [Fact]
+    public void PC_05_offline_a_newer_cloud_save_waits()
+    {
+        var v2 = V("v2", V1, Laptop, 20, F("a.sav", "two", 15));
+
+        var decision = Decide(Inputs([F("a.sav", "one")], V1, V1, v2) with { CloudReachable = false });
+
+        Assert.Equal(SyncAction.WaitForCloud, decision.Action);
+        Assert.Null(decision.KeepLocalFirst);
+    }
+
+    [Fact]
+    public void PC_05_offline_changes_on_both_sides_keep_this_pcs_save_and_wait()
+    {
+        var v2 = V("v2", V1, Laptop, 20, F("a.sav", "laptop", 10));
+
+        var decision = Decide(Inputs([F("a.sav", "desktop", 30)], V1, V1, v2) with { CloudReachable = false });
+
+        Assert.Equal(SyncAction.WaitForCloud, decision.Action);
+        Assert.Equal(VersionOrigin.KeptInConflict, decision.KeepLocalFirst!.Origin);
+        Assert.Empty(decision.Pins);
+    }
+
     private static SyncDecision Decide(SyncInputs inputs) => DecisionEngine.Decide(inputs);
 
     private static SyncInputs Inputs(IReadOnlyList<FileEntry> local, VersionRecord? basis, params VersionRecord[] versions) => new()

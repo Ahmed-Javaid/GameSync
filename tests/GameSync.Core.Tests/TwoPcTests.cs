@@ -59,7 +59,7 @@ public class TwoPcTests
     }
 
     [Fact]
-    public async Task SYNC_03_offline_play_on_both_pcs_is_one_conflict_and_nothing_else()
+    public async Task SYNC_03_and_PC_05_offline_play_on_both_pcs_is_one_conflict_and_nothing_else()
     {
         using var world = new TestWorld();
         using var desktop = world.Pc("DESKTOP");
@@ -72,23 +72,30 @@ public class TwoPcTests
         await desktop.SyncAsync();
         await laptop.SyncAsync();
 
-        // The laptop goes offline with its own copy of the cloud; both PCs play and upload from the same parent.
-        var offlineCloud = Path.Combine(world.Root, "laptop-offline-cloud");
-        Cloud.CopyFolder(world.Cloud, offlineCloud);
+        // The laptop goes offline; both PCs play from the same starting point.
+        laptop.Offline = true;
         desktop.Played("hades");
         desktop.Write("hades", "save.sav", "desktop run");
         await desktop.SyncAsync();
         laptop.Played("hades");
         laptop.Write("hades", "save.sav", "laptop run");
-        await laptop.SyncAsync(offlineCloud);
+        var offline = Single(await laptop.SyncAsync());
 
-        Cloud.CopyFolder(offlineCloud, world.Cloud);
+        // PC-05: the session is snapshotted on the laptop and its upload waits.
+        Assert.Equal(SyncAction.Upload, offline.Action);
+        Assert.Equal(GameStatus.UploadPending, offline.Status);
+        Assert.Single(await Cloud.VersionsAsync(world, "hades"), v => v.Device.Name == "DESKTOP" && v.Origin == VersionOrigin.Session);
+
+        // Back online, the laptop's upload lands next to the desktop's: a fork, so a conflict for that game only.
+        laptop.Offline = false;
+        Assert.Equal(GameStatus.Conflict, Single(await laptop.SyncAsync()).Status);
         var results = await desktop.SyncAsync();
 
         Assert.Equal(GameStatus.Conflict, results.Single(r => r.Game.Value == "hades").Status);
         Assert.Contains("same starting point", results.Single(r => r.Game.Value == "hades").Message);
         Assert.Equal(GameStatus.Synced, results.Single(r => r.Game.Value == "other").Status);
         Assert.Equal("desktop run", desktop.Read("hades", "save.sav"));
+        Assert.Equal("laptop run", laptop.Read("hades", "save.sav"));
     }
 
     [Fact]

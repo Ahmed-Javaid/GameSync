@@ -30,9 +30,20 @@ public static class GameValidator
                 problems.Add($"{game.Title}: '{key}' isn't a valid root name (letters, digits, '-' and '_').");
             }
 
-            if (!Path.IsPathFullyQualified(folder))
+            if (RootResolver.IsUnresolved(folder))
             {
-                problems.Add($"{game.Title}: '{folder}' must be a full path, like C:\\Users\\you\\Documents\\Game.");
+                // A portable folder; the resolved form gets the checks below on each PC.
+                problems.AddRange(RootResolver.CheckPlaceholders(folder).Select(p => $"{game.Title}: {p}"));
+                var start = RootResolver.FolderPlaceholders.Append(RootResolver.InstallDir)
+                    .Any(p => folder.StartsWith(p, StringComparison.OrdinalIgnoreCase));
+                if (!start && !Path.IsPathFullyQualified(folder[..folder.IndexOf('<', StringComparison.Ordinal)]))
+                {
+                    problems.Add($"{game.Title}: '{folder}' must be a full path or start with a folder like <documents>.");
+                }
+            }
+            else if (!Path.IsPathFullyQualified(folder))
+            {
+                problems.Add($"{game.Title}: '{folder}' must be a full path, like C:\\Users\\you\\Documents\\Game, or start with a folder like <documents>.");
             }
             else if (guard.CheckRoot(folder) is { } refusal)
             {

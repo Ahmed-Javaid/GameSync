@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Globalization;
 using GameSync.App;
 using GameSync.Core.Games;
@@ -7,6 +8,7 @@ using GameSync.Core.Scanning;
 using GameSync.Core.State;
 using GameSync.Core.Storage;
 using GameSync.Core.Sync;
+using GameSync.Storage.Drive;
 using GameSync.Windows;
 
 return await Cli.RunAsync(args);
@@ -14,15 +16,31 @@ return await Cli.RunAsync(args);
 internal static class Cli
 {
     private const string Usage = """
-        GameSync (Milestone 1: the sync engine, with a folder standing in for Google Drive)
+        GameSync (Milestone 2: Google Drive and a second PC, from the command line)
 
         gamesync [--data <folder>] <command> ...
 
         Setup
-          init --remote <folder> [--name <this PC's name>]
+          init --drive [--name <this PC's name>]       sync through your Google Drive
+          init --remote <folder> [--name <name>]       or through a folder, such as a NAS or another drive
+          signin [--client <file>]    signs in to Google Drive in your browser. The first time, give the
+                                      OAuth client JSON you downloaded from Google Cloud.
+          signout                     cancels GameSync's access at Google
+          account                     where the cloud is, who's signed in, and how full it is
           add-game <id> --title <title> --root <key>=<folder> [--root ...] [--include <pattern>]
                    [--mode sync|backup-only] [--policy newest-wins|always-ask|this-pc-wins]
+                   A folder may start with <documents>, <publicDocuments>, <roaming>, <localAppData>,
+                   <localLow>, <savedGames>, <home>, <programData> or <installDir>, and may hold
+                   <steamUser> or <epicUser>, so the same games.json works on every PC.
           games
+          devices                     every PC that syncs, its GameSync version and when it was last seen
+          rename-device <name>
+
+        Settings on this PC
+          set history-folder <folder>          moves the backup folder, checking every file before switching
+          set history-keep all|recent          keep every version's files here, or the last 10 per game within 2 GB
+          set install-dir <game> <folder>      where a game is installed on this PC, for <installDir>
+          set account steamUser|epicUser <id>  this PC's account IDs, for <steamUser> and <epicUser>
 
         Sync
           plan [<game>...]           what the next sync would do for each game, and why
@@ -31,6 +49,16 @@ internal static class Cli
           approve <game>             syncs changes held for review
           resolve <game> keep-this-pc|keep-cloud [<version>]
           swap <game>                switches to the save that lost the last conflict
+
+        Named saves
+          save <game> <name>         keeps the save as it is now under a name, like "Before Lady Maria"
+          saves <game>               the game's named saves from every PC, newest first
+          restore <game> <name>      brings a named save back; your current files are kept first
+          rename-save <game> <name> <new name>
+          forget-save <game> <name>  removes the name; the save stays in history
+          import-saves <game> <folder> [--root <key>] [--apply]
+                                     turns save folders you kept by hand (each holding a copy of the live
+                                     save folder, or a .zip of one) into named saves. Previews by default.
 
         History
           history <game>
@@ -60,36 +88,60 @@ internal static class Cli
         var rest = list.Skip(1).ToList();
         try
         {
-            if (command == "init")
+            switch (command)
             {
-                return Init(dataDir, rest);
+                case "init":
+                    return Init(dataDir, rest);
+                case "signin":
+                    return await SignInAsync(dataDir, rest);
+                case "signout":
+                    return await SignOutAsync(dataDir);
             }
 
             var config = AppConfig.Load(dataDir)
-                ?? throw new UsageException($"No games.json in {dataDir}. Run 'gamesync init --remote <folder>' first.");
+                ?? throw new UsageException($"No games.json in {dataDir}. Run 'gamesync init --drive' or 'gamesync init --remote <folder>' first.");
             if (command == "add-game")
             {
                 return AddGame(dataDir, config, rest);
             }
 
             using var state = new StateStore(dataDir);
+            if (command == "rename-device")
+            {
+                state.GetOrCreateDevice(Environment.MachineName);
+                state.RenameDevice(Arg(rest, 0, "new name"));
+            }
+
             var device = state.GetOrCreateDevice(Environment.MachineName);
             var guard = SensitivePathGuard.ForThisPc(dataDir);
-            foreach (var problem in config.Games.SelectMany(g => GameValidator.Problems(g, guard)))
+            var installDirs = InstallDirs(state, config);
+            var resolver = new RootResolver(KnownFolders.ForThisPc(), Accounts(state), installDirs);
+            var games = config.Games.Select(resolver.Resolve).ToList();
+            foreach (var problem in config.Games.Concat(games).SelectMany(g => GameValidator.Problems(g, guard)).Distinct())
             {
                 throw new UsageException($"games.json: {problem}");
             }
 
+            if (command == "set")
+            {
+                return Set(dataDir, state, games, installDirs.Values, rest);
+            }
+
             using var amsi = new AmsiScanner();
-            var service = new SyncService(
-                config.Games,
-                new FolderBlobStore(config.Remote),
-                new FolderVersionLog(config.Remote),
+            using var drive = config.UsesDrive ? OpenDrive(dataDir) : null;
+            SyncService? service = null;
+            string? Title(GameId id) => service?.Streams.FirstOrDefault(s => s.Id == id)?.Definition.Title;
+            ICloud cloud = drive is not null ? new DriveCloud(drive, Title) : new FolderCloud(config.Remote);
+            service = new SyncService(
+                games,
+                new LocalHistory(HistoryFolder(state, dataDir)),
+                cloud,
                 state,
                 new SnapshotScanner(guard, state),
                 amsi,
                 device,
-                dataDir);
+                dataDir,
+                new SyncOptions { AppVersion = AppVersion, HistoryLimits = KeepLimits(state), Progress = new ConsoleProgress(Title) });
 
             // Anything a crash or reboot interrupted is finished before anything new starts (BAK-08, BAK-13).
             var recovered = await service.RecoverAsync(CancellationToken.None);
@@ -100,21 +152,26 @@ internal static class Cli
                 Console.WriteLine();
             }
 
-            return await RunCommandAsync(command, rest, service, state);
+            return await RunCommandAsync(command, rest, service, state, cloud, config.UsesDrive);
         }
         catch (UsageException e)
         {
             Console.Error.WriteLine(e.Message);
             return 2;
         }
-        catch (Exception e) when (e is InvalidOperationException or FormatException or IOException)
+        catch (CloudException e)
+        {
+            Console.Error.WriteLine(e.Kind == CloudErrorKind.SignInExpired ? $"{e.Message} Run 'gamesync signin' to sign in again." : e.Message);
+            return 1;
+        }
+        catch (Exception e) when (e is InvalidOperationException or FormatException or IOException or TimeoutException or UnauthorizedAccessException)
         {
             Console.Error.WriteLine(e.Message);
             return 1;
         }
     }
 
-    private static async Task<int> RunCommandAsync(string command, List<string> rest, SyncService service, StateStore state)
+    private static async Task<int> RunCommandAsync(string command, List<string> rest, SyncService service, StateStore state, ICloud cloud, bool usesDrive)
     {
         var ct = CancellationToken.None;
         switch (command)
@@ -132,13 +189,55 @@ internal static class Cli
 
                 return 0;
 
-            case "plan":
-                PrintPlans(await service.PlanAsync(Games(rest), ct));
+            case "account":
+            {
+                var info = await cloud.GetInfoAsync(ct);
+                Console.WriteLine($"Cloud:    {info.Where}");
+                if (info.Account is not null)
+                {
+                    Console.WriteLine($"Account:  {info.Account}");
+                }
+
+                if (info.UsedBytes is { } used && info.TotalBytes is { } total && total > 0)
+                {
+                    Console.WriteLine($"Storage:  {FormatSize(used)} of {FormatSize(total)} used ({used * 100 / total}%)");
+                }
+
+                if (usesDrive)
+                {
+                    Console.WriteLine("Access:   only the files GameSync made (the drive.file permission); the rest of your Drive is invisible to it.");
+                }
+
                 return 0;
+            }
+
+            case "devices":
+            case "rename-device":
+                foreach (var d in await service.DevicesAsync(ct))
+                {
+                    var here = d.Id == service.Device.Id ? "(this PC)" : "";
+                    Console.WriteLine($"{d.Name,-16} {here,-10} last seen {d.LastSeenUtc.ToLocalTime():yyyy-MM-dd HH:mm}   GameSync {d.AppVersion}");
+                }
+
+                if (command == "rename-device")
+                {
+                    Console.WriteLine($"This PC is now '{service.Device.Name}'. Other PCs show the new name after their next sync.");
+                }
+
+                return 0;
+
+            case "plan":
+            {
+                var plans = await service.PlanAsync(Games(rest), ct);
+                PrintNotices(service);
+                PrintPlans(plans);
+                return 0;
+            }
 
             case "sync":
             {
                 var plans = await service.PlanAsync(Games(rest), ct);
+                PrintNotices(service);
                 Console.WriteLine("Plan:");
                 PrintPlans(plans);
                 Console.WriteLine();
@@ -182,8 +281,9 @@ internal static class Cli
                         entry.IsBase ? "this-pc" : null,
                         entry.Pinned ? "pinned" : null,
                         v.Kind == VersionKind.Normal ? null : v.Kind.ToString().ToLowerInvariant(),
+                        entry.Uploaded ? null : "not-uploaded-yet",
                     }.OfType<string>());
-                    Console.WriteLine($"{v.Id.Value,-44} {v.Device.Name,-12} {v.Files.Count,5} files {FormatSize(FileSet.TotalSize(v.Files)),10}  {flags}");
+                    Console.WriteLine($"{v.Id.Value,-44} {entry.DeviceName,-12} {v.Files.Count,5} files {FormatSize(FileSet.TotalSize(v.Files)),10}  {flags}");
                     if (entry.PinLabel is not null)
                     {
                         Console.WriteLine($"{"",-44} {entry.PinLabel}");
@@ -193,8 +293,84 @@ internal static class Cli
                 return 0;
 
             case "restore":
-                PrintResults([await service.RestoreAsync(Game(rest, 0), VersionId.Parse(Arg(rest, 1, "version")), ct)]);
+            {
+                var game = Game(rest, 0);
+                var what = string.Join(' ', rest.Skip(1));
+                if (what.Length == 0)
+                {
+                    throw new UsageException("Say which save: a name from 'gamesync saves', or a version id from 'gamesync history'.");
+                }
+
+                var isVersion = VersionId.TryParse(what, out var version) && (await service.HistoryAsync(game, ct)).Any(h => h.Version.Id == version);
+                PrintResults([isVersion ? await service.RestoreAsync(game, version, ct) : await service.RestoreNamedAsync(game, what, ct)]);
                 return 0;
+            }
+
+            case "save":
+            {
+                var name = string.Join(' ', rest.Skip(1));
+                if (name.Length == 0)
+                {
+                    throw new UsageException("Give the save a name: gamesync save <game> \"Before Lady Maria\".");
+                }
+
+                PrintResults([await service.SaveAsAsync(Game(rest, 0), name, ct)]);
+                return 0;
+            }
+
+            case "saves":
+            {
+                var game = Game(rest, 0);
+                var saves = await service.NamedSavesAsync(game, ct);
+                if (saves.Count == 0)
+                {
+                    Console.WriteLine($"No named saves yet. Make one with: gamesync save {game} \"<name>\"");
+                    return 0;
+                }
+
+                foreach (var save in saves)
+                {
+                    var note = save.Uploaded ? "" : "  not uploaded yet";
+                    Console.WriteLine($"  {save.SavedUtc.ToLocalTime():yyyy-MM-dd HH:mm}  {save.Name,-44} {save.DeviceName,-12} {FormatSize(FileSet.TotalSize(save.Version.Files)),9}{note}");
+                }
+
+                Console.WriteLine($"Bring one back with: gamesync restore {game} \"<name>\"");
+                return 0;
+            }
+
+            case "rename-save":
+                await service.RenameSaveAsync(Game(rest, 0), Arg(rest, 1, "save's name"), Arg(rest, 2, "new name"), ct);
+                Console.WriteLine("Renamed.");
+                return 0;
+
+            case "forget-save":
+                await service.ForgetSaveAsync(Game(rest, 0), string.Join(' ', rest.Skip(1)), ct);
+                Console.WriteLine("The name is gone. The save itself stays in history.");
+                return 0;
+
+            case "import-saves":
+            {
+                var apply = rest.Remove("--apply");
+                var root = TakeOption(rest, "--root");
+                var game = Game(rest, 0);
+                var folder = Path.GetFullPath(Arg(rest, 1, "folder"));
+                var report = await service.ImportSavesAsync(game, folder, apply, root, ct);
+                foreach (var item in report.Items.OrderBy(i => i.SavedUtc))
+                {
+                    var what = item.SameAs is null ? "" : $"  same files as {item.SameAs}";
+                    Console.WriteLine($"  {item.SavedUtc.ToLocalTime():yyyy-MM-dd HH:mm}  {item.Name,-44} {item.Files,4} files {FormatSize(item.Bytes),9}{what}");
+                }
+
+                foreach (var skipped in report.Skipped)
+                {
+                    Console.WriteLine($"  ! {skipped}");
+                }
+
+                Console.WriteLine(apply
+                    ? $"Imported {report.Added} named saves. Your folders weren't changed; list the saves with: gamesync saves {game}"
+                    : $"Found {report.Items.Count} kept saves. Nothing was imported yet; add --apply to import them. Your folders are never changed.");
+                return 0;
+            }
 
             case "pin":
                 await service.PinAsync(Game(rest, 0), VersionId.Parse(Arg(rest, 1, "version")),
@@ -261,15 +437,27 @@ internal static class Cli
 
     private static int Init(string dataDir, List<string> rest)
     {
-        var remote = TakeOption(rest, "--remote") ?? throw new UsageException("Say where the cloud folder is: --remote <folder>.");
+        var drive = rest.Remove("--drive");
+        var remote = TakeOption(rest, "--remote");
         var name = TakeOption(rest, "--name");
-        if (!Path.IsPathFullyQualified(remote))
+        if (drive == (remote is not null))
         {
-            throw new UsageException("--remote must be a full path.");
+            throw new UsageException("Say where the cloud is: --drive for Google Drive, or --remote <folder>.");
         }
 
+        if (remote is not null)
+        {
+            if (!Path.IsPathFullyQualified(remote))
+            {
+                throw new UsageException("--remote must be a full path.");
+            }
+
+            Directory.CreateDirectory(remote);
+        }
+
+        var value = drive ? "drive" : remote!;
         var existing = AppConfig.Load(dataDir);
-        (existing is null ? new AppConfig { Remote = remote } : existing with { Remote = remote }).Save(dataDir);
+        (existing is null ? new AppConfig { Remote = value } : existing with { Remote = value }).Save(dataDir);
         using var state = new StateStore(dataDir);
         var device = state.GetOrCreateDevice(name ?? Environment.MachineName);
         if (name is not null && device.Name != name)
@@ -277,7 +465,189 @@ internal static class Cli
             state.RenameDevice(name);
         }
 
-        Console.WriteLine($"Ready. This PC is '{name ?? device.Name}'; the cloud folder is {remote}.");
+        Console.WriteLine(drive
+            ? $"Ready. This PC is '{name ?? device.Name}'. Next, sign in to Google Drive: gamesync signin --client <the JSON from Google Cloud>"
+            : $"Ready. This PC is '{name ?? device.Name}'; the cloud folder is {remote}.");
+        return 0;
+    }
+
+    private static async Task<int> SignInAsync(string dataDir, List<string> rest)
+    {
+        if (TakeOption(rest, "--client") is { } clientFile)
+        {
+            if (!File.Exists(clientFile))
+            {
+                throw new UsageException(
+                    $"There's no file at {Path.GetFullPath(clientFile)}. The one Google Cloud gave you is named like client_secret_<numbers>.apps.googleusercontent.com.json; dragging it into this window pastes its full path.");
+            }
+
+            var bytes = await File.ReadAllBytesAsync(clientFile);
+            GoogleClient.Parse(bytes);
+            Directory.CreateDirectory(dataDir);
+            await File.WriteAllBytesAsync(ClientFile(dataDir), bytes);
+        }
+
+        var auth = Auth(dataDir)
+            ?? throw new UsageException("The first sign-in needs GameSync's Google Cloud client: gamesync signin --client <the JSON you downloaded>.");
+        Console.WriteLine("Opening Google's sign-in page in your browser. GameSync asks only for the files it makes in your Drive.");
+        await auth.SignInAsync(url =>
+        {
+            Console.WriteLine($"If the browser doesn't open, paste this into it: {url.AbsoluteUri}");
+            OpenBrowser(url);
+        }, TimeSpan.FromMinutes(5), CancellationToken.None);
+
+        using var drive = new GoogleDriveClient(auth);
+        var about = await drive.AboutAsync(CancellationToken.None);
+        Console.WriteLine(about.Email is null ? "Signed in." : $"Signed in as {about.Email}.");
+        return 0;
+    }
+
+    private static async Task<int> SignOutAsync(string dataDir)
+    {
+        if (Auth(dataDir) is not { IsSignedIn: true } auth)
+        {
+            Console.WriteLine("GameSync isn't signed in to Google Drive.");
+            return 0;
+        }
+
+        await auth.SignOutAsync(CancellationToken.None);
+        Console.WriteLine("Signed out: Google no longer lets GameSync into your Drive. Your saves there stay where they are.");
+        return 0;
+    }
+
+    private static GoogleDriveClient OpenDrive(string dataDir)
+    {
+        var auth = Auth(dataDir)
+            ?? throw new UsageException("GameSync needs its Google Cloud client first: gamesync signin --client <the JSON you downloaded>.");
+        return auth.IsSignedIn
+            ? new GoogleDriveClient(auth)
+            : throw new UsageException("GameSync isn't signed in to Google Drive. Run 'gamesync signin'.");
+    }
+
+    private static GoogleAuth? Auth(string dataDir) =>
+        File.Exists(ClientFile(dataDir))
+            ? new GoogleAuth(GoogleClient.Parse(File.ReadAllBytes(ClientFile(dataDir))), Path.Combine(dataDir, "google-token.bin"), new DpapiProtector())
+            : null;
+
+    private static string ClientFile(string dataDir) => Path.Combine(dataDir, "google-client.json");
+
+    private static void OpenBrowser(Uri url)
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo(url.AbsoluteUri) { UseShellExecute = true });
+        }
+        catch (Exception e) when (e is System.ComponentModel.Win32Exception or InvalidOperationException)
+        {
+            // The link is printed above.
+        }
+    }
+
+    private static int Set(string dataDir, StateStore state, IReadOnlyList<GameDefinition> games, IEnumerable<string> installDirs, List<string> rest)
+    {
+        switch (Arg(rest, 0, "setting"))
+        {
+            case "history-folder":
+                return MoveHistory(dataDir, state, games, installDirs, Path.GetFullPath(Arg(rest, 1, "folder")));
+
+            case "history-keep":
+                var keep = Arg(rest, 1, "all or recent");
+                if (keep is not ("all" or "recent"))
+                {
+                    throw new UsageException("Choose all or recent.");
+                }
+
+                state.SetSetting("history.keep", keep);
+                Console.WriteLine(keep == "all"
+                    ? "This PC now keeps every version's files. The cloud keeps everything either way."
+                    : "This PC keeps the files of the last 10 versions per game, within 2 GB. The cloud keeps everything.");
+                return 0;
+
+            case "install-dir":
+            {
+                var game = GameId.Parse(Arg(rest, 1, "game id"));
+                var folder = Arg(rest, 2, "install folder");
+                if (!Path.IsPathFullyQualified(folder))
+                {
+                    throw new UsageException("The install folder must be a full path.");
+                }
+
+                state.SetSetting($"installDir.{game}", Path.GetFullPath(folder));
+                Console.WriteLine($"<installDir> for {game} is {Path.GetFullPath(folder)} on this PC.");
+                return 0;
+            }
+
+            case "account":
+            {
+                var key = Arg(rest, 1, "steamUser or epicUser");
+                var id = Arg(rest, 2, "account id");
+                if (key is not ("steamUser" or "epicUser"))
+                {
+                    throw new UsageException("Set steamUser or epicUser.");
+                }
+
+                if (!id.All(char.IsAsciiLetterOrDigit))
+                {
+                    throw new UsageException("An account id is letters and digits only.");
+                }
+
+                state.SetSetting($"account.{key}", id);
+                Console.WriteLine($"<{key}> is {id} on this PC.");
+                return 0;
+            }
+
+            default:
+                throw new UsageException("Settings: history-folder, history-keep, install-dir, account. Run 'gamesync help'.");
+        }
+    }
+
+    /// <summary>FOLD-02 to FOLD-04: copies and checks everything first; if anything fails, the old folder stays in use.</summary>
+    private static int MoveHistory(string dataDir, StateStore state, IReadOnlyList<GameDefinition> games, IEnumerable<string> installDirs, string target)
+    {
+        var current = Path.GetFullPath(HistoryFolder(state, dataDir));
+        var from = Path.TrimEndingDirectorySeparator(current);
+        var to = Path.TrimEndingDirectorySeparator(target);
+        if (from.Equals(to, StringComparison.OrdinalIgnoreCase))
+        {
+            Console.WriteLine($"The backup folder is already {target}.");
+            return 0;
+        }
+
+        if (to.StartsWith(from + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) ||
+            from.StartsWith(to + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new UsageException("The new backup folder can't be inside the current one, or the other way round.");
+        }
+
+        if (BackupFolderGuard.ForThisPc().Check(target, games, installDirs) is { } refusal)
+        {
+            throw new UsageException(refusal);
+        }
+
+        if (Path.GetPathRoot(target) is { } drive && !Directory.Exists(drive))
+        {
+            throw new UsageException($"Drive {drive.TrimEnd('\\')} isn't connected.");
+        }
+
+        int skipped;
+        try
+        {
+            skipped = Directory.Exists(current) ? new LocalHistory(current).CopyTo(target) : 0;
+            Directory.CreateDirectory(target);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            throw new InvalidOperationException($"Couldn't move the backup folder: {e.Message} GameSync keeps using {current}.");
+        }
+
+        state.SetSetting("history.folder", target);
+        LocalHistory.TryDelete(current);
+        Console.WriteLine($"Moved the backup folder to {target}. Every file was checked there before the old folder was removed.");
+        if (skipped > 0)
+        {
+            Console.WriteLine($"{skipped} damaged files stayed behind; the cloud still has them.");
+        }
+
         return 0;
     }
 
@@ -304,7 +674,7 @@ internal static class Cli
             var parts = root.Split('=', 2);
             if (parts.Length != 2)
             {
-                throw new UsageException("Roots look like --root saves=C:\\Users\\you\\Documents\\Game.");
+                throw new UsageException("Roots look like --root saves=<documents>/My Games/Terraria or --root saves=D:\\Games\\Saves.");
             }
 
             roots[parts[0]] = parts[1];
@@ -339,6 +709,19 @@ internal static class Cli
         (config with { Games = [.. config.Games, game] }).Save(dataDir);
         Console.WriteLine($"Added {title}.");
         return 0;
+    }
+
+    private static void PrintNotices(SyncService service)
+    {
+        foreach (var notice in service.Notices)
+        {
+            Console.WriteLine($"! {notice}");
+        }
+
+        if (service.Notices.Count > 0)
+        {
+            Console.WriteLine();
+        }
     }
 
     private static void PrintPlans(IReadOnlyList<GamePlan> plans)
@@ -382,10 +765,11 @@ internal static class Cli
         SyncAction.Unavailable => "Not available",
         SyncAction.SavesMissing => "Saves missing",
         SyncAction.NoSaves => "No saves yet",
+        SyncAction.WaitForCloud => "Waits for cloud",
         _ => action.ToString(),
     };
 
-    private static string FormatSize(long bytes) => bytes switch
+    internal static string FormatSize(long bytes) => bytes switch
     {
         < 1024 => $"{bytes} B",
         < 1024 * 1024 => $"{bytes / 1024.0:0.#} KB",
@@ -421,6 +805,76 @@ internal static class Cli
 
     private static DateTime ParseLocalTime(string text) =>
         DateTime.Parse(text, CultureInfo.CurrentCulture, DateTimeStyles.AssumeLocal).ToUniversalTime();
+
+    private static string AppVersion =>
+        typeof(Cli).Assembly.GetName().Version?.ToString(3) ?? "dev";
+
+    /// <summary>FOLD-02: the backup folder, by default next to the rest of GameSync's data.</summary>
+    private static string HistoryFolder(StateStore state, string dataDir) =>
+        state.GetSetting("history.folder") ?? Path.Combine(dataDir, "history");
+
+    /// <summary>FOLD-06: the last 10 versions per game within 2 GB, unless the user chose to keep everything.</summary>
+    private static HistoryLimits KeepLimits(StateStore state) =>
+        state.GetSetting("history.keep") == "all" ? HistoryLimits.Everything : new HistoryLimits();
+
+    /// <summary>PC-03: this PC's account IDs, set with 'gamesync set account'.</summary>
+    private static Dictionary<string, string> Accounts(StateStore state)
+    {
+        var accounts = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var key in RootResolver.AccountPlaceholders.Select(p => p.Trim('<', '>')))
+        {
+            if (state.GetSetting($"account.{key}") is { Length: > 0 } value)
+            {
+                accounts[key] = value;
+            }
+        }
+
+        return accounts;
+    }
+
+    /// <summary>Where each game is installed on this PC, for &lt;installDir&gt;; set with 'gamesync set install-dir'.</summary>
+    private static Dictionary<GameId, string> InstallDirs(StateStore state, AppConfig config)
+    {
+        var dirs = new Dictionary<GameId, string>();
+        foreach (var game in config.Games)
+        {
+            if (state.GetSetting($"installDir.{game.Id}") is { Length: > 0 } folder)
+            {
+                dirs[game.Id] = folder;
+            }
+        }
+
+        return dirs;
+    }
+}
+
+/// <summary>CLOUD-09: a line per big upload now and then, and when it finishes.</summary>
+internal sealed class ConsoleProgress(Func<GameId, string?> titleOf) : IProgress<TransferProgress>
+{
+    private const long Big = 20L * 1024 * 1024;
+    private readonly Lock _gate = new();
+    private DateTime _last;
+
+    public void Report(TransferProgress value)
+    {
+        if (value.BytesTotal < Big && value.FilesTotal < 100)
+        {
+            return;
+        }
+
+        lock (_gate)
+        {
+            var done = value.FilesDone == value.FilesTotal;
+            if (!done && value.FilesDone > 0 && DateTime.UtcNow - _last < TimeSpan.FromSeconds(3))
+            {
+                return;
+            }
+
+            _last = DateTime.UtcNow;
+            Console.WriteLine($"  Uploading {titleOf(value.Game) ?? value.Game.Value}: {value.FilesDone} of {value.FilesTotal} files, " +
+                $"{Cli.FormatSize(value.BytesDone)} of {Cli.FormatSize(value.BytesTotal)}");
+        }
+    }
 }
 
 internal sealed class UsageException(string message) : Exception(message);

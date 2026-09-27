@@ -38,6 +38,46 @@ public sealed class FolderVersionLog(string root, Action<StorageProblem>? onProb
         return records.OrderBy(r => r.CreatedUtc).ThenBy(r => r.Id).ToList();
     }
 
+    public Task<IReadOnlySet<VersionId>> ListIdsAsync(GameId game, CancellationToken ct)
+    {
+        var folder = Folder(game, "versions");
+        var ids = new HashSet<VersionId>();
+        if (Directory.Exists(folder))
+        {
+            foreach (var file in Directory.EnumerateFiles(folder, "*.json"))
+            {
+                if (VersionId.TryParse(Path.GetFileNameWithoutExtension(file), out var id))
+                {
+                    ids.Add(id);
+                }
+                else
+                {
+                    onProblem?.Invoke(new StorageProblem(game, Path.GetFileName(file), "Not a version record's name."));
+                }
+            }
+        }
+
+        return Task.FromResult<IReadOnlySet<VersionId>>(ids);
+    }
+
+    public async Task<VersionRecord?> GetAsync(GameId game, VersionId id, CancellationToken ct)
+    {
+        var file = Path.Combine(Folder(game, "versions"), id.Value + ".json");
+        if (!File.Exists(file))
+        {
+            return null;
+        }
+
+        var record = await ReadAsync<VersionRecord>(game, file, ct);
+        if (record is not null && (record.Id != id || record.Game != game))
+        {
+            onProblem?.Invoke(new StorageProblem(game, Path.GetFileName(file), "The version's name doesn't match its contents."));
+            return null;
+        }
+
+        return record;
+    }
+
     public Task AppendAsync(GameId game, VersionRecord version, CancellationToken ct)
     {
         var bytes = JsonSerializer.SerializeToUtf8Bytes(version, Json.Options);

@@ -6,9 +6,9 @@ A Windows app that keeps game saves backed up and synced across a person's PCs, 
 
 - **Phase: building.** The design is done and saved in the repo: `docs/design.md`, `docs/requirements.md` and `design/system/`.
 - **Milestone 1 is done (2026-09-27):** the sync engine as a command-line tool. Every decision and crash scenario passes on copies of all 44 of the owner's games that have file saves. `docs/milestone-1.md` has what was built, how to try it, the results to record in the live requirements doc, and the known limits. The code is on GitHub (link below).
-- **Next: Milestone 2**, Google Drive and the laptop, with Drive unencrypted (decided 2026-09-27). The owner needs a Google Cloud project with a "Desktop app" OAuth client for it.
+- **Now: Milestone 2**, Google Drive and the laptop, with Drive unencrypted (decided 2026-09-27). Built, and passing live on the owner's Drive since 2026-09-28 (the whole two-PC scenario, crash recovery included): local-first sync with an outbox, the Drive backend, sign-in, devices, portable folders, the clock check, the restore kit, named saves. Left: publishing the Google app. The week on both PCs waits until the whole app is built (owner's choice, 2026-09-28), so building carries on with Milestone 3. Status, results and the owner's steps: `docs/milestone-2.md`. The owner's OAuth client JSON and sign-in live in `%LOCALAPPDATA%\GameSync` and `notes\`, never in the repo.
 - **Look chosen (2026-09-27):** the launcher follows `Design inspirations/`, the save manager uses the Console look, and both live in the GameSync design system with preset themes (Dark, Light, pure black; Arcade, Moss, Tidal, Sakura, Citrus, Mono, Windows accent).
-- **Before Milestone 5 (the UI):** design Game detail, Conflict, Plan and Onboarding from the design system's components; they are still wireframes.
+- **Before Milestone 5 (the UI):** design Game detail, Conflict, Plan and Onboarding from the design system's components; they are still wireframes. Include named saves (added 2026-09-27): Save as… with a name prompt and the named-save list with Restore, on the launcher and in Game detail.
 
 ## Where things are
 
@@ -16,9 +16,10 @@ A Windows app that keeps game saves backed up and synced across a person's PCs, 
 | --- | --- |
 | Full design, the source of truth | `docs/design.md` |
 | Build handoff: what to build first, PC setup, where the design is | `docs/handoff.md` |
-| Code: `GameSync.sln`, engine in `src/GameSync.Core`, AMSI in `src/GameSync.Windows`, command line in `src/GameSync.App` | `src/`, tests in `tests/` |
+| Code: `GameSync.sln`, engine in `src/GameSync.Core`, Google Drive in `src/GameSync.Storage.Drive`, AMSI, DPAPI and known folders in `src/GameSync.Windows`, command line in `src/GameSync.App` | `src/`, tests in `tests/` |
 | GitHub repository (public; commit or push only when the owner asks) | https://github.com/Ahmed-Javaid/GameSync |
 | Milestone 1 report: what was built, how to try it, requirement results, known limits | `docs/milestone-1.md` |
+| Milestone 2 plan: local-first history, Drive, two PCs, the owner's Google Cloud steps | `docs/milestone-2.md` |
 | Requirements with IDs and tests (copy of the live doc) | `docs/requirements.md` |
 | Design system copy: tokens, theming, component specs, offline viewer | `design/system/` (open `design/system/viewer.html`) |
 | Same design as a Claude Doc with drawn diagrams (snapshot 2026-09-27, not kept in sync) | https://claude.ai/code/artifact/4eae149b-1a37-41b5-a498-cd15c81b6aa1 |
@@ -40,6 +41,7 @@ A Windows app that keeps game saves backed up and synced across a person's PCs, 
 - **Multiple PCs:** yes (desktop and laptop). Portable paths, device IDs, now-playing marker in the cloud.
 - **Conflicts:** newest save wins automatically and the loser is pinned with a Swap button. Never automatic on a first sync on a PC, when the newer side shrank by over half or is empty, when it changed outside a play session, or when the clock is off.
 - **Retention:** every version is kept forever. Thinning is manual only, and pinned versions are never thinned.
+- **Named saves (2026-09-27):** Save as… keeps the save under a name ("Before Lady Maria") as a pinned version on every PC, restorable in a step; folders the owner kept by hand (Bloodborne on shadPS4: `CUSA00207\<name>\SPRJ0005` beside the live `CUSA00207\SPRJ0005`) import as named saves without being touched. BAK-18, BAK-19; design.md → Sync engine → Named saves.
 - **Game updates:** when a game's build changes, the current save is snapshotted and pinned before the new build runs.
 - **Daily backup:** the user sets the time; a missed run catches up about 10 minutes after the next sign-in.
 - **Save discovery:** PCGamingWiki list (Ludusavi manifest), then engine rules, then name search, then learn mode (folder watcher, optional admin ETW tracer).

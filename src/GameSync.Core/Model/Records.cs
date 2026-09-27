@@ -42,6 +42,9 @@ public enum VersionOrigin
     KeptAtFirstSync,
     KeptInConflict,
     KeptBeforeRestore,
+
+    /// <summary>A save folder someone kept by hand, brought in as a named save (BAK-19).</summary>
+    Imported,
 }
 
 public sealed record DeviceInfo(DeviceId Id, string Name);
@@ -83,11 +86,20 @@ public sealed record VersionRecord
 
     public string? Label { get; init; }
 
+    /// <summary>Account IDs the save folders used, such as <c>steamUser</c>, so another PC can warn when its own differ (PC-03).</summary>
+    public IReadOnlyDictionary<string, string>? Accounts { get; init; }
+
     public required IReadOnlyList<FileEntry> Files { get; init; }
 }
 
-/// <summary>A pin added after a version was written. <paramref name="FromConflict"/> marks a save that lost a conflict.</summary>
-public sealed record PinRecord(VersionId Version, string Label, DateTime CreatedUtc, DeviceInfo Device, bool FromConflict = false);
+/// <summary>A PC in the cloud's <c>devices/</c> folder (PC-01).</summary>
+public sealed record DeviceRecord(DeviceId Id, string Name, string AppVersion, DateTime LastSeenUtc);
+
+/// <summary>
+/// A pin added after a version was written. <paramref name="FromConflict"/> marks a save that lost a conflict;
+/// <paramref name="Named"/> marks a named save, where <paramref name="Label"/> is the name the user gave it (BAK-18).
+/// </summary>
+public sealed record PinRecord(VersionId Version, string Label, DateTime CreatedUtc, DeviceInfo Device, bool FromConflict = false, bool Named = false);
 
 /// <summary>The cloud's "now playing" marker for a game (used from Milestone 4).</summary>
 public sealed record SessionMarker(DeviceInfo Device, DateTime StartedUtc);

@@ -1,0 +1,34 @@
+GameSync keeps your game saves here. You can get them back without GameSync.
+
+Each game has a folder in "games". Inside it:
+
+  latest     the newest save, as plain files. Each folder in it is one of the game's
+             save folders (for example "saves"), holding the files as the game wrote them.
+  versions   one small file per saved version: when, which PC, and which files.
+  blobs      the files of every version, compressed and named by their SHA-256 hash.
+
+To get the newest save back
+  1. Download the game's "latest" folder.
+  2. Close the game.
+  3. Copy the files from each folder in "latest" into the matching save folder of the
+     game, replacing what's there. Keep a copy of the files you replace.
+
+To get an older version back
+  1. Download the whole GameSync folder and unzip it.
+  2. Open PowerShell in that folder and run:
+
+       powershell -ExecutionPolicy Bypass -File .\restore.ps1
+
+     It lists your games. Then list one game's versions, newest first:
+
+       powershell -ExecutionPolicy Bypass -File .\restore.ps1 -Game <game>
+
+     Then write one version's files into an empty folder:
+
+       powershell -ExecutionPolicy Bypass -File .\restore.ps1 -Game <game> -Version <version> -To <empty folder>
+
+     Every file is checked against its hash and gets back its original date.
+  3. Close the game and copy those files into its save folders, as above.
+
+restore.ps1 only reads this folder and writes into the folder you name. It never
+touches your games, and it skips program files.

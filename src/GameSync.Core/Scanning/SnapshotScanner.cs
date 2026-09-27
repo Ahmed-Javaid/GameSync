@@ -43,6 +43,17 @@ public sealed class SnapshotScanner(SensitivePathGuard guard, StateStore? hashCa
                 throw new InvalidGameDefinitionException($"{game.Title}: a rule uses the root '{rule.Root}', which isn't defined.");
             }
 
+            if (RootResolver.IsUnresolved(folder))
+            {
+                // Missing, like an unplugged drive: never "no saves" (SYNC-12).
+                if (!problems.Any(p => p.RootKey == rule.Root))
+                {
+                    problems.Add(new RootProblem(rule.Root, folder, RootResolver.DescribeUnresolved(game.Title, folder), DriveMissing: true));
+                }
+
+                continue;
+            }
+
             if (checkedRoots.Add(rule.Root) && guard.CheckRoot(folder) is { } refusal)
             {
                 throw new InvalidGameDefinitionException($"{game.Title}: {refusal}");

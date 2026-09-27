@@ -17,6 +17,9 @@ public static class CrashPoints
     public const string AfterStagingBeforeSwap = "restore:after-staging";
     public const string MidSwap = "restore:mid-swap";
 
+    /// <summary>Between uploading a version's files to the cloud and writing its record there.</summary>
+    public const string PushAfterBlobs = "push:after-blobs";
+
     // A box, so disarming inside the async call that crashed is seen by the test that armed it; a plain
     // AsyncLocal value set inside an async method never flows back to its caller.
     private static readonly AsyncLocal<StrongBox<string?>?> Armed = new();

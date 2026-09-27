@@ -9,6 +9,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\GameSync.Core\GameSync.Core.csproj" />
+    <ProjectReference Include="..\GameSync.Storage.Drive\GameSync.Storage.Drive.csproj" />
     <ProjectReference Include="..\GameSync.Windows\GameSync.Windows.csproj" />
   </ItemGroup>
 

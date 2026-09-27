@@ -48,6 +48,12 @@ public readonly record struct GameId : IStringId<GameId>
     public static GameId Parse(string value) =>
         IdRules.IsSafe(value, 64) ? new GameId(value) : throw new FormatException($"'{value}' isn't a valid game id (letters, digits, '-' and '_', up to 64).");
 
+    public static bool TryParse(string? value, out GameId id)
+    {
+        id = IdRules.IsSafe(value, 64) ? new GameId(value!) : default;
+        return id.Value is not null;
+    }
+
     public override string ToString() => Value;
 }
 
@@ -61,6 +67,12 @@ public readonly record struct VersionId : IStringId<VersionId>, IComparable<Vers
 
     public static VersionId Parse(string value) =>
         IdRules.IsSafe(value, 100) ? new VersionId(value) : throw new FormatException($"'{value}' isn't a valid version id.");
+
+    public static bool TryParse(string? value, out VersionId id)
+    {
+        id = IdRules.IsSafe(value, 100) ? new VersionId(value!) : default;
+        return id.Value is not null;
+    }
 
     public static VersionId New(DateTime utcNow, string deviceName)
     {
@@ -92,6 +104,12 @@ public readonly record struct BlobId : IStringId<BlobId>
         value is { Length: 64 } && value.All(char.IsAsciiHexDigitLower) ? new BlobId(value) : throw new FormatException($"'{value}' isn't a SHA-256 hash.");
 
     public static BlobId FromHash(ReadOnlySpan<byte> sha256) => new(Convert.ToHexStringLower(sha256));
+
+    public static bool TryParse(string? value, out BlobId id)
+    {
+        id = value is { Length: 64 } && value.All(char.IsAsciiHexDigitLower) ? new BlobId(value) : default;
+        return id.Value is not null;
+    }
 
     public override string ToString() => Value;
 }

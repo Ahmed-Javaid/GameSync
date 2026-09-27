@@ -4,7 +4,7 @@
 
 ## How to use this doc
 
-There are 187 requirements in ten areas, each with an ID, a priority and a test: run the test and set Result as you go. Anything you expected that has no row here is a gap, so add it to the last section.
+There are 189 requirements in ten areas, each with an ID, a priority and a test: run the test and set Result as you go. Anything you expected that has no row here is a gap, so add it to the last section.
 
 - **ID**: area plus number, for example `FOLD-04`. IDs are never reused, so test notes and GitHub issues can point at them.
 - **Priority**: **Must** means v1 doesn't ship without it. **Should** means v1 unless it slips. **Later** means designed for now, built after v1.
@@ -110,6 +110,8 @@ Every change becomes a version that is kept forever, and any version restores in
 | BAK-15 | Each game shows how much space its history uses. | Should | The size on game detail matches the game's files in the cloud folder. |  |
 | BAK-16 | Back up now works on any game, Backup-only games included. | Must | Press it on Cyberpunk 2077: a new version appears. |  |
 | BAK-17 | This PC keeps the last 10 versions per game within 2 GB by default (changeable, FOLD-06); the cloud keeps everything. | Must | After 12 versions, 10 are on this PC and all 12 are in the cloud. |  |
+| BAK-18 | *New.* Named saves: Save as… keeps the save as it is now under a name you give, like "Before Lady Maria", pinned and on every PC. The launcher and game detail list them by date and restore one in a step, keeping your current files first. Names can be changed or removed; the save stays in history. | Must | Save "Before Lady Maria", beat the boss, restore it: the save is back, and the save from after the fight is in history. LAPTOP lists the name too. |  |
+| BAK-19 | *New.* Save folders you kept by hand next to a game's live save (a copy of the live folder, the files themselves, or a .zip) import as named saves, named after each folder. The folders are never changed, and identical copies are stored once. | Must | Import Bloodborne's CUSA00207 folder: every "Before …" and "After …" folder becomes a named save, and restoring "Before Orphan" matches that folder file for file. |  |
 
 ## Sync between PCs and conflicts
 

@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
+    <TargetFramework>net10.0-windows</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
@@ -20,6 +20,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\GameSync.Core\GameSync.Core.csproj" />
+    <ProjectReference Include="..\..\src\GameSync.Storage.Drive\GameSync.Storage.Drive.csproj" />
+    <ProjectReference Include="..\..\src\GameSync.Windows\GameSync.Windows.csproj" />
   </ItemGroup>
 
 </Project>

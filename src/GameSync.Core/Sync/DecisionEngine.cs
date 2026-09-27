@@ -29,6 +29,9 @@ public enum SyncAction
     SavesMissing,
 
     NoSaves,
+
+    /// <summary>Offline, and the cloud's side matters: this PC's changes are kept locally and the decision waits (PC-05).</summary>
+    WaitForCloud,
 }
 
 /// <summary>Before downloading, this PC's files are kept as a pinned version.</summary>
@@ -92,6 +95,14 @@ public sealed record SyncInputs
 
     /// <summary>A conflict is already waiting for the user; it stays until they decide (SYNC-11).</summary>
     public bool ConflictPending { get; init; }
+
+    /// <summary>False when the cloud couldn't be reached, so <see cref="Versions"/> may be out of date (PC-05).</summary>
+    public bool CloudReachable { get; init; } = true;
+
+    /// <summary>This PC's clock minus the cloud's, when the cloud has a clock (SYNC-08).</summary>
+    public TimeSpan? ClockSkew { get; init; }
+
+    public TimeSpan ClockTolerance { get; init; } = TimeSpan.FromMinutes(2);
 }
 
 /// <summary>Decides what one game's sync does. Pure: the same inputs always give the same decision (SYNC-14).</summary>
@@ -100,6 +111,57 @@ public static class DecisionEngine
     public static readonly TimeSpan SessionSlack = TimeSpan.FromSeconds(30);
 
     public static SyncDecision Decide(SyncInputs input)
+    {
+        var decision = DecideOnline(input);
+        return input.CloudReachable ? decision : WhileOffline(input, decision);
+    }
+
+    /// <summary>"5 minutes ahead of" or "3 minutes behind", for a clock that's off.</summary>
+    public static string DescribeSkew(TimeSpan skew)
+    {
+        var minutes = Math.Max(1, (int)Math.Round(skew.Duration().TotalMinutes));
+        var unit = minutes == 1 ? "minute" : "minutes";
+        return skew > TimeSpan.Zero ? $"{minutes} {unit} ahead of" : $"{minutes} {unit} behind";
+    }
+
+    /// <summary>
+    /// PC-05: offline, a sync only snapshots this PC. Uploads that don't depend on the cloud's newest state go ahead
+    /// (they wait in the outbox); downloads and conflicts wait until the cloud can be seen again, with this PC's
+    /// changes kept locally meanwhile.
+    /// </summary>
+    private static SyncDecision WhileOffline(SyncInputs input, SyncDecision online)
+    {
+        switch (online.Action)
+        {
+            // A first sync here can't know whether the cloud already has this game's saves, so the first-sync rule waits.
+            case SyncAction.Upload when input.Base is null || input.Reinstalled:
+                return new SyncDecision
+                {
+                    Action = SyncAction.WaitForCloud,
+                    KeepLocalFirst = new KeepLocal(VersionOrigin.KeptAtFirstSync, $"{input.Device.Name}'s files before its first sync"),
+                    Reason = "Offline, and this is the game's first sync on this PC: its files are kept here, and what happens next is decided when you're back online.",
+                };
+            case SyncAction.Upload when online.Pins.Count == 0 && online.Supersedes.Count == 0:
+                return online with { Reason = $"{online.Reason} Offline: kept on this PC, and it uploads when you're back online." };
+            case SyncAction.Download when online.KeepLocalFirst is null:
+                return new SyncDecision
+                {
+                    Action = SyncAction.WaitForCloud,
+                    Reason = $"Offline: {online.Reason} It downloads when you're back online.",
+                };
+            case SyncAction.Upload or SyncAction.Download:
+                return new SyncDecision
+                {
+                    Action = SyncAction.WaitForCloud,
+                    KeepLocalFirst = online.KeepLocalFirst ?? new KeepLocal(VersionOrigin.KeptInConflict, $"{input.Device.Name}'s save while offline"),
+                    Reason = "Offline, and the cloud has a different save too: this PC's is kept, and which one continues is decided when you're back online.",
+                };
+            default:
+                return online;
+        }
+    }
+
+    private static SyncDecision DecideOnline(SyncInputs input)
     {
         var local = input.Local;
         var basis = input.Reinstalled ? null : input.Base;
@@ -217,6 +279,12 @@ public static class DecisionEngine
                 return LocalWins(input, head, $"Changed on {here} and on {cloudName}; this game is set to keep {here}'s save.");
             case ConflictPolicy.ThisPcWins:
                 return NeedsYou($"Changed on {here} and on {cloudName}, and {here}'s change happened while the game wasn't running.");
+        }
+
+        // SYNC-08: newest-wins compares times, which a wrong clock makes meaningless.
+        if (input.ClockSkew is { } skew && skew.Duration() > input.ClockTolerance)
+        {
+            return NeedsYou($"Changed on {here} and on {cloudName}, and {here}'s clock is {DescribeSkew(skew)} Google's, so which save is newer can't be trusted.");
         }
 
         var localNewest = FileSet.NewestChange(local, basis.Files) ?? DateTime.MinValue;

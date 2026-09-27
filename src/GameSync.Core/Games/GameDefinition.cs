@@ -46,7 +46,10 @@ public sealed record GameDefinition
 
     public ConflictPolicy ConflictPolicy { get; init; } = ConflictPolicy.NewestWins;
 
-    /// <summary>Root key to this PC's folder. The key is what versions store, which keeps paths portable between PCs.</summary>
+    /// <summary>
+    /// Root key to folder. The key is what versions store, which keeps paths portable between PCs. A folder may start
+    /// with a placeholder such as <c>&lt;documents&gt;</c>, which each PC resolves for itself (FIND-08).
+    /// </summary>
     public required IReadOnlyDictionary<string, string> Roots { get; init; }
 
     public required IReadOnlyList<SaveRule> Rules { get; init; }
@@ -55,4 +58,8 @@ public sealed record GameDefinition
     public bool SyncConfig { get; init; }
 
     public bool IncludeScreenshots { get; init; }
+
+    /// <summary>Account IDs this PC filled into the roots, such as <c>steamUser</c> (PC-03). Set when roots are resolved, never saved.</summary>
+    [JsonIgnore]
+    public IReadOnlyDictionary<string, string> Accounts { get; init; } = new Dictionary<string, string>();
 }
