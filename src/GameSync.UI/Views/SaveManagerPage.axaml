@@ -1,0 +1,124 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="using:GameSync.UI.Controls"
+             xmlns:vm="using:GameSync.UI.ViewModels"
+             x:Class="GameSync.UI.Views.SaveManagerPage"
+             x:DataType="vm:SaveManagerViewModel">
+  <!-- The save manager (design system → SaveManagerScreen): every game's saves in one console-style table, a strip of
+       numbers and the live log; a game's row opens its saves (GameSavesScreen), where the save work is. Sharing,
+       importing, Plan and Versions come with their screens. -->
+  <UserControl.Resources>
+    <!-- A row of the table: the whole row opens the game's saves; bg-200 under the pointer, as the console's rows -->
+    <ControlTheme x:Key="SaveRowButton" TargetType="Button">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderBrush" Value="{DynamicResource line-100}" />
+      <Setter Property="BorderThickness" Value="0,0,0,1" />
+      <Setter Property="MinHeight" Value="{DynamicResource row-height}" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="FocusAdorner" Value="{DynamicResource InsetFocus}" />
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}"
+                  MinHeight="{TemplateBinding MinHeight}">
+            <ContentPresenter Content="{TemplateBinding Content}" ContentTemplate="{TemplateBinding ContentTemplate}" VerticalAlignment="Center"
+                              HorizontalContentAlignment="Stretch" />
+          </Border>
+        </ControlTemplate>
+      </Setter>
+      <Style Selector="^:pointerover">
+        <Setter Property="Background" Value="{DynamicResource bg-200}" />
+      </Style>
+    </ControlTheme>
+  </UserControl.Resources>
+
+  <Panel Margin="24,20">
+    <!-- Every game's saves -->
+    <DockPanel IsVisible="{Binding ShowsTable}">
+      <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" MinHeight="40" Margin="0,0,0,16">
+        <StackPanel VerticalAlignment="Center">
+          <TextBlock Text="{Binding Title}" FontSize="15" LineHeight="20" FontWeight="SemiBold" />
+          <TextBlock Classes="caption faint" Text="{Binding Subtitle}" TextTrimming="CharacterEllipsis" />
+        </StackPanel>
+        <c:GsButton Grid.Column="1" Classes="primary" Icon="sync" Content="Sync now" Command="{Binding SyncNowCommand}"
+                    ToolTip.Tip="Every game syncs in a moment; a game you're playing, once you quit" />
+      </Grid>
+
+      <ItemsControl DockPanel.Dock="Top" ItemsSource="{Binding Stats}" Margin="4,4,4,16">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate>
+            <WrapPanel ItemSpacing="48" LineSpacing="12" />
+          </ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:SaveStat">
+            <StackPanel Spacing="2" AutomationProperties.Name="{Binding}">
+              <TextBlock Classes="th" Margin="0" Padding="0" Text="{Binding Label, Converter={x:Static c:UpperConverter.Instance}}" />
+              <TextBlock Classes="mono-stat" Text="{Binding Value}" />
+            </StackPanel>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+
+      <c:GsConsoleLog DockPanel.Dock="Bottom" Lines="{Binding Log}" Live="True" Height="168" Margin="0,16,0,0" AutomationProperties.Name="What GameSync is doing" />
+
+      <c:GsConsole Command="saves --sort last-played">
+        <c:GsConsole.Toolbar>
+          <TextBlock Text="A game's row opens its saves" />
+        </c:GsConsole.Toolbar>
+        <DockPanel Grid.IsSharedSizeScope="True">
+          <Border DockPanel.Dock="Top" BorderBrush="{DynamicResource line-100}" BorderThickness="0,0,0,1">
+            <Grid>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="2*" MinWidth="160" />
+                <ColumnDefinition Width="Auto" SharedSizeGroup="Status" />
+                <ColumnDefinition Width="3*" />
+                <ColumnDefinition Width="Auto" SharedSizeGroup="Ver" />
+                <ColumnDefinition Width="Auto" SharedSizeGroup="Size" />
+                <ColumnDefinition Width="Auto" SharedSizeGroup="Backup" />
+              </Grid.ColumnDefinitions>
+              <TextBlock Classes="th" Text="GAME" />
+              <TextBlock Grid.Column="1" Classes="th" Text="STATUS" />
+              <TextBlock Grid.Column="2" Classes="th" Text="SAVE PATH" />
+              <TextBlock Grid.Column="3" Classes="th num" Text="VER" />
+              <TextBlock Grid.Column="4" Classes="th num" Text="SIZE" />
+              <TextBlock Grid.Column="5" Classes="th num" Text="LAST BACKUP" />
+            </Grid>
+          </Border>
+          <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+            <ItemsControl ItemsSource="{Binding Rows}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:SaveRow">
+                  <Button Theme="{StaticResource SaveRowButton}" AutomationProperties.Name="{Binding}"
+                          Command="{Binding $parent[UserControl].((vm:SaveManagerViewModel)DataContext).OpenCommand}" CommandParameter="{Binding Id}">
+                    <Grid>
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="2*" MinWidth="160" />
+                        <ColumnDefinition Width="Auto" SharedSizeGroup="Status" />
+                        <ColumnDefinition Width="3*" />
+                        <ColumnDefinition Width="Auto" SharedSizeGroup="Ver" />
+                        <ColumnDefinition Width="Auto" SharedSizeGroup="Size" />
+                        <ColumnDefinition Width="Auto" SharedSizeGroup="Backup" />
+                      </Grid.ColumnDefinitions>
+                      <TextBlock Classes="td" Text="{Binding Title}" />
+                      <c:GsStatusBadge Grid.Column="1" Plain="True" Status="{Binding Status}" Label="{Binding StatusLabel}" Margin="12,0" FontFamily="{DynamicResource font-mono}" />
+                      <TextBlock Grid.Column="2" Classes="td path" Text="{Binding Path}" ToolTip.Tip="{Binding Path}" TextTrimming="LeadingCharacterEllipsis" />
+                      <TextBlock Grid.Column="3" Classes="td num" Text="{Binding Versions}" />
+                      <TextBlock Grid.Column="4" Classes="td num" Text="{Binding Size}" />
+                      <TextBlock Grid.Column="5" Classes="td num" Text="{Binding LastBackup}" />
+                    </Grid>
+                  </Button>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+        </DockPanel>
+      </c:GsConsole>
+    </DockPanel>
+
+    <!-- A game's saves -->
+    <ContentControl Content="{Binding Game}" IsVisible="{Binding !ShowsTable}" />
+  </Panel>
+</UserControl>

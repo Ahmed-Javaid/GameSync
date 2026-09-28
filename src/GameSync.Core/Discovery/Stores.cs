@@ -22,6 +22,24 @@ public static class StoreNames
         StoreKind.Ea => "Synced by EA",
         _ => "Synced by its store",
     };
+
+    /// <summary>The store's name as the one that syncs a game: "Steam", "Epic", "The EA app", "Its store".</summary>
+    public static string SyncingStore(StoreKind? store) => store switch
+    {
+        StoreKind.Steam => "Steam",
+        StoreKind.Epic => "Epic",
+        StoreKind.Ea => "The EA app",
+        _ => "Its store",
+    };
+
+    /// <summary>The store's own name, for a game's page and its Properties: "Steam", "Epic Games", "EA app"; null for a game in its own folder.</summary>
+    public static string? Name(StoreKind? store) => store switch
+    {
+        StoreKind.Steam => "Steam",
+        StoreKind.Epic => "Epic Games",
+        StoreKind.Ea => "EA app",
+        _ => null,
+    };
 }
 
 /// <summary>A game a store says is installed, or a folder that looks like one (LIB-01 to LIB-05).</summary>

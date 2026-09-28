@@ -41,6 +41,8 @@ internal sealed class TrayApp
     private MainWindow? _window;
     private ShellViewModel? _shell;
     private Pages? _pages;
+    private LibraryViewModel? _library;
+    private SaveManagerViewModel? _saves;
     private string _page = "home";
     private readonly Backdrops _backdrops;
     private Look _look = new();
@@ -152,7 +154,7 @@ internal sealed class TrayApp
             var shell = new ShellViewModel(MakePage, _page) { Rail = _pages?.Rail ?? ShellViewModel.DefaultRail(null, null) };
             shell.PropertyChanged += (_, e) =>
             {
-                if (e.PropertyName == nameof(ShellViewModel.Strength))
+                if (e.PropertyName is nameof(ShellViewModel.Strength) or nameof(ShellViewModel.BackdropArt))
                 {
                     ShowSurface();
                 }
@@ -165,6 +167,8 @@ internal sealed class TrayApp
                 _window = null;
                 _shell = null;
                 _pages = null;
+                _library = null;
+                _saves = null;
                 LetGoSoon(force: true);
             };
             (_window, _shell) = (window, shell);
@@ -180,10 +184,9 @@ internal sealed class TrayApp
         "home" when !_setUp => new PlaceholderViewModel("Welcome to GameSync", "logo",
             "GameSync isn't set up on this PC yet. First run, which does it in four steps, is on its way; until then, set it up from the command line with gamesync init."),
         "home" => _pages?.Home,
-        "library" => _pages?.Library,
+        "library" => Library,
         "log" => _console,
-        "saves" => new PlaceholderViewModel("Save manager", "saves",
-            "Every game's saves in one table, with Plan, Versions and the full log, and sharing saves with friends. It's the next screen being built."),
+        "saves" => Saves,
         "settings" => new PlaceholderViewModel("Settings", "settings",
             "Appearance, folders, the daily backup, the cloud, your PCs and notifications. They come after the save manager; until then, the command line has them."),
         _ => null,
@@ -205,8 +208,178 @@ internal sealed class TrayApp
         }
     }
 
-    /// <summary>What the launcher's pages ask of the app: Play, Sync now, another page, hiding a game.</summary>
-    private LauncherActions Actions => new(Play, SyncNow, Show, SetHidden);
+    /// <summary>
+    /// What the pages ask of the app: Play, Sync now, another page, hiding a game, favourites, the order, a game's page,
+    /// its saves in the save manager, its Properties, and the save jobs.
+    /// </summary>
+    private LauncherActions Actions => new(Play, SyncNow, Show, SetHidden)
+    {
+        SetFavourite = SetFavourite,
+        SetSort = sort => Task.Run(() => LauncherData.SetSort(_dataDir, sort)),
+        OpenGame = OpenGame,
+        LoadGame = (game, ct) => Task.Run(() => GameDetails.ReadAsync(_dataDir, game, ct, SteamIdOf(game)), ct),
+        OpenFolder = OpenFolder,
+        OpenSaves = OpenSaves,
+        OpenProperties = OpenProperties,
+        OpenLink = OpenLink,
+        CloseDialog = () =>
+        {
+            if (_shell is not null)
+            {
+                _shell.Dialog = null;
+            }
+        },
+        LoadSaves = ct => Task.Run(() => SaveOverview.ReadAsync(_dataDir, ct), ct),
+        LoadProperties = (game, ct) => Task.Run(() => GameSettings.ReadAsync(_dataDir, game, SteamIdOf(game), ct), ct),
+        SaveProperties = (game, change) => Job(async ct =>
+        {
+            try
+            {
+                _output.Say(await GameSettings.ApplyAsync(_dataDir, game, change, () => _output.Say("Waiting for the sync in the background to finish first."), ct));
+            }
+            catch (Exception e) when (e is UsageException or IOException or UnauthorizedAccessException or InvalidOperationException)
+            {
+                _output.NeedsYou("GameSync", e.Message);
+            }
+        }),
+        Approve = game => Job(ct => AppActions.ApproveAsync(_dataDir, game, _output, ct)),
+        SyncGame = game => Job(async ct =>
+        {
+            if (await AppActions.SyncGameAsync(_dataDir, game, _output, ct))
+            {
+                _agent.SyncNow();
+            }
+        }),
+        BackUpNow = game => Job(ct => AppActions.BackUpNowAsync(_dataDir, game, _output, ct)),
+        SaveAs = (game, name) => Job(ct => AppActions.SaveAsAsync(_dataDir, game, name, _output, ct)),
+        Restore = (game, version, name) => Job(ct => AppActions.RestoreAsync(_dataDir, game, version, name, _output, ct)),
+    };
+
+    /// <summary>A job a page asked for, off the UI thread; the pages show what it changed once it's done.</summary>
+    private void Job(Func<CancellationToken, Task> job) => _ = Task.Run(async () =>
+    {
+        try
+        {
+            await job(_stop.Token);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        finally
+        {
+            Dispatcher.UIThread.Post(RefreshSoon);
+        }
+    });
+
+    /// <summary>A game's save folder in Explorer, from its page.</summary>
+    private void OpenFolder(string folder)
+    {
+        if (!Directory.Exists(folder))
+        {
+            _output.NeedsYou("GameSync", $"{folder} isn't there on this PC right now.");
+            return;
+        }
+
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("explorer.exe", $"\"{folder}\"") { UseShellExecute = false })?.Dispose();
+        }
+        catch (System.ComponentModel.Win32Exception e)
+        {
+            _output.Say($"! Explorer didn't open {folder}: {e.Message}");
+        }
+    }
+
+    /// <summary>
+    /// The library, for as long as the window is open: its search, order, view and open game stay when the games
+    /// refresh (LIB-14 to LIB-18). Its order is the one kept on this PC.
+    /// </summary>
+    private LibraryViewModel Library => _library ??= NewLibrary();
+
+    private LibraryViewModel NewLibrary()
+    {
+        var library = new LibraryViewModel(Actions, ReadSort());
+        if (_pages is { } pages)
+        {
+            library.Update(pages.Games, pages.Tiles);
+        }
+
+        return library;
+    }
+
+    private LibrarySort ReadSort()
+    {
+        try
+        {
+            return LauncherData.ReadSort(_dataDir);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            return LibrarySort.RecentlyPlayed;
+        }
+    }
+
+    /// <summary>A game's page in the library, from a cover on Home or a Needs you row (LIB-18); Back returns to that page.</summary>
+    private void OpenGame(GameId game)
+    {
+        Library.Open(game, _shell?.Current is { } from && from != "library" ? from : null);
+        _shell?.Open("library");
+    }
+
+    /// <summary>
+    /// The save manager, for as long as the window is open: the game open in it stays when the games refresh (MGR-07).
+    /// It shows the agent's log as it happens.
+    /// </summary>
+    private SaveManagerViewModel Saves => _saves ??= NewSaves();
+
+    private SaveManagerViewModel NewSaves()
+    {
+        var saves = new SaveManagerViewModel(Actions, _console.Lines);
+        saves.Update(_pages?.Games ?? []);
+        return saves;
+    }
+
+    /// <summary>A game's saves in the save manager, from its page's Open in Saves or its status's action; Back returns to its page.</summary>
+    private void OpenSaves(GameId game)
+    {
+        Saves.Open(game, _shell?.Current == "library" ? "library" : null);
+        _shell?.Open("saves");
+    }
+
+    /// <summary>A game's Properties over the page (LIB-20, FIND-12), read after it opens.</summary>
+    private void OpenProperties(GameId game, string? section)
+    {
+        if (_shell is null)
+        {
+            return;
+        }
+
+        var title = _pages?.Games.FirstOrDefault(g => g.Id == game)?.Title ?? game.Value;
+        var properties = new PropertiesViewModel(game, title, Actions, section);
+        _shell.Dialog = properties;
+        properties.Load();
+    }
+
+    /// <summary>A link GameSync made (a game's Steam store page, or Steam's own install and library links), in the app Windows keeps for it.</summary>
+    private void OpenLink(string link)
+    {
+        if (!link.StartsWith("https://store.steampowered.com/app/", StringComparison.Ordinal) && !link.StartsWith("steam://", StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(link) { UseShellExecute = true })?.Dispose();
+        }
+        catch (System.ComponentModel.Win32Exception e)
+        {
+            _output.Say($"! {link} didn't open: {e.Message}");
+        }
+    }
+
+    /// <summary>The game's Steam app ID as the launcher knows it, for its page's About.</summary>
+    private long? SteamIdOf(GameId game) => _pages?.Games.FirstOrDefault(g => g.Id == game)?.SteamAppId;
 
     private void Play(GameId game) => _ = Task.Run(() => AppActions.PlayAsync(_dataDir, game, _output));
 
@@ -225,9 +398,10 @@ internal sealed class TrayApp
     /// <summary>Opens a page, and the library on a view when asked: Home's My games and Needs you tabs are the library's views.</summary>
     private void Show(string page, string? tab)
     {
-        if (page == "library" && tab is not null && _pages is not null)
+        if (page == "library" && tab is not null)
         {
-            _pages.Library.SelectedTab = tab;
+            Library.SelectedTab = tab;
+            Library.Selected = null;
         }
 
         _shell?.Open(page);
@@ -280,14 +454,17 @@ internal sealed class TrayApp
         {
             _setUp = File.Exists(AppConfig.PathIn(_dataDir));
             var withPages = _window is not null && _setUp;
-            var (actions, tab) = (Actions, _pages?.Library.SelectedTab ?? "all");
-            var (counts, pages) = await Task.Run(() => (SyncCounts.Read(_dataDir), withPages ? Pages.Read(_dataDir, actions, tab) : null));
+            var actions = Actions;
+            var cloud = _cloud;
+            var (counts, pages) = await Task.Run(() => (SyncCounts.Read(_dataDir), withPages ? Pages.Read(_dataDir, actions, cloud) : null));
             _counts = counts;
             ShowStatus();
             if (_shell is not null && pages is not null)
             {
                 _pages = pages;
                 _backdropArt = pages.BackdropArt;
+                _library?.Update(pages.Games, pages.Tiles);
+                _saves?.Update(pages.Games);
                 _shell.Rail = pages.Rail;
                 _shell.Reload();
                 ShowSurface();
@@ -341,6 +518,12 @@ internal sealed class TrayApp
     private void SetHidden(GameId game, bool hidden)
     {
         LauncherData.SetHidden(_dataDir, game, hidden);
+        Dispatcher.UIThread.Post(RefreshSoon);
+    }
+
+    private void SetFavourite(GameId game, bool favourite)
+    {
+        LauncherData.SetFavourite(_dataDir, game, favourite);
         Dispatcher.UIThread.Post(RefreshSoon);
     }
 
@@ -403,13 +586,15 @@ internal sealed class TrayApp
             return;
         }
 
+        // A game's page shows its own game's art; every other page the last-played game's.
         var strength = _shell.Strength;
-        var glass = _backdropArt is not null && _look.ShowsGlossy(_choice, _transparency) ? ThemeEngine.Glass(_choice, strength) : null;
+        var art = _shell.BackdropArt ?? _backdropArt;
+        var glass = art is not null && _look.ShowsGlossy(_choice, _transparency) ? ThemeEngine.Glass(_choice, strength) : null;
         if (glass is null)
         {
             _window.ShowSurface(null, null);
         }
-        else if (_backdrops.TryGet(_backdropArt!, strength, _choice, glass, _tokens, out var backdrop))
+        else if (_backdrops.TryGet(art!, strength, _choice, glass, _tokens, out var backdrop))
         {
             _window.ShowSurface(backdrop is null ? null : glass, backdrop);
         }
@@ -525,20 +710,45 @@ internal sealed class TrayApp
 
     /// <summary>
     /// What the launcher's pages show, read off the UI thread: the games, the home screen, and their pictures at the size
-    /// they're shown; and Glossy's art, the last-played game's (LOOK-17).
+    /// they're shown (the library's tiles, handed to the library that stays); and Glossy's art, the last-played game's (LOOK-17).
     /// </summary>
-    private sealed record Pages(HomeViewModel Home, LibraryViewModel Library, IReadOnlyList<RailItem> Rail, string? BackdropArt)
+    private sealed record Pages(HomeViewModel Home, IReadOnlyList<LauncherGame> Games, IReadOnlyDictionary<GameId, TileItem> Tiles,
+        IReadOnlyList<RailItem> Rail, string? BackdropArt)
     {
-        /// <param name="libraryTab">The library's view, kept when the pages are read again.</param>
-        public static Pages Read(string dataDir, LauncherActions actions, string libraryTab)
+        public static Pages Read(string dataDir, LauncherActions actions, CloudErrorKind? cloud)
         {
             var now = DateTime.Now;
             var (games, home) = LauncherData.Read(dataDir, now);
             return new Pages(
-                HomeViewModel.From(home, games, now, actions),
-                LibraryViewModel.From(games, now, libraryTab, actions),
+                HomeViewModel.From(home, games, now, actions, Status(dataDir, now, cloud)),
+                games,
+                LibraryViewModel.Tiles(games, now, actions),
                 ShellViewModel.DefaultRail(games.FirstOrDefault(g => g.Status == GameStatus.Playing)?.Title, games.Count(g => g.NeedsYou)),
                 home.Hero?.HeroPath ?? home.Hero?.CoverPath);
+        }
+
+        /// <summary>Home's top bar: where the saves go and whether it's reachable, this PC, and the other PCs with when each was last seen.</summary>
+        private static HomeStatus? Status(string dataDir, DateTime nowLocal, CloudErrorKind? cloud)
+        {
+            try
+            {
+                var (thisPc, others, where) = LauncherData.Devices(dataDir);
+                var line = cloud switch
+                {
+                    CloudErrorKind.Offline => "Offline: new saves wait on this PC and go up once you're back online.",
+                    CloudErrorKind.SignInExpired => "Signed out: new saves wait on this PC until you sign in to Google Drive again (gamesync signin).",
+                    CloudErrorKind.StorageFull => "Your Google Drive is full: new saves wait on this PC until there's room.",
+                    null when where == "Google Drive" => "Connected. Every game's saves go to your own Google Drive, into a folder only GameSync can see.",
+                    null => $"Every game's saves go to {where}.",
+                    _ => "The last sync had trouble reaching it; new saves wait on this PC, and GameSync tries again.",
+                };
+                return new HomeStatus(where, line, thisPc.ToUpperInvariant(),
+                    others.Select(o => $"{o.Name.ToUpperInvariant()} · last seen {Launcher.WhenText(o.LastSeenUtc, nowLocal)}").ToList());
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidOperationException or UsageException)
+            {
+                return null;
+            }
         }
     }
 }

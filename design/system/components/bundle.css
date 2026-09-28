@@ -8,7 +8,10 @@
 .gs-faint { color: var(--ink-faint); }
 .gs-row { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
 .gs-stack { display: flex; flex-direction: column; gap: var(--space-4); }
-:where(.gs-btn, .gs-tab, .gs-iconbtn, .gs-rail-btn, .gs-check input, .gs-share-item, .gs-switch, .gs-setnav-item, .gs-tcard, .gs-swatch, .gs-tile, .gs-share-toggle):focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+:where(.gs-btn, .gs-tab, .gs-iconbtn, .gs-rail-btn, .gs-check input, .gs-share-item, .gs-switch, .gs-setnav-item, .gs-tcard, .gs-swatch, .gs-tile, .gs-share-toggle, .gs-glist-head, .gs-ftree-twisty):focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+/* Rows packed tight (the game list, a menu) draw the ring inside themselves */
+:where(.gs-grow, .gs-menu-item):focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+.gs-overline { font: 600 11px/14px var(--font-sans); letter-spacing: .12em; text-transform: uppercase; color: var(--ink-faint); }
 .gs-icon { display: inline-block; flex-shrink: 0; vertical-align: middle; }
 .gs-tag { display: inline-flex; align-items: center; height: 18px; padding: 0 7px; border-radius: var(--radius-pill); background: var(--bg-300); color: var(--ink-muted); font: 600 10px/14px var(--font-sans); letter-spacing: .08em; text-transform: uppercase; white-space: nowrap; }
 
@@ -28,6 +31,9 @@
 .gs-iconbtn-sm { width: 32px; height: 32px; }
 .gs-iconbtn-glass { background: var(--glass); border-color: var(--glass-edge); color: var(--on-art); }
 .gs-iconbtn-glass:hover { background: var(--art-scrim); }
+/* A toggle that's on (the favourite star): its icon fills, in secondary off art and on-art on it */
+.gs-iconbtn[aria-pressed="true"] { color: var(--secondary); }
+.gs-iconbtn-glass[aria-pressed="true"] { color: var(--on-art); }
 
 /* ---------- PillTabs ---------- */
 .gs-tabs { display: inline-flex; gap: var(--space-2); flex-wrap: wrap; }
@@ -99,6 +105,47 @@
 .gs-tile-name { font: 500 13px/18px var(--font-sans); }
 .gs-tile-meta { font: 400 12px/16px var(--font-sans); color: var(--ink-faint); margin-top: -4px; }
 
+/* ---------- SearchField: a text field (surface-field inside line-200) with its icon ---------- */
+.gs-search { display: flex; align-items: center; gap: var(--space-2); height: var(--control-height); padding: 0 6px 0 12px; border-radius: var(--radius-md); border: 1.5px solid var(--line-200); background: var(--surface-field); color: var(--ink-faint); cursor: text; }
+.gs-search:focus-within { outline: 2px solid var(--primary); outline-offset: 1px; }
+.gs-search input { flex: 1; min-width: 0; height: 100%; padding: 0; border: 0; background: transparent; color: var(--ink); font: 400 14px/20px var(--font-sans); outline: none; }
+.gs-search input::placeholder { color: var(--ink-faint); }
+.gs-search input::-webkit-search-cancel-button { display: none; }
+.gs-search-clear { width: 28px; height: 28px; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--ink-muted); display: grid; place-items: center; cursor: pointer; flex-shrink: 0; }
+.gs-search-clear:hover { background: var(--bg-400); color: var(--ink); }
+.gs-search-hint { font: 500 11px/16px var(--font-mono); color: var(--ink-faint); border: 1px solid var(--line-200); border-radius: 4px; padding: 0 5px; margin-right: 4px; white-space: nowrap; }
+
+/* ---------- Menu: over the page like a dialog, so it takes the dialog's surface ---------- */
+.gs-menu { min-width: 220px; padding: 6px; background: var(--surface-dialog); border: 1px solid var(--edge-dialog); border-radius: var(--radius-md); box-shadow: var(--shadow-dialog); display: flex; flex-direction: column; gap: 2px; }
+.gs-menu-item { display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 var(--space-3) 0 var(--space-2); border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--ink); font: 400 14px/20px var(--font-sans); text-align: left; cursor: pointer; }
+.gs-menu-item:hover { background: var(--bg-300); }
+.gs-menu-item[disabled] { opacity: .45; cursor: not-allowed; }
+.gs-menu-check { width: 16px; display: grid; place-items: center; flex-shrink: 0; color: var(--ink-muted); }
+.gs-menu-item[aria-checked="true"] .gs-menu-check { color: var(--secondary); }
+.gs-menu-label { flex: 1; white-space: nowrap; }
+.gs-menu-hint { font: 400 12px/16px var(--font-mono); color: var(--ink-faint); }
+.gs-menu-sep { height: 1px; background: var(--line-100); margin: 4px 6px; }
+.gs-menu-heading { font: 600 11px/14px var(--font-sans); letter-spacing: .12em; text-transform: uppercase; color: var(--ink-faint); padding: 8px 10px 4px; }
+
+/* ---------- GameList: rows like the settings nav, a small cover and the name, the status under it when it needs you ---------- */
+.gs-glist { display: flex; flex-direction: column; gap: 2px; }
+.gs-glist-group { display: flex; flex-direction: column; gap: 2px; }
+.gs-glist-group + .gs-glist-group { margin-top: var(--space-3); }
+.gs-glist-head { display: flex; align-items: center; gap: 6px; height: 28px; padding: 0 var(--space-2); border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--ink-faint); font: 600 11px/14px var(--font-sans); letter-spacing: .12em; text-transform: uppercase; text-align: left; cursor: pointer; }
+.gs-glist-head:hover { color: var(--ink); }
+.gs-glist-count { font: 500 11px/14px var(--font-mono); letter-spacing: 0; }
+.gs-grow { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 36px; padding: 3px var(--space-2); border: 0; border-radius: var(--radius-md); background: transparent; color: var(--ink); font: 500 13px/18px var(--font-sans); text-align: left; cursor: pointer; }
+.gs-grow:hover { background: var(--bg-300); }
+.gs-grow[aria-current="true"] { background: var(--secondary-soft); }
+.gs-grow-cover { width: 20px; height: 30px; border-radius: var(--radius-sm); background-size: cover; background-position: center; flex-shrink: 0; font-size: 11px; }
+.gs-grow-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.gs-grow-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gs-grow .gs-status { font-size: 11px; line-height: 14px; gap: 4px; }
+.gs-grow .gs-status .gs-icon { width: 12px; height: 12px; }
+.gs-grow.is-away .gs-grow-name { color: var(--ink-faint); }
+.gs-grow.is-away .gs-grow-cover { opacity: .55; }
+.gs-glist-empty { padding: var(--space-3) var(--space-2); color: var(--ink-faint); font-size: 13px; }
+
 /* ---------- ProgressBar ---------- */
 .gs-progress { display: flex; flex-direction: column; gap: 6px; }
 .gs-progress-track { height: 6px; border-radius: var(--radius-pill); background: var(--bg-400); overflow: hidden; }
@@ -148,6 +195,8 @@
 .gs-ctable .gs-num { text-align: right; font-variant-numeric: tabular-nums; }
 .gs-ctable .gs-path { color: var(--ink-muted); max-width: 320px; overflow: hidden; text-overflow: ellipsis; }
 .gs-ctable .gs-w { width: 1%; }
+.gs-ctable-empty td { height: auto; padding: var(--space-4) var(--space-3); color: var(--ink-muted); white-space: normal; font-family: var(--font-sans); }
+.gs-ctable tbody tr.gs-ctable-empty:hover td { background: transparent; }
 
 /* ---------- ConsoleLog ---------- */
 .gs-log-grow { flex: 1; min-height: 0; }
@@ -277,6 +326,57 @@
 .gs-input::placeholder { color: var(--ink-faint); }
 .gs-input:focus { outline: 2px solid var(--primary); outline-offset: 1px; }
 .gs-custom-note { font: 400 12px/16px var(--font-sans); color: var(--ink-muted); }
+
+/* ---------- PlayBar: under a game's hero, like Steam's: Play, then the facts a player looks for, then the game's buttons ---------- */
+.gs-playbar { flex-direction: row; align-items: center; gap: var(--space-6); padding: var(--space-4) var(--space-5); }
+.gs-playbar-lead { display: flex; gap: var(--space-2); align-items: center; flex-shrink: 0; }
+.gs-playbar-stats { display: flex; gap: var(--space-2) var(--space-6); margin: 0; flex: 1; min-width: 0; flex-wrap: wrap; }
+.gs-playbar-stat { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.gs-playbar-stat dt { font: 600 11px/14px var(--font-sans); letter-spacing: .12em; text-transform: uppercase; color: var(--ink-faint); white-space: nowrap; }
+.gs-playbar-stat dd { margin: 0; font: 500 14px/20px var(--font-sans); color: var(--ink); white-space: nowrap; }
+.gs-playbar-stat .gs-status-plain { font-size: 14px; line-height: 20px; }
+.gs-playbar-actions { display: flex; gap: var(--space-2); align-items: center; flex-shrink: 0; }
+
+/* ---------- Facts: an overline label beside each value ---------- */
+.gs-facts { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: var(--space-2) var(--space-4); margin: 0; align-items: baseline; }
+.gs-fact { display: contents; }
+.gs-fact dt { font: 600 11px/20px var(--font-sans); letter-spacing: .12em; text-transform: uppercase; color: var(--ink-faint); white-space: nowrap; }
+.gs-fact dd { margin: 0; min-width: 0; font: 400 13px/20px var(--font-sans); color: var(--ink); overflow-wrap: anywhere; }
+.gs-fact dd.gs-mono { font: 400 12px/20px var(--font-mono); }
+
+/* ---------- Select: a small button that opens a Menu of choices ---------- */
+.gs-select { position: relative; display: inline-flex; }
+.gs-select-menu { position: absolute; right: 0; top: calc(100% + 4px); z-index: 20; }
+
+/* ---------- FileTree: ticked files are backed up; unticked ones stay on this PC ---------- */
+.gs-ftree { display: flex; flex-direction: column; gap: 1px; padding: 6px; border-radius: var(--radius-md); background: var(--surface-well); border: 1px solid var(--edge-well); }
+.gs-ftree-row { display: flex; align-items: center; gap: var(--space-2); min-height: 32px; padding-right: var(--space-3); border-radius: var(--radius-sm); }
+.gs-ftree-row:hover { background: var(--bg-300); }
+.gs-ftree-twisty { width: 20px; height: 20px; flex-shrink: 0; display: grid; place-items: center; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--ink-faint); padding: 0; cursor: pointer; }
+span.gs-ftree-twisty { cursor: default; }
+button.gs-ftree-twisty:hover { color: var(--ink); background: var(--bg-400); }
+.gs-ftree-icon { color: var(--ink-faint); }
+.gs-ftree-name { flex: 1; min-width: 0; font: 400 13px/20px var(--font-mono); color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gs-ftree-row.is-off .gs-ftree-name { color: var(--ink-muted); }
+.gs-ftree-row.is-locked .gs-ftree-name { color: var(--ink-faint); }
+.gs-ftree-lock { width: 18px; display: grid; place-items: center; color: var(--ink-faint); flex-shrink: 0; }
+.gs-ftree-note { font: 400 12px/16px var(--font-sans); color: var(--ink-faint); white-space: nowrap; }
+.gs-ftree-meta { font: 400 12px/16px var(--font-mono); color: var(--ink-muted); white-space: nowrap; text-align: right; min-width: 64px; }
+.gs-ftree-row .gs-tag { background: var(--bg-400); }
+
+/* ---------- GamePropertiesDialog: sections down the left like Settings, the section's rows on the right ---------- */
+.gs-props { width: 880px; height: 620px; }
+.gs-props-head { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-5) var(--space-6) var(--space-4); border-bottom: 1px solid var(--line-100); }
+.gs-props-main { flex: 1; min-height: 0; display: grid; grid-template-columns: 208px minmax(0, 1fr); }
+.gs-props-nav { padding: var(--space-4) var(--space-3); border-right: 1px solid var(--line-100); }
+.gs-props-body { overflow: auto; padding: var(--space-5) var(--space-6); display: flex; flex-direction: column; gap: var(--space-3); }
+.gs-props-title { margin: 0; font: 500 16px/22px var(--font-sans); }
+.gs-props-count { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; font: 400 12px/18px var(--font-mono); color: var(--ink-muted); }
+.gs-props-count b { color: var(--ink); font-weight: 500; }
+.gs-props-foot { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-4) var(--space-6); border-top: 1px solid var(--line-100); }
+.gs-well-line { display: flex; align-items: center; gap: var(--space-2); padding: 8px 8px 8px 12px; border-radius: var(--radius-md); background: var(--surface-well); border: 1px solid var(--edge-well); font: 400 12px/18px var(--font-mono); color: var(--ink); min-height: 40px; }
+.gs-well-line > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gs-input-wide { width: 260px; font-family: var(--font-sans); }
 
 /* ---------- Surface: Glossy puts the page on a blurred copy of the game's art (ThemeScope with surface, strength, art) ---------- */
 .gs-glossy { position: relative; isolation: isolate; }

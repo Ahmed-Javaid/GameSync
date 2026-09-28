@@ -1,6 +1,6 @@
 # GameSync design system
 
-> Snapshot of the [online design system](https://claude.ai/code/artifact/6a117b31-dc9a-4cd7-be46-037c91f1f074), 28 Sep 2026. Designs are edited there; copy changed files here afterwards, as with `design/mockups/`. Open `viewer.html` in a browser to see every component and screen offline, in all eight themes.
+> Snapshot of the [online design system](https://claude.ai/code/artifact/6a117b31-dc9a-4cd7-be46-037c91f1f074), 29 Sep 2026, version 17. Designs are edited there; copy changed files here afterwards, as with `design/mockups/`. Open `viewer.html` in a browser to see every component and screen offline, in all eight themes.
 >
 > For building: `tokens.json` holds every colour, type style, spacing and radius, per theme; `Theming.md` says how themes are generated; each `components/<Name>/README.md` is that component's spec. `components/bundle.js` and `bundle.css` are a React reference implementation for the previews, not app code; the app itself is Avalonia.
 
@@ -45,20 +45,37 @@ GameSync is a Windows game launcher that also keeps every game's saves backed up
 
 ## Layout
 
-- **Launcher home**: `SideRail` on the left; a top bar with a greeting, `PillTabs` for the library view and icon buttons on the right; a `HeroBanner` for the last-played game; then a row of three cards: Needs you, Jump back in (`GameTile`s), Activity (`ActivityGrid`).
-- **Save manager**: same rail and top bar; a strip of `mono-stat` numbers; a selectable `ConsoleTable` of every game's saves; a live `ConsoleLog` beneath it. The top bar holds **Share N selected** (secondary, disabled until a row is ticked), **Share all** (secondary) and **Sync now** (primary).
+- **Launcher home**: `SideRail` on the left; a top bar with a greeting, `PillTabs` for the library view and icon buttons on the right; a `HeroBanner` for the last-played game; then a row of three cards: Needs you, Jump back in (`GameTile`s), Activity (`ActivityGrid`). A tile opens that game's page in the library; a Needs you row's button (Review, Resolve) opens its saves in the save manager, where that's done. The hero's Manage saves opens its saves, and its gear its Properties.
+- **Game library**: laid out like Steam's. A 272px `Card` down the left holds a `SearchField`, the sort (a `Menu`: Recently played, Name, Hours played, Recently added) and a `GameList` with Favourites first; the rest of the page is the covers (a top bar with `PillTabs` for the view, then `GameTile`s, favourites first) or, once a game is picked, that game's page. The view, the search and the sort apply to both sides. A right-click on a game opens Play, Add to favourites, Hide from the library and Properties.
+- **Save manager**: same rail and top bar; a strip of `mono-stat` numbers; a selectable `ConsoleTable` of every game's saves; a live `ConsoleLog` beneath it. The top bar holds **Share N selected** (secondary, disabled until a row is ticked), **Share all** (secondary) and **Sync now** (primary). A game's name opens **its saves**: Back and a breadcrumb, its status with its actions, Named saves and Where the saves are as `Card`s, every version as a `ConsoleTable` with Restore and Export, and its `ConsoleLog`. All save work happens here; a game's page only points to it.
 - **Sharing**: both share buttons open `ShareSavesDialog`. From a selection it opens on "Choose saves" with those games ticked; Share all opens on "Share all", which packages the whole save folder, optionally latest saves only. Games with an anti-cheat or an online mode are shown locked, with the reason, and left out. The result is one zip with a path the person can copy or show in Explorer.
 - **Importing**: the download icon button in the save manager opens `ImportSavesDialog`. Imported saves become pinned versions, never current ones; unknown games can't be imported.
-- **Settings**: the rail's Settings button opens a two-column screen: `SettingsNav` on the left (Appearance, Storage and folders, Backup and sync, Cloud, Devices, Notifications, Safety), `Card`s of `SettingsRow`s on the right. Appearance holds the Surface (Glossy or Solid), `ThemePicker` and `ColorSwatchPicker`; Storage and folders holds the backup folder (`FolderField`), history to keep, game folders to scan and extra save folders (`FolderList`), and where shared zips go.
-- **Game detail**: a breadcrumb in the top bar; a shorter `HeroBanner` with the game's status and Play (the status's own action takes the primary when the game needs you); then Named saves and Where the saves are as `Card`s on the left, and the version history as a `ConsoleTable` over the game's `ConsoleLog` on the right.
+- **Settings**: the rail's Settings button opens a two-column screen: `SettingsNav` on the left (Appearance, Storage and folders, Backup and sync, Cloud, Devices, Notifications, Safety), `Card`s of `SettingsRow`s on the right. Appearance holds the Surface (Glossy or Solid), `ThemePicker` and `ColorSwatchPicker`; Storage and folders holds the backup folder (`FolderField`), history to keep, game folders to scan and extra save folders (`FolderList`), and where shared zips go. Backup and sync holds What to back up: the defaults every new game starts from (settings files and screenshots as `Select`s, the usual skips, patterns to skip).
+- **Game detail**: about the game, like Steam's page; it opens in the library beside the list. Back and a breadcrumb (My games › the game) at the top left; a shorter `HeroBanner` of just the art and the logo; a `PlayBar` with Play (or the status's own action when the game needs you), Last played, Play time, Achievements and Saves, the favourite star, Properties and More; then About (`Facts` from the store page) and Achievements on the left, and a small Saves `Card` (status, last backup, the save folder, Open in Saves) and On this PC on the right.
+- **Game properties**: a dialog, like Steam's Properties, with a `SettingsNav` of General, Launch, Installed files, Saves and Sync. Saves is where a person picks which files are backed up, in a `FileTree`; changes wait for Save changes.
 - **Conflict**: the game's name and what happened as the title, a suggestion `Card` that says why GameSync asked, the two sides as `Card`s with the suggested side's Keep button as the primary, Compare files opening a `ConsoleTable`, and Decide later.
 - **Plan**: a tab of the save manager. Run N changes replaces Sync now; one `ConsoleTable` of the changes, each ticked, and one of the games that won't run, each with its status and button.
 - **First run**: no rail; a `SettingsNav` of the four steps (Scan this PC, Choose games, Connect the cloud, Backups and startup) with a `check` on finished steps, one primary button per step, and grouped game `Card`s with a checkbox per group and per game. Choose games takes the full width: Sync, Synced by their store, Probably online-only, Saves found but game not installed and No saves found yet, then Something missing? with Add a game or folder; the anti-cheat note sits beside Back and Continue.
 
+## Navigation and feedback
+
+The screens follow Nielsen's ten heuristics and Shneiderman's eight golden rules; in GameSync they come down to these.
+
+- **Always a way back.** Every page below a rail destination (a game's page, a game's saves) has Back at its top left, then a breadcrumb that says where you are. Back returns to where you came from; Esc, Alt+Left and the mouse's back button do the same. A dialog closes with Esc, its close button and Cancel.
+- **Say what's happening, where it happens.** Every game shows its one status with an icon and a word, on its row, its tile, its page and its saves. A job shows progress in place and ends with one line saying what it did ("Backed up: 1 changed file, 0.5 MB").
+- **Nothing that does nothing.** A button that can't act now is disabled with the reason in its tooltip ("Once you quit, it backs up by itself"); a feature that isn't built isn't shown.
+- **Ask before anything that writes into a game's folders**, and say what's kept: "Your files now are kept as a version first". Choices that change what's backed up show their effect before they apply ("12 of 14 files, 5.9 MB") and wait for Save changes.
+- **Easy to undo.** Restores keep the files they replace as a version; unticking a file never deletes it; a hidden game has its Hidden view; favourites and sorts change back in one click.
+- **Recognition over recall.** Show paths, sizes, dates and PC names instead of asking for them; pick folders with a picker; copy command lines with a button.
+- **The same thing in the same place.** Back is always top left; the gear is always Properties; the primary button is the one recommendation; every game's status reads the same everywhere.
+- **Shortcuts for people who use it a lot**: Ctrl+F searches, Enter opens the first match, Up and Down move through the list, the Menu key opens a game's menu, Esc goes back.
+- **Errors say which game, what happened and what to do**, in plain words, never a code.
+
 ## Iconography
 
 - Outlined icons on a 24px grid at a 1.75 stroke with round caps and joins, drawn at 20px (rail), 18px (buttons) and 14px (badges). `Icon` holds the full set; use its names, not other icon fonts.
-- The only filled icon is `play`.
+- The only filled icons are `play`, and the `star` of a favourite (filled while it's on).
+- `arrowLeft` is Back, `settings` is Settings and a game's Properties, `trophy` is achievements, and `external` marks a link that leaves GameSync.
 - The set is drawn for GameSync in a Lucide-like style; no icon library is bundled. Add new icons on the same grid and stroke.
 - Logo: `assets/Logos/gamesync-mark.svg`, drawn in the default `primary`; in the app it takes the theme's `primary`. No wordmark.
 
@@ -74,7 +91,8 @@ GameSync is a Windows game launcher that also keeps every game's saves backed up
 ## States and focus
 
 - Focus is a 2px `primary` ring offset by 2px on every control; it passes 3:1 on every surface in every theme.
-- Selected rows, ticked share and import items, the current page and the selected tab fill with `secondary-soft`.
+- Selected rows, ticked share and import items, the current page and the selected tab fill with `secondary-soft`; so does the open game's row in the library's list.
+- A toggle icon button that's on (the favourite star) fills its icon, in `secondary` off art and `on-art` on it.
 - Switches and checkboxes: off shows a `line-200` edge, on fills with `primary`.
 - Disabled controls drop to 45% opacity and keep their label.
 - Motion is short (120–200ms) and only on colour and progress width.

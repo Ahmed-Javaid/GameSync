@@ -1,0 +1,21 @@
+<!-- @dsCard group="Launcher" height=260 subtitle="Under a game's hero: Play, the facts, the game's buttons; and when it needs you" -->
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>preview</title>
+<style>html,body{margin:0;background:var(--bg-100);} .pv{padding:24px;} </style>
+</head>
+<body class="gs-root">
+<div id="root"></div>
+<script>
+var G = window.GameSync, h = React.createElement;
+
+function actions(fav){return [h(G.IconButton,{key:'f',icon:'star',pressed:fav,label:fav?'Remove from favourites':'Add to favourites'}),h(G.IconButton,{key:'p',icon:'settings',label:'Properties'}),h(G.IconButton,{key:'m',icon:'more',label:'More'})];}
+ReactDOM.createRoot(document.getElementById('root')).render(h('div',{className:'pv gs-stack'},
+  h(G.PlayBar,{label:'Risk of Rain 2',primary:h(G.Button,{variant:'primary',icon:'play'},'Play'),actions:actions(true),stats:[
+    {label:'Last played',value:'25 Sep'},{label:'Play time',value:'218 hours'},{label:'Achievements',value:'43 of 58'},{label:'Saves',value:'Synced',status:'synced'}]}),
+  h(G.PlayBar,{label:'Cuphead',primary:[h(G.Button,{key:'r',variant:'primary',icon:'pause'},'Review'),h(G.IconButton,{key:'p',icon:'play',label:'Play'})],actions:actions(false),stats:[
+    {label:'Last played',value:'20 Sep'},{label:'Play time',value:'22 hours'},{label:'Saves',value:'Held for review',status:'held'}]})));
+
+</script>
+</body>
+</html>

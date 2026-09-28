@@ -1,0 +1,151 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="using:GameSync.UI.Controls"
+             xmlns:vm="using:GameSync.UI.ViewModels"
+             xmlns:v="using:GameSync.UI.Views"
+             x:Class="GameSync.UI.Views.GamePage"
+             x:DataType="vm:GameViewModel">
+  <!-- A game's page, beside the library's list (design system → GameDetailScreen): about the game, with a little about
+       its saves. Back and the breadcrumb; the hero of just the art and the name; the play bar; About and, on the right,
+       Saves (Open in Saves goes to the save manager, where the save work is) and On this PC. -->
+  <DockPanel>
+    <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="12" MinHeight="40" Margin="0,0,0,16">
+      <c:GsButton Classes="sm" Icon="arrowLeft" Content="Back" ToolTip.Tip="Back (Esc)"
+                  Command="{Binding $parent[v:LibraryPage].((vm:LibraryViewModel)DataContext).BackCommand}" />
+      <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+        <Button Theme="{StaticResource CrumbButton}" Content="My games" AutomationProperties.Name="My games: every game's cover"
+                Command="{Binding $parent[v:LibraryPage].((vm:LibraryViewModel)DataContext).CoversCommand}" />
+        <c:GsIcon Icon="chevronRight" Size="14" Foreground="{DynamicResource ink-muted}" VerticalAlignment="Center" />
+        <TextBlock Text="{Binding Title}" FontSize="13" FontWeight="Medium" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+      </StackPanel>
+    </StackPanel>
+
+    <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+      <StackPanel Spacing="16" Margin="0,0,0,8">
+        <!-- The hero is only the art and the name; Play and the facts sit under it, as on Steam -->
+        <c:GsHeroBanner MinHeight="188" RoomyHeight="0" Art="{Binding HeroArt}" Logo="{Binding Logo}" Title="{Binding Title}" Eyebrow="{Binding Eyebrow}"
+                        ShowsPlay="False" ShowsStatus="False">
+          <c:GsHeroBanner.Actions>
+            <Panel />
+          </c:GsHeroBanner.Actions>
+        </c:GsHeroBanner>
+
+        <c:GsPlayBar Stats="{Binding Stats}" AutomationProperties.Name="{Binding Title}">
+          <c:GsPlayBar.Primary>
+            <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding PrimaryLabel, Converter={x:Static ObjectConverters.IsNotNull}}">
+              <c:GsButton Classes.primary="{Binding PrimaryIsMain}" Icon="{Binding PrimaryIcon}" Content="{Binding PrimaryLabel}" Command="{Binding PrimaryCommand}"
+                          IsEnabled="{Binding PrimaryEnabled}" ToolTip.Tip="{Binding PrimaryTip}" />
+              <c:GsIconButton Icon="play" Label="Play" Command="{Binding PlayCommand}" IsVisible="{Binding ShowsPlayBeside}" />
+            </StackPanel>
+          </c:GsPlayBar.Primary>
+          <c:GsPlayBar.Actions>
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <c:GsIconButton Icon="star" IsOn="{Binding IsFavourite}" Label="{Binding FavouriteLabel}" Command="{Binding ToggleFavouriteCommand}" />
+              <c:GsIconButton Icon="settings" Label="Properties" Command="{Binding OpenPropertiesCommand}" CommandParameter="general" />
+              <c:GsIconButton Icon="more" Label="More">
+                <c:GsIconButton.Flyout>
+                  <MenuFlyout Placement="BottomEdgeAlignedRight">
+                    <MenuItem Header="{Binding HideLabel}" Command="{Binding ToggleHiddenCommand}" />
+                    <MenuItem Header="Open the game's folder" Command="{Binding OpenGameFolderCommand}" IsVisible="{Binding CanOpenGameFolder}">
+                      <MenuItem.Icon><c:GsIcon Icon="folder" Size="16" /></MenuItem.Icon>
+                    </MenuItem>
+                    <MenuItem Header="Open the save folder" Command="{Binding OpenSaveFolderCommand}" IsVisible="{Binding HasSaveFolder}">
+                      <MenuItem.Icon><c:GsIcon Icon="saves" Size="16" /></MenuItem.Icon>
+                    </MenuItem>
+                    <Separator />
+                    <MenuItem Header="Properties" Command="{Binding OpenPropertiesCommand}" CommandParameter="general">
+                      <MenuItem.Icon><c:GsIcon Icon="settings" Size="16" /></MenuItem.Icon>
+                    </MenuItem>
+                  </MenuFlyout>
+                </c:GsIconButton.Flyout>
+              </c:GsIconButton>
+            </StackPanel>
+          </c:GsPlayBar.Actions>
+        </c:GsPlayBar>
+
+        <c:GameDetailLayout>
+          <!-- The main column: About (and Achievements, once they're read, after v1) -->
+          <StackPanel Spacing="16">
+            <c:GsCard Title="About" Subtitle="{Binding AboutSource}">
+              <c:GsCard.Action>
+                <c:GsButton Classes="ghost sm" IconAfter="external" Content="Store page" Command="{Binding OpenStorePageCommand}"
+                            IsVisible="{Binding CanOpenStorePage}" ToolTip.Tip="Opens its Steam store page in your browser" />
+              </c:GsCard.Action>
+              <StackPanel Spacing="16">
+                <StackPanel Spacing="6" IsVisible="{Binding HasAbout}">
+                  <TextBlock Text="{Binding About}" FontSize="14" LineHeight="21" TextWrapping="Wrap" MaxLines="{Binding AboutLines}" TextTrimming="CharacterEllipsis" />
+                  <c:GsButton Classes="ghost sm" Content="{Binding ExpandLabel}" Command="{Binding ToggleAboutCommand}" HorizontalAlignment="Left" Margin="-12,0,0,0"
+                              IsVisible="{Binding CanExpandAbout}" />
+                </StackPanel>
+                <c:GsNote Icon="info" Text="{Binding AboutNote}" IsVisible="{Binding NoAbout}" />
+                <c:GsFacts ItemsSource="{Binding AboutFacts}" />
+              </StackPanel>
+            </c:GsCard>
+          </StackPanel>
+
+          <!-- Saves, a little: the save work is in the save manager -->
+          <c:GsCard Title="Saves">
+            <c:GsCard.Action>
+              <c:GsButton Classes="ghost sm" IconAfter="chevronRight" Content="Open in Saves" Command="{Binding OpenSavesCommand}" />
+            </c:GsCard.Action>
+            <StackPanel Spacing="16">
+              <StackPanel Spacing="8">
+                <c:GsStatusBadge Status="{Binding SavesStatus}" Label="{Binding SavesStatusLabel}" />
+                <TextBlock Classes="muted" Text="{Binding SavesSentence}" FontSize="13" LineHeight="19" TextWrapping="Wrap" />
+              </StackPanel>
+              <c:GsFacts ItemsSource="{Binding SavesFacts}" />
+              <Border Background="{DynamicResource surface-well}" BorderBrush="{DynamicResource edge-well}" BorderThickness="1" BackgroundSizing="OuterBorderEdge"
+                      CornerRadius="{DynamicResource radius-md}" Padding="12,4,4,4" IsVisible="{Binding HasSaveFolder}">
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                  <TextBlock Classes="mono-small" Text="{Binding SaveFolder}" TextTrimming="LeadingCharacterEllipsis" ToolTip.Tip="{Binding SaveFolder}" VerticalAlignment="Center" />
+                  <c:GsIconButton Grid.Column="1" Classes="sm" Icon="folder" Label="Open the save folder" Command="{Binding OpenSaveFolderCommand}" />
+                </Grid>
+              </Border>
+              <!-- When it needs you: the status's own action; else Back up now and Save as…; not syncing yet: Sync these saves and Choose files… -->
+              <c:GsButton Classes="sm" Icon="{Binding NeedIcon}" Content="{Binding NeedAction}" Command="{Binding OpenSavesCommand}" HorizontalAlignment="Left"
+                          IsVisible="{Binding SavesNeedYou}" />
+              <WrapPanel ItemSpacing="8" LineSpacing="8" IsVisible="{Binding SavesSyncing}">
+                <c:GsButton Classes="sm" Icon="upload" Content="Back up now" Command="{Binding BackUpNowCommand}" IsEnabled="{Binding !IsPlaying}"
+                            ToolTip.Tip="Keeps this PC's save as a new version now" />
+                <c:GsButton Classes="ghost sm" Icon="plus" Content="Save as…">
+                  <c:GsButton.Flyout>
+                    <Flyout Placement="BottomEdgeAlignedLeft">
+                      <StackPanel Width="300" Spacing="12" Margin="8">
+                        <TextBlock Text="Keep this save under a name" FontWeight="SemiBold" />
+                        <TextBlock Classes="caption muted" TextWrapping="Wrap"
+                                   Text="It's kept on every PC and never thinned, and comes back in one step: before a boss, or a big choice." />
+                        <TextBox Text="{Binding SaveName}" PlaceholderText="Before Lady Maria" MaxLength="100">
+                          <TextBox.KeyBindings>
+                            <KeyBinding Gesture="Enter" Command="{Binding SaveAsCommand}" />
+                          </TextBox.KeyBindings>
+                        </TextBox>
+                        <c:GsButton Classes="primary sm" Icon="pin" Content="Save" HorizontalAlignment="Right" Command="{Binding SaveAsCommand}" Click="CloseFlyout" />
+                      </StackPanel>
+                    </Flyout>
+                  </c:GsButton.Flyout>
+                </c:GsButton>
+              </WrapPanel>
+              <WrapPanel ItemSpacing="8" LineSpacing="8" IsVisible="{Binding SavesNotSyncing}">
+                <c:GsButton Classes="sm" Icon="check" Content="Sync these saves" Command="{Binding SyncGameCommand}"
+                            ToolTip.Tip="Backs these saves up and keeps them in step between your PCs" />
+                <c:GsButton Classes="ghost sm" Content="Choose files…" Command="{Binding OpenPropertiesCommand}" CommandParameter="saves" />
+              </WrapPanel>
+            </StackPanel>
+          </c:GsCard>
+
+          <!-- On this PC: where it's installed, how it starts -->
+          <c:GsCard Title="On this PC">
+            <StackPanel Spacing="16">
+              <c:GsNote Icon="info" Text="Not installed here. Its saves are still on this PC, and still back up." IsVisible="{Binding NotInstalled}" />
+              <c:GsFacts ItemsSource="{Binding PcFacts}" />
+              <WrapPanel ItemSpacing="8" LineSpacing="8">
+                <c:GsButton Classes="sm" Icon="folder" Content="Open the folder" Command="{Binding OpenGameFolderCommand}" IsVisible="{Binding CanOpenGameFolder}" />
+                <c:GsButton Classes="ghost sm" Icon="settings" Content="Properties" Command="{Binding OpenPropertiesCommand}" CommandParameter="general" />
+              </WrapPanel>
+            </StackPanel>
+          </c:GsCard>
+        </c:GameDetailLayout>
+      </StackPanel>
+    </ScrollViewer>
+  </DockPanel>
+</UserControl>

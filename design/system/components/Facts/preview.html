@@ -1,0 +1,19 @@
+<!-- @dsCard group="Layout" height=260 subtitle="Labelled facts: a game's About, what's on this PC" -->
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>preview</title>
+<style>html,body{margin:0;background:var(--bg-100);} .pv{padding:24px;} </style>
+</head>
+<body class="gs-root">
+<div id="root"></div>
+<script>
+var G = window.GameSync, h = React.createElement;
+
+ReactDOM.createRoot(document.getElementById('root')).render(h('div',{className:'pv',style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16}},
+  h(G.Card,{title:'About'},h(G.Facts,{items:[{label:'Developer',value:'Hopoo Games'},{label:'Publisher',value:'Gearbox Publishing'},{label:'Released',value:'11 Aug 2020'},
+    {label:'Genres',value:h('span',{style:{display:'inline-flex',gap:6}},h('span',{className:'gs-tag'},'Action'),h('span',{className:'gs-tag'},'Roguelike'))},{label:'Engine',value:'Unity'},{label:'Build',value:null}]})),
+  h(G.Card,{title:'On this PC'},h(G.Facts,{items:[{label:'Installed in',value:'E:\\Steam\\steamapps\\common\\Risk of Rain 2',mono:true},{label:'Size',value:'1.8 GB'},{label:'Starts',value:'Through Steam'},{label:'Options',value:'-novid',mono:true}]}))));
+
+</script>
+</body>
+</html>

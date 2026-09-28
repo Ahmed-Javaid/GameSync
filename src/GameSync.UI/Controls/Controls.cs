@@ -40,7 +40,10 @@ public class GsButton : Button
     }
 }
 
-/// <summary>40px round icon button; its label is the tooltip and what a screen reader says (A11Y-03). Classes: <c>glass</c>, <c>sm</c>.</summary>
+/// <summary>
+/// 40px round icon button; its label is the tooltip and what a screen reader says (A11Y-03). Classes: <c>glass</c>,
+/// <c>sm</c>. <see cref="IsOn"/> makes it a toggle that's on, such as the favourite star, which then fills.
+/// </summary>
 public class GsIconButton : Button
 {
     public static readonly StyledProperty<string?> IconProperty = AvaloniaProperty.Register<GsIconButton, string?>(nameof(Icon));
@@ -48,6 +51,15 @@ public class GsIconButton : Button
     public static readonly StyledProperty<string?> LabelProperty = AvaloniaProperty.Register<GsIconButton, string?>(nameof(Label));
 
     public static readonly StyledProperty<double> IconSizeProperty = AvaloniaProperty.Register<GsIconButton, double>(nameof(IconSize), 18);
+
+    public static readonly StyledProperty<bool> IsOnProperty = AvaloniaProperty.Register<GsIconButton, bool>(nameof(IsOn));
+
+    /// <summary>A toggle that's on: its icon fills, in <c>secondary</c> off art and <c>on-art</c> on it.</summary>
+    public bool IsOn
+    {
+        get => GetValue(IsOnProperty);
+        set => SetValue(IsOnProperty, value);
+    }
 
     public string? Icon
     {
@@ -74,6 +86,10 @@ public class GsIconButton : Button
         {
             ToolTip.SetTip(this, Label);
             AutomationProperties.SetName(this, Label);
+        }
+        else if (change.Property == IsOnProperty)
+        {
+            PseudoClasses.Set(":on", IsOn);
         }
     }
 }

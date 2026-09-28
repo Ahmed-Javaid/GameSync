@@ -1,0 +1,7 @@
+Showcase of one game's saves in the save manager: everything about a game's saves that used to be on its page. It opens from the game's row in the save manager's table, Open in Saves on the game's page, a status's own action (Review, Resolve), and a Needs you row's button on Home. Back returns to where it was opened from. Built only from the components above.
+
+- **Back** and the breadcrumb (Save manager › the game) at the top left return to every game's saves; Esc, Alt+Left and the mouse's back button do the same.
+- The top bar: Choose files… (the game's Properties, on Saves), Save as… and Back up now, which is the primary unless the game needs you (disabled while it runs, since quitting backs it up).
+- **Status**: the game's one status, what happened in a sentence, and its actions when it needs you: Keep the new save (primary) and Restore the previous save for a held save, Resolve for a conflict.
+- **Named saves**, newest first, each with Restore; none yet says what Save as… is for. **Where the saves are**: each place as this PC has it, in `mono`, with its files, size and newest date, Open the folder and Choose files…; Add a place comes with its folder picker (FOLD-01).
+- **History**: every version from every PC (`ConsoleTable`): when, which PC, a note (Current; a pin and the label for named, before-update and conflict versions), the size, and Restore (it asks first, and keeps the files there now as a version) and Export. The game's log (`ConsoleLog`) under it.

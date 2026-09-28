@@ -45,11 +45,26 @@ public sealed record LauncherGame
     /// <summary>The person hid it from the launcher on this PC; it syncs as before.</summary>
     public bool IsHidden { get; init; }
 
+    /// <summary>A favourite on this PC: first in the library's list and covers (LIB-17).</summary>
+    public bool IsFavourite { get; init; }
+
+    /// <summary>When GameSync first found it on this PC, for Recently added (LIB-16); unknown for games added by hand.</summary>
+    public DateTime? AddedUtc { get; init; }
+
     /// <summary>What Home and the library's game tabs show: games the person hasn't hidden.</summary>
     public bool Shown => !IsSoftware && !IsHidden;
 
     /// <summary>A status that waits for the person (a conflict, a review, a missing folder, a blocked file).</summary>
     public bool NeedsYou => SyncCounts.NeedsYou(Status);
+}
+
+/// <summary>LIB-16: the orders the library's list and covers can take, kept per PC.</summary>
+public enum LibrarySort
+{
+    RecentlyPlayed,
+    Name,
+    HoursPlayed,
+    RecentlyAdded,
 }
 
 /// <summary>What the launcher home shows (PLAY-01): the last-played game, what needs you, what to jump back into, and this month's play.</summary>
@@ -78,17 +93,21 @@ public static class Launcher
         IReadOnlyDictionary<long, SteamPlay> steamPlay,
         ArtCache? art)
     {
+        var marks = new Marks(state.GetSettings(HiddenPrefix), state.GetSettings(FavouritePrefix));
         var games = new List<LauncherGame>();
         foreach (var entry in library.Where(e => e.State != LibraryState.Ignored && e.MergedInto is null))
         {
             var steamId = SteamIdOf(entry, saveList);
-            games.Add(Describe(entry.Id, entry.DisplayTitle, entry.State == LibraryState.Synced, entry.Installed, entry.Store, steamId, state, steamPlay, art));
+            games.Add(Describe(entry.Id, entry.DisplayTitle, entry.State == LibraryState.Synced, entry.Installed, entry.Store, steamId, state, steamPlay, art, marks) with
+            {
+                AddedUtc = entry.FirstSeenUtc == default ? null : entry.FirstSeenUtc,
+            });
         }
 
         foreach (var (id, title) in handAdded.Where(g => games.All(x => x.Id != g.Id)))
         {
             var steamId = saveList?.ByTitle(title)?.SteamIds.FirstOrDefault() is > 0 and var listed ? listed : (long?)null;
-            games.Add(Describe(id, title, syncs: true, installed: true, store: null, steamId, state, steamPlay, art));
+            games.Add(Describe(id, title, syncs: true, installed: true, store: null, steamId, state, steamPlay, art, marks));
         }
 
         return games
@@ -142,7 +161,91 @@ public static class Launcher
     }
 
     /// <summary>The setting that hides a game from the launcher on this PC.</summary>
-    public static string HiddenKey(GameId game) => $"hidden.{game}";
+    public static string HiddenKey(GameId game) => $"{HiddenPrefix}{game}";
+
+    /// <summary>The setting that makes a game a favourite on this PC (LIB-17).</summary>
+    public static string FavouriteKey(GameId game) => $"{FavouritePrefix}{game}";
+
+    /// <summary>The setting that keeps the library's order on this PC (LIB-16).</summary>
+    public const string SortKey = "library.sort";
+
+    private const string HiddenPrefix = "hidden.";
+    private const string FavouritePrefix = "favourite.";
+
+    /// <summary>
+    /// LIB-16: the library's order. Recently played puts the newest played first and never-played games last; Name
+    /// goes A to Z; Hours played puts the most played first; Recently added puts what GameSync found last first. Ties,
+    /// and games with nothing to go by, go by name.
+    /// </summary>
+    public static IReadOnlyList<LauncherGame> Sort(IEnumerable<LauncherGame> games, LibrarySort sort)
+    {
+        var byName = StringComparer.Create(CultureInfo.InvariantCulture, CompareOptions.IgnoreCase);
+        return (sort switch
+        {
+            LibrarySort.Name => games.OrderBy(g => g.Title, byName),
+            LibrarySort.HoursPlayed => games.OrderByDescending(g => g.Playtime).ThenBy(g => g.Title, byName),
+            LibrarySort.RecentlyAdded => games.OrderByDescending(g => g.AddedUtc ?? DateTime.MinValue).ThenBy(g => g.Title, byName),
+            _ => games.OrderByDescending(g => g.LastPlayedUtc ?? DateTime.MinValue).ThenBy(g => g.Title, byName),
+        }).ToList();
+    }
+
+    /// <summary>
+    /// LIB-15: whether a title answers a search. Case, accents and punctuation don't count ("ragnarok" finds
+    /// "Ragnarök", "black myth" finds "Black Myth: Wukong"), spaces don't either ("slaythe" finds Slay the Spire),
+    /// and neither do the first letters of the words ("sts" and "sts2" find Slay the Spire 2, "cs2" Counter-Strike 2).
+    /// </summary>
+    public static bool Matches(string title, string? query)
+    {
+        var words = Words(query);
+        if (words.Count == 0)
+        {
+            return true;
+        }
+
+        var titleWords = Words(title);
+        var spaced = string.Join(' ', titleWords);
+        var q = string.Join(' ', words);
+        if (spaced.Contains(q, StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        var joined = string.Concat(words);
+        if (string.Concat(titleWords).Contains(joined, StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        // A number counts whole among the initials: "Slay the Spire 2" is "sts2".
+        var initials = string.Concat(titleWords.Select(w => char.IsAsciiDigit(w[0]) ? w : w[..1]));
+        return initials.StartsWith(joined, StringComparison.Ordinal);
+    }
+
+    /// <summary>A text's words in lower case, letters and digits only, accents dropped.</summary>
+    private static List<string> Words(string? text)
+    {
+        var words = new List<string>();
+        var word = new System.Text.StringBuilder();
+        foreach (var c in (text ?? "").Normalize(System.Text.NormalizationForm.FormD).ToLowerInvariant())
+        {
+            if (char.IsLetterOrDigit(c))
+            {
+                word.Append(c);
+            }
+            else if (CharUnicodeInfo.GetUnicodeCategory(c) != UnicodeCategory.NonSpacingMark && word.Length > 0)
+            {
+                words.Add(word.ToString());
+                word.Clear();
+            }
+        }
+
+        if (word.Length > 0)
+        {
+            words.Add(word.ToString());
+        }
+
+        return words;
+    }
 
     /// <summary>0 none, 1 under 2 hours, 2 two to four, 3 over four, as the activity calendar shows it.</summary>
     public static int ActivityLevel(TimeSpan played) =>
@@ -183,8 +286,11 @@ public static class Launcher
         return listed?.SteamIds.FirstOrDefault() is > 0 and var id ? id : null;
     }
 
+    /// <summary>The games hidden and made favourites on this PC, read once for the whole library.</summary>
+    private sealed record Marks(IReadOnlyDictionary<string, string> Hidden, IReadOnlyDictionary<string, string> Favourites);
+
     private static LauncherGame Describe(GameId id, string title, bool syncs, bool installed, StoreKind? store, long? steamId,
-        StateStore state, IReadOnlyDictionary<long, SteamPlay> steamPlay, ArtCache? art)
+        StateStore state, IReadOnlyDictionary<long, SteamPlay> steamPlay, ArtCache? art, Marks marks)
     {
         var sessions = state.GetSessions(id);
         var steam = steamId is { } appId ? steamPlay.GetValueOrDefault(appId) : null;
@@ -207,7 +313,8 @@ public static class Launcher
             HeroPath = steamId is { } h ? art?.Find(h, ArtKind.Hero) : null,
             LogoPath = steamId is { } l ? art?.Find(l, ArtKind.Logo) : null,
             IsSoftware = steamId is { } s && art?.IsSoftware(s) == true,
-            IsHidden = state.GetSetting(HiddenKey(id)) is { Length: > 0 },
+            IsHidden = marks.Hidden.ContainsKey(HiddenKey(id)),
+            IsFavourite = marks.Favourites.ContainsKey(FavouriteKey(id)),
         };
     }
 

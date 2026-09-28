@@ -66,7 +66,7 @@ public static partial class Cli
         return games;
     }
 
-    private static IReadOnlyList<string> Problems(GameDefinition portable, GameDefinition resolved, ThisPc here) =>
+    internal static IReadOnlyList<string> Problems(GameDefinition portable, GameDefinition resolved, ThisPc here) =>
         GameValidator.Problems(portable, here.Guard).Concat(GameValidator.Problems(resolved, here.Guard)).Distinct().ToList();
 
     private static void PrintSkipped(ThisPc here)
@@ -113,6 +113,23 @@ public static partial class Cli
                     Console.WriteLine(hide
                         ? $"{title} is hidden from Home and the game library on this PC. Its saves sync as before. Bring it back with: gamesync unhide {id}"
                         : $"{title} shows in the launcher again.");
+                }
+
+                return 0;
+            }
+
+            case "favourite":
+            case "unfavourite":
+            {
+                // LIB-17: first in the library's list and covers, on this PC alone.
+                var favourite = command == "favourite";
+                foreach (var id in Games(rest, "game id"))
+                {
+                    var title = here.Library.All().FirstOrDefault(e => e.Id == id)?.DisplayTitle ?? id.Value;
+                    here.State.SetSetting(Launcher.FavouriteKey(id), favourite ? "1" : "");
+                    Console.WriteLine(favourite
+                        ? $"{title} is a favourite on this PC: first in the game library."
+                        : $"{title} isn't a favourite any more.");
                 }
 
                 return 0;

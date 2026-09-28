@@ -122,18 +122,335 @@ public class GsGameTile : Button
         if (change.Property == TitleProperty)
         {
             Initial = InitialOf(Title);
-            Avalonia.Automation.AutomationProperties.SetName(this, Title);
         }
         else if (change.Property == StatusProperty)
         {
             // Synced games and games not syncing yet show no badge, so the problems stand out.
             ShowsStatus = Status is { } s && s != GameStatus.Synced;
         }
+
+        if (change.Property == TitleProperty || change.Property == StatusProperty || change.Property == StatusLabelProperty)
+        {
+            // What a screen reader says: the name, and the badge's words when there's a badge (A11Y-03).
+            Avalonia.Automation.AutomationProperties.SetName(this, ShowsStatus ? $"{Title}, {StatusLabel ?? GsStatusBadge.Describe(Status).Word}" : Title);
+        }
         else if (change.Property == ArtProperty)
         {
             PseudoClasses.Set(":art", Art is not null);
         }
     }
+}
+
+/// <summary>
+/// A game in the library's list (design system → GameList): its small cover and name, the status under the name when
+/// it needs the person or the game is running, dimmed when the game isn't installed here, and <c>secondary-soft</c>
+/// while its page is open.
+/// </summary>
+public class GsGameRow : Button
+{
+    public static readonly StyledProperty<string?> TitleProperty = AvaloniaProperty.Register<GsGameRow, string?>(nameof(Title));
+
+    public static readonly StyledProperty<IImage?> ArtProperty = AvaloniaProperty.Register<GsGameRow, IImage?>(nameof(Art));
+
+    public static readonly StyledProperty<GameStatus?> StatusProperty = AvaloniaProperty.Register<GsGameRow, GameStatus?>(nameof(Status));
+
+    public static readonly StyledProperty<string?> StatusLabelProperty = AvaloniaProperty.Register<GsGameRow, string?>(nameof(StatusLabel));
+
+    public static readonly StyledProperty<bool> ShowsStatusProperty = AvaloniaProperty.Register<GsGameRow, bool>(nameof(ShowsStatus));
+
+    public static readonly StyledProperty<bool> IsInstalledProperty = AvaloniaProperty.Register<GsGameRow, bool>(nameof(IsInstalled), true);
+
+    public static readonly StyledProperty<bool> IsCurrentProperty = AvaloniaProperty.Register<GsGameRow, bool>(nameof(IsCurrent));
+
+    public static readonly DirectProperty<GsGameRow, string> InitialProperty =
+        AvaloniaProperty.RegisterDirect<GsGameRow, string>(nameof(Initial), r => r.Initial);
+
+    private string _initial = "?";
+
+    public string? Title
+    {
+        get => GetValue(TitleProperty);
+        set => SetValue(TitleProperty, value);
+    }
+
+    public IImage? Art
+    {
+        get => GetValue(ArtProperty);
+        set => SetValue(ArtProperty, value);
+    }
+
+    public GameStatus? Status
+    {
+        get => GetValue(StatusProperty);
+        set => SetValue(StatusProperty, value);
+    }
+
+    public string? StatusLabel
+    {
+        get => GetValue(StatusLabelProperty);
+        set => SetValue(StatusLabelProperty, value);
+    }
+
+    /// <summary>Show the status under the name: only when the game needs the person or is running, so those stand out.</summary>
+    public bool ShowsStatus
+    {
+        get => GetValue(ShowsStatusProperty);
+        set => SetValue(ShowsStatusProperty, value);
+    }
+
+    public bool IsInstalled
+    {
+        get => GetValue(IsInstalledProperty);
+        set => SetValue(IsInstalledProperty, value);
+    }
+
+    /// <summary>Its page is the one open beside the list.</summary>
+    public bool IsCurrent
+    {
+        get => GetValue(IsCurrentProperty);
+        set => SetValue(IsCurrentProperty, value);
+    }
+
+    public string Initial
+    {
+        get => _initial;
+        private set => SetAndRaise(InitialProperty, ref _initial, value);
+    }
+
+    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
+    {
+        base.OnPropertyChanged(change);
+        if (change.Property == TitleProperty)
+        {
+            Initial = GsGameTile.InitialOf(Title);
+        }
+        else if (change.Property == IsCurrentProperty)
+        {
+            PseudoClasses.Set(":current", IsCurrent);
+        }
+        else if (change.Property == IsInstalledProperty)
+        {
+            PseudoClasses.Set(":away", !IsInstalled);
+        }
+        else if (change.Property == ArtProperty)
+        {
+            PseudoClasses.Set(":art", Art is not null);
+        }
+    }
+}
+
+/// <summary>A group's heading in the library's list: <c>overline</c> with its count in mono and a chevron; a click opens or closes the group.</summary>
+public class GsListHeading : Button
+{
+    public static readonly StyledProperty<string?> LabelProperty = AvaloniaProperty.Register<GsListHeading, string?>(nameof(Label));
+
+    public static readonly StyledProperty<string?> CountProperty = AvaloniaProperty.Register<GsListHeading, string?>(nameof(Count));
+
+    public static readonly StyledProperty<bool> IsOpenProperty = AvaloniaProperty.Register<GsListHeading, bool>(nameof(IsOpen), true);
+
+    public string? Label
+    {
+        get => GetValue(LabelProperty);
+        set => SetValue(LabelProperty, value);
+    }
+
+    public string? Count
+    {
+        get => GetValue(CountProperty);
+        set => SetValue(CountProperty, value);
+    }
+
+    public bool IsOpen
+    {
+        get => GetValue(IsOpenProperty);
+        set => SetValue(IsOpenProperty, value);
+    }
+
+    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
+    {
+        base.OnPropertyChanged(change);
+        if (change.Property == IsOpenProperty)
+        {
+            PseudoClasses.Set(":closed", !IsOpen);
+        }
+    }
+}
+
+/// <summary>
+/// The library's covers: as many columns as fit with none narrower than <see cref="MinItemWidth"/>, the tiles sharing
+/// the width, wrapping to rows. A bigger window shows more games in a row, not the same ones bigger.
+/// </summary>
+public sealed class TilesPanel : Panel
+{
+    public static readonly StyledProperty<double> MinItemWidthProperty = AvaloniaProperty.Register<TilesPanel, double>(nameof(MinItemWidth), 150);
+
+    public static readonly StyledProperty<double> ColumnGapProperty = AvaloniaProperty.Register<TilesPanel, double>(nameof(ColumnGap), 16);
+
+    public static readonly StyledProperty<double> RowGapProperty = AvaloniaProperty.Register<TilesPanel, double>(nameof(RowGap), 20);
+
+    static TilesPanel() => AffectsMeasure<TilesPanel>(MinItemWidthProperty, ColumnGapProperty, RowGapProperty);
+
+    public double MinItemWidth
+    {
+        get => GetValue(MinItemWidthProperty);
+        set => SetValue(MinItemWidthProperty, value);
+    }
+
+    public double ColumnGap
+    {
+        get => GetValue(ColumnGapProperty);
+        set => SetValue(ColumnGapProperty, value);
+    }
+
+    public double RowGap
+    {
+        get => GetValue(RowGapProperty);
+        set => SetValue(RowGapProperty, value);
+    }
+
+    /// <summary>How many tiles share a row of this width: as many as fit at the least width, never fewer than two.</summary>
+    public static int Columns(double width, double minItemWidth, double gap) =>
+        double.IsInfinity(width) ? 6 : Math.Max(2, (int)Math.Floor((width + gap) / (minItemWidth + gap)));
+
+    protected override Size MeasureOverride(Size availableSize)
+    {
+        var columns = Columns(availableSize.Width, MinItemWidth, ColumnGap);
+        var width = double.IsInfinity(availableSize.Width) ? columns * MinItemWidth + (columns - 1) * ColumnGap : availableSize.Width;
+        var cell = (width - ColumnGap * (columns - 1)) / columns;
+        double height = 0, row = 0;
+        for (var i = 0; i < Children.Count; i++)
+        {
+            Children[i].Measure(new Size(cell, double.PositiveInfinity));
+            row = Math.Max(row, Children[i].DesiredSize.Height);
+            if (i % columns == columns - 1 || i == Children.Count - 1)
+            {
+                height += row + (height > 0 ? RowGap : 0);
+                row = 0;
+            }
+        }
+
+        return new Size(width, height);
+    }
+
+    protected override Size ArrangeOverride(Size finalSize)
+    {
+        var columns = Columns(finalSize.Width, MinItemWidth, ColumnGap);
+        var cell = (finalSize.Width - ColumnGap * (columns - 1)) / columns;
+        double y = 0, row = 0;
+        for (var i = 0; i < Children.Count; i++)
+        {
+            var column = i % columns;
+            Children[i].Arrange(new Rect(column * (cell + ColumnGap), y, cell, Children[i].DesiredSize.Height));
+            row = Math.Max(row, Children[i].DesiredSize.Height);
+            if (column == columns - 1)
+            {
+                y += row + RowGap;
+                row = 0;
+            }
+        }
+
+        return finalSize;
+    }
+}
+
+/// <summary>
+/// A game's page below its play bar (design system → GameDetailScreen), from three children: the main column (About,
+/// and Achievements once they're read), the Saves card and On this PC. On a page from <see cref="WideFrom"/> wide, the
+/// main column takes the left and the other two stack in a column of <see cref="SideWidth"/> on the right; narrower,
+/// one column: Saves, the main column, On this PC.
+/// </summary>
+public sealed class GameDetailLayout : Panel
+{
+    public static readonly StyledProperty<double> SpacingProperty = AvaloniaProperty.Register<GameDetailLayout, double>(nameof(Spacing), 16);
+
+    public static readonly StyledProperty<double> SideWidthProperty = AvaloniaProperty.Register<GameDetailLayout, double>(nameof(SideWidth), 316);
+
+    public static readonly StyledProperty<double> WideFromProperty = AvaloniaProperty.Register<GameDetailLayout, double>(nameof(WideFrom), 800);
+
+    static GameDetailLayout() => AffectsMeasure<GameDetailLayout>(SpacingProperty, SideWidthProperty, WideFromProperty);
+
+    public double Spacing
+    {
+        get => GetValue(SpacingProperty);
+        set => SetValue(SpacingProperty, value);
+    }
+
+    public double SideWidth
+    {
+        get => GetValue(SideWidthProperty);
+        set => SetValue(SideWidthProperty, value);
+    }
+
+    /// <summary>The page width from which the side column appears.</summary>
+    public double WideFrom
+    {
+        get => GetValue(WideFromProperty);
+        set => SetValue(WideFromProperty, value);
+    }
+
+    private bool Wide(double width) => !double.IsInfinity(width) && width >= WideFrom;
+
+    protected override Size MeasureOverride(Size availableSize)
+    {
+        if (Children.Count != 3)
+        {
+            return base.MeasureOverride(availableSize);
+        }
+
+        var width = double.IsInfinity(availableSize.Width) ? 1280 : availableSize.Width;
+        var (main, saves, pc) = (Children[0], Children[1], Children[2]);
+        if (Wide(width))
+        {
+            main.Measure(new Size(width - SideWidth - Spacing, double.PositiveInfinity));
+            saves.Measure(new Size(SideWidth, double.PositiveInfinity));
+            pc.Measure(new Size(SideWidth, double.PositiveInfinity));
+            return new Size(width, Math.Max(HeightOf(main), Stacked(saves, pc)));
+        }
+
+        foreach (var child in Children)
+        {
+            child.Measure(new Size(width, double.PositiveInfinity));
+        }
+
+        return new Size(width, Stacked(saves, main, pc));
+    }
+
+    protected override Size ArrangeOverride(Size finalSize)
+    {
+        if (Children.Count != 3)
+        {
+            return base.ArrangeOverride(finalSize);
+        }
+
+        var width = finalSize.Width;
+        var (main, saves, pc) = (Children[0], Children[1], Children[2]);
+        if (Wide(width))
+        {
+            main.Arrange(new Rect(0, 0, width - SideWidth - Spacing, HeightOf(main)));
+            var left = width - SideWidth;
+            saves.Arrange(new Rect(left, 0, SideWidth, HeightOf(saves)));
+            pc.Arrange(new Rect(left, HeightOf(saves) + (saves.IsVisible ? Spacing : 0), SideWidth, HeightOf(pc)));
+            return finalSize;
+        }
+
+        var y = 0.0;
+        foreach (var child in new[] { saves, main, pc })
+        {
+            child.Arrange(new Rect(0, y, width, HeightOf(child)));
+            y += child.IsVisible ? HeightOf(child) + Spacing : 0;
+        }
+
+        return finalSize;
+    }
+
+    /// <summary>The height of cards stacked with the spacing between the visible ones.</summary>
+    private double Stacked(params Control[] children)
+    {
+        var shown = children.Where(c => c.IsVisible).ToList();
+        return shown.Sum(HeightOf) + Math.Max(0, shown.Count - 1) * Spacing;
+    }
+
+    private static double HeightOf(Control child) => child.IsVisible ? child.DesiredSize.Height : 0;
 }
 
 /// <summary>A pill on cover art (the hero's playtime): <c>glass</c> behind <c>on-art</c> text, the same in every theme.</summary>
@@ -186,6 +503,50 @@ public class GsHeroBanner : TemplatedControl
     public static readonly StyledProperty<ICommand?> SavesCommandProperty = AvaloniaProperty.Register<GsHeroBanner, ICommand?>(nameof(SavesCommand));
 
     public static readonly StyledProperty<ICommand?> SettingsCommandProperty = AvaloniaProperty.Register<GsHeroBanner, ICommand?>(nameof(SettingsCommand));
+
+    public static readonly StyledProperty<object?> ActionsProperty = AvaloniaProperty.Register<GsHeroBanner, object?>(nameof(Actions));
+
+    public static readonly StyledProperty<bool> ShowsPlayProperty = AvaloniaProperty.Register<GsHeroBanner, bool>(nameof(ShowsPlay), true);
+
+    public static readonly StyledProperty<string> PlayIconProperty = AvaloniaProperty.Register<GsHeroBanner, string>(nameof(PlayIcon), "play");
+
+    public static readonly StyledProperty<double> RoomyHeightProperty = AvaloniaProperty.Register<GsHeroBanner, double>(nameof(RoomyHeight), RoomyAt);
+
+    public static readonly StyledProperty<bool> ShowsStatusProperty = AvaloniaProperty.Register<GsHeroBanner, bool>(nameof(ShowsStatus), true);
+
+    /// <summary>False leaves the status out: a game's page shows it in its play bar instead.</summary>
+    public bool ShowsStatus
+    {
+        get => GetValue(ShowsStatusProperty);
+        set => SetValue(ShowsStatusProperty, value);
+    }
+
+    /// <summary>The glass buttons beside the primary, in place of Manage saves and Game settings: a game's page has the favourite star and More.</summary>
+    public object? Actions
+    {
+        get => GetValue(ActionsProperty);
+        set => SetValue(ActionsProperty, value);
+    }
+
+    /// <summary>False leaves the primary out, for a game not installed on this PC.</summary>
+    public bool ShowsPlay
+    {
+        get => GetValue(ShowsPlayProperty);
+        set => SetValue(ShowsPlayProperty, value);
+    }
+
+    public string PlayIcon
+    {
+        get => GetValue(PlayIconProperty);
+        set => SetValue(PlayIconProperty, value);
+    }
+
+    /// <summary>Below this height the chip and blurb give way; 0 keeps them, as a game's page, sized by its content, does.</summary>
+    public double RoomyHeight
+    {
+        get => GetValue(RoomyHeightProperty);
+        set => SetValue(RoomyHeightProperty, value);
+    }
 
     public IImage? Art
     {
@@ -262,8 +623,8 @@ public class GsHeroBanner : TemplatedControl
     public static readonly DirectProperty<GsHeroBanner, bool> HasRoomProperty =
         AvaloniaProperty.RegisterDirect<GsHeroBanner, bool>(nameof(HasRoom), b => b.HasRoom);
 
-    /// <summary>Under this height the banner drops its playtime chip and blurb, so the title, status and Play still fit.</summary>
-    public const double RoomyHeight = 280;
+    /// <summary>Under this height Home's banner drops its playtime chip and blurb, so the title, status and Play still fit.</summary>
+    public const double RoomyAt = 280;
 
     private bool _hasRoom = true;
 
@@ -277,7 +638,7 @@ public class GsHeroBanner : TemplatedControl
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
         base.OnPropertyChanged(change);
-        if (change.Property == BoundsProperty)
+        if (change.Property == BoundsProperty || change.Property == RoomyHeightProperty)
         {
             HasRoom = Bounds.Height >= RoomyHeight;
         }

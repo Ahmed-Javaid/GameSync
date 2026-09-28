@@ -1,0 +1,247 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="using:GameSync.UI.Controls"
+             xmlns:vm="using:GameSync.UI.ViewModels"
+             xmlns:v="using:GameSync.UI.Views"
+             x:Class="GameSync.UI.Views.GameSavesPage"
+             x:DataType="vm:GameSavesViewModel">
+  <!-- One game's saves in the save manager (design system → GameSavesScreen): Back and the breadcrumb; Choose files…,
+       Save as… and Back up now; the status with its actions when it needs you; named saves and where the saves are;
+       every version from every PC with Restore; the game's log. A game not syncing yet shows the saves found. -->
+  <UserControl.Resources>
+    <!-- A place a game keeps saves: this PC's folder, how the save list names it, and what's there -->
+    <DataTemplate x:Key="PlaceRow" x:DataType="vm:PlaceItem">
+      <Border Background="{DynamicResource surface-well}" BorderBrush="{DynamicResource edge-well}" BorderThickness="1" BackgroundSizing="OuterBorderEdge"
+              CornerRadius="{DynamicResource radius-md}" Padding="12,10,8,10" AutomationProperties.Name="{Binding}">
+        <Grid ColumnDefinitions="*,Auto,32" ColumnSpacing="8">
+          <StackPanel Spacing="2" VerticalAlignment="Center">
+            <TextBlock Classes="mono" Text="{Binding FolderText}" TextTrimming="LeadingCharacterEllipsis" ToolTip.Tip="{Binding FolderText}" IsVisible="{Binding ShowsFolder}" />
+            <TextBlock Classes="mono" Text="{Binding Portable}" TextTrimming="LeadingCharacterEllipsis" ToolTip.Tip="{Binding Portable}" IsVisible="{Binding !ShowsFolder}" />
+            <TextBlock Classes="caption faint" Text="{Binding Evidence}" TextTrimming="CharacterEllipsis" />
+          </StackPanel>
+          <c:GsTag Grid.Column="1" Text="{Binding Tag}" Background="{DynamicResource bg-400}" IsVisible="{Binding HasTag}" VerticalAlignment="Center" />
+          <c:GsIconButton Grid.Column="2" Classes="sm" Icon="folder" Label="Open the save folder" Command="{Binding OpenFolder}" IsVisible="{Binding CanOpen}"
+                          VerticalAlignment="Center" />
+        </Grid>
+      </Border>
+    </DataTemplate>
+  </UserControl.Resources>
+
+  <DockPanel>
+    <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto" MinHeight="40" Margin="0,0,0,16">
+      <StackPanel Orientation="Horizontal" Spacing="12">
+        <c:GsButton Classes="sm" Icon="arrowLeft" Content="Back" ToolTip.Tip="Back (Esc)" Command="{Binding BackCommand}" />
+        <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+          <Button Theme="{StaticResource CrumbButton}" Content="{Binding Root}" Command="{Binding BackCommand}" />
+          <c:GsIcon Icon="chevronRight" Size="14" Foreground="{DynamicResource ink-muted}" VerticalAlignment="Center" />
+          <TextBlock Text="{Binding Title}" FontSize="13" FontWeight="Medium" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+        </StackPanel>
+      </StackPanel>
+      <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" IsVisible="{Binding Syncing}">
+        <c:GsButton Classes="ghost" Icon="settings" Content="Choose files…" Command="{Binding ChooseFilesCommand}" />
+        <c:GsButton Icon="plus" Content="Save as…">
+          <c:GsButton.Flyout>
+            <Flyout Placement="BottomEdgeAlignedRight">
+              <StackPanel Width="300" Spacing="12" Margin="8">
+                <TextBlock Text="Keep this save under a name" FontWeight="SemiBold" />
+                <TextBlock Classes="caption muted" TextWrapping="Wrap"
+                           Text="It's kept on every PC and never thinned, and comes back in one step: before a boss, or a big choice." />
+                <TextBox Text="{Binding SaveName}" PlaceholderText="Before Lady Maria" MaxLength="100">
+                  <TextBox.KeyBindings>
+                    <KeyBinding Gesture="Enter" Command="{Binding SaveAsCommand}" />
+                  </TextBox.KeyBindings>
+                </TextBox>
+                <c:GsButton Classes="primary sm" Icon="pin" Content="Save" HorizontalAlignment="Right" Command="{Binding SaveAsCommand}" Click="CloseFlyout" />
+              </StackPanel>
+            </Flyout>
+          </c:GsButton.Flyout>
+        </c:GsButton>
+        <c:GsButton Classes.primary="{Binding !NeedsYou}" Icon="upload" Content="Back up now" Command="{Binding BackUpNowCommand}"
+                    IsEnabled="{Binding !IsPlaying}" ToolTip.Tip="{Binding BackUpTip}" />
+      </StackPanel>
+    </Grid>
+
+    <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+      <StackPanel Spacing="16" Margin="0,0,0,8">
+        <!-- The status, what happened, and what to do when it needs you -->
+        <Border Background="{DynamicResource bg-200}" BorderBrush="{DynamicResource edge-card}" BorderThickness="1" BackgroundSizing="OuterBorderEdge"
+                BoxShadow="{DynamicResource lift-card}" CornerRadius="{DynamicResource radius-lg}" Padding="20,14">
+          <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="16">
+            <c:GsStatusBadge Status="{Binding Status}" Label="{Binding StatusLabel}" VerticalAlignment="Center" />
+            <TextBlock Grid.Column="1" Classes="muted" Text="{Binding Sentence}" FontSize="13" LineHeight="19" TextWrapping="Wrap" VerticalAlignment="Center" />
+            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" IsVisible="{Binding IsHeld}">
+              <c:GsButton Icon="reset" Content="Restore the previous save">
+                <c:GsButton.Flyout>
+                  <Flyout Placement="BottomEdgeAlignedRight">
+                    <StackPanel Width="280" Spacing="12" Margin="8">
+                      <TextBlock Text="Bring back the save from before the change?" FontWeight="SemiBold" TextWrapping="Wrap" />
+                      <TextBlock Classes="caption muted" TextWrapping="Wrap" Text="The changed files stay in the history, so you can go back to them." />
+                      <c:GsButton Classes="primary sm" Icon="reset" Content="Restore" HorizontalAlignment="Right" Click="CloseFlyout" Command="{Binding RestorePreviousCommand}" />
+                    </StackPanel>
+                  </Flyout>
+                </c:GsButton.Flyout>
+              </c:GsButton>
+              <c:GsButton Classes="primary" Icon="check" Content="Keep the new save" Command="{Binding ApproveCommand}" />
+            </StackPanel>
+          </Grid>
+        </Border>
+
+        <!-- A game that syncs: named saves and where the saves are, then its history and log -->
+        <Grid ColumnDefinitions="*,*" ColumnSpacing="16" IsVisible="{Binding Syncing}">
+          <c:GsCard Title="Named saves" Subtitle="On every PC, and back in one step." VerticalAlignment="Top">
+            <Panel>
+              <c:GsNote Icon="info" IsVisible="{Binding NoNamedSaves}" Text="None yet. Save as… keeps this save under a name, on every PC, before a boss or a big choice." />
+              <ItemsControl ItemsSource="{Binding NamedSaves}" IsVisible="{Binding HasNamedSaves}">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate>
+                    <StackPanel Spacing="12" />
+                  </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:NamedSaveItem">
+                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12" AutomationProperties.Name="{Binding}">
+                      <c:GsIcon Icon="pin" Size="16" VerticalAlignment="Center" Foreground="{DynamicResource ink-muted}" />
+                      <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Classes="mono-small faint" Text="{Binding Meta}" />
+                      </StackPanel>
+                      <c:GsButton Grid.Column="2" Classes="ghost sm" Icon="reset" Content="Restore" AutomationProperties.Name="{Binding Name, StringFormat='Restore {0}'}">
+                        <c:GsButton.Flyout>
+                          <Flyout Placement="BottomEdgeAlignedRight">
+                            <StackPanel Width="280" Spacing="12" Margin="8">
+                              <TextBlock Text="{Binding Name, StringFormat='Bring back “{0}”?'}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                              <TextBlock Classes="caption muted" TextWrapping="Wrap" Text="Your files now are kept as a version first, so you can go back to them." />
+                              <c:GsButton Classes="primary sm" Icon="reset" Content="Restore" HorizontalAlignment="Right" Click="CloseFlyout"
+                                          Command="{Binding $parent[v:GameSavesPage].((vm:GameSavesViewModel)DataContext).RestoreCommand}" CommandParameter="{Binding}" />
+                            </StackPanel>
+                          </Flyout>
+                        </c:GsButton.Flyout>
+                      </c:GsButton>
+                    </Grid>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </Panel>
+          </c:GsCard>
+
+          <c:GsCard Grid.Column="1" Title="Where the saves are" Subtitle="{Binding FoundBy}" VerticalAlignment="Top">
+            <c:GsCard.Action>
+              <c:GsButton Classes="ghost sm" Icon="settings" Content="Choose files…" Command="{Binding ChooseFilesCommand}" />
+            </c:GsCard.Action>
+            <StackPanel Spacing="8">
+              <ItemsControl ItemsSource="{Binding Places}" ItemTemplate="{StaticResource PlaceRow}">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate>
+                    <StackPanel Spacing="8" />
+                  </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+              </ItemsControl>
+              <StackPanel Spacing="8" IsVisible="{Binding HasSuggestions}" Margin="0,4,0,0">
+                <TextBlock Classes="caption muted" TextWrapping="Wrap" Text="A later scan found these too. They don't sync until you add them." />
+                <ItemsControl ItemsSource="{Binding Suggestions}" ItemTemplate="{StaticResource PlaceRow}">
+                  <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                      <StackPanel Spacing="8" />
+                    </ItemsPanelTemplate>
+                  </ItemsControl.ItemsPanel>
+                </ItemsControl>
+                <c:GsButton Classes="sm" Icon="plus" Content="Add these places" Command="{Binding SyncGameCommand}" HorizontalAlignment="Left" />
+              </StackPanel>
+            </StackPanel>
+          </c:GsCard>
+        </Grid>
+
+        <c:GsConsole Command="{Binding HistoryCommand}" IsVisible="{Binding Syncing}">
+          <c:GsConsole.Toolbar>
+            <TextBlock Text="{Binding HistorySummary}" VerticalAlignment="Center" />
+          </c:GsConsole.Toolbar>
+          <StackPanel Grid.IsSharedSizeScope="True">
+            <Border BorderBrush="{DynamicResource line-100}" BorderThickness="0,0,0,1">
+              <Grid>
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="Auto" SharedSizeGroup="Saved" />
+                  <ColumnDefinition Width="Auto" SharedSizeGroup="Pc" />
+                  <ColumnDefinition Width="*" />
+                  <ColumnDefinition Width="Auto" SharedSizeGroup="Size" />
+                  <ColumnDefinition Width="Auto" SharedSizeGroup="Act" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Classes="th" Text="SAVED" />
+                <TextBlock Grid.Column="1" Classes="th" Text="PC" />
+                <TextBlock Grid.Column="2" Classes="th" Text="NOTE" />
+                <TextBlock Grid.Column="3" Classes="th num" Text="SIZE" />
+              </Grid>
+            </Border>
+            <TextBlock Classes="caption muted" Margin="12,16" TextWrapping="Wrap" FontFamily="{DynamicResource font-sans}" IsVisible="{Binding NoVersions}"
+                       Text="Nothing is kept yet. Every version from every PC is kept here once its saves are backed up." />
+            <ItemsControl ItemsSource="{Binding Versions}" IsVisible="{Binding HasVersions}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:VersionItem">
+                  <Border BorderBrush="{DynamicResource line-100}" BorderThickness="0,0,0,1" MinHeight="34" AutomationProperties.Name="{Binding}">
+                    <Grid>
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" SharedSizeGroup="Saved" />
+                        <ColumnDefinition Width="Auto" SharedSizeGroup="Pc" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" SharedSizeGroup="Size" />
+                        <ColumnDefinition Width="Auto" SharedSizeGroup="Act" />
+                      </Grid.ColumnDefinitions>
+                      <TextBlock Classes="td" Text="{Binding Saved}" />
+                      <TextBlock Grid.Column="1" Classes="td" Text="{Binding Pc}" />
+                      <Panel Grid.Column="2" Margin="12,0" VerticalAlignment="Center">
+                        <c:GsTag Text="Current" Background="{DynamicResource secondary-soft}" Foreground="{DynamicResource ink}" IsVisible="{Binding IsCurrent}" />
+                        <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding ShowsNote}">
+                          <c:GsIcon Icon="pin" Size="14" Foreground="{DynamicResource ink-muted}" VerticalAlignment="Center" IsVisible="{Binding ShowsPin}" />
+                          <TextBlock Classes="td path" Margin="0" Text="{Binding Note}" />
+                        </StackPanel>
+                      </Panel>
+                      <TextBlock Grid.Column="3" Classes="td num" Text="{Binding Size}" />
+                      <c:GsButton Grid.Column="4" Classes="ghost sm" Content="Restore" Margin="0,0,8,0" FontFamily="{DynamicResource font-sans}"
+                                  IsVisible="{Binding CanRestore}" AutomationProperties.Name="{Binding Saved, StringFormat='Restore the save from {0}'}">
+                        <c:GsButton.Flyout>
+                          <Flyout Placement="BottomEdgeAlignedRight">
+                            <StackPanel Width="280" Spacing="12" Margin="8">
+                              <TextBlock Text="{Binding Saved, StringFormat='Bring back the save from {0}?'}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                              <TextBlock Classes="caption muted" TextWrapping="Wrap" Text="Your files now are kept as a version first, so you can go back to them." />
+                              <c:GsButton Classes="primary sm" Icon="reset" Content="Restore" HorizontalAlignment="Right" Click="CloseFlyout"
+                                          Command="{Binding $parent[v:GameSavesPage].((vm:GameSavesViewModel)DataContext).RestoreCommand}" CommandParameter="{Binding}" />
+                            </StackPanel>
+                          </Flyout>
+                        </c:GsButton.Flyout>
+                      </c:GsButton>
+                    </Grid>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+        </c:GsConsole>
+
+        <!-- A game not syncing yet: the saves found, with Sync these saves -->
+        <c:GsCard Title="Saves found" Subtitle="{Binding FoundBy}" IsVisible="{Binding NotSyncing}">
+          <c:GsCard.Action>
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <c:GsButton Classes="ghost sm" Content="Choose files…" Command="{Binding ChooseFilesCommand}" IsVisible="{Binding HasPlaces}" />
+              <c:GsButton Classes="primary sm" Icon="check" Content="Sync these saves" Command="{Binding SyncGameCommand}" IsVisible="{Binding HasPlaces}" />
+            </StackPanel>
+          </c:GsCard.Action>
+          <StackPanel Spacing="8">
+            <c:GsNote Icon="search" IsVisible="{Binding NothingFound}"
+                      Text="No saves were found for it on this PC yet. They're looked for again at every scan." />
+            <ItemsControl ItemsSource="{Binding Places}" ItemTemplate="{StaticResource PlaceRow}">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                  <StackPanel Spacing="8" />
+                </ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+            </ItemsControl>
+            <c:GsNote Icon="shield" IsVisible="{Binding HasPlaces}"
+                      Text="Not syncing yet: nothing is backed up until you say so. Only save data ever moves, never the game's own files." />
+          </StackPanel>
+        </c:GsCard>
+
+        <c:GsConsoleLog Lines="{Binding LogLines}" TimeWidth="92" MaxHeight="320" IsVisible="{Binding HasLog}"
+                        AutomationProperties.Name="{Binding Title, StringFormat='{}{0} activity'}" />
+      </StackPanel>
+    </ScrollViewer>
+  </DockPanel>
+</UserControl>

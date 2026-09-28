@@ -12,6 +12,9 @@ namespace GameSync.UI.ViewModels;
 public interface IPageSurface
 {
     GlassStrength Strength { get; }
+
+    /// <summary>The art Glossy shows behind the page: its own game's, on a game's page; null takes the last-played game's.</summary>
+    string? BackdropArt => null;
 }
 
 /// <summary>A screen the window has a place for but that isn't built yet: its name and what it will hold.</summary>

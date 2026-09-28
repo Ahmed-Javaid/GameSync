@@ -115,6 +115,8 @@ public static partial class Cli
                                      this PC first, and from Steam's store only for new games and missing art
           hide <game>... / unhide <game>...
                                      hides games from Home and the game library on this PC; they sync as before
+          favourite <game>... / unfavourite <game>...
+                                     puts games first in the game library on this PC
 
         By hand
           session <game> <start> <end>   records a play session, times in local time (2026-09-27T19:12)
@@ -883,7 +885,7 @@ public static partial class Cli
         _ => action.ToString(),
     };
 
-    internal static string FormatSize(long bytes) => bytes switch
+    public static string FormatSize(long bytes) => bytes switch
     {
         < 1024 => $"{bytes} B",
         < 1024 * 1024 => $"{bytes / 1024.0:0.#} KB",
@@ -999,4 +1001,4 @@ internal sealed class ConsoleProgress(Func<GameId, string?> titleOf) : IProgress
     }
 }
 
-internal sealed class UsageException(string message) : Exception(message);
+public sealed class UsageException(string message) : Exception(message);

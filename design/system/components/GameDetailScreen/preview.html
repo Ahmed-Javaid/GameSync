@@ -1,77 +1,330 @@
-<!-- @dsCard group="Screens" height=800 width=1280 page=true subtitle="Game detail: status and Play, named saves, where the saves are, every version across PCs" -->
+<!-- @dsCard group="Screens" height=800 width=1280 page=true subtitle="Game detail, beside the library's list: Back, the art, a play bar like Steam's, about the game, achievements, and a little about its saves" -->
 <!doctype html>
 <html lang="en">
 <head><meta charset="utf-8"><title>preview</title>
-<style>html,body{margin:0;background:var(--bg-100);} .gd-log .gs-log-line{grid-template-columns:92px 72px 1fr} .gd-hist .gs-ctable td{height:34px}</style>
+<style>
+html,body{margin:0;background:var(--bg-100);}
+.lib-pane{width:272px;flex-shrink:0;padding:12px;gap:12px;min-height:0}
+.lib-scroll{flex:1;min-height:0;overflow:auto;margin:0 -6px;padding:0 6px;scrollbar-width:thin;scrollbar-color:var(--bg-400) transparent}
+.lib-content{flex:1;min-width:0;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:16px;padding-right:4px;scrollbar-width:thin;scrollbar-color:var(--bg-400) transparent}
+.lib-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:20px 16px}
+.lib-grid .gs-tile{width:100%}
+.lib-crumb{display:flex;align-items:center;gap:6px;font:500 13px/20px var(--font-sans);min-width:0}
+.lib-crumb button{border:0;background:none;padding:0;color:var(--ink-muted);font:inherit;cursor:pointer}
+.lib-crumb button:hover{color:var(--ink);text-decoration:underline}
+.lib-crumb span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gd-top{display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:40px}
+.gd-grid{display:grid;grid-template-columns:minmax(0,1fr) 316px;gap:16px;align-items:start}
+.gd-col{display:flex;flex-direction:column;gap:16px;min-width:0}
+.gd-about{margin:0;font:400 14px/21px var(--font-sans);color:var(--ink);display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.gd-about.is-open{display:block}
+.gd-ach-row{display:flex;gap:12px}
+.gd-ach{width:76px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.gd-ach-icon{width:56px;height:56px;border-radius:var(--radius-md);background-size:cover;background-position:center;box-shadow:0 0 0 1px var(--edge-art)}
+.gd-ach-name{font:500 12px/16px var(--font-sans);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gd-ach-when{font:400 11px/14px var(--font-sans);color:var(--ink-faint)}
+.gd-status{display:flex;flex-direction:column;gap:8px;align-items:flex-start}
+.gd-status p{margin:0;font:400 13px/19px var(--font-sans);color:var(--ink-muted)}
+.gd-genres{display:inline-flex;gap:6px;flex-wrap:wrap}
+</style>
 </head>
 <body class="gs-root">
 <div id="root"></div>
 <script>
-var G = window.GameSync, h = React.createElement;
+var G = window.GameSync, h = React.createElement, useState = React.useState, useRef = React.useRef, useEffect = React.useEffect;
+// The game whose page is open when the preview starts; null shows the covers.
+var INITIAL = 'ror2';
 
-var ART = "data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%201200%20500%27%20preserveAspectRatio%3D%27xMidYMid%20slice%27%3E%3Crect%20width%3D%271200%27%20height%3D%27500%27%20fill%3D%27%232c2519%27/%3E%3Ccircle%20cx%3D%27860%27%20cy%3D%27150%27%20r%3D%2770%27%20fill%3D%27%23f2b544%27%20opacity%3D%27.3%27/%3E%3Cpath%20d%3D%27M0%20330%20L180%20200%20L330%20300%20L520%20150%20L700%20290%20L880%20190%20L1200%20320%20V500%20H0Z%27%20fill%3D%27%233a2f1e%27/%3E%3Cpath%20d%3D%27M0%20400%20L220%20290%20L420%20380%20L640%20270%20L860%20370%20L1040%20300%20L1200%20360%20V500%20H0Z%27%20fill%3D%27%23261f14%27/%3E%3Cpath%20d%3D%27M0%20460%20L300%20390%20L600%20450%20L900%20380%20L1200%20440%20V500%20H0Z%27%20fill%3D%27%2317130c%27/%3E%3C/svg%3E";
+var HERO_CYAN = "data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%201200%20500%27%20preserveAspectRatio%3D%27xMidYMid%20slice%27%3E%3Crect%20width%3D%271200%27%20height%3D%27500%27%20fill%3D%27%231b2a33%27/%3E%3Ccircle%20cx%3D%27860%27%20cy%3D%27150%27%20r%3D%2770%27%20fill%3D%27%237fe6f2%27%20opacity%3D%27.35%27/%3E%3Cpath%20d%3D%27M0%20330%20L180%20200%20L330%20300%20L520%20150%20L700%20290%20L880%20190%20L1200%20320%20V500%20H0Z%27%20fill%3D%27%23223640%27/%3E%3Cpath%20d%3D%27M0%20400%20L220%20290%20L420%20380%20L640%20270%20L860%20370%20L1040%20300%20L1200%20360%20V500%20H0Z%27%20fill%3D%27%23182730%27/%3E%3Cpath%20d%3D%27M0%20460%20L300%20390%20L600%20450%20L900%20380%20L1200%20440%20V500%20H0Z%27%20fill%3D%27%2310191f%27/%3E%3C/svg%3E";
+var HERO_AMBER = "data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%201200%20500%27%20preserveAspectRatio%3D%27xMidYMid%20slice%27%3E%3Crect%20width%3D%271200%27%20height%3D%27500%27%20fill%3D%27%232c2519%27/%3E%3Ccircle%20cx%3D%27860%27%20cy%3D%27150%27%20r%3D%2770%27%20fill%3D%27%23f2b544%27%20opacity%3D%27.3%27/%3E%3Cpath%20d%3D%27M0%20330%20L180%20200%20L330%20300%20L520%20150%20L700%20290%20L880%20190%20L1200%20320%20V500%20H0Z%27%20fill%3D%27%233a2f1e%27/%3E%3Cpath%20d%3D%27M0%20400%20L220%20290%20L420%20380%20L640%20270%20L860%20370%20L1040%20300%20L1200%20360%20V500%20H0Z%27%20fill%3D%27%23261f14%27/%3E%3Cpath%20d%3D%27M0%20460%20L300%20390%20L600%20450%20L900%20380%20L1200%20440%20V500%20H0Z%27%20fill%3D%27%2317130c%27/%3E%3C/svg%3E";
+var C = ["data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%20200%20300%27%3E%3Crect%20width%3D%27200%27%20height%3D%27300%27%20fill%3D%27%232b2220%27/%3E%3Ccircle%20cx%3D%27140%27%20cy%3D%2790%27%20r%3D%2738%27%20fill%3D%27%23e0b36a%27%20opacity%3D%27.5%27/%3E%3Cpath%20d%3D%27M0%20220%20L70%20160%20L130%20210%20L200%20150%20V300%20H0Z%27%20fill%3D%27%23e0b36a%27%20opacity%3D%27.35%27/%3E%3C/svg%3E", "data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%20200%20300%27%3E%3Crect%20width%3D%27200%27%20height%3D%27300%27%20fill%3D%27%231d2a24%27/%3E%3Ccircle%20cx%3D%27140%27%20cy%3D%2790%27%20r%3D%2738%27%20fill%3D%27%237fd1a6%27%20opacity%3D%27.5%27/%3E%3Cpath%20d%3D%27M0%20220%20L70%20160%20L130%20210%20L200%20150%20V300%20H0Z%27%20fill%3D%27%237fd1a6%27%20opacity%3D%27.35%27/%3E%3C/svg%3E", "data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%20200%20300%27%3E%3Crect%20width%3D%27200%27%20height%3D%27300%27%20fill%3D%27%23221f33%27/%3E%3Ccircle%20cx%3D%27140%27%20cy%3D%2790%27%20r%3D%2738%27%20fill%3D%27%23b9a3ff%27%20opacity%3D%27.5%27/%3E%3Cpath%20d%3D%27M0%20220%20L70%20160%20L130%20210%20L200%20150%20V300%20H0Z%27%20fill%3D%27%23b9a3ff%27%20opacity%3D%27.35%27/%3E%3C/svg%3E", "data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%20200%20300%27%3E%3Crect%20width%3D%27200%27%20height%3D%27300%27%20fill%3D%27%231d2630%27/%3E%3Ccircle%20cx%3D%27140%27%20cy%3D%2790%27%20r%3D%2738%27%20fill%3D%27%237fe6f2%27%20opacity%3D%27.5%27/%3E%3Cpath%20d%3D%27M0%20220%20L70%20160%20L130%20210%20L200%20150%20V300%20H0Z%27%20fill%3D%27%237fe6f2%27%20opacity%3D%27.35%27/%3E%3C/svg%3E", "data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%20200%20300%27%3E%3Crect%20width%3D%27200%27%20height%3D%27300%27%20fill%3D%27%232c2519%27/%3E%3Ccircle%20cx%3D%27140%27%20cy%3D%2790%27%20r%3D%2738%27%20fill%3D%27%23f2b544%27%20opacity%3D%27.5%27/%3E%3Cpath%20d%3D%27M0%20220%20L70%20160%20L130%20210%20L200%20150%20V300%20H0Z%27%20fill%3D%27%23f2b544%27%20opacity%3D%27.35%27/%3E%3C/svg%3E", "data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%20200%20300%27%3E%3Crect%20width%3D%27200%27%20height%3D%27300%27%20fill%3D%27%2322262b%27/%3E%3Ccircle%20cx%3D%27140%27%20cy%3D%2790%27%20r%3D%2738%27%20fill%3D%27%23a4abb3%27%20opacity%3D%27.5%27/%3E%3Cpath%20d%3D%27M0%20220%20L70%20160%20L130%20210%20L200%20150%20V300%20H0Z%27%20fill%3D%27%23a4abb3%27%20opacity%3D%27.35%27/%3E%3C/svg%3E", "data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%20200%20300%27%3E%3Crect%20width%3D%27200%27%20height%3D%27300%27%20fill%3D%27%232a1f24%27/%3E%3Ccircle%20cx%3D%27140%27%20cy%3D%2790%27%20r%3D%2738%27%20fill%3D%27%23ff8a7d%27%20opacity%3D%27.5%27/%3E%3Cpath%20d%3D%27M0%20220%20L70%20160%20L130%20210%20L200%20150%20V300%20H0Z%27%20fill%3D%27%23ff8a7d%27%20opacity%3D%27.35%27/%3E%3C/svg%3E"];
 
-function rail(cur){return h(G.SideRail,{current:cur,items:[
+// rank: order of last play (0 = now); added: days since GameSync first found it. status null: found, not syncing yet.
+var GAMES = [
+  {id:'sts2',name:'Slay the Spire 2',art:C[2],hero:HERO_CYAN,status:'playing',fav:true,hours:38,rank:0,last:'Now',added:3,store:'Steam'},
+  {id:'sekiro',name:'Sekiro: Shadows Die Twice',art:C[0],hero:HERO_AMBER,status:'conflict',fav:true,hours:61,rank:1,last:'Today 21:04',added:40,store:'Steam'},
+  {id:'terraria',name:'Terraria',art:C[1],hero:HERO_CYAN,status:'synced',fav:true,hours:214,rank:2,last:'Yesterday',added:60,store:'Steam'},
+  {id:'ror2',name:'Risk of Rain 2',art:C[3],hero:HERO_CYAN,status:'synced',hours:218,rank:3,last:'25 Sep',added:55,store:'Steam'},
+  {id:'wukong',name:'Black Myth: Wukong',art:C[4],hero:HERO_AMBER,status:'synced',hours:74,rank:4,last:'23 Sep',added:30,loose:'G:\\Black Myth Wukong',engine:'Unreal Engine'},
+  {id:'core',name:'Core Keeper',art:C[1],hero:HERO_CYAN,status:null,hours:155,rank:5,last:'23 Sep',added:50,store:'Steam',found:'<winAppDataLocalLow>/Pugstorm/Core Keeper/Steam/<storeUserId>',at:'C:\\Users\\You\\AppData\\LocalLow\\Pugstorm\\Core Keeper\\Steam\\76561198041',files:'14 files \u00b7 6.2 MB \u00b7 newest 23 Sep 22:40'},
+  {id:'valheim',name:'Valheim',art:C[5],hero:HERO_CYAN,status:'backup-only',statusLabel:'Synced by Steam',hours:215,rank:6,last:'22 Sep',added:58,store:'Steam'},
+  {id:'cuphead',name:'Cuphead',art:C[3],hero:HERO_CYAN,status:'held',hours:22,rank:7,last:'20 Sep',added:45,store:'Steam'},
+  {id:'apex',name:'Apex Legends',art:C[6],hero:HERO_AMBER,status:null,hours:1090,rank:8,last:'5 Sep',added:59,store:'Steam',found:'<home>/Saved Games/Respawn/Apex/local',at:'C:\\Users\\You\\Saved Games\\Respawn\\Apex\\local',files:'2 files \u00b7 4 KB \u00b7 newest 5 Sep 23:12'},
+  {id:'ds3',name:'Dark Souls III',art:C[5],hero:HERO_AMBER,status:'backup-only',statusLabel:'Synced by Steam',hours:96,rank:9,last:'2 Sep',added:57,store:'Steam'},
+  {id:'hades',name:'Hades',art:C[6],hero:HERO_AMBER,status:'newer-in-cloud',hours:90,rank:10,last:'30 Aug',added:52,store:'Epic'},
+  {id:'gtav',name:'GTA V Enhanced',art:C[6],hero:HERO_AMBER,status:'synced',hours:40,rank:11,last:'29 Aug',added:44,store:'Steam'},
+  {id:'elden',name:'Elden Ring',art:C[0],hero:HERO_AMBER,status:null,hours:130,rank:12,last:'12 Aug',added:43,store:'Steam',found:'<winAppData>/EldenRing/<storeUserId>',at:'C:\\Users\\You\\AppData\\Roaming\\EldenRing\\76561198041',files:'3 files \u00b7 28.4 MB \u00b7 newest 12 Aug 00:31'},
+  {id:'hollow',name:'Hollow Knight',art:null,hero:null,status:'synced',hours:44,rank:13,last:'2 Jul',added:41,store:'Steam'},
+  {id:'drg',name:'Deep Rock Galactic',art:C[0],hero:HERO_AMBER,status:null,hours:66,rank:14,last:'9 Apr',added:39,store:'Steam',found:'<base>/FSD/Saved/SaveGames',at:'E:\\Steam\\steamapps\\common\\Deep Rock Galactic\\FSD\\Saved\\SaveGames',files:'5 files \u00b7 1.1 MB \u00b7 newest 9 Apr 21:05'},
+  {id:'stardew',name:'Stardew Valley',art:C[1],hero:HERO_CYAN,status:null,hours:57,rank:15,last:'12 Mar',added:38,store:'Steam',found:'<winAppData>/StardewValley/Saves',at:'C:\\Users\\You\\AppData\\Roaming\\StardewValley\\Saves',files:'12 files \u00b7 3.0 MB \u00b7 newest 12 Mar 23:58'},
+  {id:'bloodborne',name:'Bloodborne',art:null,hero:null,status:'synced',hours:0,rank:16,last:null,added:2,loose:'E:\\Emulators\\shadPS4'},
+  {id:'mcworld',name:'Minecraft server world',art:null,hero:null,status:'synced',hours:0,rank:17,last:null,added:1,byHand:true},
+  {id:'cyberpunk',name:'Cyberpunk 2077',art:C[4],hero:HERO_AMBER,status:null,installed:false,hours:120,rank:18,last:'3 Mar',added:37,store:'Steam',found:'<home>/Saved Games/CD Projekt Red/Cyberpunk 2077',at:'C:\\Users\\You\\Saved Games\\CD Projekt Red\\Cyberpunk 2077',files:'61 files \u00b7 412 MB \u00b7 newest 3 Mar 01:20'},
+  {id:'witcher',name:'The Witcher 3: Wild Hunt',art:C[5],hero:HERO_AMBER,status:null,installed:false,hours:180,rank:19,last:'14 Jan',added:36,store:'Steam',found:'<home>/Documents/The Witcher 3/gamesaves',at:'C:\\Users\\You\\Documents\\The Witcher 3\\gamesaves',files:'40 files \u00b7 96 MB \u00b7 newest 14 Jan 22:17'},
+  {id:'forza',name:'Forza Horizon 6',art:C[3],hero:HERO_CYAN,status:null,installed:false,hours:12,rank:20,last:'2 Jan',added:35,store:'Steam',found:'<winLocalAppData>/ForzaHorizon6/User_SteamLocalStorageDirectory',at:'C:\\Users\\You\\AppData\\Local\\ForzaHorizon6\\User_SteamLocalStorageDirectory',files:'9 files \u00b7 8.8 MB \u00b7 newest 2 Jan 19:44'}
+];
+var SOFTWARE = [
+  {id:'wallpaper',name:'Wallpaper Engine',art:C[2],hero:HERO_CYAN,status:null,hours:902,rank:30,last:'Today 09:12',added:59,store:'Steam',software:true},
+  {id:'lossless',name:'Lossless Scaling',art:C[3],hero:HERO_CYAN,status:null,hours:31,rank:31,last:'19 Sep',added:48,store:'Steam',software:true}];
+var HIDDEN = [{id:'spacewar',name:'Spacewar',art:null,hero:null,status:null,hours:0,rank:40,last:null,added:59,store:'Steam',hidden:true}];
+
+var SORTS = [{id:'recent',label:'Recently played'},{id:'name',label:'Name'},{id:'hours',label:'Hours played'},{id:'added',label:'Recently added'}];
+var NEEDS = {conflict:'Resolve',held:'Review','not-found':'Add a place','in-use':'Retry'};
+function sorted(list, sort){
+  var by = {recent:function(a,b){return a.rank-b.rank}, name:function(a,b){return a.name.localeCompare(b.name)},
+            hours:function(a,b){return b.hours-a.hours||a.name.localeCompare(b.name)}, added:function(a,b){return a.added-b.added||a.name.localeCompare(b.name)}}[sort];
+  return list.slice().sort(by);
+}
+// Letters and digits only, so "black myth" finds "Black Myth: Wukong"; or the first letters of the words, so "sts" finds Slay the Spire.
+function norm(s){return String(s).toLowerCase().normalize('NFD').replace(/[^a-z0-9]+/g,' ').trim()}
+function matches(g, q){
+  q = norm(q); if(!q) return true;
+  var n = norm(g.name);
+  return n.indexOf(q) >= 0 || n.replace(/ /g,'').indexOf(q.replace(/ /g,'')) >= 0 || n.split(' ').map(function(w){return w[0]}).join('').indexOf(q.replace(/ /g,'')) === 0;
+}
+function meta(g){return [g.hours ? g.hours + ' h' : null, g.last].filter(Boolean).join(' \u00b7 ') || null}
+
+function rail(cur, onNav){return h(G.SideRail,{current:cur,onNavigate:onNav,items:[
   {id:'search',icon:'search',label:'Search'},
   {id:'home',icon:'home',label:'Home',sep:true},
-  {id:'library',icon:'library',label:'Game library'},
-  {id:'saves',icon:'saves',label:'Save manager',sep:true,dot:'warn',dotLabel:'1 game needs you'},
+  {id:'library',icon:'library',label:'Game library',dot:'play',dotLabel:'Slay the Spire 2 is running'},
+  {id:'saves',icon:'saves',label:'Save manager',sep:true,dot:'warn',dotLabel:'2 games need you'},
   {id:'log',icon:'terminal',label:'Console'},
   {id:'settings',icon:'settings',label:'Settings',bottom:true}]})}
-function crumb(parent,here){return h('nav',{'aria-label':'Breadcrumb',className:'gs-row',style:{gap:6,font:'500 13px/20px var(--font-sans)'}},h('a',{href:'#',className:'gs-muted',style:{textDecoration:'none'}},parent),h(G.Icon,{name:'chevronRight',size:14}),h('span',{'aria-current':'page'},here));}
-function topbar(left,right){return h('header',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',gap:16}},left,h('div',{className:'gs-row',style:{flexWrap:'nowrap'}},right));}
 
-var NAMED=[
-  {name:'Before Erlang Shen',when:'23 Sep 21:02',pc:'DESKTOP'},
-  {name:'Chapter 5 start',when:'20 Sep 18:10',pc:'LAPTOP'},
-  {name:'Ludusavi backup (14 Sep)',when:'14 Sep 12:00',pc:'DESKTOP'}];
-var VERSIONS=[
-  {id:'v17',saved:'23 Sep 21:10',pc:'DESKTOP',note:'current',size:524288},
-  {id:'v16',saved:'23 Sep 21:02',pc:'DESKTOP',note:'Before Erlang Shen',size:522240},
-  {id:'v15',saved:'21 Sep 22:47',pc:'LAPTOP',size:519168},
-  {id:'v14',saved:'20 Sep 18:05',pc:'DESKTOP',note:'Before update to build 19870412',size:511000},
-  {id:'v13',saved:'18 Sep 23:31',pc:'DESKTOP',size:508000},
-  {id:'v12',saved:'16 Sep 20:12',pc:'LAPTOP',size:503808}];
+/* ---------- What GameSync knows about each game: Steam's store page (one request per new game), this PC, its saves ---------- */
+var INFO = {
+  ror2:{about:'A roguelike shooter for one to four players. Fight across a hostile alien planet while the monsters grow stronger by the minute, collect items that stack in odd ways, and find the way off before the difficulty runs away from you.',
+    dev:'Hopoo Games',pub:'Gearbox Publishing',released:'11 Aug 2020',genres:['Action','Roguelike','Co-op'],appId:'632360',engine:'Unity',
+    dir:'E:\\Steam\\steamapps\\common\\Risk of Rain 2',size:'1.8 GB',build:'15632211',options:'-novid',found:'Steam\u2019s library, 28 Sep',
+    ach:{done:43,total:58,rarest:{name:'Eclipse 8',pct:'1.2%'},latest:[{name:'Mercenary',when:'21 Sep',art:C[3]},{name:'Deicide',when:'18 Sep',art:C[2]},{name:'Cosmic Explorer',when:'14 Sep',art:C[1]},{name:'Newtist',when:'2 Sep',art:C[5]},{name:'Glorious Battle',when:'30 Aug',art:C[0]}]},
+    saves:{last:'25 Sep 03:36 \u00b7 DESKTOP',kept:'17 versions \u00b7 2.6 MB',named:'2',path:'E:\\Steam\\userdata\\41755\\632360\\remote\\UserProfiles',places:3}},
+  terraria:{about:'A 2D sandbox of digging, building and fighting. Carve through a generated world, craft gear from what you find, and take on its bosses alone or with friends on a shared world.',
+    dev:'Re-Logic',pub:'Re-Logic',released:'16 May 2011',genres:['Sandbox','Adventure','Co-op'],appId:'105600',engine:'XNA',
+    dir:'E:\\Steam\\steamapps\\common\\Terraria',size:'468 MB',build:'14892355',found:'Steam\u2019s library, 27 Sep',
+    ach:{done:61,total:115,rarest:{name:'Rainbows and Unicorns',pct:'3.4%'},latest:[{name:'Head in the Clouds',when:'Yesterday',art:C[1]},{name:'Slippery Shinobi',when:'26 Sep',art:C[3]},{name:'Boots of the Hero',when:'24 Sep',art:C[5]},{name:'Timber!!',when:'20 Sep',art:C[0]}]},
+    saves:{last:'Yesterday 23:12 \u00b7 DESKTOP',kept:'52 versions \u00b7 326 MB',named:'1',path:'C:\\Users\\You\\Documents\\My Games\\Terraria',places:1}},
+  sekiro:{about:'A third-person action game set in a war-torn Sengoku Japan. A shinobi with a prosthetic arm fights to rescue his young lord, with a combat system built on deflecting blows and breaking posture.',
+    dev:'FromSoftware',pub:'Activision',released:'22 Mar 2019',genres:['Action','Adventure'],appId:'814380',engine:'FromSoftware\u2019s own',
+    dir:'E:\\Steam\\steamapps\\common\\Sekiro',size:'14.6 GB',build:'4336713',found:'Steam\u2019s library, 27 Sep',
+    ach:{done:29,total:34,rarest:{name:'Return',pct:'9.8%'},latest:[{name:'Shura',when:'Today',art:C[0]},{name:'Isshin Ashina',when:'Today',art:C[4]},{name:'Great Shinobi',when:'26 Sep',art:C[6]}]},
+    saves:{last:'Today 21:04 \u00b7 DESKTOP',kept:'14 versions \u00b7 29 MB',named:'1',path:'C:\\Users\\You\\AppData\\Roaming\\Sekiro\\76561198041',places:1}},
+  sts2:{about:'A deck-building roguelike. Climb the Spire with one of several characters, build a deck from the cards you find on the way, and beat the bosses at the top of each act.',
+    dev:'Mega Crit',pub:'Mega Crit',released:'2026',genres:['Strategy','Card game','Roguelike'],appId:'2868840',engine:'Godot',
+    dir:'E:\\Steam\\steamapps\\common\\Slay the Spire 2',size:'2.1 GB',build:'19950412',found:'Steam\u2019s library, 26 Sep',
+    saves:{last:'Today 18:40 \u00b7 DESKTOP',kept:'23 versions \u00b7 20 MB',named:'0',path:'C:\\Users\\You\\AppData\\Roaming\\SlayTheSpire2\\saves',places:1}},
+  wukong:{about:'An action RPG drawn from Journey to the West. As the Destined One, face the great yaoguai of Chinese myth in hard, fast fights, and change shape to turn a battle.',
+    dev:'Game Science',pub:'Game Science',released:'20 Aug 2024',genres:['Action','RPG'],appId:'2358720',engine:'Unreal Engine 5',
+    dir:'G:\\Black Myth Wukong',size:'128 GB',program:'G:\\Black Myth Wukong\\b1\\Binaries\\Win64\\b1-Win64-Shipping.exe',found:'the Unreal engine rule, 27 Sep',
+    saves:{last:'23 Sep 21:10 \u00b7 DESKTOP',kept:'17 versions \u00b7 31.4 MB',named:'3',path:'G:\\Black Myth Wukong\\b1\\Saved\\SaveGames',places:1}},
+  core:{about:'A mining and crafting adventure for up to eight players. Wake beneath the ground next to an ancient relic, dig out a home, farm, fish and fight the titans of the underground.',
+    dev:'Pugstorm',pub:'Fireshine Games',released:'27 Aug 2024',genres:['Adventure','Survival','Co-op'],appId:'1621690',engine:'Unity',
+    dir:'E:\\Steam\\steamapps\\common\\Core Keeper',size:'1.2 GB',found:'Steam\u2019s library, 28 Sep',
+    ach:{done:12,total:43,rarest:{name:'Hive Mother',pct:'6.1%'},latest:[{name:'Deep Diver',when:'23 Sep',art:C[1]},{name:'Farmer',when:'22 Sep',art:C[5]}]}},
+  valheim:{about:'A survival and exploration game for one to ten Vikings. Sail, build and fight through a procedurally made world of Norse myth, and prove yourself worthy of Valhalla.',
+    dev:'Iron Gate AB',pub:'Coffee Stain Publishing',released:'2 Feb 2021',genres:['Survival','Adventure','Co-op'],appId:'892970',engine:'Unity',
+    dir:'E:\\Steam\\steamapps\\common\\Valheim',size:'1.6 GB',found:'Steam\u2019s library, 27 Sep',
+    saves:{last:'22 Sep 22:31 \u00b7 DESKTOP',kept:'31 versions \u00b7 140 MB',named:'0',path:'C:\\Users\\You\\AppData\\LocalLow\\IronGate\\Valheim',places:1}},
+  cuphead:{about:'A run-and-gun game drawn and animated in the style of 1930s cartoons, built around its bosses. Play alone or with a friend in local co-op.',
+    dev:'Studio MDHR',pub:'Studio MDHR',released:'29 Sep 2017',genres:['Action','Platformer'],appId:'268910',engine:'Unity',
+    dir:'E:\\Steam\\steamapps\\common\\Cuphead',size:'4.1 GB',found:'Steam\u2019s library, 27 Sep',
+    saves:{last:'20 Sep 19:02 \u00b7 DESKTOP',kept:'9 versions \u00b7 48 KB',named:'0',path:'C:\\Users\\You\\AppData\\LocalLow\\StudioMDHR\\Cuphead',places:2}},
+  apex:{about:'A free-to-play hero shooter played in squads, where legendary characters with their own abilities fight to be the last team standing.',
+    dev:'Respawn',pub:'Electronic Arts',released:'4 Nov 2020',genres:['Action','Shooter'],appId:'1172470',engine:'Source',
+    dir:'E:\\Steam\\steamapps\\common\\Apex Legends',size:'75 GB',found:'Steam\u2019s library, 28 Sep',antiCheat:'Easy Anti-Cheat'},
+  hollow:{about:'A hand-drawn action adventure through a ruined kingdom of insects and heroes, with a wide web of caverns to explore and old secrets to find.',
+    dev:'Team Cherry',pub:'Team Cherry',released:'24 Feb 2017',genres:['Action','Metroidvania'],appId:'367520',engine:'Unity',
+    dir:'E:\\Steam\\steamapps\\common\\Hollow Knight',size:'9.1 GB',found:'Steam\u2019s library, 27 Sep',
+    saves:{last:'2 Jul 22:40 \u00b7 LAPTOP',kept:'8 versions \u00b7 1.1 MB',named:'0',path:'C:\\Users\\You\\AppData\\LocalLow\\Team Cherry\\Hollow Knight',places:1}},
+  mcworld:{byHand:true,dir:'D:\\Minecraft Server\\world',program:'D:\\Minecraft Server\\run.bat',found:'you, 28 Sep',
+    saves:{last:'28 Sep 23:10 \u00b7 DESKTOP',kept:'4 versions \u00b7 612 MB',named:'0',path:'D:\\Minecraft Server\\world',places:1}},
+  bloodborne:{dir:'E:\\Emulators\\shadPS4',program:'E:\\Emulators\\shadPS4\\shadPS4.exe',args:'CUSA00207',found:'you, 28 Sep',
+    saves:{last:'28 Sep 02:14 \u00b7 DESKTOP',kept:'2 versions \u00b7 38 MB',named:'4',path:'E:\\Emulators\\shadPS4\\user\\savedata\\1\\CUSA00207',places:1}}
+};
 
-function Note(r){
-  if(r.note==='current')return h('span',{className:'gs-tag',style:{background:'var(--secondary-soft)',color:'var(--ink)'}},'Current');
-  if(!r.note)return null;
-  return h('span',{className:'gs-row',style:{gap:6,flexWrap:'nowrap',color:'var(--ink-muted)'}},h(G.Icon,{name:'pin',size:14}),r.note);
+/* ---------- The files a game's saves are made of, as its Properties shows them ---------- */
+var FILES = {
+  ror2:[
+    {id:'p1',name:'E:\\Steam\\userdata\\41755\\632360\\remote\\UserProfiles',kind:'folder',checked:true,mixed:true,open:true,meta:'4 files',children:[
+      {id:'p1a',name:'3f1a8c2e-profile.xml',checked:true,bytes:224256,meta:'219 KB'},
+      {id:'p1b',name:'7b90d44a-profile.xml',checked:true,bytes:230400,meta:'225 KB'},
+      {id:'p1c',name:'default-profile.xml',checked:true,bytes:218112,meta:'213 KB'},
+      {id:'p1d',name:'default-profile.xml.bak',checked:false,bytes:223232,meta:'218 KB',note:'You left it out'}]},
+    {id:'p2',name:'E:\\Steam\\steamapps\\common\\Risk of Rain 2\\Risk of Rain 2_Data\\Config',kind:'folder',checked:true,tag:'Settings',meta:'45 files',children:[
+      {id:'p2a',name:'config.cfg',checked:true,bytes:3277,meta:'3 KB'},
+      {id:'p2b',name:'keybindings.cfg',checked:true,bytes:2150,meta:'2 KB'},
+      {id:'p2c',name:'43 more files',checked:true,bytes:6284,count:43,meta:'6 KB'}]},
+    {id:'p3',name:'E:\\Steam\\steamapps\\common\\Risk of Rain 2\\Risk of Rain 2_Data\\Logs',kind:'folder',checked:false,note:'Skipped: logs',meta:'12 files',children:[
+      {id:'p3a',name:'output_log.txt',checked:false,bytes:1153434,meta:'1.1 MB'},
+      {id:'p3b',name:'11 more files',checked:false,bytes:2306867,count:11,meta:'2.2 MB'}]},
+    {id:'p4',name:'HKEY_CURRENT_USER\\Software\\Hopoo Games, LLC\\Risk of Rain 2',kind:'registry',checked:true,tag:'Registry',meta:'16 values',bytes:4096}]
+};
+function filesOf(g, info){
+  if (FILES[g.id]) return FILES[g.id];
+  var s = info.saves || {};
+  return [{id:'f1',name:s.path||g.at||'Its save folder',kind:'folder',checked:!!g.status,open:true,meta:'3 files',children:[
+    {id:'f1a',name:'save0.sav',checked:!!g.status,bytes:262144,meta:'256 KB'},{id:'f1b',name:'save1.sav',checked:!!g.status,bytes:258048,meta:'252 KB'},{id:'f1c',name:'settings.ini',checked:!!g.status,bytes:2048,meta:'2 KB',tag:'Settings'}]}];
 }
-function Actions(r){return h('span',{className:'gs-row',style:{gap:4,flexWrap:'nowrap',justifyContent:'flex-end'}},
-  r.note==='current'?null:h(G.Button,{size:'sm',variant:'ghost'},'Restore'),
-  h(G.Button,{size:'sm',variant:'ghost'},'Export'));}
+function propsOf(g){
+  var info = INFO[g.id] || {}, steam = g.store === 'Steam';
+  return {id:g.id,name:g.name,favourite:!!g.fav,hidden:!!g.hidden,installed:g.installed!==false,store:g.store||null,storeId:info.appId,installDir:info.dir||g.loose,size:info.size,
+    build:info.build,engine:info.engine||g.engine,foundBy:info.found,antiCheat:info.antiCheat,
+    launch:{url:steam&&info.appId?'steam://rungameid/'+info.appId:null,program:info.program,steamOptions:info.options,args:info.args},
+    files:filesOf(g,info),settings:'this-pc',screenshots:'off',skip:true,mode:g.status==='backup-only'?'backup':'sync',conflict:'newest'};
+}
+
+// Today's words; Add a place (FOLD-01) and Retry come with their screens.
+var SAVE_ACTION = {conflict:['Resolve','alert'],held:['Review','pause'],'not-found':['See where','search'],'in-use':['See why','lock']};
+function statusWord(g){
+  if (!g.status) return 'Not syncing yet';
+  return g.statusLabel || {synced:'Synced',playing:'Playing','upload-pending':'Upload pending','newer-in-cloud':'Newer in cloud',conflict:'Conflict',held:'Held for review','in-use':'Files in use','not-found':'Saves not found'}[g.status] || 'Synced';
+}
+function blurbOf(g){
+  if(!g.status) return g.installed===false ? 'Its saves are still on this PC. Sync them to keep them safe for when you play again.' : 'GameSync found its saves on this PC. Nothing is backed up until you sync them.';
+  return {synced:'DESKTOP and LAPTOP have the same save.',
+    conflict:'It changed on DESKTOP and LAPTOP. The newest is kept, and LAPTOP\u2019s copy is pinned until you decide.',
+    held:'Its save changed while the game wasn\u2019t running, so GameSync held it for you to look at.',
+    'newer-in-cloud':'LAPTOP saved a newer game on 29 Sep 19:30. It comes down before you play.',
+    playing:'Its save syncs a few seconds after you quit.',
+    'backup-only':'Steam syncs its saves between your PCs; GameSync keeps a backup of every version.'}[g.status] || null;
+}
+
+/* ---------- A game's page, beside the list ---------- */
+function GamePage(p){
+  var g = p.game, info = INFO[g.id] || {}, s = info.saves || {}, syncs = !!g.status, away = g.installed === false, need = SAVE_ACTION[g.status];
+  var aboutOpen = useState(false);
+  var where = g.loose ? 'Loose game in ' + g.loose + (g.engine ? ' \u00b7 ' + g.engine : '') : g.byHand ? 'Added by hand' : (away ? 'Not installed on this PC \u00b7 ' : '') + g.store;
+  var primary = away ? (g.store === 'Steam' ? h(G.Button,{variant:'secondary',icon:'download'},'Install through Steam') : null)
+    : need ? [h(G.Button,{key:'n',variant:'primary',icon:need[1],onClick:p.onSaves},need[0]), h(G.IconButton,{key:'p',icon:'play',label:'Play'})]
+    : g.status === 'playing' ? h(G.Button,{variant:'primary',icon:'play',disabled:true,title:'It\u2019s running now'},'Playing')
+    : h(G.Button,{variant:'primary',icon:'play'},'Play');
+  var stats = [
+    {label:'Last played',value:g.last||'Never'},
+    {label:'Play time',value:g.hours?g.hours+' hours':'None yet'},
+    info.ach ? {label:'Achievements',value:info.ach.done+' of '+info.ach.total} : null,
+    {label:'Saves',value:statusWord(g),status:g.status||'not-syncing'}];
+  var actions = [
+    h(G.IconButton,{key:'fav',icon:'star',pressed:!!g.fav,label:g.fav?'Remove from favourites':'Add to favourites',onClick:function(){p.onFav(g)}}),
+    h(G.IconButton,{key:'props',icon:'settings',label:'Properties',onClick:function(){p.onProps('general')}}),
+    h(G.IconButton,{key:'more',icon:'more',label:'More',onClick:function(e){p.onMore(g,e)}})];
+  var pct = info.ach ? Math.round(info.ach.done * 100 / info.ach.total) : 0;
+  return h(React.Fragment,null,
+    h('header',{className:'gd-top'},
+      h('div',{className:'gs-row',style:{flexWrap:'nowrap',gap:12,minWidth:0}},
+        h(G.Button,{size:'sm',variant:'secondary',icon:'arrowLeft',onClick:p.onBack,title:'Back to My games (Esc)'},'Back'),
+        h('nav',{'aria-label':'Breadcrumb',className:'lib-crumb'},h('button',{type:'button',onClick:p.onBack},'My games'),h(G.Icon,{name:'chevronRight',size:14}),h('span',{'aria-current':'page'},g.name))),
+      null),
+    h(G.HeroBanner,{art:g.hero,eyebrow:where,title:g.name,actions:[],noPlay:true,style:{minHeight:188,flexShrink:0}}),
+    h(G.PlayBar,{label:g.name,primary:primary,stats:stats,actions:actions}),
+    h('div',{className:'gd-grid'},
+      h('div',{className:'gd-col'},
+        h(G.Card,{title:'About',subtitle:info.about?'From its Steam store page':null,action:info.appId?h(G.Button,{size:'sm',variant:'ghost',iconAfter:'external'},'Store page'):null},
+          info.about ? h('div',{className:'gs-stack',style:{gap:6}},
+              h('p',{className:'gd-about'+(aboutOpen[0]?' is-open':'')},info.about),
+              h('div',null,h(G.Button,{size:'sm',variant:'ghost',style:{marginLeft:-12},onClick:function(){aboutOpen[1](!aboutOpen[0])}},aboutOpen[0]?'Show less':'Show more')))
+            : h('div',{className:'gs-note'},h(G.Icon,{name:'info',size:16}),info.byHand||g.byHand?'Added by hand, so there\u2019s no store page to show.':'No store page matches this game, so there\u2019s nothing more to show.'),
+          h(G.Facts,{items:[{label:'Developer',value:info.dev},{label:'Publisher',value:info.pub},{label:'Released',value:info.released},
+            {label:'Genres',value:info.genres?h('span',{className:'gd-genres'},info.genres.map(function(x){return h('span',{key:x,className:'gs-tag'},x)})):null},
+            {label:'Engine',value:info.engine||g.engine}]})),
+        info.ach ? h(G.Card,{title:'Achievements',subtitle:info.ach.done+' of '+info.ach.total+' unlocked on Steam',action:h(G.Button,{size:'sm',variant:'ghost',iconAfter:'chevronRight'},'View all')},
+          h(G.ProgressBar,{value:pct,label:'Unlocked',right:pct+'%',ariaLabel:pct+'% of achievements unlocked'}),
+          h('div',{className:'gd-ach-row'},info.ach.latest.map(function(a){return h('div',{key:a.name,className:'gd-ach',title:a.name+', unlocked '+a.when},
+            h('span',{className:'gd-ach-icon',style:{backgroundImage:'url('+a.art+')'},'aria-hidden':'true'}),h('span',{className:'gd-ach-name'},a.name),h('span',{className:'gd-ach-when'},a.when))})),
+          h('div',{className:'gs-note'},h(G.Icon,{name:'trophy',size:16}),'Rarest: '+info.ach.rarest.name+', unlocked by '+info.ach.rarest.pct+' of players.')) : null),
+      h('div',{className:'gd-col'},
+        h(G.Card,{title:'Saves',action:h(G.Button,{size:'sm',variant:'ghost',iconAfter:'chevronRight',onClick:p.onSaves},'Open in Saves')},
+          h('div',{className:'gd-status'},h(G.StatusBadge,{status:g.status||'not-syncing',label:statusWord(g)}),h('p',null,blurbOf(g))),
+          syncs ? h(G.Facts,{items:[{label:'Backed up',value:s.last},{label:'History',value:s.kept},{label:'Named',value:s.named&&s.named!=='0'?s.named+(s.named==='1'?' save':' saves'):'None yet'}]})
+            : h(G.Facts,{items:[{label:'Found',value:g.files||'Its saves'}]}),
+          h('div',{className:'gs-well-line'},h('span',{title:s.path||g.at},s.path||g.at||'Its save folder'),h(G.IconButton,{size:'sm',icon:'folder',label:'Open the save folder'})),
+          need ? h('div',{className:'gs-row'},h(G.Button,{size:'sm',variant:'secondary',icon:need[1],onClick:p.onSaves},need[0]))
+          : syncs ? h('div',{className:'gs-row'},h(G.Button,{size:'sm',variant:'secondary',icon:'upload',disabled:g.status==='playing',title:g.status==='playing'?'Once you quit, it backs up by itself':null},'Back up now'),h(G.Button,{size:'sm',variant:'ghost',icon:'plus'},'Save as\u2026'))
+          : h('div',{className:'gs-row'},h(G.Button,{size:'sm',variant:'secondary',icon:'check'},'Sync these saves'),h(G.Button,{size:'sm',variant:'ghost',onClick:function(){p.onProps('saves')}},'Choose files\u2026'))),
+        h(G.Card,{title:'On this PC'},
+          away ? h('div',{className:'gs-note'},h(G.Icon,{name:'info',size:16}),'Not installed here. Its saves are still on this PC, and still back up.')
+            : h(G.Facts,{items:[{label:'Installed in',value:info.dir||g.loose||'Its own folder',mono:true},{label:'Size',value:info.size},
+              {label:'Starts',value:g.store?'Through '+g.store:'Its own program'},{label:'Options',value:info.options||info.args||'None',mono:!!(info.options||info.args)}]}),
+          h('div',{className:'gs-row'},away?null:h(G.Button,{size:'sm',variant:'secondary',icon:'folder'},'Open the folder'),h(G.Button,{size:'sm',variant:'ghost',icon:'settings',onClick:function(){p.onProps('general')}},'Properties'))))));
+}
+
+/* ---------- The covers ---------- */
+function Covers(p){
+  var favs = p.games.filter(function(g){return g.fav}), rest = p.games.filter(function(g){return !g.fav});
+  function tiles(list){return h('div',{className:'lib-grid'},list.map(function(g){
+    return h('div',{key:g.id,onContextMenu:function(e){e.preventDefault();p.onMenu(g,e)}},
+      h(G.GameTile,{name:g.name,art:g.art,status:g.status||undefined,statusLabel:g.statusLabel,meta:meta(g),onClick:function(){p.onOpen(g.id)}}));}))}
+  return h(React.Fragment,null,
+    h('header',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',gap:16}},
+      h('div',{style:{minWidth:0}},h('div',{style:{font:'600 15px/20px var(--font-sans)'}},'My games'),h('div',{className:'gs-faint',style:{fontSize:12}},GAMES.length+' games \u00b7 '+GAMES.filter(function(g){return g.installed!==false}).length+' installed')),
+      h(G.PillTabs,{label:'Library view',value:p.tab,onChange:p.onTab,items:[{id:'all',label:'All games'},{id:'attn',label:'Needs you',count:GAMES.filter(function(g){return NEEDS[g.status]}).length},{id:'software',label:'Software'},{id:'hidden',label:'Hidden'}]}),
+      h(G.Button,{icon:'plus'},'Add game')),
+    p.games.length === 0 ? h('div',{className:'gs-note',style:{fontSize:13}},h(G.Icon,{name:'search',size:16}),'No game here matches \u201c'+p.query+'\u201d.')
+    : favs.length ? [h('div',{key:'fh',className:'gs-overline'},'Favourites'),h('div',{key:'ft'},tiles(favs)),rest.length?h('div',{key:'rh',className:'gs-overline'},p.tab==='all'?'All games':'The rest'):null,h('div',{key:'rt'},tiles(rest))]
+    : tiles(rest));
+}
 
 function App(){
- return h(G.ThemeScope,{strength:'glass',art:ART,style:{width:1280,height:800,display:'flex'}},
-  rail('library'),
-  h('main',{style:{flex:1,minWidth:0,padding:'20px 24px',display:'flex',flexDirection:'column',gap:16}},
-   topbar(crumb('Game library','Black Myth: Wukong'),
-     [h(G.IconButton,{key:1,icon:'sync',label:'Sync now'}),h(G.IconButton,{key:2,icon:'cloud',label:'Google Drive connected'}),h(G.IconButton,{key:3,icon:'monitor',label:'This PC: DESKTOP'})]),
-   h(G.HeroBanner,{art:ART,eyebrow:'Loose game in G:\\Black Myth Wukong \u00b7 Unreal Engine',chip:'74 hrs played',title:'Black Myth: Wukong',status:'synced',statusLabel:'Synced \u00b7 DESKTOP and LAPTOP match',blurb:'Last played 23 Sep 21:10 on DESKTOP. Every version is kept: 17 in the cloud, the last 10 on this PC.',playLabel:'Play',style:{minHeight:212}}),
-   h('div',{style:{display:'grid',gridTemplateColumns:'376px minmax(0,1fr)',gap:16,flex:1,minHeight:0}},
-    h('div',{style:{display:'flex',flexDirection:'column',gap:16,minHeight:0}},
-     h(G.Card,{title:'Named saves',subtitle:'On every PC, and back in one step.',action:h(G.Button,{size:'sm',variant:'secondary',icon:'plus'},'Save as\u2026')},
-       NAMED.map(function(n){return h('div',{key:n.name,style:{display:'flex',alignItems:'center',gap:12}},
-         h(G.Icon,{name:'pin',size:16}),
-         h('div',{style:{flex:1,minWidth:0}},h('div',{style:{fontWeight:600,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}},n.name),h('div',{className:'gs-faint gs-mono',style:{fontSize:12,lineHeight:'16px'}},n.when+' \u00b7 '+n.pc)),
-         h(G.Button,{size:'sm',variant:'ghost',icon:'reset'},'Restore'))})),
-     h(G.Card,{title:'Where the saves are',subtitle:'Found by the Unreal engine rule, confirmed 27 Sep.',style:{flex:1}},
-       h('div',{style:{background:'var(--bg-300)',borderRadius:'var(--radius-md)',padding:'10px 8px 10px 12px',display:'flex',alignItems:'center',gap:8}},
-         h('div',{style:{flex:1,minWidth:0,display:'flex',flexDirection:'column',gap:2}},
-           h('div',{className:'gs-row',style:{flexWrap:'nowrap'}},h('span',{className:'gs-mono',style:{fontSize:13}},'<installDir>/b1/Saved/SaveGames'),h('span',{className:'gs-tag',style:{background:'var(--bg-400)'}},'Saves')),
-           h('div',{className:'gs-mono gs-muted',style:{fontSize:12,lineHeight:'18px',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'},title:'G:\\Black Myth Wukong\\b1\\Saved\\SaveGames'},'G:\\Black Myth Wukong\\b1\\Saved\\SaveGames'),
-           h('div',{className:'gs-faint',style:{fontSize:12,lineHeight:'16px'}},'3 files \u00b7 0.5 MB \u00b7 newest 23 Sep 21:09')),
-         h(G.IconButton,{size:'sm',icon:'folder',label:'Open the save folder'})),
-       h('div',{className:'gs-row'},h(G.Button,{size:'sm',variant:'secondary',icon:'plus'},'Add a place'),h(G.Button,{size:'sm',variant:'ghost',icon:'search'},'Learn mode')))),
-    h('div',{style:{display:'flex',flexDirection:'column',gap:12,minWidth:0,minHeight:0}},
-     h('div',{className:'gd-hist'},h(G.ConsoleTable,{command:'history black-myth-wukong',toolbar:h('span',{className:'gs-row',style:{gap:12,flexWrap:'nowrap'}},h('span',null,'17 versions \u00b7 31.4 MB'),h(G.Button,{size:'sm',variant:'secondary',icon:'upload'},'Back up now')),
-       rows:VERSIONS,columns:[{key:'saved',label:'Saved'},{key:'pc',label:'PC'},{key:'note',label:'Note',render:Note},{key:'size',label:'Size',align:'right',render:function(r){return G.formatBytes(r.size)}},{key:'act',label:'',align:'right',render:Actions}]})),
-     h('div',{className:'gd-log',style:{flex:1,minHeight:0,display:'flex'}},h(G.ConsoleLog,{grow:true,label:'Black Myth: Wukong activity',lines:[
-       {time:'23 Sep 21:10',level:'ok',tag:'upload',msg:'Session over after 3 h 08 min. Uploaded 1 changed file, 0.5 MB.'},
-       {time:'23 Sep 21:02',level:'info',tag:'named',msg:'Saved as \u201cBefore Erlang Shen\u201d, pinned on every PC.'},
-       {time:'23 Sep 18:02',level:'info',tag:'play',msg:'Started from GameSync. The cloud had nothing newer.'},
-       {time:'20 Sep 18:05',level:'info',tag:'update',msg:'Build 19870412 found. Kept the save before it ran.'}]}))))));
+  var games = useState(GAMES.concat(SOFTWARE, HIDDEN)), all = games[0];
+  // A render can open a game, and its Properties: #core, or #ror2/saves.
+  var hash = (location.hash || '').slice(1).split('/');
+  var sel = useState(hash[0] || INITIAL), tab = useState('all'), sort = useState('recent'), q = useState(''), menu = useState(null), props = useState(hash[1] ? {section:hash[1]} : null);
+  var frame = useRef(null), search = useRef(null);
+  function back(){ sel[1](null); }
+  useEffect(function(){
+    function key(e){
+      if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='f'){e.preventDefault(); if(search.current) search.current.focus();}
+      else if(e.key==='Escape'){ if(menu[0]) menu[1](null); else if(props[0]) props[1](null); else if(sel[0] && document.activeElement!==search.current) back(); }
+      else if(e.altKey&&e.key==='ArrowLeft'&&sel[0]){ e.preventDefault(); back(); } }
+    function click(){ menu[1](null); }
+    function mouse(e){ if(e.button===3&&sel[0]){ e.preventDefault(); back(); } }
+    document.addEventListener('keydown',key); document.addEventListener('click',click); document.addEventListener('mouseup',mouse);
+    return function(){document.removeEventListener('keydown',key);document.removeEventListener('click',click);document.removeEventListener('mouseup',mouse);};
+  });
+  function update(g, change){ games[1](all.map(function(x){return x.id===g.id?Object.assign({},x,change):x})); }
+  function at(e){ var r = frame.current.getBoundingClientRect(); return {x:Math.min(e.clientX-r.left,1280-240),y:Math.min(e.clientY-r.top,800-230)}; }
+  function openMenu(kind, g, e){ e.stopPropagation(); var p = at(e); menu[1]({kind:kind,game:g,x:p.x,y:p.y}); }
+  var inView = all.filter(function(g){ return tab[0]==='software'?g.software:tab[0]==='hidden'?g.hidden:tab[0]==='attn'?NEEDS[g.status]&&!g.hidden:!g.software&&!g.hidden; });
+  var shown = sorted(inView.filter(function(g){return matches(g,q[0])}), sort[0]);
+  var current = sel[0] ? all.filter(function(g){return g.id===sel[0]})[0] : null;
+  var groups = [{id:'fav',label:'Favourites',games:shown.filter(function(g){return g.fav})},
+    {id:'rest',label:{all:'Games',attn:'Needs you',software:'Software',hidden:'Hidden'}[tab[0]],games:shown.filter(function(g){return !g.fav})}];
+  var menuEl = null;
+  if (menu[0]) {
+    var m = menu[0], g = m.game;
+    var items = m.kind==='sort' ? [{heading:'Sort by'}].concat(SORTS.map(function(s){return {id:s.id,label:s.label,checked:s.id===sort[0]}}))
+      : m.kind==='more' ? [{id:'hide',label:g.hidden?'Show in the library':'Hide from the library'}].concat(g.installed===false?[]:[{id:'folder',label:'Open the game\u2019s folder',icon:'folder'}],
+          [{id:'saves-folder',label:'Open the save folder',icon:'saves'},{sep:true},{id:'props',label:'Properties',icon:'settings'}])
+      : (g.installed===false ? [] : [{id:'play',label:'Play',icon:'play'},{sep:true}]).concat([
+         {id:'fav',label:g.fav?'Remove from favourites':'Add to favourites',icon:'star',filled:!!g.fav},
+         {id:'hide',label:g.hidden?'Show in the library':'Hide from the library'},{sep:true},{id:'props',label:'Properties',icon:'settings'}]);
+    menuEl = h('div',{onClick:function(e){e.stopPropagation()},style:{position:'absolute',left:m.x,top:m.y,zIndex:20}},
+      h(G.Menu,{label:m.kind==='sort'?'Sort by':g.name,items:items,onPick:function(id){
+        if(m.kind==='sort') sort[1](id);
+        else if(id==='fav') update(g,{fav:!g.fav});
+        else if(id==='hide') update(g,{hidden:!g.hidden});
+        else if(id==='props'){ sel[1](g.id); props[1]({section:'general'}); }
+        menu[1](null);}}));
+  }
+  return h('div',{ref:frame,style:{position:'relative',width:1280,height:800}},
+    h(G.ThemeScope,{strength:current?'glass':'home',art:current&&current.hero?current.hero:HERO_AMBER,style:{width:1280,height:800,display:'flex'}},
+      rail('library',function(id){ if(id==='search'&&search.current) search.current.focus(); }),
+      h('main',{style:{flex:1,minWidth:0,padding:'20px 24px',display:'flex',gap:16}},
+        h('aside',{className:'gs-card lib-pane','aria-label':'Your games'},
+          h(G.SearchField,{value:q[0],onChange:q[1],placeholder:'Search your games',hint:'Ctrl F',inputRef:search,onSubmit:function(){ if(shown[0]) sel[1](shown[0].id); }}),
+          h('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8}},
+            h('span',{className:'gs-faint',style:{fontSize:12}},q[0]?shown.length+' of '+inView.length+' games':inView.length+' games'),
+            h(G.Button,{size:'sm',variant:'ghost',icon:'sort',iconAfter:'chevronDown','aria-haspopup':'menu','aria-label':'Sort by: '+SORTS.filter(function(s){return s.id===sort[0]})[0].label,
+              onClick:function(e){openMenu('sort',null,e)}},SORTS.filter(function(s){return s.id===sort[0]})[0].label)),
+          h('div',{className:'lib-scroll'},h(G.GameList,{groups:groups,selected:sel[0],onSelect:sel[1],onMenu:function(g,e){openMenu('row',g,e)},
+            empty:'No game matches \u201c'+q[0]+'\u201d.'}))),
+        h('section',{className:'lib-content','aria-label':current?current.name:'My games'},
+          current ? h(GamePage,{key:current.id,game:current,onBack:back,onFav:function(g){update(g,{fav:!g.fav})},onMore:function(g,e){openMenu('more',g,e)},
+              onProps:function(section){props[1]({section:section})},onSaves:function(){}})
+          : h(Covers,{games:shown,tab:tab[0],onTab:tab[1],query:q[0],onOpen:sel[1],onMenu:function(g,e){openMenu('tile',g,e)}})))),
+    menuEl,
+    props[0] && current ? h('div',{className:'gs-scrim',style:{position:'absolute',inset:0,zIndex:30},onClick:function(){props[1](null)}},
+      h('div',{onClick:function(e){e.stopPropagation()}},h(G.GamePropertiesDialog,{key:current.id+props[0].section,game:propsOf(current),section:props[0].section,
+        onClose:function(){props[1](null)},onSave:function(v){update(current,{name:v.name,fav:v.favourite,hidden:!v.shown});props[1](null)}}))) : null);
 }
 ReactDOM.createRoot(document.getElementById('root')).render(h(App));
 </script>

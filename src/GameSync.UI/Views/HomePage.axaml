@@ -2,6 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:c="using:GameSync.UI.Controls"
              xmlns:vm="using:GameSync.UI.ViewModels"
+             xmlns:sys="using:System"
              x:Class="GameSync.UI.Views.HomePage"
              x:DataType="vm:HomeViewModel">
   <!-- The launcher home (design system → Launcher home): the top bar, the last-played game, then Needs you, Jump back in and
@@ -15,15 +16,44 @@
       <c:GsPillTabs Grid.Column="1" ItemsSource="{Binding Tabs}" SelectedId="{Binding SelectedTab, Mode=TwoWay}" />
       <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
         <c:GsIconButton Icon="sync" Label="Sync now" Command="{Binding SyncNowCommand}" />
-        <c:GsIconButton Icon="cloud" Label="Google Drive" />
-        <c:GsIconButton Icon="monitor" Label="This PC" />
+        <!-- Where the saves go and which PCs sync: what the app is doing, a click away (settings for both come with Settings) -->
+        <c:GsIconButton Icon="cloud" Label="{Binding Status.Cloud, StringFormat='Where your saves go: {0}', FallbackValue='Where your saves go'}"
+                        IsVisible="{Binding HasStatus}">
+          <c:GsIconButton.Flyout>
+            <Flyout Placement="BottomEdgeAlignedRight">
+              <StackPanel Width="280" Spacing="8" Margin="8">
+                <TextBlock Text="{Binding Status.Cloud}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                <TextBlock Classes="caption muted" Text="{Binding Status.CloudLine}" TextWrapping="Wrap" />
+              </StackPanel>
+            </Flyout>
+          </c:GsIconButton.Flyout>
+        </c:GsIconButton>
+        <c:GsIconButton Icon="monitor" Label="{Binding Status.ThisPc, StringFormat='This PC: {0}', FallbackValue='This PC'}" IsVisible="{Binding HasStatus}">
+          <c:GsIconButton.Flyout>
+            <Flyout Placement="BottomEdgeAlignedRight">
+              <StackPanel Width="280" Spacing="8" Margin="8">
+                <TextBlock Text="{Binding Status.ThisPc, StringFormat='This PC: {0}'}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                <TextBlock Classes="caption muted" Text="No other PC syncs with this one yet. Set GameSync up on your other PC with the same Google account."
+                           TextWrapping="Wrap" IsVisible="{Binding Status.NoOtherPcs, FallbackValue=False}" />
+                <ItemsControl ItemsSource="{Binding Status.OtherPcs}" IsVisible="{Binding Status.HasOtherPcs, FallbackValue=False}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="sys:String">
+                      <TextBlock Classes="mono-small" Text="{Binding}" Margin="0,2" />
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </StackPanel>
+            </Flyout>
+          </c:GsIconButton.Flyout>
+        </c:GsIconButton>
       </StackPanel>
     </Grid>
 
     <Panel>
     <c:GsHeroBanner MinHeight="0" Art="{Binding HeroArt}" Logo="{Binding HeroLogo}" Title="{Binding HeroTitle}"
                     Eyebrow="{Binding HeroEyebrow}" Chip="{Binding HeroChip}" Status="{Binding HeroStatus}" StatusLabel="{Binding HeroStatusLabel}"
-                    Blurb="{Binding HeroBlurb}" PlayLabel="{Binding HeroPlayLabel}" PlayCommand="{Binding PlayCommand}" IsVisible="{Binding HasHero}" />
+                    Blurb="{Binding HeroBlurb}" PlayLabel="{Binding HeroPlayLabel}" PlayCommand="{Binding PlayCommand}" IsVisible="{Binding HasHero}"
+                    SavesCommand="{Binding OpenHeroSavesCommand}" SettingsCommand="{Binding OpenHeroPropertiesCommand}" />
     <c:GsCard Title="No games yet" Subtitle="GameSync hasn't looked for games on this PC." IsVisible="{Binding NoGames}">
       <c:GsNote Icon="search" MaxWidth="640" HorizontalAlignment="Left" VerticalAlignment="Top"
                 Text="First run will do it for you. Until it's built, run gamesync scan: it reads what Steam, Epic and EA know and changes nothing, and nothing syncs until you choose games. Then gamesync art brings their covers, and Home shows your last-played game." />
@@ -72,7 +102,8 @@
                       <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
                       <c:GsStatusBadge Status="{Binding Status}" Plain="True" />
                     </StackPanel>
-                    <c:GsButton Grid.Column="2" Classes="sm" Content="{Binding Action}" VerticalAlignment="Center" />
+                    <c:GsButton Grid.Column="2" Classes="sm" Content="{Binding Action}" VerticalAlignment="Center"
+                                Command="{Binding $parent[UserControl].((vm:HomeViewModel)DataContext).OpenGameSavesCommand}" CommandParameter="{Binding Id}" />
                   </Grid>
                 </DataTemplate>
               </ItemsControl.ItemTemplate>
@@ -85,7 +116,7 @@
         <c:GsCard.Action>
           <c:GsIconButton Icon="chevronRight" Label="All games" Command="{Binding OpenLibraryCommand}" />
         </c:GsCard.Action>
-        <ItemsControl ItemsSource="{Binding JumpBackIn}">
+        <ItemsControl ItemsSource="{Binding JumpBackIn}" ClipToBounds="False">
           <ItemsControl.ItemsPanel>
             <ItemsPanelTemplate>
               <c:ShelfPanel Gap="12" />
@@ -93,9 +124,17 @@
           </ItemsControl.ItemsPanel>
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="vm:TileItem">
-              <c:GsGameTile Classes="compact" Width="NaN" Title="{Binding Title}" Art="{Binding Art}" Status="{Binding Status}" StatusLabel="{Binding StatusLabel}" Meta="{Binding Meta}">
+              <c:GsGameTile Classes="compact" Width="NaN" Title="{Binding Title}" Art="{Binding Art}" Status="{Binding Status}" StatusLabel="{Binding StatusLabel}" Meta="{Binding Meta}"
+                          Command="{Binding $parent[UserControl].((vm:HomeViewModel)DataContext).OpenGameCommand}" CommandParameter="{Binding Id}">
               <c:GsGameTile.ContextMenu>
-                <ContextMenu IsVisible="{Binding ToggleHidden, Converter={x:Static ObjectConverters.IsNotNull}}">
+                <ContextMenu IsVisible="{Binding HasMenu}">
+                  <MenuItem Header="Play" Command="{Binding PlayCommand}" IsVisible="{Binding PlayCommand, Converter={x:Static ObjectConverters.IsNotNull}}">
+                    <MenuItem.Icon><c:GsIcon Icon="play" Size="16" /></MenuItem.Icon>
+                  </MenuItem>
+                  <Separator IsVisible="{Binding PlayCommand, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                  <MenuItem Header="{Binding FavouriteLabel}" Command="{Binding ToggleFavourite}">
+                    <MenuItem.Icon><c:GsIcon Icon="star" Size="16" Filled="{Binding IsFavourite}" /></MenuItem.Icon>
+                  </MenuItem>
                   <MenuItem Header="{Binding HideLabel}" Command="{Binding ToggleHidden}" />
                 </ContextMenu>
               </c:GsGameTile.ContextMenu>

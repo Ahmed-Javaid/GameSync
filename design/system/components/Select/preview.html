@@ -1,0 +1,22 @@
+<!-- @dsCard group="Actions" height=240 subtitle="A choice of three or more: the current one on a button, the rest in a Menu" -->
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>preview</title>
+<style>html,body{margin:0;background:var(--bg-100);} .pv{padding:24px;} </style>
+</head>
+<body class="gs-root">
+<div id="root"></div>
+<script>
+var G = window.GameSync, h = React.createElement;
+
+function Demo(){
+  var v=React.useState('this-pc'), w=React.useState('newest');
+  return h('div',{className:'pv gs-row',style:{alignItems:'flex-start',gap:24}},
+    h(G.Select,{label:'Settings files',value:v[0],onChange:v[1],options:[{id:'sync',label:'Sync between PCs'},{id:'this-pc',label:'Back up on this PC'},{id:'off',label:'Don\u2019t back up'}]}),
+    h(G.Select,{label:'When both PCs changed it',value:w[0],onChange:w[1],options:[{id:'newest',label:'Newest wins'},{id:'ask',label:'Always ask'},{id:'this-pc',label:'This PC wins'}]}));
+}
+ReactDOM.createRoot(document.getElementById('root')).render(h(Demo));
+
+</script>
+</body>
+</html>

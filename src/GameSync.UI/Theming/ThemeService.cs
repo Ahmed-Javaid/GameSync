@@ -25,8 +25,64 @@ public static class ThemeService
             app.Resources[key] = primary;
         }
 
+        foreach (var (fluent, token) in FluentColours)
+        {
+            app.Resources[fluent] = app.Resources[token];
+        }
+
+        // The title bar's minimize and maximize buttons under the pointer: the theme's ink laid thinly over the page, as
+        // Windows' own caption buttons do, so the art shows through in Glossy.
+        var ink = ParseColor(tokens["ink"]);
+        SetBrush(app.Resources, "caption-hover", Color.FromArgb(28, ink.R, ink.G, ink.B));
+        SetBrush(app.Resources, "caption-press", Color.FromArgb(16, ink.R, ink.G, ink.B));
+
+        app.Resources["TextControlBorderThemeThickness"] = new Thickness(1.5);
+        app.Resources["TextControlBorderThemeThicknessFocused"] = new Thickness(2);
+        app.Resources["OverlayCornerRadius"] = new CornerRadius(10);
+        app.Resources["MenuFlyoutPresenterThemePadding"] = new Thickness(6);
+        app.Resources["MenuFlyoutItemThemePadding"] = new Thickness(10, 8, 12, 8);
         return tokens;
     }
+
+    /// <summary>
+    /// Fluent's own text fields and menus take the design system's colours (design system → SearchField, Menu): a field
+    /// is <c>surface-field</c> inside a <c>line-200</c> border that turns <c>primary</c> with the cursor in it, and a menu
+    /// floats on the dialog's surface with rows that go <c>bg-300</c> under the pointer. The same brushes, so they recolour
+    /// with the theme.
+    /// </summary>
+    private static readonly (string Fluent, string Token)[] FluentColours =
+    [
+        ("TextControlBackground", "surface-field"),
+        ("TextControlBackgroundPointerOver", "surface-field"),
+        ("TextControlBackgroundFocused", "surface-field"),
+        ("TextControlBorderBrush", "line-200"),
+        ("TextControlBorderBrushPointerOver", "line-200"),
+        ("TextControlBorderBrushFocused", "primary"),
+        ("TextControlForeground", "ink"),
+        ("TextControlForegroundPointerOver", "ink"),
+        ("TextControlForegroundFocused", "ink"),
+        ("TextControlPlaceholderForeground", "ink-faint"),
+        ("TextControlPlaceholderForegroundPointerOver", "ink-faint"),
+        ("TextControlPlaceholderForegroundFocused", "ink-faint"),
+        ("TextControlSelectionHighlightColor", "primary-soft"),
+        ("TextControlButtonForeground", "ink-muted"),
+        ("TextControlButtonForegroundPointerOver", "ink"),
+        ("TextControlButtonForegroundPressed", "ink"),
+        ("TextControlButtonBackgroundPointerOver", "bg-400"),
+        ("TextControlButtonBackgroundPressed", "bg-400"),
+        ("MenuFlyoutPresenterBackground", "surface-dialog"),
+        ("MenuFlyoutPresenterBorderBrush", "line-100"),
+        ("MenuFlyoutItemBackgroundPointerOver", "bg-300"),
+        ("MenuFlyoutItemBackgroundPressed", "bg-400"),
+        ("MenuFlyoutItemForeground", "ink"),
+        ("MenuFlyoutItemForegroundPointerOver", "ink"),
+        ("MenuFlyoutItemForegroundPressed", "ink"),
+        ("MenuFlyoutItemKeyboardAcceleratorTextForeground", "ink-faint"),
+        ("MenuFlyoutItemKeyboardAcceleratorTextForegroundPointerOver", "ink-muted"),
+        ("MenuFlyoutItemKeyboardAcceleratorTextForegroundPressed", "ink-muted"),
+        ("MenuFlyoutSubItemChevron", "ink-muted"),
+        ("MenuFlyoutSubItemChevronPointerOver", "ink"),
+    ];
 
     /// <summary>
     /// Glossy (LOOK-17): lays a strength's tokens over the theme for everything inside <paramref name="scope"/>'s
@@ -94,14 +150,20 @@ public static class ThemeService
 
             var color = ParseColor(value);
             resources[key + "-color"] = color;
-            if (resources.TryGetValue(key, out var existing) && existing is SolidColorBrush brush)
-            {
-                brush.Color = color;
-            }
-            else
-            {
-                resources[key] = new SolidColorBrush(color);
-            }
+            SetBrush(resources, key, color);
+        }
+    }
+
+    /// <summary>Recolours the brush under <paramref name="key"/>, or makes it: everything bound to it follows.</summary>
+    private static void SetBrush(IResourceDictionary resources, string key, Color color)
+    {
+        if (resources.TryGetValue(key, out var existing) && existing is SolidColorBrush brush)
+        {
+            brush.Color = color;
+        }
+        else
+        {
+            resources[key] = new SolidColorBrush(color);
         }
     }
 }

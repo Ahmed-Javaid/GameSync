@@ -1,13 +1,31 @@
-<!-- @dsCard group="Screens" height=800 width=1280 page=true subtitle="Console-style save manager; Share and Import open their dialogs" -->
+<!-- @dsCard group="Screens" height=800 width=1280 page=true subtitle="Console-style save manager; a game's name opens its saves; Share and Import open their dialogs" -->
 <!doctype html>
 <html lang="en">
 <head><meta charset="utf-8"><title>preview</title>
-<style>html,body{margin:0;background:var(--bg-100);} .pv{padding:24px;} </style>
+<style>
+html,body{margin:0;background:var(--bg-100);} .pv{padding:24px;}
+.sm-main{flex:1;min-width:0;padding:20px 24px;display:flex;flex-direction:column;gap:16px;overflow:auto;scrollbar-width:thin;scrollbar-color:var(--bg-400) transparent}
+.sm-top{display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:40px}
+.sm-crumb{display:flex;align-items:center;gap:6px;font:500 13px/20px var(--font-sans);min-width:0}
+.sm-crumb button{border:0;background:none;padding:0;color:var(--ink-muted);font:inherit;cursor:pointer}
+.sm-crumb button:hover{color:var(--ink);text-decoration:underline}
+.sm-crumb span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sm-open{border:0;background:none;padding:0;color:var(--ink);font:inherit;cursor:pointer;text-align:left}
+.sm-open:hover{text-decoration:underline}
+.sm-open:focus-visible{outline:2px solid var(--primary);outline-offset:2px;border-radius:2px}
+.sm-status{flex-direction:row;align-items:center;gap:16px;padding:14px 20px}
+.sm-status p{margin:0;flex:1;min-width:0;color:var(--ink-muted);font:400 13px/19px var(--font-sans)}
+.sm-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:start}
+.sm-log .gs-log-line{grid-template-columns:92px 72px 1fr}
+.sm-hist .gs-ctable td{height:34px}
+</style>
 </head>
 <body class="gs-root">
 <div id="root"></div>
 <script>
 var G = window.GameSync, h = React.createElement;
+// The game whose saves are open when the preview starts; null shows every game's.
+var INITIAL = null;
 
 var ART = "data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%201200%20500%27%20preserveAspectRatio%3D%27xMidYMid%20slice%27%3E%3Crect%20width%3D%271200%27%20height%3D%27500%27%20fill%3D%27%231b2a33%27/%3E%3Ccircle%20cx%3D%27860%27%20cy%3D%27150%27%20r%3D%2770%27%20fill%3D%27%237fe6f2%27%20opacity%3D%27.35%27/%3E%3Cpath%20d%3D%27M0%20330%20L180%20200%20L330%20300%20L520%20150%20L700%20290%20L880%20190%20L1200%20320%20V500%20H0Z%27%20fill%3D%27%23223640%27/%3E%3Cpath%20d%3D%27M0%20400%20L220%20290%20L420%20380%20L640%20270%20L860%20370%20L1040%20300%20L1200%20360%20V500%20H0Z%27%20fill%3D%27%23182730%27/%3E%3Cpath%20d%3D%27M0%20460%20L300%20390%20L600%20450%20L900%20380%20L1200%20440%20V500%20H0Z%27%20fill%3D%27%2310191f%27/%3E%3C/svg%3E";
 var COVERS = ["data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%20200%20300%27%3E%3Crect%20width%3D%27200%27%20height%3D%27300%27%20fill%3D%27%232b2220%27/%3E%3Ccircle%20cx%3D%27140%27%20cy%3D%2790%27%20r%3D%2738%27%20fill%3D%27%23e0b36a%27%20opacity%3D%27.5%27/%3E%3Cpath%20d%3D%27M0%20220%20L70%20160%20L130%20210%20L200%20150%20V300%20H0Z%27%20fill%3D%27%23e0b36a%27%20opacity%3D%27.35%27/%3E%3C/svg%3E", "data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%20200%20300%27%3E%3Crect%20width%3D%27200%27%20height%3D%27300%27%20fill%3D%27%231d2a24%27/%3E%3Ccircle%20cx%3D%27140%27%20cy%3D%2790%27%20r%3D%2738%27%20fill%3D%27%237fd1a6%27%20opacity%3D%27.5%27/%3E%3Cpath%20d%3D%27M0%20220%20L70%20160%20L130%20210%20L200%20150%20V300%20H0Z%27%20fill%3D%27%237fd1a6%27%20opacity%3D%27.35%27/%3E%3C/svg%3E", "data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%20200%20300%27%3E%3Crect%20width%3D%27200%27%20height%3D%27300%27%20fill%3D%27%23221f33%27/%3E%3Ccircle%20cx%3D%27140%27%20cy%3D%2790%27%20r%3D%2738%27%20fill%3D%27%23b9a3ff%27%20opacity%3D%27.5%27/%3E%3Cpath%20d%3D%27M0%20220%20L70%20160%20L130%20210%20L200%20150%20V300%20H0Z%27%20fill%3D%27%23b9a3ff%27%20opacity%3D%27.35%27/%3E%3C/svg%3E", "data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%20200%20300%27%3E%3Crect%20width%3D%27200%27%20height%3D%27300%27%20fill%3D%27%231d2630%27/%3E%3Ccircle%20cx%3D%27140%27%20cy%3D%2790%27%20r%3D%2738%27%20fill%3D%27%237fe6f2%27%20opacity%3D%27.5%27/%3E%3Cpath%20d%3D%27M0%20220%20L70%20160%20L130%20210%20L200%20150%20V300%20H0Z%27%20fill%3D%27%237fe6f2%27%20opacity%3D%27.35%27/%3E%3C/svg%3E", "data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%20200%20300%27%3E%3Crect%20width%3D%27200%27%20height%3D%27300%27%20fill%3D%27%232c2519%27/%3E%3Ccircle%20cx%3D%27140%27%20cy%3D%2790%27%20r%3D%2738%27%20fill%3D%27%23f2b544%27%20opacity%3D%27.5%27/%3E%3Cpath%20d%3D%27M0%20220%20L70%20160%20L130%20210%20L200%20150%20V300%20H0Z%27%20fill%3D%27%23f2b544%27%20opacity%3D%27.35%27/%3E%3C/svg%3E", "data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%20200%20300%27%3E%3Crect%20width%3D%27200%27%20height%3D%27300%27%20fill%3D%27%2322262b%27/%3E%3Ccircle%20cx%3D%27140%27%20cy%3D%2790%27%20r%3D%2738%27%20fill%3D%27%23a4abb3%27%20opacity%3D%27.5%27/%3E%3Cpath%20d%3D%27M0%20220%20L70%20160%20L130%20210%20L200%20150%20V300%20H0Z%27%20fill%3D%27%23a4abb3%27%20opacity%3D%27.35%27/%3E%3C/svg%3E", "data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%20200%20300%27%3E%3Crect%20width%3D%27200%27%20height%3D%27300%27%20fill%3D%27%232a1f24%27/%3E%3Ccircle%20cx%3D%27140%27%20cy%3D%2790%27%20r%3D%2738%27%20fill%3D%27%23ff8a7d%27%20opacity%3D%27.5%27/%3E%3Cpath%20d%3D%27M0%20220%20L70%20160%20L130%20210%20L200%20150%20V300%20H0Z%27%20fill%3D%27%23ff8a7d%27%20opacity%3D%27.35%27/%3E%3C/svg%3E"];
@@ -39,25 +57,102 @@ function rail(cur){return h(G.SideRail,{current:cur,items:[
 function topbar(title,sub,tabs,right){return h('header',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',gap:16}},h('div',null,h('div',{style:{font:'600 15px/20px var(--font-sans)'}},title),h('div',{className:'gs-faint',style:{fontSize:12}},sub)),tabs,h('div',{className:'gs-row',style:{flexWrap:'nowrap'}},right));}
 
 function Stat(p){return h('div',{style:{display:'flex',flexDirection:'column',gap:2}},h('span',{className:'gs-faint',style:{font:'500 11px/14px var(--font-mono)',letterSpacing:'.08em',textTransform:'uppercase'}},p.k),h('span',{style:{font:'500 28px/32px var(--font-mono)'}},p.v))}
+
+/* ---------- One game's saves: what the game's page used to hold ---------- */
+var NAMED = {wukong:[{name:'Before Erlang Shen',when:'23 Sep 21:02',pc:'DESKTOP'},{name:'Chapter 5 start',when:'20 Sep 18:10',pc:'LAPTOP'},{name:'Ludusavi backup (14 Sep)',when:'14 Sep 12:00',pc:'DESKTOP'}],
+  sekiro:[{name:'Before update 1.06',when:'12 Sep 20:31',pc:'DESKTOP'}]};
+var PLACES = {wukong:[{portable:'<installDir>/b1/Saved/SaveGames',here:'G:\\Black Myth Wukong\\b1\\Saved\\SaveGames',files:'3 files \u00b7 0.5 MB \u00b7 newest 23 Sep 21:09'}],
+  sekiro:[{portable:'<roaming>/Sekiro/*',here:'C:\\Users\\You\\AppData\\Roaming\\Sekiro\\76561198041',files:'2 files \u00b7 2.1 MB \u00b7 newest today 21:04'}]};
+var VERSIONS=[
+  {id:'v17',saved:'23 Sep 21:10',pc:'DESKTOP',note:'current',size:524288},
+  {id:'v16',saved:'23 Sep 21:02',pc:'DESKTOP',note:'Before Erlang Shen',size:522240},
+  {id:'v15',saved:'21 Sep 22:47',pc:'LAPTOP',size:519168},
+  {id:'v14',saved:'20 Sep 18:05',pc:'DESKTOP',note:'Before update to build 19870412',size:511000},
+  {id:'v13',saved:'18 Sep 23:31',pc:'DESKTOP',size:508000},
+  {id:'v12',saved:'17 Sep 22:02',pc:'LAPTOP',size:503000}];
+var SENTENCE = {
+  held:function(g){return g.name+'\u2019s save changed while the game wasn\u2019t running, on 22 Sep 09:14, so GameSync held it for you to look at. Its previous save is kept either way.'},
+  conflict:function(g){return 'DESKTOP saved 21:04, LAPTOP saved 19:30. The newest is current, and LAPTOP\u2019s copy is pinned until you decide.'},
+  synced:function(){return 'DESKTOP and LAPTOP have the same save. Every version is kept: 17 in the cloud, the last 10 on this PC.'},
+  playing:function(){return 'Running now. Its save syncs a few seconds after you quit.'},
+  'newer-in-cloud':function(){return 'LAPTOP saved a newer game on 29 Sep 19:30. It comes down before you play.'},
+  'backup-only':function(){return 'Steam syncs its saves between your PCs; GameSync keeps a backup of every version.'}};
+function Note(r){
+  if(r.note==='current')return h('span',{className:'gs-tag',style:{background:'var(--secondary-soft)',color:'var(--ink)'}},'Current');
+  if(!r.note)return null;
+  return h('span',{className:'gs-row',style:{gap:6,flexWrap:'nowrap',color:'var(--ink-muted)'}},h(G.Icon,{name:'pin',size:14}),r.note);
+}
+function Actions(r){return h('span',{className:'gs-row',style:{gap:4,flexWrap:'nowrap',justifyContent:'flex-end'}},
+  r.note==='current'?null:h(G.Button,{size:'sm',variant:'ghost'},'Restore'), h(G.Button,{size:'sm',variant:'ghost'},'Export'));}
+
+function GameSaves(p){
+  var g = p.game, named = NAMED[g.id] || [], places = PLACES[g.id] || [{portable:'<roaming>/'+g.name.replace(/[^A-Za-z0-9]/g,''),here:g.path,files:'2 files \u00b7 '+G.formatBytes(g.size)+' \u00b7 newest '+g.backup}];
+  var need = {held:1,conflict:1}[g.status];
+  return h(React.Fragment,null,
+    h('header',{className:'sm-top'},
+      h('div',{className:'gs-row',style:{flexWrap:'nowrap',gap:12,minWidth:0}},
+        h(G.Button,{size:'sm',variant:'secondary',icon:'arrowLeft',onClick:p.onBack,title:'Back to every game\u2019s saves (Esc)'},'Back'),
+        h('nav',{'aria-label':'Breadcrumb',className:'sm-crumb'},h('button',{type:'button',onClick:p.onBack},'Save manager'),h(G.Icon,{name:'chevronRight',size:14}),h('span',{'aria-current':'page'},g.name))),
+      h('div',{className:'gs-row',style:{flexWrap:'nowrap'}},
+        h(G.Button,{variant:'ghost',icon:'settings'},'Choose files\u2026'),
+        h(G.Button,{variant:'secondary',icon:'plus'},'Save as\u2026'),
+        h(G.Button,{variant:need?'secondary':'primary',icon:'upload',disabled:g.status==='playing',title:g.status==='playing'?'Once you quit, it backs up by itself':null},'Back up now'))),
+    h('section',{className:'gs-card sm-status','aria-label':'Status'},
+      h(G.StatusBadge,{status:g.status,label:g.status==='backup-only'?'Synced by Steam':undefined}),
+      h('p',null,(SENTENCE[g.status]||SENTENCE.synced)(g)),
+      g.status==='held' ? h('div',{className:'gs-row',style:{flexWrap:'nowrap'}},h(G.Button,{variant:'secondary',icon:'reset'},'Restore the previous save'),h(G.Button,{variant:'primary',icon:'check'},'Keep the new save'))
+      : g.status==='conflict' ? h(G.Button,{variant:'primary',icon:'alert'},'Resolve') : null),
+    h('div',{className:'sm-grid'},
+      h(G.Card,{title:'Named saves',subtitle:'On every PC, and back in one step.',action:h(G.Button,{size:'sm',variant:'secondary',icon:'plus'},'Save as\u2026')},
+        named.length ? named.map(function(n){return h('div',{key:n.name,style:{display:'flex',alignItems:'center',gap:12}},
+          h(G.Icon,{name:'pin',size:16}),
+          h('div',{style:{flex:1,minWidth:0}},h('div',{style:{fontWeight:600,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}},n.name),h('div',{className:'gs-faint gs-mono',style:{fontSize:12,lineHeight:'16px'}},n.when+' \u00b7 '+n.pc)),
+          h(G.Button,{size:'sm',variant:'ghost',icon:'reset'},'Restore'))})
+        : h('div',{className:'gs-note'},h(G.Icon,{name:'info',size:16}),'None yet. Save as\u2026 keeps this save under a name, on every PC, before a boss or a big choice.')),
+      h(G.Card,{title:'Where the saves are',subtitle:'Found by the save list, confirmed 27 Sep.',action:h(G.Button,{size:'sm',variant:'ghost',icon:'settings'},'Choose files\u2026')},
+        places.map(function(pl){return h('div',{key:pl.here,className:'gs-well-line',style:{alignItems:'flex-start',fontFamily:'var(--font-sans)'}},
+          h('div',{style:{flex:1,minWidth:0,display:'flex',flexDirection:'column',gap:2}},
+            h('div',{className:'gs-mono',style:{fontSize:13,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'},title:pl.here},pl.here),
+            h('div',{className:'gs-faint',style:{fontSize:12,lineHeight:'16px'}},pl.files)),
+          h(G.IconButton,{size:'sm',icon:'folder',label:'Open the save folder'}))}),
+        h('div',{className:'gs-row'},h(G.Button,{size:'sm',variant:'secondary',icon:'plus'},'Add a place')))),
+    h('div',{className:'sm-hist'},h(G.ConsoleTable,{command:'history '+g.id,
+      toolbar:h('span',null,g.versions+' versions \u00b7 '+G.formatBytes(g.size)+' of history'),
+      rows:VERSIONS,columns:[{key:'saved',label:'Saved'},{key:'pc',label:'PC'},{key:'note',label:'Note',render:Note},{key:'size',label:'Size',align:'right',render:function(r){return G.formatBytes(r.size)}},{key:'act',label:'',align:'right',render:Actions}]})),
+    h('div',{className:'sm-log'},h(G.ConsoleLog,{label:g.name+' activity',lines:[
+      {time:'23 Sep 21:10',level:'ok',tag:'upload',msg:'Session over after 3 h 08 min. Uploaded 1 changed file, 0.5 MB.'},
+      {time:'23 Sep 21:02',level:'info',tag:'named',msg:'Saved as \u201cBefore Erlang Shen\u201d, pinned on every PC.'},
+      {time:'23 Sep 18:02',level:'info',tag:'play',msg:'Started from GameSync. The cloud had nothing newer.'}]})));
+}
+
 function App(){
  var s=React.useState(['sekiro','cuphead']), d=React.useState(null);
+ var open=React.useState((location.hash||'').slice(1)||INITIAL);
+ var game=open[0]?GAMES.filter(function(g){return g.id===open[0]})[0]:null;
+ React.useEffect(function(){
+   function key(e){ if(e.key==='Escape'&&!d[0]&&open[0]) open[1](null); else if(e.altKey&&e.key==='ArrowLeft'&&open[0]){ e.preventDefault(); open[1](null); } }
+   document.addEventListener('keydown',key); return function(){document.removeEventListener('keydown',key)};
+ });
  return h(G.ThemeScope,{strength:'glass',art:ART,style:{width:1280,height:800,display:'flex',position:'relative'}},
   rail('saves'),
-  h('main',{style:{flex:1,minWidth:0,padding:'20px 24px',display:'flex',flexDirection:'column',gap:16}},
-   topbar('Save manager','DESKTOP \u00b7 daily backup 20:00',
+  h('main',{className:'sm-main'},
+   game ? h(GameSaves,{key:game.id,game:game,onBack:function(){open[1](null)}}) : [
+   h(React.Fragment,{key:'top'},topbar('Save manager','DESKTOP \u00b7 daily backup 20:00',
      h(G.PillTabs,{label:'Save manager view',items:[{id:'saves',label:'Saves',icon:'saves'},{id:'plan',label:'Plan',icon:'chevronsRight'},{id:'versions',label:'Versions',icon:'clock'},{id:'log',label:'Log',icon:'terminal'}]}),
      [h(G.Button,{key:1,variant:'secondary',icon:'share',disabled:!s[0].length,onClick:function(){d[1]('pick')}},s[0].length?'Share '+s[0].length+' selected':'Share selected'),
       h(G.Button,{key:2,variant:'secondary',icon:'zip',onClick:function(){d[1]('all')}},'Share all'),
       h(G.IconButton,{key:4,icon:'download',label:'Import saves',onClick:function(){d[1]('import')}}),
-      h(G.Button,{key:3,variant:'primary',icon:'sync'},'Sync now')]),
-   h('div',{style:{display:'flex',gap:48,padding:'4px 4px 0'}},h(Stat,{k:'Games',v:'12'}),h(Stat,{k:'Save folder',v:'1.04 GB'}),h(Stat,{k:'Versions',v:'214'}),h(Stat,{k:'Last backup',v:'20:00'}),h(Stat,{k:'Needs you',v:'2'})),
-   h(G.ConsoleTable,{command:'saves --pc DESKTOP --sort last-played',toolbar:h('span',null,s[0].length+' of '+GAMES.length+' selected'),selected:s[0],onSelect:s[1],rows:GAMES,columns:[{key:'name',label:'Game'},{key:'status',label:'Status'},{key:'path',label:'Save path',path:true},{key:'versions',label:'Ver',align:'right'},{key:'size',label:'Size',align:'right',render:function(r){return G.formatBytes(r.size)}},{key:'backup',label:'Last backup',align:'right'}]}),
-   h(G.ConsoleLog,{live:true,grow:true,lines:[
+      h(G.Button,{key:3,variant:'primary',icon:'sync'},'Sync now')])),
+   h('div',{key:'stats',style:{display:'flex',gap:48,padding:'4px 4px 0'}},h(Stat,{k:'Games',v:'12'}),h(Stat,{k:'Save folder',v:'1.04 GB'}),h(Stat,{k:'Versions',v:'214'}),h(Stat,{k:'Last backup',v:'20:00'}),h(Stat,{k:'Needs you',v:'2'})),
+   h(G.ConsoleTable,{key:'table',command:'saves --pc DESKTOP --sort last-played',toolbar:h('span',null,s[0].length+' of '+GAMES.length+' selected \u00b7 a game\u2019s name opens its saves'),selected:s[0],onSelect:s[1],rows:GAMES,columns:[
+     {key:'name',label:'Game',render:function(r){return h('button',{type:'button',className:'sm-open',onClick:function(e){e.stopPropagation();open[1](r.id)}},r.name)}},
+     {key:'status',label:'Status'},{key:'path',label:'Save path',path:true},{key:'versions',label:'Ver',align:'right'},{key:'size',label:'Size',align:'right',render:function(r){return G.formatBytes(r.size)}},{key:'backup',label:'Last backup',align:'right'}]}),
+   h(G.ConsoleLog,{key:'log',live:true,grow:true,lines:[
     {time:'20:00:02',level:'info',tag:'backup',msg:'daily backup started \u00b7 12 games'},
     {time:'20:00:09',level:'ok',tag:'upload',msg:'Terraria  v52  326.0 MB  (3 files changed)'},
     {time:'20:00:11',level:'warn',tag:'held',msg:'Black Myth: Wukong changed while the game was not running. Held for review.'},
     {time:'21:04:40',level:'warn',tag:'conflict',msg:'Sekiro: DESKTOP saved 21:04, LAPTOP saved 19:30. Newest kept, LAPTOP copy pinned.'},
-    {time:'21:06:13',level:'ok',tag:'upload',msg:'Sekiro  v14  2.1 MB'}]})),
+    {time:'21:06:13',level:'ok',tag:'upload',msg:'Sekiro  v14  2.1 MB'}]})]),
   d[0]?h('div',{className:'gs-scrim',style:{position:'absolute',inset:0}},
     d[0]==='import'?h(G.ImportSavesDialog,{zipName:'GameSync-saves-2026-09-27.zip',from:'27 Sep 2026',items:IMPORT_ITEMS,onClose:function(){d[1](null)}})
     :h(G.ShareSavesDialog,{key:d[0],mode:d[0],games:shareGames(),initialSelection:s[0],onClose:function(){d[1](null)}})):null);

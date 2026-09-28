@@ -293,16 +293,16 @@ public class AppTests
         var synced = 0;
         var actions = new LauncherActions(played.Add, () => synced++, (page, tab) => shown.Add((page, tab)), (_, _) => { });
 
-        var library = LibraryViewModel.From(games, DateTime.Now, "all", actions);
+        var library = LibraryViewModel.From(games, DateTime.Now, "all", actions, LibrarySort.Name);
         var changed = new List<string?>();
         library.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
         Assert.Equal(["all", "attn", "software", "hidden"], library.Tabs.Select(t => t.Id));
-        Assert.Equal(["hades", "celeste"], library.Tiles.Select(t => t.Title));
+        Assert.Equal(["celeste", "hades"], library.OtherTiles.Select(t => t.Title));
         library.SelectedTab = "attn";
-        Assert.Equal(["celeste"], library.Tiles.Select(t => t.Title));
+        Assert.Equal(["celeste"], library.OtherTiles.Select(t => t.Title));
         library.SelectedTab = "hidden";
-        Assert.Equal(["rounds"], library.Tiles.Select(t => t.Title));
-        Assert.Contains(nameof(LibraryViewModel.Tiles), changed);
+        Assert.Equal(["rounds"], library.OtherTiles.Select(t => t.Title));
+        Assert.Contains(nameof(LibraryViewModel.OtherTiles), changed);
         Assert.Equal("all", LibraryViewModel.From([Game("hades")], DateTime.Now, "hidden").SelectedTab);
 
         using var world = new TestWorld();

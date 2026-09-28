@@ -1,4 +1,4 @@
-<!-- @dsCard group="Screens" height=800 width=1280 page=true subtitle="Settings: Appearance re-themes the whole screen live, its Surface included (every screen follows it); Storage and folders" -->
+<!-- @dsCard group="Screens" height=800 width=1280 page=true subtitle="Settings: Appearance re-themes the whole screen live, its Surface included (every screen follows it); Storage and folders; what to back up" -->
 <!doctype html>
 <html lang="en">
 <head><meta charset="utf-8"><title>preview</title>
@@ -46,7 +46,8 @@ function App(){
  var t=React.useState(fresh), th=t[0];
  function set(x){t[1](Object.assign({},th,x));}
  React.useEffect(function(){var mo=new MutationObserver(function(){t[1](fresh())});mo.observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});return function(){mo.disconnect()}},[]);
- var sec=React.useState('appearance');
+ // A render can open a section: #backup.
+ var sec=React.useState((location.hash||'').slice(1)||'appearance');
  var mode=th.system?(window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches?'light':'dark'):th.mode;
  var opts={preset:th.preset,mode:mode,pureBlack:th.pureBlack&&mode==='dark',primary:th.primary,secondary:th.secondary,accent:'#0078d4'};
  var surface=G.surface.use();
@@ -59,6 +60,8 @@ function App(){
  var scan=React.useState([{path:'E:\\Games',meta:'16 games'},{path:'G:\\',meta:'3 games'}]);
  var extra=React.useState([{path:'D:\\Portable Games\\Saves',meta:'Watched for saves'},{path:'D:\\OldPC\\userdata',tag:'By game ID',meta:'Subfolders are Steam app IDs'}]);
  var ask=React.useState(false), hold=React.useState(true), daily=React.useState(false), snaps=React.useState(true), admin=React.useState(false), policy=React.useState('newest');
+ var cfg=React.useState('this-pc'), shots=React.useState('off'), skip=React.useState(true), also=React.useState([{path:'*.bak',meta:'Backup copies some games keep',icon:'file'},{path:'**/Mods/**',meta:'Mod folders',icon:'folder'}]);
+ var touched=cfg[0]!=='this-pc'||shots[0]!=='off'||!skip[0]||also[0].length!==2;
  var views={
   appearance:function(){return h(Page,{title:'Appearance',sub:'Changes apply straight away and are saved on this PC only.'},
     h(G.Card,{title:'Theme',subtitle:pre.dynamic?'Follows your Windows accent colour.':pre.note,action:h(G.PillTabs,{label:'Mode',value:th.system?'system':th.mode,onChange:function(v){set(v==='system'?{system:true}:{system:false,mode:v})},items:[{id:'dark',label:'Dark',icon:'moon'},{id:'light',label:'Light',icon:'sun'},{id:'system',label:'Match Windows',icon:'monitor'}]})},
@@ -83,6 +86,14 @@ function App(){
     h(G.Card,{title:'Daily backup'},
       h(G.SettingsRow,{title:'Time',description:'Pick a time your PC is usually on. If it\u2019s off then, the backup runs about 10 minutes after the next sign-in.'},h('span',{className:'gs-mono',style:{fontSize:15}},'20:00'),h(G.Button,{size:'sm',variant:'secondary',icon:'clock'},'Change')),
       h(G.SettingsRow,{title:'Last run',description:'Today 20:00 \u00b7 12 games checked \u00b7 1 uploaded \u00b7 running games are always skipped'},h(G.Button,{size:'sm',variant:'secondary',icon:'sync'},'Run now'))),
+    h(G.Card,{title:'What to back up',subtitle:'Every new game starts from these. A game\u2019s Properties, Saves, can opt files in or out, and that game\u2019s choice travels with its saves.'},
+      h(G.SettingsRow,{title:'Game saves',description:'Always backed up, and synced between your PCs.'},h('span',{className:'gs-tag'},'Always')),
+      h(G.SettingsRow,{title:'Settings files',description:'A game\u2019s options and key bindings. On this PC they\u2019re kept for you, but each PC keeps its own.'},h(G.Select,{label:'Settings files',value:cfg[0],onChange:cfg[1],options:[{id:'sync',label:'Sync between PCs'},{id:'this-pc',label:'Back up on this PC'},{id:'off',label:'Don\u2019t back up'}]})),
+      h(G.SettingsRow,{title:'Screenshots',description:'Pictures a game saves in its own folders.'},h(G.Select,{label:'Screenshots',value:shots[0],onChange:shots[1],options:[{id:'this-pc',label:'Back up on this PC'},{id:'off',label:'Don\u2019t back up'}]})),
+      h(G.SettingsRow,{title:'Skip logs, crash dumps and caches',description:'They never hold saves, and some are large.'},h(G.Switch,{label:'Skip logs, crash dumps and caches',checked:skip[0],onChange:skip[1]})),
+      h(G.SettingsRow,{title:'Also skip',description:'Files or folders no game should back up, as patterns: * is any name, ** any folders.',stack:true},
+        h(G.FolderList,{items:also[0],addLabel:'Add a pattern',onRemove:function(it){also[1](also[0].filter(function(x){return x!==it}))},onAdd:function(){also[1](also[0].concat([{path:'*.old',meta:'Added just now',icon:'file'}]))}})),
+      touched ? h('div',{className:'gs-row',style:{justifyContent:'space-between'}},h('span',{className:'gs-note'},h(G.Icon,{name:'info',size:16}),'New games follow this now. Your 12 synced games keep their own until you say.'),h(G.Button,{size:'sm',variant:'secondary'},'Apply to your 12 games\u2026')) : null),
     h(G.Card,{title:'When two PCs disagree'},
       h(G.SettingsRow,{title:'Default for every game',description:'Newest wins keeps the other side pinned, with a Swap button. GameSync always asks on a first sync, a save that shrank by half, changes outside a session, or a wrong clock.'},h(G.PillTabs,{label:'Conflict default',value:policy[0],onChange:policy[1],items:[{id:'newest',label:'Newest wins'},{id:'ask',label:'Always ask'}]})),
       h(G.SettingsRow,{title:'Snapshot long sessions',description:'A local copy every 30 minutes, never uploaded before you quit.'},h(G.Switch,{label:'Snapshot long sessions',checked:snaps[0],onChange:snaps[1]}))));},

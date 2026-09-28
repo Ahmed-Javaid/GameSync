@@ -1,4 +1,4 @@
-/* @ds-bundle: {"format":4,"namespace":"GameSync","components":[{"name":"Icon"},{"name":"Button"},{"name":"IconButton"},{"name":"PillTabs"},{"name":"SideRail"},{"name":"Card"},{"name":"HeroBanner"},{"name":"StatusBadge"},{"name":"GameTile"},{"name":"ProgressBar"},{"name":"ActivityGrid"},{"name":"Checkbox"},{"name":"Switch"},{"name":"ConsoleTable"},{"name":"ConsoleLog"},{"name":"ShareSavesDialog"},{"name":"ImportSavesDialog"},{"name":"SettingsNav"},{"name":"SettingsRow"},{"name":"FolderField"},{"name":"FolderList"},{"name":"ThemeScope"},{"name":"ThemePicker"},{"name":"ColorSwatchPicker"}]} */
+/* @ds-bundle: {"format":4,"namespace":"GameSync","components":[{"name":"Icon"},{"name":"Button"},{"name":"IconButton"},{"name":"PillTabs"},{"name":"SideRail"},{"name":"Card"},{"name":"HeroBanner"},{"name":"StatusBadge"},{"name":"GameTile"},{"name":"SearchField"},{"name":"Menu"},{"name":"GameList"},{"name":"ProgressBar"},{"name":"ActivityGrid"},{"name":"Checkbox"},{"name":"Switch"},{"name":"ConsoleTable"},{"name":"ConsoleLog"},{"name":"ShareSavesDialog"},{"name":"ImportSavesDialog"},{"name":"SettingsNav"},{"name":"SettingsRow"},{"name":"FolderField"},{"name":"FolderList"},{"name":"ThemeScope"},{"name":"ThemePicker"},{"name":"ColorSwatchPicker"}]} */
 (function () {
   var React = window.React;
   var h = React.createElement;
@@ -341,12 +341,23 @@
     moon: ["M20 14.5A8.5 8.5 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"],
     pencil: ["M4 20h4L19 9l-4-4L4 16z", "M13.5 6.5l4 4"],
     reset: ["M4 12a8 8 0 1 0 2.3-5.7L4 8.6", "M4 3.5v5.1h5.1"],
-    logo: ["M3 3h12v12H3z", "M9 9h12v12H9z"]
+    star: ["M12 3.6l2.6 5.3 5.8.8-4.2 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.2-4.1 5.8-.8z"],
+    sort: ["M7 4v16", "M3.5 7.5L7 4l3.5 3.5", "M17 20V4", "M13.5 16.5L17 20l3.5-3.5"],
+    chevronLeft: ["M15 5l-7 7 7 7"],
+    more: ["M6 11a1 1 0 1 0 0 2a1 1 0 1 0 0-2", "M12 11a1 1 0 1 0 0 2a1 1 0 1 0 0-2", "M18 11a1 1 0 1 0 0 2a1 1 0 1 0 0-2"],
+    logo: ["M3 3h12v12H3z", "M9 9h12v12H9z"],
+    arrowLeft: ["M19 12H5", "M11 18l-6-6 6-6"],
+    trophy: ["M7 4h10v5a5 5 0 0 1-10 0z", "M7 5.5H4V7a3.5 3.5 0 0 0 3.6 3.5", "M17 5.5h3V7a3.5 3.5 0 0 1-3.6 3.5", "M12 14v4", "M8 20.5h8", "M9.5 18h5"],
+    external: ["M14 4h6v6", "M20 4l-9 9", "M18 13.5V20H4V6h6.5"],
+    file: ["M6 3h8l4 4v14H6z", "M14 3v4h4"],
+    key: ["M8 10a4 4 0 1 0 0 8a4 4 0 1 0 0-8", "M10.9 11.1L19 3", "M16 6l2.5 2.5", "M13.5 8.5l2 2"]
   };
+  // Filled: play always; the star only when it's on (a favourite).
+  var FILLABLE = { star: true };
   function Icon(props) {
     var name = props.name, size = props.size || 20;
     var d = P[name] || P.info;
-    var filled = name === "play";
+    var filled = name === "play" || (!!props.filled && !!FILLABLE[name]);
     return h("svg", {
       className: cx("gs-icon", props.className), width: size, height: size, viewBox: "0 0 24 24",
       fill: filled ? "currentColor" : "none", stroke: "currentColor", strokeWidth: props.strokeWidth || 1.75,
@@ -369,12 +380,13 @@
       props.iconAfter ? h(Icon, { name: props.iconAfter, size: 16 }) : null);
   }
 
+  // `pressed` makes it a toggle (aria-pressed), such as the favourite star, which fills while it's on.
   function IconButton(props) {
     var rest = Object.assign({}, props);
-    ["icon", "label", "glass", "className", "badge", "size"].forEach(function (k) { delete rest[k]; });
-    return h("button", Object.assign({ type: "button", "aria-label": props.label, title: props.label }, rest, {
+    ["icon", "label", "glass", "className", "badge", "size", "pressed"].forEach(function (k) { delete rest[k]; });
+    return h("button", Object.assign({ type: "button", "aria-label": props.label, title: props.label, "aria-pressed": props.pressed != null ? String(!!props.pressed) : undefined }, rest, {
       className: cx("gs-iconbtn", props.glass && "gs-iconbtn-glass", props.size === "sm" && "gs-iconbtn-sm", props.className)
-    }), h(Icon, { name: props.icon, size: props.size === "sm" ? 16 : 18 }));
+    }), h(Icon, { name: props.icon, size: props.size === "sm" ? 16 : 18, filled: !!props.pressed }));
   }
 
   /* ---------- PillTabs ---------- */
@@ -443,7 +455,8 @@
     "not-found": ["warn", "search", "Saves not found"],
     "not-available": ["neutral", "unplug", "Not available"],
     blocked: ["danger", "block", "Blocked"],
-    "backup-only": ["neutral", "archive", "Synced by its store"]
+    "backup-only": ["neutral", "archive", "Synced by its store"],
+    "not-syncing": ["neutral", "cloud", "Not syncing yet"]
   };
   function StatusBadge(props) {
     var s = STATUS[props.status] || STATUS.synced;
@@ -465,9 +478,10 @@
           props.status ? h("div", null, h(StatusBadge, { status: props.status, label: props.statusLabel })) : null,
           props.blurb ? h("p", { className: "gs-hero-blurb" }, props.blurb) : null),
         h("div", { className: "gs-hero-actions" },
-          h(IconButton, { icon: "saves", label: "Manage saves", glass: true, onClick: props.onSaves }),
-          h(IconButton, { icon: "settings", label: "Game settings", glass: true, onClick: props.onSettings }),
-          h(Button, { variant: "primary", icon: "play", onClick: props.onPlay }, props.playLabel || "Continue playing"))));
+          props.actions != null ? props.actions : [
+            h(IconButton, { key: "saves", icon: "saves", label: "Manage saves", glass: true, onClick: props.onSaves }),
+            h(IconButton, { key: "settings", icon: "settings", label: "Properties", glass: true, onClick: props.onSettings })],
+          props.noPlay ? null : h(Button, { variant: "primary", icon: props.playIcon || "play", onClick: props.onPlay }, props.playLabel || "Continue playing"))));
   }
 
   /* ---------- GameTile ---------- */
@@ -476,9 +490,89 @@
     return h("button", { type: "button", className: "gs-tile", style: props.width ? { width: props.width } : null, onClick: props.onClick, "aria-label": props.name + (props.status ? ", " + (STATUS[props.status] || [])[2] : "") },
       h("div", { className: cx("gs-tile-art", !props.art && "gs-title-cover"), style: bg, "data-initial": props.art ? undefined : initialOf(props.name) },
         !props.art ? h("span", { className: "gs-title-cover-name", "aria-hidden": "true" }, props.name) : null,
-        props.status && props.status !== "synced" ? h(StatusBadge, { status: props.status }) : null),
+        props.status && props.status !== "synced" ? h(StatusBadge, { status: props.status, label: props.statusLabel }) : null),
       h("div", { className: "gs-tile-name" }, props.name),
       props.meta ? h("div", { className: "gs-tile-meta" }, props.meta) : null);
+  }
+
+  /* ---------- SearchField: filters as you type; Esc clears, Enter picks the first match ---------- */
+  function SearchField(props) {
+    var st = useState(props.value != null ? props.value : "");
+    var value = props.value != null ? props.value : st[0];
+    function set(v) { st[1](v); if (props.onChange) props.onChange(v); }
+    return h("label", { className: cx("gs-search", props.className), style: props.style },
+      h(Icon, { name: "search", size: 16 }),
+      h("input", {
+        type: "search", value: value, placeholder: props.placeholder || "Search", spellCheck: false, autoComplete: "off",
+        "aria-label": props.label || props.placeholder || "Search", ref: props.inputRef,
+        onChange: function (e) { set(e.target.value); },
+        onKeyDown: function (e) {
+          if (e.key === "Escape" && value) { e.preventDefault(); set(""); }
+          else if (e.key === "Enter" && props.onSubmit) { e.preventDefault(); props.onSubmit(value); }
+        }
+      }),
+      value ? h("button", { type: "button", className: "gs-search-clear", "aria-label": "Clear the search", onClick: function () { set(""); } }, h(Icon, { name: "x", size: 14 }))
+        : props.hint ? h("kbd", { className: "gs-search-hint", "aria-hidden": "true" }, props.hint) : null);
+  }
+
+  /* ---------- Menu: a short list of choices over the page (a sort, a game's right-click menu) ---------- */
+  function Menu(props) {
+    var items = props.items || [];
+    return h("div", { className: cx("gs-menu", props.className), role: "menu", "aria-label": props.label, style: props.style },
+      items.map(function (it, i) {
+        if (it.sep) return h("div", { key: "s" + i, className: "gs-menu-sep", role: "separator" });
+        if (it.heading) return h("div", { key: "h" + i, className: "gs-menu-heading", role: "presentation" }, it.heading);
+        var radio = it.checked != null;
+        return h("button", {
+          key: it.id, type: "button", role: radio ? "menuitemradio" : "menuitem", "aria-checked": radio ? String(!!it.checked) : undefined,
+          className: "gs-menu-item", disabled: it.disabled, onClick: function () { if (props.onPick) props.onPick(it.id); }
+        },
+          radio ? h("span", { className: "gs-menu-check" }, it.checked ? h(Icon, { name: "check", size: 16, strokeWidth: 2.25 }) : null)
+            : h("span", { className: "gs-menu-check" }, it.icon ? h(Icon, { name: it.icon, size: 16, filled: it.filled }) : null),
+          h("span", { className: "gs-menu-label" }, it.label),
+          it.hint ? h("span", { className: "gs-menu-hint" }, it.hint) : null);
+      }));
+  }
+
+  /* ---------- GameList: every game by name, in groups, like Steam's list beside the covers ---------- */
+  // Statuses a row shows under the name: the ones that need the person, and Playing. The rest show on the game's page.
+  var LIST_STATUS = { playing: 1, conflict: 1, held: 1, "in-use": 1, "not-found": 1, blocked: 1 };
+  function GameList(props) {
+    var groups = props.groups || [];
+    // `collapsed` is where a group starts; a click on its heading opens or closes it from then on.
+    var closedS = useState({});
+    function isClosed(g) { return closedS[0][g.id] != null ? closedS[0][g.id] : !!g.collapsed; }
+    function toggle(g) {
+      if (props.onToggle) props.onToggle(g.id);
+      var n = Object.assign({}, closedS[0]); n[g.id] = !isClosed(g); closedS[1](n);
+    }
+    var shown = groups.filter(function (g) { return (g.games || []).length > 0; });
+    return h("nav", { className: "gs-glist", "aria-label": props.label || "Games" },
+      shown.length === 0 ? h("div", { className: "gs-glist-empty" }, props.empty || "No games") : null,
+      shown.map(function (g) {
+        var closed = isClosed(g);
+        return h("section", { key: g.id, className: "gs-glist-group", "aria-label": g.label },
+          h("button", { type: "button", className: "gs-glist-head", "aria-expanded": String(!closed), onClick: function () { toggle(g); } },
+            h(Icon, { name: closed ? "chevronRight" : "chevronDown", size: 14, strokeWidth: 2 }),
+            h("span", null, g.label), h("span", { className: "gs-glist-count" }, g.games.length)),
+          closed ? null : g.games.map(function (game) {
+            var away = game.installed === false;
+            var status = game.status && LIST_STATUS[game.status] ? game.status : null;
+            var word = status ? (game.statusLabel || STATUS[status][2]) : null;
+            return h("button", {
+              key: game.id, type: "button", className: cx("gs-grow", away && "is-away"),
+              "aria-current": game.id === props.selected ? "true" : undefined,
+              "aria-label": game.name + (word ? ", " + word : "") + (away ? ", not installed on this PC" : ""),
+              title: away ? game.name + " · not installed on this PC" : game.name,
+              onClick: function () { if (props.onSelect) props.onSelect(game.id); },
+              onContextMenu: props.onMenu ? function (e) { e.preventDefault(); props.onMenu(game, e); } : undefined
+            },
+              h("span", { className: cx("gs-grow-cover", !game.art && "gs-cover-empty"), style: game.art ? { backgroundImage: "url(" + game.art + ")" } : null, "aria-hidden": "true" }, game.art ? null : initialOf(game.name)),
+              h("span", { className: "gs-grow-text" },
+                h("span", { className: "gs-grow-name" }, game.name),
+                status ? h(StatusBadge, { status: status, label: game.statusLabel, plain: true }) : null));
+          }));
+      }));
   }
 
   /* ---------- ProgressBar ---------- */
@@ -548,7 +642,7 @@
         h("thead", null, h("tr", null,
           selectable ? h("th", { className: "gs-w" }, h(Checkbox, { label: "Select all", checked: all, indeterminate: some, onChange: function (on) { props.onSelect(on ? rows.map(function (r) { return r.id; }) : []); } })) : null,
           cols.map(function (c) { return h("th", { key: c.key, className: c.align === "right" ? "gs-num" : null }, c.label); }))),
-        h("tbody", null, rows.map(function (r) {
+        h("tbody", null, rows.length === 0 && props.empty ? h("tr", { className: "gs-ctable-empty" }, h("td", { colSpan: cols.length + (selectable ? 1 : 0) }, props.empty)) : null, rows.map(function (r) {
           var on = sel.indexOf(r.id) >= 0;
           return h("tr", { key: r.id, "aria-selected": selectable ? String(on) : undefined, onClick: selectable ? function () { toggle(r.id, !on); } : props.onRowClick ? function () { props.onRowClick(r); } : undefined, style: selectable || props.onRowClick ? { cursor: "pointer" } : null },
             selectable ? h("td", null, h(Checkbox, { label: "Select " + (r.name || r.id), checked: on, onChange: function (v) { toggle(r.id, v); } })) : null,
@@ -571,11 +665,233 @@
       props.live ? h("div", { className: "gs-log-line" }, h("time", null, ""), h("span", { className: "gs-log-lvl gs-console-prompt" }, ">"), h("span", null, h("span", { className: "gs-log-cursor" }))) : null);
   }
 
+  /* ---------- PlayBar: under a game's hero, Play (or the status's action), a few facts, the game's icon buttons ---------- */
+  function PlayBar(props) {
+    var stats = (props.stats || []).filter(Boolean);
+    return h("section", { className: cx("gs-card", "gs-playbar", props.className), "aria-label": props.label || "Play" },
+      props.primary ? h("div", { className: "gs-playbar-lead" }, props.primary) : null,
+      h("dl", { className: "gs-playbar-stats" }, stats.map(function (s, i) {
+        return h("div", { key: s.label || i, className: "gs-playbar-stat" },
+          h("dt", null, s.label),
+          h("dd", null, s.status ? h(StatusBadge, { status: s.status, label: s.value, plain: true }) : s.value));
+      })),
+      props.actions ? h("div", { className: "gs-playbar-actions" }, props.actions) : null);
+  }
+
+  /* ---------- Facts: short labelled facts (Developer, Released, Installed in); empty ones are left out ---------- */
+  function Facts(props) {
+    var items = (props.items || []).filter(function (it) { return it && it.value != null && it.value !== ""; });
+    return h("dl", { className: cx("gs-facts", props.className), style: props.style },
+      items.map(function (it, i) {
+        return h("div", { key: it.label || i, className: "gs-fact" },
+          h("dt", null, it.label),
+          h("dd", { className: it.mono ? "gs-mono" : undefined, title: it.title }, it.value));
+      }));
+  }
+
+  /* ---------- Select: the current choice on a small button; the choices in a Menu under it ---------- */
+  function Select(props) {
+    var open = useState(false);
+    var options = props.options || [];
+    var cur = options.filter(function (o) { return o.id === props.value; })[0] || options[0] || { label: "" };
+    useEffect(function () {
+      if (!open[0]) return undefined;
+      function close() { open[1](false); }
+      function key(e) { if (e.key === "Escape") open[1](false); }
+      document.addEventListener("click", close); document.addEventListener("keydown", key);
+      return function () { document.removeEventListener("click", close); document.removeEventListener("keydown", key); };
+    }, [open[0]]);
+    return h("span", { className: cx("gs-select", props.className) },
+      h(Button, { size: "sm", variant: "secondary", iconAfter: "chevronDown", disabled: props.disabled, "aria-haspopup": "menu", "aria-expanded": String(open[0]),
+        "aria-label": (props.label ? props.label + ": " : "") + cur.label, onClick: function (e) { e.stopPropagation(); open[1](!open[0]); } }, cur.label),
+      open[0] ? h(Menu, { className: "gs-select-menu", label: props.label, items: options.map(function (o) { return { id: o.id, label: o.label, checked: o.id === cur.id }; }),
+        onPick: function (id) { open[1](false); if (props.onChange) props.onChange(id); } }) : null);
+  }
+
+  /* ---------- FileTree: the files a game's saves are made of; ticked ones are backed up ---------- */
+  // item: { id, name, kind: "folder" | "file" | "registry", meta, tag, note, checked, mixed, locked, open, children }
+  function FileTree(props) {
+    var openS = useState({});
+    function isOpen(it) { return openS[0][it.id] != null ? openS[0][it.id] : !!it.open; }
+    function flip(it) { var n = Object.assign({}, openS[0]); n[it.id] = !isOpen(it); openS[1](n); }
+    function rows(list, depth) {
+      var out = [];
+      list.forEach(function (it) {
+        var kids = it.children || [];
+        var open = kids.length > 0 && isOpen(it);
+        var off = !it.checked && !it.mixed;
+        out.push(h("div", { key: it.id, className: cx("gs-ftree-row", off && "is-off", it.locked && "is-locked"), role: "treeitem",
+          "aria-level": depth + 1, "aria-expanded": kids.length ? String(open) : undefined, style: { paddingLeft: 4 + depth * 22 } },
+          kids.length ? h("button", { type: "button", className: "gs-ftree-twisty", "aria-label": (open ? "Close " : "Open ") + it.name, onClick: function () { flip(it); } },
+            h(Icon, { name: open ? "chevronDown" : "chevronRight", size: 14, strokeWidth: 2 })) : h("span", { className: "gs-ftree-twisty", "aria-hidden": "true" }),
+          it.locked ? h("span", { className: "gs-ftree-lock", title: it.note }, h(Icon, { name: "lock", size: 14 }))
+            : h(Checkbox, { label: (off ? "Back up " : "Leave out ") + it.name, checked: !!it.checked && !it.mixed, indeterminate: !!it.mixed,
+              onChange: function (on) { if (props.onToggle) props.onToggle(it.id, on); } }),
+          h(Icon, { name: it.kind === "folder" ? "folder" : it.kind === "registry" ? "key" : "file", size: 16, className: "gs-ftree-icon" }),
+          h("span", { className: "gs-ftree-name", title: it.name }, it.name),
+          it.note ? h("span", { className: "gs-ftree-note" }, it.note) : null,
+          it.tag ? h("span", { className: "gs-tag" }, it.tag) : null,
+          it.meta ? h("span", { className: "gs-ftree-meta" }, it.meta) : null));
+        if (open) out = out.concat(rows(kids, depth + 1));
+      });
+      return out;
+    }
+    return h("div", { className: cx("gs-ftree", props.className), role: "tree", "aria-label": props.label || "Files" }, rows(props.items || [], 0));
+  }
+  // A tree with one item ticked or unticked, and its folder's box showing whether all, some or none of it is in.
+  function treeToggle(items, id, on) {
+    function mark(it) {
+      var n = Object.assign({}, it, { checked: on, mixed: false });
+      if (it.children) n.children = it.children.map(function (c) { return c.locked ? c : mark(c); });
+      return n;
+    }
+    function sum(kids) {
+      var live = kids.filter(function (c) { return !c.locked; });
+      var full = live.filter(function (c) { return c.checked && !c.mixed; }).length;
+      var any = live.some(function (c) { return c.checked || c.mixed; });
+      return { checked: any, mixed: any && full < live.length };
+    }
+    return items.map(function (it) {
+      if (it.id === id) return mark(it);
+      if (!it.children) return it;
+      var kids = treeToggle(it.children, id, on);
+      return kids === it.children ? it : Object.assign({}, it, { children: kids }, sum(kids));
+    });
+  }
+  // How many files a tree backs up, and their size: { files, bytes, all, allBytes }.
+  function treeCount(items) {
+    var r = { files: 0, bytes: 0, all: 0, allBytes: 0 };
+    (function walk(list) {
+      list.forEach(function (it) {
+        if (it.children) { walk(it.children); return; }
+        if (it.locked) return;
+        var n = it.count || 1, b = it.bytes || 0;
+        r.all += n; r.allBytes += b;
+        if (it.checked) { r.files += n; r.bytes += b; }
+      });
+    })(items || []);
+    return r;
+  }
+
   /* ---------- sizes ---------- */
   function fmt(bytes) {
     if (bytes >= 1073741824) return (bytes / 1073741824).toFixed(2) + " GB";
     if (bytes >= 1048576) return (bytes / 1048576).toFixed(1) + " MB";
     return Math.max(1, Math.round(bytes / 1024)) + " KB";
+  }
+
+  /* ---------- GamePropertiesDialog: one game's settings, like Steam's Properties ---------- */
+  var PROP_SECTIONS = [
+    { id: "general", label: "General", icon: "info" },
+    { id: "launch", label: "Launch", icon: "play" },
+    { id: "files", label: "Installed files", icon: "drive" },
+    { id: "saves", label: "Saves", icon: "saves" },
+    { id: "sync", label: "Sync", icon: "sync" }];
+  var SETTINGS_FILES = [{ id: "sync", label: "Sync between PCs" }, { id: "this-pc", label: "Back up on this PC" }, { id: "off", label: "Don\u2019t back up" }];
+  var SCREENSHOTS = [{ id: "this-pc", label: "Back up on this PC" }, { id: "off", label: "Don\u2019t back up" }];
+  var CONFLICT = [{ id: "newest", label: "Newest wins" }, { id: "ask", label: "Always ask" }, { id: "this-pc", label: "This PC wins" }];
+  function GamePropertiesDialog(props) {
+    var g = props.game || {};
+    var launch = g.launch || {};
+    var initial = {
+      name: g.name || "", favourite: !!g.favourite, shown: !g.hidden, args: launch.args || "",
+      files: g.files || [], settings: g.settings || "this-pc", screenshots: g.screenshots || "off", skip: g.skip !== false,
+      mode: g.mode || "sync", conflict: g.conflict || "newest"
+    };
+    var secS = useState(props.section || "general"), sec = secS[0];
+    var stS = useState(initial), st = stS[0];
+    var copiedS = useState(null);
+    function set(k, v) { var n = Object.assign({}, st); n[k] = v; stS[1](n); }
+    var changed = Object.keys(initial).filter(function (k) { return JSON.stringify(initial[k]) !== JSON.stringify(st[k]); });
+    var count = treeCount(st.files);
+    var store = g.store || null;
+    function copy(what) { copiedS[1](what); }
+    function row(title, description, control, extra) { return h(SettingsRow, Object.assign({ title: title, description: description }, extra || {}), control); }
+    var views = {
+      general: function () {
+        return [
+          h("h3", { key: "t", className: "gs-props-title" }, "General"),
+          row("Name", "What GameSync calls it. A rescan keeps the name you give it.",
+            h("input", { className: "gs-input gs-input-wide", value: st.name, "aria-label": "Name", onChange: function (e) { set("name", e.target.value); } }), { key: "name" }),
+          row("Favourite", "First in the library\u2019s list and covers, on this PC.", h(Switch, { label: "Favourite", checked: st.favourite, onChange: function (v) { set("favourite", v); } }), { key: "fav" }),
+          row("Show in the library", "A hidden game still backs up and syncs; the library\u2019s Hidden view brings it back.", h(Switch, { label: "Show in the library", checked: st.shown, onChange: function (v) { set("shown", v); } }), { key: "shown" }),
+          row("Game ID", h("span", null, "For the command line: ", h("span", { className: "gs-mono" }, "gamesync sync " + g.id)),
+            h(Button, { size: "sm", variant: "ghost", icon: copiedS[0] === "id" ? "check" : "copy", onClick: function () { copy("id"); } }, copiedS[0] === "id" ? "Copied" : "Copy"), { key: "id" }),
+          g.antiCheat ? h("div", { key: "ac", className: "gs-note" }, h(Icon, { name: "shield", size: 16 }),
+            "Ships " + g.antiCheat + ": it starts only through " + (store || "its launcher") + ", learn mode stays off, and its saves are never shared.") : null];
+      },
+      launch: function () {
+        var line = "\"C:\\Program Files\\GameSync\\GameSync.Tray.exe\" launch " + g.id + " -- %command%";
+        return [
+          h("h3", { key: "t", className: "gs-props-title" }, "Launch"),
+          row(store ? "Starts through " + store : "Program", store ? store + " starts it, so its overlay, its cloud and its own launch options work as usual." : "GameSync starts it in its own folder, never as admin.",
+            store ? null : h(Button, { size: "sm", variant: "secondary", icon: "folder" }, "Change\u2026"), { key: "route" }),
+          h("div", { key: "route-line", className: "gs-well-line" }, h("span", { title: store ? launch.url : launch.program }, (store ? launch.url : launch.program) || "Not set yet")),
+          store ? row("Steam\u2019s launch options", "Steam adds these every time the game starts. Change them in Steam: the game\u2019s Properties, General.",
+            h("span", { className: "gs-row", style: { flexWrap: "nowrap" } }, h("span", { className: "gs-mono", style: { fontSize: 13 } }, launch.steamOptions || "None"),
+              h(Button, { size: "sm", variant: "ghost", iconAfter: "external" }, "Open in Steam")), { key: "steam" })
+            : row("Launch options", "Added after the program\u2019s name when GameSync starts it, such as -windowed.",
+              h("input", { className: "gs-input gs-input-wide", value: st.args, placeholder: "None", "aria-label": "Launch options", onChange: function (e) { set("args", e.target.value); } }), { key: "args" }),
+          store ? row("Starting from Steam", "To get GameSync\u2019s check for a newer save when you start from Steam too, put this in Steam\u2019s launch options:",
+            h(Button, { size: "sm", variant: "secondary", icon: copiedS[0] === "line" ? "check" : "copy", onClick: function () { copy("line"); } }, copiedS[0] === "line" ? "Copied" : "Copy the line"), { key: "line", stack: false }) : null,
+          store ? h("div", { key: "l", className: "gs-well-line" }, h("span", { title: line }, line)) : null,
+          h("div", { key: "n", className: "gs-note" }, h(Icon, { name: "info", size: 16 }),
+            "Play in GameSync always checks for a newer save on your other PC first, and brings it down before the game starts.")];
+      },
+      files: function () {
+        return [
+          h("h3", { key: "t", className: "gs-props-title" }, "Installed files"),
+          g.installed === false ? h("div", { key: "away", className: "gs-note" }, h(Icon, { name: "info", size: 16 }), "Not installed on this PC. Its saves are still here, and still back up.")
+            : h(Facts, { key: "f", items: [
+              { label: "Folder", value: g.installDir, mono: true },
+              { label: "Size", value: g.size },
+              { label: "Store", value: store ? store + (g.storeId ? " \u00b7 app " + g.storeId : "") : "None: a game in its own folder" },
+              { label: "Build", value: g.build, mono: true },
+              { label: "Engine", value: g.engine },
+              { label: "Found", value: g.foundBy }] }),
+          g.installed === false ? null : h("div", { key: "b", className: "gs-row" },
+            h(Button, { size: "sm", variant: "secondary", icon: "folder" }, "Open the folder"),
+            store && g.storeId ? h(Button, { size: "sm", variant: "ghost", iconAfter: "external" }, "Store page") : null)];
+      },
+      saves: function () {
+        return [
+          h("h3", { key: "t", className: "gs-props-title" }, "Saves"),
+          h("p", { key: "d", className: "gs-muted", style: { margin: 0, fontSize: 13, lineHeight: "19px" } },
+            "Ticked files are backed up and synced. Unticked ones stay on this PC only, and older versions keep them; nothing is deleted."),
+          h("div", { key: "c", className: "gs-props-count" },
+            h("span", null, h("b", null, count.files), " of " + count.all + " files \u00b7 ", h("b", null, fmt(count.bytes)), " backed up"),
+            h("span", { className: "gs-row" }, h(Button, { size: "sm", variant: "secondary", icon: "plus" }, "Add a file or folder"),
+              h(Button, { size: "sm", variant: "ghost", disabled: !!g.antiCheat, title: g.antiCheat ? "Not for games with an anti-cheat" : "Watch one session to find saves the scan missed" }, "Learn mode\u2026"))),
+          h(FileTree, { key: "tree", label: g.name + "\u2019s save files", items: st.files, onToggle: function (id, on) { set("files", treeToggle(st.files, id, on)); } }),
+          row("Settings files", "A game\u2019s options and key bindings, tagged Settings.", h(Select, { label: "Settings files", value: st.settings, options: SETTINGS_FILES, onChange: function (v) { set("settings", v); } }), { key: "set" }),
+          row("Screenshots", "Pictures the game saves itself.", h(Select, { label: "Screenshots", value: st.screenshots, options: SCREENSHOTS, onChange: function (v) { set("screenshots", v); } }), { key: "shots" }),
+          row("Skip logs, crash dumps and caches", "They never hold saves, and some are large.", h(Switch, { label: "Skip logs, crash dumps and caches", checked: st.skip, onChange: function (v) { set("skip", v); } }), { key: "skip" }),
+          h("div", { key: "n", className: "gs-note" }, h(Icon, { name: "info", size: 16 }),
+            h("span", null, "New games follow your defaults in Settings, Backup and sync. Changes here are this game\u2019s own, and travel with its saves to your other PCs."))];
+      },
+      sync: function () {
+        return [
+          h("h3", { key: "t", className: "gs-props-title" }, "Sync"),
+          row("Keep it in step", st.mode === "sync" ? "Each PC\u2019s save goes to the cloud after you play, and the newest comes down before you play."
+            : "Its store syncs it between PCs; GameSync keeps every version as a backup and never brings one down by itself.",
+            h(PillTabs, { label: "Sync", value: st.mode, onChange: function (v) { set("mode", v); }, items: [{ id: "sync", label: "Between your PCs" }, { id: "backup", label: "Back up only" }] }), { key: "mode" }),
+          row("When both PCs changed it", "Newest wins keeps the other side pinned, with a Swap button. GameSync always asks on a first sync, a save that shrank by half, a change outside play, or a wrong clock.",
+            h(Select, { label: "When both PCs changed it", value: st.conflict, options: CONFLICT, onChange: function (v) { set("conflict", v); } }), { key: "conflict" }),
+          row("Stop syncing it", "Its versions stay in the cloud and on this PC. GameSync asks first.", h(Button, { size: "sm", variant: "danger" }, "Stop syncing\u2026"), { key: "stop" })];
+      }
+    };
+    return h("div", { className: "gs-dialog gs-props", role: "dialog", "aria-modal": "true", "aria-label": "Properties of " + (g.name || "the game") },
+      h("div", { className: "gs-props-head" },
+        h("div", { style: { flex: 1, minWidth: 0 } }, h("h2", { className: "gs-dialog-title" }, "Properties"), h("p", { className: "gs-dialog-sub", style: { margin: 0 } }, g.name)),
+        h(IconButton, { icon: "x", label: "Close", size: "sm", onClick: props.onClose })),
+      h("div", { className: "gs-props-main" },
+        h("div", { className: "gs-props-nav" }, h(SettingsNav, { label: "Properties", items: PROP_SECTIONS, current: sec, onChange: secS[1] })),
+        h("div", { className: "gs-props-body" }, views[sec]())),
+      h("div", { className: "gs-props-foot" },
+        h("span", { className: "gs-faint", style: { fontSize: 12 } }, changed.length === 0 ? "No changes" : changed.length === 1 ? "1 change, not saved yet" : changed.length + " changes, not saved yet"),
+        h("span", { className: "gs-row" },
+          h(Button, { variant: "ghost", onClick: props.onClose }, "Cancel"),
+          h(Button, { variant: "primary", disabled: changed.length === 0, onClick: function () { if (props.onSave) props.onSave(st); } }, "Save changes"))));
   }
 
   /* ---------- ShareSavesDialog ---------- */
@@ -889,10 +1205,13 @@
 
   var api = {
     Icon: Icon, Button: Button, IconButton: IconButton, PillTabs: PillTabs, SideRail: SideRail, Card: Card, HeroBanner: HeroBanner,
-    StatusBadge: StatusBadge, GameTile: GameTile, ProgressBar: ProgressBar, ActivityGrid: ActivityGrid, Checkbox: Checkbox, Switch: Switch,
+    StatusBadge: StatusBadge, GameTile: GameTile, SearchField: SearchField, Menu: Menu, GameList: GameList,
+    ProgressBar: ProgressBar, ActivityGrid: ActivityGrid, Checkbox: Checkbox, Switch: Switch,
     ConsoleTable: ConsoleTable, ConsoleLog: ConsoleLog, ShareSavesDialog: ShareSavesDialog, ImportSavesDialog: ImportSavesDialog,
     SettingsNav: SettingsNav, SettingsRow: SettingsRow, FolderField: FolderField, FolderList: FolderList,
     ThemeScope: ThemeScope, Backdrop: Backdrop, ThemePicker: ThemePicker, ColorSwatchPicker: ColorSwatchPicker,
+    PlayBar: PlayBar, Facts: Facts, Select: Select, FileTree: FileTree, GamePropertiesDialog: GamePropertiesDialog,
+    fileTree: { toggle: treeToggle, count: treeCount },
     surface: { get: getSurface, set: setSurface, use: useSurface },
     formatBytes: fmt, theme: Theme
   };

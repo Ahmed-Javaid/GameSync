@@ -1,10 +1,13 @@
 <!-- The Launcher register: game tiles, the hero banner and its chip (design/system/components/bundle.css). -->
 <ResourceDictionary xmlns="https://github.com/avaloniaui"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-                    xmlns:c="using:GameSync.UI.Controls">
+                    xmlns:c="using:GameSync.UI.Controls"
+                    xmlns:sys="using:System">
 
   <!-- GameTile: 2:3 art, a status badge unless synced, the name and a meta line; a title cover when there's no art -->
   <ControlTheme x:Key="{x:Type c:GsGameTile}" TargetType="c:GsGameTile">
+    <!-- Avalonia 12 clips a templated control to its bounds, which cut the rings outside the art on three sides -->
+    <Setter Property="ClipToBounds" Value="False" />
     <Setter Property="Width" Value="160" />
     <Setter Property="Background" Value="Transparent" />
     <Setter Property="Cursor" Value="Hand" />
@@ -52,6 +55,86 @@
     </Style>
   </ControlTheme>
 
+  <!-- Rows packed tight (the game list) draw the focus ring just inside themselves (A11Y-02) -->
+  <FocusAdornerTemplate x:Key="InsetFocus">
+    <Border BorderBrush="{DynamicResource primary}" BorderThickness="2" CornerRadius="10" />
+  </FocusAdornerTemplate>
+
+  <!-- GameList row: the small cover, the name, the status under it when it needs you or runs; dimmed when not installed -->
+  <ControlTheme x:Key="{x:Type c:GsGameRow}" TargetType="c:GsGameRow">
+    <Setter Property="MinHeight" Value="36" />
+    <Setter Property="Padding" Value="8,3" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Foreground" Value="{DynamicResource ink}" />
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="FontWeight" Value="Medium" />
+    <Setter Property="Cursor" Value="Hand" />
+    <Setter Property="FocusAdorner" Value="{StaticResource InsetFocus}" />
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border Background="{TemplateBinding Background}" CornerRadius="{DynamicResource radius-md}" Padding="{TemplateBinding Padding}">
+          <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+            <Border Name="PART_Cover" Width="20" Height="30" CornerRadius="{DynamicResource radius-sm}" ClipToBounds="True" Background="{DynamicResource bg-300}"
+                    VerticalAlignment="Center">
+              <Panel>
+                <TextBlock Text="{TemplateBinding Initial}" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource ink-muted}"
+                           HorizontalAlignment="Center" VerticalAlignment="Center" />
+                <c:GsCoverImage Source="{TemplateBinding Art}" />
+              </Panel>
+            </Border>
+            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+              <TextBlock Name="PART_Name" Text="{TemplateBinding Title}" LineHeight="18" TextTrimming="CharacterEllipsis" />
+              <c:GsStatusBadge Status="{TemplateBinding Status}" Label="{TemplateBinding StatusLabel}" Plain="True" FontSize="11"
+                               IsVisible="{TemplateBinding ShowsStatus}" />
+            </StackPanel>
+          </Grid>
+        </Border>
+      </ControlTemplate>
+    </Setter>
+    <Style Selector="^:pointerover">
+      <Setter Property="Background" Value="{DynamicResource bg-300}" />
+    </Style>
+    <Style Selector="^:current">
+      <Setter Property="Background" Value="{DynamicResource secondary-soft}" />
+    </Style>
+    <Style Selector="^:away /template/ TextBlock#PART_Name">
+      <Setter Property="Foreground" Value="{DynamicResource ink-faint}" />
+    </Style>
+    <Style Selector="^:away /template/ Border#PART_Cover">
+      <Setter Property="Opacity" Value="0.55" />
+    </Style>
+  </ControlTheme>
+
+  <!-- GameList group heading: overline and a mono count, with a chevron; a click opens or closes the group -->
+  <ControlTheme x:Key="{x:Type c:GsListHeading}" TargetType="c:GsListHeading">
+    <Setter Property="Height" Value="28" />
+    <Setter Property="Padding" Value="8,0" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Foreground" Value="{DynamicResource ink-faint}" />
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
+    <Setter Property="Cursor" Value="Hand" />
+    <Setter Property="FocusAdorner" Value="{StaticResource InsetFocus}" />
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border Background="{TemplateBinding Background}" CornerRadius="{DynamicResource radius-sm}" Padding="{TemplateBinding Padding}">
+          <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+            <c:GsIcon Name="PART_Chevron" Icon="chevronDown" Size="14" StrokeWidth="2" VerticalAlignment="Center" />
+            <TextBlock Text="{TemplateBinding Label, Converter={x:Static c:UpperConverter.Instance}}" FontSize="11" LineHeight="14" FontWeight="SemiBold"
+                       LetterSpacing="1.32" VerticalAlignment="Center" />
+            <TextBlock Text="{TemplateBinding Count}" FontFamily="{DynamicResource font-mono}" FontSize="11" LineHeight="14" FontWeight="Medium" VerticalAlignment="Center" />
+          </StackPanel>
+        </Border>
+      </ControlTemplate>
+    </Setter>
+    <Style Selector="^:pointerover">
+      <Setter Property="Foreground" Value="{DynamicResource ink}" />
+    </Style>
+    <Style Selector="^:closed /template/ c|GsIcon#PART_Chevron">
+      <Setter Property="Icon" Value="chevronRight" />
+    </Style>
+  </ControlTheme>
+
   <!-- Chip: on cover art, the same in every theme and surface -->
   <ControlTheme x:Key="{x:Type c:GsChip}" TargetType="c:GsChip">
     <Setter Property="HorizontalAlignment" Value="Left" />
@@ -72,6 +155,8 @@
 
   <!-- HeroBanner: text sits on the art, so it uses on-art over the art-scrim fade in every theme -->
   <ControlTheme x:Key="{x:Type c:GsHeroBanner}" TargetType="c:GsHeroBanner">
+    <!-- Its ring sits just outside the art, which Avalonia 12's clip to bounds would hide -->
+    <Setter Property="ClipToBounds" Value="False" />
     <Setter Property="MinHeight" Value="280" />
     <Setter Property="Foreground" Value="{DynamicResource on-art}" />
     <Setter Property="Template">
@@ -112,7 +197,7 @@
                   </c:GsChip>
                   <Image Name="PART_Logo" Source="{TemplateBinding Logo}" MaxWidth="380" MaxHeight="112" Stretch="Uniform" HorizontalAlignment="Left" IsVisible="False" />
                   <TextBlock Name="PART_Title" Classes="hero-title" Text="{TemplateBinding Title}" TextWrapping="Wrap" />
-                  <c:GsStatusBadge Classes="art" Status="{TemplateBinding Status}" Label="{TemplateBinding StatusLabel}" />
+                  <c:GsStatusBadge Classes="art" Status="{TemplateBinding Status}" Label="{TemplateBinding StatusLabel}" IsVisible="{TemplateBinding ShowsStatus}" />
                   <TextBlock Text="{TemplateBinding Blurb}" FontSize="13" LineHeight="19" Opacity="0.88" TextWrapping="Wrap">
                     <TextBlock.IsVisible>
                       <MultiBinding Converter="{x:Static BoolConverters.And}">
@@ -123,9 +208,15 @@
                   </TextBlock>
                 </StackPanel>
                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Bottom" Margin="20,0,0,0">
-                  <c:GsIconButton Classes="glass" Icon="saves" Label="Manage saves" Command="{TemplateBinding SavesCommand}" />
-                  <c:GsIconButton Classes="glass" Icon="settings" Label="Game settings" Command="{TemplateBinding SettingsCommand}" />
-                  <c:GsButton Classes="primary" Icon="play" Content="{TemplateBinding PlayLabel}" Command="{TemplateBinding PlayCommand}" />
+                  <!-- A game's page brings its own glass buttons (the favourite star and More) -->
+                  <ContentPresenter Content="{TemplateBinding Actions}" VerticalAlignment="Center"
+                                    IsVisible="{Binding $parent[c:GsHeroBanner].Actions, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                  <c:GsIconButton Classes="glass" Icon="saves" Label="Manage saves" Command="{TemplateBinding SavesCommand}"
+                                  IsVisible="{Binding $parent[c:GsHeroBanner].Actions, Converter={x:Static ObjectConverters.IsNull}}" />
+                  <c:GsIconButton Classes="glass" Icon="settings" Label="Properties" Command="{TemplateBinding SettingsCommand}"
+                                  IsVisible="{Binding $parent[c:GsHeroBanner].Actions, Converter={x:Static ObjectConverters.IsNull}}" />
+                  <c:GsButton Classes="primary" Icon="{TemplateBinding PlayIcon}" Content="{TemplateBinding PlayLabel}" Command="{TemplateBinding PlayCommand}"
+                              IsVisible="{TemplateBinding ShowsPlay}" />
                 </StackPanel>
               </Grid>
             </DockPanel>
@@ -142,6 +233,79 @@
       <Setter Property="IsVisible" Value="False" />
     </Style>
   </ControlTheme>
+  <!-- PlayBar: a card under a game's hero; Play, the facts in a row that wraps, the game's buttons -->
+  <ControlTheme x:Key="{x:Type c:GsPlayBar}" TargetType="c:GsPlayBar">
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border Background="{DynamicResource bg-200}" BorderBrush="{DynamicResource edge-card}" BorderThickness="1" BackgroundSizing="OuterBorderEdge"
+                BoxShadow="{DynamicResource lift-card}" CornerRadius="{DynamicResource radius-lg}" Padding="20,16">
+          <DockPanel>
+            <ContentPresenter DockPanel.Dock="Left" Content="{TemplateBinding Primary}" VerticalAlignment="Center" Margin="0,0,24,0"
+                              IsVisible="{Binding $parent[c:GsPlayBar].Primary, Converter={x:Static ObjectConverters.IsNotNull}}" />
+            <ContentPresenter DockPanel.Dock="Right" Content="{TemplateBinding Actions}" VerticalAlignment="Center" Margin="24,0,0,0" />
+            <ItemsControl ItemsSource="{TemplateBinding Stats}" VerticalAlignment="Center">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                  <WrapPanel ItemSpacing="24" LineSpacing="8" />
+                </ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="c:PlayStat">
+                  <StackPanel Spacing="2" AutomationProperties.Name="{Binding}">
+                    <TextBlock Classes="overline faint" Text="{Binding Label, Converter={x:Static c:UpperConverter.Instance}}" />
+                    <TextBlock Text="{Binding Value}" FontSize="14" LineHeight="20" FontWeight="Medium" IsVisible="{Binding IsText}" />
+                    <c:GsStatusBadge Plain="True" Status="{Binding Status}" Label="{Binding Value}" FontSize="14" IsVisible="{Binding IsStatus}" />
+                  </StackPanel>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </DockPanel>
+        </Border>
+      </ControlTemplate>
+    </Setter>
+  </ControlTheme>
+
+  <!-- Facts: an overline label beside each value, the labels in one column -->
+  <ControlTheme x:Key="{x:Type c:GsFacts}" TargetType="c:GsFacts">
+    <Setter Property="Grid.IsSharedSizeScope" Value="True" />
+    <Setter Property="Template">
+      <ControlTemplate>
+        <ItemsPresenter Name="PART_ItemsPresenter" ItemsPanel="{TemplateBinding ItemsPanel}" />
+      </ControlTemplate>
+    </Setter>
+    <Setter Property="ItemsPanel">
+      <ItemsPanelTemplate>
+        <StackPanel Spacing="8" />
+      </ItemsPanelTemplate>
+    </Setter>
+    <Setter Property="ItemTemplate">
+      <DataTemplate x:DataType="c:Fact">
+        <Grid ColumnSpacing="16" AutomationProperties.Name="{Binding}">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto" SharedSizeGroup="FactLabel" />
+            <ColumnDefinition Width="*" />
+          </Grid.ColumnDefinitions>
+          <TextBlock Classes="overline faint" Text="{Binding Label, Converter={x:Static c:UpperConverter.Instance}}" LineHeight="20" VerticalAlignment="Top" />
+          <TextBlock Grid.Column="1" Text="{Binding Value}" FontSize="13" LineHeight="20" TextWrapping="Wrap" IsVisible="{Binding IsPlain}" />
+          <TextBlock Grid.Column="1" Classes="mono-fact" Text="{Binding Value}" LineHeight="20" TextTrimming="LeadingCharacterEllipsis"
+                     ToolTip.Tip="{Binding Value}" IsVisible="{Binding IsMono}" />
+          <ItemsControl Grid.Column="1" ItemsSource="{Binding Tags}" IsVisible="{Binding HasTags}" VerticalAlignment="Center">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate>
+                <WrapPanel ItemSpacing="6" LineSpacing="6" />
+              </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="sys:String">
+                <c:GsTag Text="{Binding}" />
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </Grid>
+      </DataTemplate>
+    </Setter>
+  </ControlTheme>
+
   <!-- ActivityGrid: the legend, a cell a day, and the weekday names -->
   <ControlTheme x:Key="{x:Type c:GsActivity}" TargetType="c:GsActivity">
     <Setter Property="Template">

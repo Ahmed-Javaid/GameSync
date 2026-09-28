@@ -92,6 +92,13 @@ const viewerPath = path.join(dir, "viewer.html");
 const viewer = fs.readFileSync(viewerPath, "utf8");
 const start = viewer.indexOf("var LIB = "), end = viewer.indexOf("var themeSel", start);
 const data = new Function(viewer.slice(start, end) + "; return { LIB, THEMES, PAGES, DOCS };")();
+// A card new since the last refresh joins the viewer after the last card of its group (or at the end, in a new group).
+for (const name of fs.readdirSync(path.join(dir, "components"))) {
+  if (data.PAGES.some((p) => p.name === name) || !fs.existsSync(path.join(dir, "components", name, "preview.html"))) continue;
+  const group = marker(read(`components/${name}/preview.html`)).group || "Components";
+  const last = data.PAGES.map((p) => p.group).lastIndexOf(group);
+  data.PAGES.splice(last < 0 ? data.PAGES.length : last + 1, 0, { name, group });
+}
 data.LIB.tokens = read("tokens.css");
 data.LIB.css = read("components/bundle.css");
 data.LIB.bundle = read("components/bundle.js");
@@ -104,4 +111,4 @@ data.PAGES = data.PAGES.map((page) => {
 data.DOCS = { Overview: markdown(read("README.md").replace(/^# GameSync design system\n\n(>.*\n)+\n/, "")), Theming: markdown(read("Theming.md")) };
 const js = (v) => JSON.stringify(v).replace(/<\//g, "<\\/").replace(/<!--/g, "<\\!--");
 fs.writeFileSync(viewerPath, viewer.slice(0, start) + `var LIB = ${js(data.LIB)};\nvar THEMES = ${js(data.THEMES)};\nvar PAGES = ${js(data.PAGES)};\nvar DOCS = ${js(data.DOCS)};\n` + viewer.slice(end));
-console.log(`tokens.css compiled; viewer.html rebuilt with ${data.PAGES.length} cards. A new card also needs an entry in viewer.html's PAGES.`);
+console.log(`tokens.css compiled; viewer.html rebuilt with ${data.PAGES.length} cards.`);

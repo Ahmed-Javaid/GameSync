@@ -12,6 +12,18 @@
     <DataTemplate DataType="vm:LibraryViewModel">
       <v:LibraryPage />
     </DataTemplate>
+    <DataTemplate DataType="vm:GameViewModel">
+      <v:GamePage />
+    </DataTemplate>
+    <DataTemplate DataType="vm:SaveManagerViewModel">
+      <v:SaveManagerPage />
+    </DataTemplate>
+    <DataTemplate DataType="vm:GameSavesViewModel">
+      <v:GameSavesPage />
+    </DataTemplate>
+    <DataTemplate DataType="vm:PropertiesViewModel">
+      <v:PropertiesDialog />
+    </DataTemplate>
     <DataTemplate DataType="vm:ConsoleViewModel">
       <v:ConsolePage />
     </DataTemplate>

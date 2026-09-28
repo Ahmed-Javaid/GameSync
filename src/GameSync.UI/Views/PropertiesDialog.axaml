@@ -1,0 +1,259 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="using:GameSync.UI.Controls"
+             xmlns:vm="using:GameSync.UI.ViewModels"
+             x:Class="GameSync.UI.Views.PropertiesDialog"
+             x:DataType="vm:PropertiesViewModel"
+             Width="880" Height="620">
+  <!-- A game's Properties, like Steam's (design system → GamePropertiesDialog): sections down the left as in Settings,
+       their rows on the right; Saves picks which files are backed up. Changes wait for Save changes. -->
+  <UserControl.Styles>
+    <Style Selector="Border.ftree-row:pointerover">
+      <Setter Property="Background" Value="{DynamicResource bg-300}" />
+    </Style>
+  </UserControl.Styles>
+  <UserControl.Resources>
+    <!-- The tree's open and close button: a small square that goes bg-400 under the pointer -->
+    <ControlTheme x:Key="TwistyButton" TargetType="Button">
+      <Setter Property="Width" Value="20" />
+      <Setter Property="Height" Value="20" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Foreground" Value="{DynamicResource ink-faint}" />
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="FocusAdorner" Value="{DynamicResource SmallFocus}" />
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Border Background="{TemplateBinding Background}" CornerRadius="{DynamicResource radius-sm}">
+            <ContentPresenter Content="{TemplateBinding Content}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+          </Border>
+        </ControlTemplate>
+      </Setter>
+      <Style Selector="^:pointerover">
+        <Setter Property="Background" Value="{DynamicResource bg-400}" />
+        <Setter Property="Foreground" Value="{DynamicResource ink}" />
+      </Style>
+    </ControlTheme>
+  </UserControl.Resources>
+
+  <Border Background="{DynamicResource surface-dialog}" BorderBrush="{DynamicResource edge-dialog}" BorderThickness="1" BackgroundSizing="OuterBorderEdge"
+          CornerRadius="16" BoxShadow="{DynamicResource shadow-dialog}" ClipToBounds="True">
+    <DockPanel>
+      <!-- Head: the title, the game, and close -->
+      <Border DockPanel.Dock="Top" BorderBrush="{DynamicResource line-100}" BorderThickness="0,0,0,1" Padding="24,20,24,16">
+        <Grid ColumnDefinitions="*,Auto">
+          <StackPanel>
+            <TextBlock Classes="card-title" Text="Properties" />
+            <TextBlock Classes="muted" Text="{Binding Title}" TextTrimming="CharacterEllipsis" />
+          </StackPanel>
+          <c:GsIconButton Grid.Column="1" Classes="sm" Icon="x" Label="Close Properties" Command="{Binding CancelCommand}" VerticalAlignment="Center" />
+        </Grid>
+      </Border>
+
+      <!-- Foot: how many changes, and Cancel and Save changes; or, closing with changes, whether to drop them -->
+      <Border DockPanel.Dock="Bottom" BorderBrush="{DynamicResource line-100}" BorderThickness="0,1,0,0" Padding="24,14">
+        <Panel>
+          <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding !ConfirmingDiscard}">
+            <TextBlock Classes="caption faint" Text="{Binding ChangesText}" VerticalAlignment="Center" />
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+              <c:GsButton Classes="ghost" Content="Cancel" Command="{Binding CancelCommand}" />
+              <c:GsButton Classes="primary" Content="Save changes" Command="{Binding SaveCommand}" IsEnabled="{Binding HasChanges}" />
+            </StackPanel>
+          </Grid>
+          <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding ConfirmingDiscard}">
+            <TextBlock Text="{Binding ChangesText, StringFormat='Close without saving? {0}.'}" FontWeight="Medium" VerticalAlignment="Center" TextWrapping="Wrap" />
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+              <c:GsButton Classes="ghost" Content="Keep editing" Command="{Binding KeepEditingCommand}" />
+              <c:GsButton Classes="danger" Content="Close without saving" Command="{Binding DiscardCommand}" />
+            </StackPanel>
+          </Grid>
+        </Panel>
+      </Border>
+
+      <!-- The sections -->
+      <Border DockPanel.Dock="Left" Width="208" BorderBrush="{DynamicResource line-100}" BorderThickness="0,0,1,0" Padding="12,16">
+        <c:GsSettingsNav ItemsSource="{Binding Sections}" SelectedId="{Binding Section, Mode=TwoWay}" AutomationProperties.Name="Properties" />
+      </Border>
+
+      <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+        <Panel Margin="24,20">
+          <TextBlock Classes="muted" Text="Reading this game's properties…" IsVisible="{Binding IsLoading}" />
+          <TextBlock Foreground="{DynamicResource warn}" Text="{Binding Error}" TextWrapping="Wrap"
+                     IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
+          <Panel IsVisible="{Binding IsLoaded}">
+          <!-- General -->
+          <StackPanel Spacing="4" IsVisible="{Binding IsGeneral}">
+            <TextBlock Text="General" FontSize="16" LineHeight="22" FontWeight="Medium" Margin="0,0,0,8" />
+            <c:GsSettingsRow Title="Name" Description="What GameSync calls it. A rescan keeps the name you give it.">
+              <TextBox Width="260" Text="{Binding Name}" MaxLength="120" AutomationProperties.Name="Name" />
+            </c:GsSettingsRow>
+            <c:GsSettingsRow Title="Favourite" Description="First in the library's list and covers, on this PC.">
+              <c:GsSwitch IsChecked="{Binding Favourite}" AutomationProperties.Name="Favourite" />
+            </c:GsSettingsRow>
+            <c:GsSettingsRow Title="Show in the library" Description="A hidden game still backs up and syncs; the library's Hidden view brings it back.">
+              <c:GsSwitch IsChecked="{Binding Shown}" AutomationProperties.Name="Show in the library" />
+            </c:GsSettingsRow>
+            <c:GsSettingsRow Title="Game ID" Description="{Binding CommandLine, StringFormat='For the command line: {0}'}">
+              <c:GsButton Classes="ghost sm" Icon="copy" Content="Copy" Click="CopyId" ToolTip.Tip="Copies the game's ID" />
+            </c:GsSettingsRow>
+            <c:GsNote Icon="shield" Text="{Binding AntiCheatNote}" IsVisible="{Binding HasAntiCheat}" Margin="0,8,0,0" />
+          </StackPanel>
+
+          <!-- Launch -->
+          <StackPanel Spacing="4" IsVisible="{Binding IsLaunch}">
+            <TextBlock Text="Launch" FontSize="16" LineHeight="22" FontWeight="Medium" Margin="0,0,0,8" />
+            <c:GsSettingsRow Title="{Binding RouteTitle}" Description="{Binding RouteDescription}">
+              <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding OwnProgram}">
+                <c:GsButton Classes="ghost sm" Content="Use the one found" Command="{Binding UseFoundProgramCommand}" IsVisible="{Binding ProgramPicked}" />
+                <c:GsButton Classes="sm" Icon="folder" Content="Change…" Click="PickProgram" />
+              </StackPanel>
+            </c:GsSettingsRow>
+            <Border Background="{DynamicResource surface-well}" BorderBrush="{DynamicResource edge-well}" BorderThickness="1" BackgroundSizing="OuterBorderEdge"
+                    CornerRadius="{DynamicResource radius-md}" Padding="12,10" Margin="0,0,0,8">
+              <TextBlock Classes="mono-small" Text="{Binding RouteText}" TextTrimming="LeadingCharacterEllipsis" ToolTip.Tip="{Binding RouteText}" />
+            </Border>
+            <c:GsSettingsRow Title="Steam's launch options" Description="Steam adds these every time the game starts. Change them in Steam: the game's Properties, General."
+                             IsVisible="{Binding IsSteam}">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Classes="mono" Text="{Binding StoreOptions}" VerticalAlignment="Center" MaxWidth="180" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding StoreOptions}" />
+                <c:GsButton Classes="ghost sm" IconAfter="external" Content="Open in Steam" Command="{Binding SteamPageCommand}" />
+              </StackPanel>
+            </c:GsSettingsRow>
+            <c:GsSettingsRow Title="Starting from Steam" Description="To get GameSync's check for a newer save when you start the game from Steam too, put this line in Steam's launch options."
+                             IsVisible="{Binding IsSteam}">
+              <c:GsButton Classes="sm" Icon="copy" Content="Copy the line" Click="CopyLine" />
+            </c:GsSettingsRow>
+            <c:GsSettingsRow Title="Launch options" Description="Added after the program's name when GameSync starts it, such as -windowed." IsVisible="{Binding OwnProgram}">
+              <TextBox Width="260" Text="{Binding LaunchOptions}" PlaceholderText="None" MaxLength="1000" AutomationProperties.Name="Launch options" />
+            </c:GsSettingsRow>
+            <c:GsNote Icon="info" Margin="0,8,0,0"
+                      Text="Play in GameSync always checks for a newer save on your other PC first, and brings it down before the game starts." />
+          </StackPanel>
+
+          <!-- Installed files -->
+          <StackPanel Spacing="16" IsVisible="{Binding IsFiles}">
+            <TextBlock Text="Installed files" FontSize="16" LineHeight="22" FontWeight="Medium" />
+            <c:GsNote Icon="info" Text="Not installed on this PC. Its saves are still here, and still back up." IsVisible="{Binding NotInstalled}" />
+            <c:GsFacts ItemsSource="{Binding InstalledFacts}" />
+            <WrapPanel ItemSpacing="8" LineSpacing="8">
+              <c:GsButton Classes="sm" Icon="folder" Content="Open the folder" Command="{Binding OpenFolderCommand}" IsVisible="{Binding CanOpenFolder}" />
+              <c:GsButton Classes="ghost sm" IconAfter="external" Content="Store page" Command="{Binding StorePageCommand}" IsVisible="{Binding CanOpenStorePage}" />
+            </WrapPanel>
+          </StackPanel>
+
+          <!-- Saves: which files are backed up -->
+          <StackPanel Spacing="12" IsVisible="{Binding IsSaves}">
+            <TextBlock Text="Saves" FontSize="16" LineHeight="22" FontWeight="Medium" />
+            <TextBlock Classes="muted" FontSize="13" LineHeight="19" TextWrapping="Wrap"
+                       Text="Ticked files are backed up and synced. Unticked ones stay on this PC only, and older versions keep them; nothing is deleted." />
+            <c:GsNote Icon="info" IsVisible="{Binding NotSyncing}"
+                      Text="Not syncing yet: this is what the scan found. Sync its saves from its page first; then you can choose its files here." />
+            <TextBlock Classes="mono-small muted" Text="{Binding CountText}" />
+            <Border Background="{DynamicResource surface-well}" BorderBrush="{DynamicResource edge-well}" BorderThickness="1" BackgroundSizing="OuterBorderEdge"
+                    CornerRadius="{DynamicResource radius-md}" Padding="6">
+              <ItemsControl ItemsSource="{Binding Rows}" AutomationProperties.Name="{Binding Title, StringFormat='{}{0} save files'}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:FileRow">
+                    <Border Classes="ftree-row" Padding="{Binding Indent}" MinHeight="32" CornerRadius="{DynamicResource radius-sm}" AutomationProperties.Name="{Binding}">
+                      <Grid ColumnDefinitions="20,Auto,Auto,*,Auto,Auto,Auto" ColumnSpacing="8">
+                        <Button Theme="{StaticResource TwistyButton}" Command="{Binding ExpandCommand}" IsVisible="{Binding HasChildren}"
+                                AutomationProperties.Name="{Binding Name, StringFormat='Open or close {0}'}">
+                          <c:GsIcon Icon="{Binding Chevron}" Size="14" StrokeWidth="2" />
+                        </Button>
+                        <CheckBox Grid.Column="1" IsChecked="{Binding IsChecked, Mode=OneWay}" Command="{Binding ToggleCommand}" IsVisible="{Binding ShowsBox}" IsEnabled="{Binding CanTick}"
+                                  AutomationProperties.Name="{Binding Name}" />
+                        <c:GsIcon Grid.Column="1" Icon="lock" Size="14" Width="18" Foreground="{DynamicResource ink-faint}" IsVisible="{Binding Locked}"
+                                  ToolTip.Tip="{Binding Note}" VerticalAlignment="Center" />
+                        <c:GsIcon Grid.Column="2" Icon="{Binding Icon}" Size="16" Foreground="{DynamicResource ink-faint}" VerticalAlignment="Center" />
+                        <TextBlock Grid.Column="3" Classes="mono" Classes.muted="{Binding IsOut}" Text="{Binding Name}" TextTrimming="LeadingCharacterEllipsis"
+                                   ToolTip.Tip="{Binding Name}" VerticalAlignment="Center" />
+                        <TextBlock Grid.Column="4" Classes="caption faint" Text="{Binding Note}" VerticalAlignment="Center" />
+                        <c:GsTag Grid.Column="5" Text="{Binding Tag}" Background="{DynamicResource bg-400}" IsVisible="{Binding HasTag}" />
+                        <TextBlock Grid.Column="6" Classes="mono-small muted" Text="{Binding Meta}" MinWidth="64" TextAlignment="Right" VerticalAlignment="Center" />
+                      </Grid>
+                    </Border>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </Border>
+            <StackPanel Spacing="4" IsVisible="{Binding CanChooseFiles}">
+              <c:GsSettingsRow Title="Settings files" Description="A game's options and key bindings, tagged Settings." IsVisible="{Binding HasSettingsFiles}">
+                <c:GsButton Classes="sm" IconAfter="chevronDown" Content="{Binding SettingsLabel}" AutomationProperties.Name="{Binding SettingsLabel, StringFormat='Settings files: {0}'}">
+                  <c:GsButton.Flyout>
+                    <MenuFlyout Placement="BottomEdgeAlignedRight">
+                      <MenuItem Header="Sync between PCs" ToggleType="CheckBox" Command="{Binding SelectCommand}" CommandParameter="settings:sync"
+                                IsChecked="{Binding SettingsFiles, Mode=OneWay, Converter={x:Static c:EqualsConverter.Instance}, ConverterParameter=sync}" />
+                      <MenuItem Header="Back up on this PC" ToggleType="CheckBox" Command="{Binding SelectCommand}" CommandParameter="settings:this-pc"
+                                IsChecked="{Binding SettingsFiles, Mode=OneWay, Converter={x:Static c:EqualsConverter.Instance}, ConverterParameter=this-pc}" />
+                      <MenuItem Header="Don't back up" ToggleType="CheckBox" Command="{Binding SelectCommand}" CommandParameter="settings:off"
+                                IsChecked="{Binding SettingsFiles, Mode=OneWay, Converter={x:Static c:EqualsConverter.Instance}, ConverterParameter=off}" />
+                    </MenuFlyout>
+                  </c:GsButton.Flyout>
+                </c:GsButton>
+              </c:GsSettingsRow>
+              <c:GsSettingsRow Title="Screenshots" Description="Pictures the game saves itself, in its save places.">
+                <c:GsButton Classes="sm" IconAfter="chevronDown" Content="{Binding ScreenshotsLabel}" AutomationProperties.Name="{Binding ScreenshotsLabel, StringFormat='Screenshots: {0}'}">
+                  <c:GsButton.Flyout>
+                    <MenuFlyout Placement="BottomEdgeAlignedRight">
+                      <MenuItem Header="Back up on this PC" ToggleType="CheckBox" Command="{Binding SelectCommand}" CommandParameter="shots:on"
+                                IsChecked="{Binding Screenshots, Mode=OneWay, Converter={x:Static c:EqualsConverter.Instance}, ConverterParameter=on}" />
+                      <MenuItem Header="Don't back up" ToggleType="CheckBox" Command="{Binding SelectCommand}" CommandParameter="shots:off"
+                                IsChecked="{Binding Screenshots, Mode=OneWay, Converter={x:Static c:EqualsConverter.Instance}, ConverterParameter=off}" />
+                    </MenuFlyout>
+                  </c:GsButton.Flyout>
+                </c:GsButton>
+              </c:GsSettingsRow>
+              <c:GsSettingsRow Title="Skip logs, crash dumps and caches" Description="They never hold saves, and some are large.">
+                <c:GsSwitch IsChecked="{Binding SkipDefaults}" AutomationProperties.Name="Skip logs, crash dumps and caches" />
+              </c:GsSettingsRow>
+              <c:GsNote Icon="info" Margin="0,8,0,0"
+                        Text="These choices are this game's own, and travel with its saves, so your other PCs back up the same files." />
+            </StackPanel>
+          </StackPanel>
+
+          <!-- Sync -->
+          <StackPanel Spacing="4" IsVisible="{Binding IsSync}">
+            <TextBlock Text="Sync" FontSize="16" LineHeight="22" FontWeight="Medium" Margin="0,0,0,8" />
+            <c:GsNote Icon="info" IsVisible="{Binding NotSyncing}" Text="Not syncing yet. Sync its saves from its page first; then these settings apply." Margin="0,0,0,8" />
+            <StackPanel Spacing="4" IsVisible="{Binding CanChooseFiles}">
+              <c:GsSettingsRow Title="Keep it in step" Description="{Binding ModeDescription}">
+                <c:GsPillTabs ItemsSource="{x:Static vm:PropertiesViewModel.ModeChoices}" SelectedId="{Binding Mode, Mode=TwoWay}" AutomationProperties.Name="Sync" />
+              </c:GsSettingsRow>
+              <c:GsSettingsRow Title="When both PCs changed it"
+                               Description="Newest wins keeps the other side pinned, with a Swap button. GameSync always asks on a first sync, a save that shrank by half, a change outside play, or a wrong clock.">
+                <c:GsButton Classes="sm" IconAfter="chevronDown" Content="{Binding ConflictLabel}" AutomationProperties.Name="{Binding ConflictLabel, StringFormat='When both PCs changed it: {0}'}">
+                  <c:GsButton.Flyout>
+                    <MenuFlyout Placement="BottomEdgeAlignedRight">
+                      <MenuItem Header="Newest wins" ToggleType="CheckBox" Command="{Binding SelectCommand}" CommandParameter="conflict:newest"
+                                IsChecked="{Binding Conflict, Mode=OneWay, Converter={x:Static c:EqualsConverter.Instance}, ConverterParameter=newest}" />
+                      <MenuItem Header="Always ask" ToggleType="CheckBox" Command="{Binding SelectCommand}" CommandParameter="conflict:ask"
+                                IsChecked="{Binding Conflict, Mode=OneWay, Converter={x:Static c:EqualsConverter.Instance}, ConverterParameter=ask}" />
+                      <MenuItem Header="This PC wins" ToggleType="CheckBox" Command="{Binding SelectCommand}" CommandParameter="conflict:this-pc"
+                                IsChecked="{Binding Conflict, Mode=OneWay, Converter={x:Static c:EqualsConverter.Instance}, ConverterParameter=this-pc}" />
+                    </MenuFlyout>
+                  </c:GsButton.Flyout>
+                </c:GsButton>
+              </c:GsSettingsRow>
+              <c:GsSettingsRow Title="Stop syncing it" Description="Its versions stay in the cloud and on this PC, and it can sync again from its page.">
+                <c:GsButton Classes="danger sm" Content="Stop syncing…">
+                  <c:GsButton.Flyout>
+                    <Flyout Placement="BottomEdgeAlignedRight">
+                      <StackPanel Width="280" Spacing="12" Margin="8">
+                        <TextBlock Text="{Binding Title, StringFormat='Stop syncing {0}?'}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                        <TextBlock Classes="caption muted" TextWrapping="Wrap"
+                                   Text="Nothing is deleted: its versions stay in the cloud and on this PC. Its saves just stop backing up here until you sync them again." />
+                        <c:GsButton Classes="danger sm" Content="Stop syncing" HorizontalAlignment="Right" Command="{Binding StopSyncingCommand}" />
+                      </StackPanel>
+                    </Flyout>
+                  </c:GsButton.Flyout>
+                </c:GsButton>
+              </c:GsSettingsRow>
+            </StackPanel>
+          </StackPanel>
+          </Panel>
+        </Panel>
+      </ScrollViewer>
+    </DockPanel>
+  </Border>
+</UserControl>

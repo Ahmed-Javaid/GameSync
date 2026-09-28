@@ -1,1 +1,1 @@
-Showcase of the console-style save manager: stats strip, selectable save table and live log. Tick rows and press Share selected, press Share all, or press the download icon to import a friend's zip.
+Showcase of the console-style save manager: stats strip, selectable save table and live log. Tick rows and press Share selected, press Share all, or press the download icon to import a friend's zip. A game's name in the table opens its saves (see Game saves).

@@ -53,5 +53,37 @@ public static class SteamActivity
         return plays;
     }
 
+    /// <summary>
+    /// The launch options the person set for a game in Steam (its Properties, General), which Steam adds to every start:
+    /// from the account that played it last, or any that has some. Read only; they're Steam's to change (PLAY-11).
+    /// </summary>
+    public static string? LaunchOptions(string steamRoot, long appId)
+    {
+        var userdata = Path.Combine(steamRoot, "userdata");
+        if (!Directory.Exists(userdata))
+        {
+            return null;
+        }
+
+        var key = appId.ToString(CultureInfo.InvariantCulture);
+        (string Options, long Played)? best = null;
+        foreach (var account in Directory.EnumerateDirectories(userdata))
+        {
+            var app = Vdf.TryReadRoot(Path.Combine(account, "config", "localconfig.vdf"))?.Block("Software")?.Block("Valve")?.Block("Steam")?.Block("apps")?.Block(key);
+            if (app?["LaunchOptions"] is not { Length: > 0 } options)
+            {
+                continue;
+            }
+
+            var played = long.TryParse(app["LastPlayed"], NumberStyles.None, CultureInfo.InvariantCulture, out var seconds) ? seconds : 0;
+            if (best is null || played > best.Value.Played)
+            {
+                best = (options.Trim(), played);
+            }
+        }
+
+        return best?.Options is { Length: > 0 } found ? found : null;
+    }
+
     private static DateTime? Latest(DateTime? a, DateTime? b) => a is null ? b : b is null ? a : a > b ? a : b;
 }

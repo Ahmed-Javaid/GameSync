@@ -8,19 +8,19 @@ Started 28 Sep 2026.
 
 | Area | IDs |
 | --- | --- |
-| Launcher and library | PLAY-01 home, PLAY-09 playtime on tiles and the activity calendar, LIB-11 art in every slot, LIB-12 rescans at startup and when a store changes, ART-01 to ART-08 cover art |
-| Game detail | BAK-14 versions across PCs, BAK-15 history size, BAK-16 Back up now, BAK-18 named saves, FOLD-01 a save place by hand, SYNC-09 per-game conflict choice |
+| Launcher and library | PLAY-01 home, PLAY-09 playtime on tiles and the activity calendar, LIB-11 art in every slot, LIB-12 rescans at startup and when a store changes, LIB-14 to LIB-18 the library like Steam's (list, search, sort, favourites, a page per game), LIB-19 a game's page about the game, LIB-20 Properties, LIB-21 Back from every page, PLAY-11 launch options, ART-01 to ART-09 cover art and the store's basics |
+| A game's saves (in the save manager since 29 Sep) | BAK-14 versions across PCs, BAK-15 history size, BAK-16 Back up now, BAK-18 named saves, FOLD-01 a save place by hand, FIND-12 choosing files, SYNC-09 per-game conflict choice |
 | Sync screens | SYNC-10 the conflict screen, SYNC-14 Plan, SYNC-04 Swap |
-| Save manager and sharing | MGR-01 to MGR-06, SHARE-01 to SHARE-13 |
-| Settings | SET-01 to SET-04, FOLD-02 to FOLD-10, PC-01 and PC-02, CLOUD-05, CLOUD-08, CLOUD-09 |
-| Appearance | LOOK-01 to LOOK-11, LOOK-17 and LOOK-18 Glossy and Solid |
+| Save manager and sharing | MGR-01 to MGR-07, SHARE-01 to SHARE-13 |
+| Settings | SET-01 to SET-06, FOLD-02 to FOLD-10, PC-01 and PC-02, CLOUD-05, CLOUD-08, CLOUD-09 |
+| Appearance | LOOK-01 to LOOK-11, LOOK-17 and LOOK-18 Glossy and Solid, LOOK-19 the caption buttons and hover rings |
 | First run | ONB-01 to ONB-05 |
 | Tray and background | BG-01 one instance, the window comes forward, BG-07 tray icon, BG-09 the command line hands off to the app |
-| Accessibility and speed | A11Y-01 to A11Y-04, PERF-01 to PERF-03 |
+| Accessibility and speed | A11Y-01 to A11Y-05, PERF-01 to PERF-03 |
 
 Not in this milestone: learn mode and its tracer (FIND-04, FIND-05, Milestone 6), the installer, updater and signing (PKG-01, PKG-03, R19: Milestone 6), `gamesync://` links (R12, registered by the installer), achievements (ACH-01 to ACH-04, after v1).
 
-The screens are designed: the Launcher, Save manager and Settings since 27 Sep, and Game detail, Conflict, Plan and First run since 28 Sep, all in the design system (link in `CLAUDE.md`, snapshot in `design/system/`), each in Glossy and Solid since version 13.
+The screens are designed: the Launcher, Save manager and Settings since 27 Sep, and Game detail, Conflict, Plan and First run since 28 Sep, all in the design system (link in `CLAUDE.md`, snapshot in `design/system/`), each in Glossy and Solid since version 13; a game's saves and Properties since 29 Sep (version 16).
 
 ## How it's built
 
@@ -61,6 +61,10 @@ The screens are designed: the Launcher, Save manager and Settings since 27 Sep, 
 - 29 Sep: from the owner's review at full screen: the pills drawn as ellipses (a regression from Glossy's edges) and the flickering ring on covers are fixed; the window has no separate title bar any more (the page and Glossy's art run to the top, with GameSync's own caption buttons, which keep Windows 11's snap layouts); Home's banner grows with the window and Jump back in shows as many covers as fit; Home says "No games yet" before any scan instead of an empty banner. The owner's own data folder was scanned for the first time (19 installed games, 52 in the library; nothing confirmed).
 - 29 Sep, later: Home fills any window. The first scaling grew the banner with the window's width only, so a taller screen (1920 × 1200 against 1920 × 1080) left gaps again; now the cards take what their content needs at the width and the banner the rest, the side cards keep a readable width, and Jump back in shows more covers on wider screens. Checked at eight window sizes from 1024 × 640 to 3440 × 1440. The page header sits 16px closer to the top.
 
+- 29 Sep, later: **the owner's library wishes and every game's page** (LIB-14 to LIB-18). Drawn first in the design system (version 14, then 15): the library like Steam's, with new SearchField, Menu and GameList components and the star, sort, back and more icons. Built: every game by name in a list down the left, with the search (Ctrl+F, the rail's new Search), the sort (Recently played, Name, Hours played, Recently added, kept per PC) and Favourites first (kept per PC, `gamesync favourite`); the covers beside it, favourites first too; a right-click for Play, favourite and hide, in the app's colours; and a click on any game (a row, a cover here or on Home, a Needs you row) opens its page beside the list at full glass over its own art. The page reads from this PC alone (`GameDetails`: the backup folder's copy of the version records, pins and PCs), so it opens at once: named saves, where the saves are, every version from every PC with its size, the game's log; for a game not syncing yet, the saves found and Sync these saves. Save as…, Restore (a named save or any version, with a confirm), Back up now and Sync these saves run like their commands, under the engine lock. The library stays alive while the window is open, so a refresh keeps the search, order, view and open page. Checked in the real window on a scratch data folder with a stand-in game whose saves live in the scratchpad: a cover on Home opens its page, the star moves a game to Favourites, Back up now adds a version (held, since it changed outside play), the sort and right-click menus open in the app's colours. 347 tests pass.
+
+- 29 Sep, last: **the owner's review of the library and a game's page.** Fixed: the caption buttons sit level and light up under the pointer (close in Windows' red); the ring round a hovered cover is even on all four sides; the library's Add game button is hidden until its dialog exists. Redesigned as they asked, following Nielsen's heuristics and Shneiderman's golden rules (design system versions 16 and 17, now with Navigation and feedback rules): a game's page is about the game, like Steam's, with a play bar (Play or the status's own action, Last played, Play time, Saves, the star, Properties, More), About from its Steam store page (asked once per game with its art; tag names monthly), a small Saves card and On this PC, with a place drawn for achievements; every page below the rail has Back (and Esc, Alt+Left and the mouse's back button) and a breadcrumb; a game's saves moved to the save manager, which now lists every game and opens one (a held game's Keep the new save and Restore the previous save, named saves, places, versions from every PC, the log); and every game has Properties like Steam's: General, Launch (a game in its own folder's program and launch options, per PC; Steam's own read only, with the line to paste), Installed files, Saves (every file in its save places, ticked when it's backed up; unticking leaves the file on the PC and out of the backups) and Sync. What new games back up is drawn for Settings (SET-06). Checked in the real window on a scratch data folder: the caption buttons' hover, Home → a game → Back → Home, Properties → Saves → Close Properties, Open in Saves → the game's saves → Back → its page. 356 tests pass.
+
 ## How to try the app
 
 ```powershell
@@ -77,7 +81,7 @@ It uses `%LOCALAPPDATA%\GameSync` like the command line, so on the owner's PC it
 1. The foundation: `GameSync.UI` with the theme engine and its tests, tokens as resources, the icon set, and the styled components. **Done.**
 2. The app shell: the tray icon and its states, the main window with the side rail, one instance and the pipe, the agent inside, the theme applied live. **Done 28 Sep.**
 3. Read models for the library, a game, the plan, a conflict and the save manager.
-4. The screens, in order of use: first run, the launcher home and library (**working since 28 Sep**, except what waits on the screens below), game detail, the save manager with Plan, Versions and Log, the conflict screen, settings, and the share and import windows.
+4. The screens, in order of use: first run, the launcher home and library (**working since 28 Sep**; the library like Steam's since 29 Sep), game detail (**working since 29 Sep**, about the game since the owner's review), the save manager (**a game's saves working since 29 Sep**) with Plan, Versions and Log, the conflict screen, settings, and the share and import windows.
 5. Cover art and the activity calendar.
 6. The command line handing off to the app.
 7. Accessibility (keyboard, focus, screen-reader names, text size, animations off) and speed with 500 games.

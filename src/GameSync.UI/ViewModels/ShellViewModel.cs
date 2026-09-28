@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using GameSync.UI.Controls;
@@ -11,6 +12,9 @@ namespace GameSync.UI.ViewModels;
 /// </summary>
 public sealed partial class ShellViewModel : ObservableObject
 {
+    /// <summary>The rail's Search: the library, with the cursor in its search field (LIB-15).</summary>
+    public const string SearchId = "search";
+
     private Func<string, object?> _makePage;
 
     [ObservableProperty]
@@ -26,6 +30,17 @@ public sealed partial class ShellViewModel : ObservableObject
     [ObservableProperty]
     private GlassStrength _strength;
 
+    /// <summary>The art Glossy shows behind the page, when the page has its own game (a game's page); null takes the last-played game's.</summary>
+    [ObservableProperty]
+    private string? _backdropArt;
+
+    /// <summary>A dialog over the page, such as a game's Properties; the page waits behind it until it closes.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasDialog))]
+    private object? _dialog;
+
+    public bool HasDialog => Dialog is not null;
+
     public ShellViewModel(Dictionary<string, Func<object?>> pages, string current = "home")
         : this(id => pages.TryGetValue(id, out var make) ? make() : null, current)
     {
@@ -35,20 +50,21 @@ public sealed partial class ShellViewModel : ObservableObject
     public ShellViewModel(Func<string, object?> makePage, string current = "home")
     {
         _makePage = makePage;
-        _current = current;
-        _page = makePage(current);
-        _strength = StrengthOf(_page);
+        _current = current == SearchId ? "library" : current;
+        _page = makePage(_current);
+        Follow(null, _page);
     }
 
     /// <summary>A page's strength; pages that don't say take the glow, the calmest.</summary>
     public static GlassStrength StrengthOf(object? page) => (page as IPageSurface)?.Strength ?? GlassStrength.Glow;
 
-    partial void OnPageChanged(object? value) => Strength = StrengthOf(value);
+    partial void OnPageChanged(object? oldValue, object? newValue) => Follow(oldValue, newValue);
 
-    /// <summary>Home, the library, the save manager, the console, and settings at the bottom; dots say a game runs or needs you.</summary>
+    /// <summary>Search at the top; Home, the library, the save manager, the console, and settings at the bottom; dots say a game runs or needs you.</summary>
     public static IReadOnlyList<RailItem> DefaultRail(string? playing, int? needYou) =>
     [
-        new RailItem("home", "home", "Home"),
+        new RailItem(SearchId, "search", "Search"),
+        new RailItem("home", "home", "Home", Separator: true),
         new RailItem("library", "library", "Game library", Dot: playing is null ? null : "play", DotLabel: playing is null ? null : $"{playing} is running"),
         new RailItem("saves", "saves", "Save manager", Separator: true, Dot: needYou > 0 ? "warn" : null,
             DotLabel: needYou > 0 ? (needYou == 1 ? "1 game needs you" : $"{needYou} games need you") : null),
@@ -73,7 +89,40 @@ public sealed partial class ShellViewModel : ObservableObject
     [RelayCommand]
     private void Navigate(string id)
     {
+        if (id == SearchId)
+        {
+            Navigate("library");
+            (Page as ISearchablePage)?.FocusSearch();
+            return;
+        }
+
         Current = id;
         Page = _makePage(id);
+    }
+
+    /// <summary>A page that changes its own strength or art (the library opening a game's page) takes the frame with it.</summary>
+    private void Follow(object? old, object? page)
+    {
+        if (old is INotifyPropertyChanged before)
+        {
+            before.PropertyChanged -= PageChanged;
+        }
+
+        if (page is INotifyPropertyChanged after)
+        {
+            after.PropertyChanged += PageChanged;
+        }
+
+        Strength = StrengthOf(page);
+        BackdropArt = (page as IPageSurface)?.BackdropArt;
+    }
+
+    private void PageChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (sender == Page && e.PropertyName is nameof(IPageSurface.Strength) or nameof(IPageSurface.BackdropArt) or null)
+        {
+            Strength = StrengthOf(Page);
+            BackdropArt = (Page as IPageSurface)?.BackdropArt;
+        }
     }
 }

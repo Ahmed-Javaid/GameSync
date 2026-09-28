@@ -1,0 +1,31 @@
+<!-- @dsCard group="Save manager" height=380 subtitle="A game's save files: tick to back up, untick to keep on this PC; skipped and locked files say why" -->
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>preview</title>
+<style>html,body{margin:0;background:var(--bg-100);} .pv{padding:24px;} </style>
+</head>
+<body class="gs-root">
+<div id="root"></div>
+<script>
+var G = window.GameSync, h = React.createElement;
+
+var ITEMS=[
+  {id:'p1',name:'E:\\Steam\\userdata\\41755\\632360\\remote\\UserProfiles',kind:'folder',checked:true,mixed:true,open:true,meta:'4 files',children:[
+    {id:'a',name:'3f1a8c2e-profile.xml',checked:true,bytes:224256,meta:'219 KB'},
+    {id:'b',name:'default-profile.xml',checked:true,bytes:218112,meta:'213 KB'},
+    {id:'c',name:'default-profile.xml.bak',checked:false,bytes:223232,meta:'218 KB',note:'You left it out'}]},
+  {id:'p2',name:'Risk of Rain 2_Data\\Config',kind:'folder',checked:true,tag:'Settings',meta:'45 files',children:[{id:'d',name:'config.cfg',checked:true,bytes:3277,meta:'3 KB'}]},
+  {id:'p3',name:'Risk of Rain 2_Data\\Logs',kind:'folder',checked:false,note:'Skipped: logs',meta:'12 files',children:[{id:'e',name:'output_log.txt',checked:false,bytes:1153434,meta:'1.1 MB'}]},
+  {id:'p4',name:'HKEY_CURRENT_USER\\Software\\Hopoo Games, LLC\\Risk of Rain 2',kind:'registry',checked:true,tag:'Registry',meta:'16 values',bytes:4096},
+  {id:'p5',name:'Risk of Rain 2.exe',locked:true,note:'A program file: never backed up',meta:'651 KB'}];
+function Demo(){
+  var t=React.useState(ITEMS), c=G.fileTree.count(t[0]);
+  return h('div',{className:'pv gs-stack',style:{gap:10}},
+    h('div',{className:'gs-mono gs-muted',style:{fontSize:12}},c.files+' of '+c.all+' files \u00b7 '+G.formatBytes(c.bytes)+' backed up'),
+    h(G.FileTree,{label:'Risk of Rain 2\u2019s save files',items:t[0],onToggle:function(id,on){t[1](G.fileTree.toggle(t[0],id,on))}}));
+}
+ReactDOM.createRoot(document.getElementById('root')).render(h(Demo));
+
+</script>
+</body>
+</html>

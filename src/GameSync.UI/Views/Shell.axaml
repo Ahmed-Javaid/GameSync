@@ -5,14 +5,21 @@
              xmlns:v="using:GameSync.UI.Views"
              x:Class="GameSync.UI.Views.Shell"
              x:DataType="vm:ShellViewModel">
-  <DockPanel>
-    <c:GsSideRail DockPanel.Dock="Left" Items="{Binding Rail}" Current="{Binding Current}" NavigateCommand="{Binding NavigateCommand}" />
-    <Panel>
-      <!-- The title bar's strip: dragging it moves the window. The rail runs to the top; the page starts a little under
-           the strip, whose lower part is the page's own clear margin, so that drags too. -->
-      <Border VerticalAlignment="Top" Height="{Binding $parent[v:Shell].TitleBarHeight}" Background="Transparent"
-              WindowDecorationProperties.ElementRole="TitleBar" />
-      <ContentControl Content="{Binding Page}" Margin="{Binding $parent[v:Shell].PageMargin}" />
-    </Panel>
-  </DockPanel>
+  <Panel>
+    <DockPanel>
+      <c:GsSideRail DockPanel.Dock="Left" Items="{Binding Rail}" Current="{Binding Current}" NavigateCommand="{Binding NavigateCommand}" />
+      <Panel>
+        <!-- The title bar's strip: dragging it moves the window. The rail runs to the top; the page starts a little under
+             the strip, whose lower part is the page's own clear margin, so that drags too. -->
+        <Border VerticalAlignment="Top" Height="{Binding $parent[v:Shell].TitleBarHeight}" Background="Transparent"
+                WindowDecorationProperties.ElementRole="TitleBar" />
+        <ContentControl Content="{Binding Page}" Margin="{Binding $parent[v:Shell].PageMargin}" IsEnabled="{Binding !HasDialog}" />
+      </Panel>
+    </DockPanel>
+
+    <!-- A dialog (a game's Properties) over the whole window: the page behind dims and waits until it closes -->
+    <Border Name="DialogLayer" Background="{DynamicResource scrim}" IsVisible="{Binding HasDialog}" Padding="24,48,24,24">
+      <ContentControl Content="{Binding Dialog}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+    </Border>
+  </Panel>
 </UserControl>

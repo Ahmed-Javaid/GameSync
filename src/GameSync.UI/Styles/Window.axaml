@@ -19,16 +19,14 @@
         </Border>
       </ControlTemplate>
     </Setter>
+    <!-- A brush made in a setter never found ink-color, so minimize and maximize showed no hover; ThemeService makes
+         these two from the theme's ink -->
     <Style Selector="^:pointerover">
-      <Setter Property="Background">
-        <SolidColorBrush Color="{DynamicResource ink-color}" Opacity="0.09" />
-      </Setter>
+      <Setter Property="Background" Value="{DynamicResource caption-hover}" />
       <Setter Property="Foreground" Value="{DynamicResource ink}" />
     </Style>
     <Style Selector="^:pressed">
-      <Setter Property="Background">
-        <SolidColorBrush Color="{DynamicResource ink-color}" Opacity="0.05" />
-      </Setter>
+      <Setter Property="Background" Value="{DynamicResource caption-press}" />
     </Style>
     <!-- Close turns Windows' red, in every theme -->
     <Style Selector="^.close:pointerover">
@@ -65,7 +63,10 @@
                           IsVisible="{TemplateBinding HasTitleBar}" Orientation="Horizontal">
                 <Button x:Name="PART_MinimizeButton" Theme="{StaticResource GsCaptionButton}" WindowDecorationProperties.ElementRole="MinimizeButton"
                         AutomationProperties.Name="Minimize">
-                  <Path Width="10" Height="10" Stretch="Uniform" Fill="{Binding $parent[Button].Foreground}" Data="M2048 1229v-205h-2048v205h2048z" />
+                  <!-- The line sits halfway down the same 10px box as the other two glyphs; stretched on its own, it rose to the top -->
+                  <Panel Width="10" Height="10">
+                    <Path Height="1" VerticalAlignment="Top" Margin="0,5,0,0" Stretch="Fill" Fill="{Binding $parent[Button].Foreground}" Data="M2048 1229v-205h-2048v205h2048z" />
+                  </Panel>
                 </Button>
                 <Button x:Name="PART_MaximizeButton" Theme="{StaticResource GsCaptionButton}" WindowDecorationProperties.ElementRole="MaximizeButton"
                         AutomationProperties.Name="Maximize">

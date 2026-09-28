@@ -44,6 +44,41 @@ public static class LauncherData
         state.SetSetting(Launcher.HiddenKey(game), hidden ? "1" : "");
     }
 
+    /// <summary>LIB-17: makes a game a favourite on this PC, first in the library's list and covers, or an ordinary game again.</summary>
+    public static void SetFavourite(string dataDir, GameSync.Core.Model.GameId game, bool favourite)
+    {
+        using var state = new GameSync.Core.State.StateStore(dataDir);
+        state.SetSetting(Launcher.FavouriteKey(game), favourite ? "1" : "");
+    }
+
+    /// <summary>LIB-16: the library's order on this PC; Recently played until the person picks another.</summary>
+    public static LibrarySort ReadSort(string dataDir)
+    {
+        using var state = new GameSync.Core.State.StateStore(dataDir);
+        return Enum.TryParse<LibrarySort>(state.GetSetting(Launcher.SortKey), out var sort) && Enum.IsDefined(sort) ? sort : LibrarySort.RecentlyPlayed;
+    }
+
+    public static void SetSort(string dataDir, LibrarySort sort)
+    {
+        using var state = new GameSync.Core.State.StateStore(dataDir);
+        state.SetSetting(Launcher.SortKey, sort.ToString());
+    }
+
+    /// <summary>
+    /// For Home's top bar: this PC's name, the other PCs that sync with when each was last seen, and where the saves go
+    /// ("Google Drive", or the folder standing in for it). Read from this PC's copy of the records.
+    /// </summary>
+    public static (string ThisPc, IReadOnlyList<(string Name, DateTime LastSeenUtc)> Others, string Cloud) Devices(string dataDir)
+    {
+        using var engine = Engine.Open(dataDir);
+        var others = new GameSync.Core.Storage.LocalHistory(Cli.HistoryFolder(engine.State, dataDir)).LoadDevices()
+            .Where(d => d.Id != engine.Device.Id)
+            .OrderByDescending(d => d.LastSeenUtc)
+            .Select(d => (d.Name, d.LastSeenUtc))
+            .ToList();
+        return (engine.Device.Name, others, engine.Config.UsesDrive ? "Google Drive" : engine.Config.Remote);
+    }
+
     private static IReadOnlyDictionary<long, SteamPlay> SteamPlay() =>
         StoreLocations.SteamRoot() is { } root ? SteamActivity.Read(root) : new Dictionary<long, SteamPlay>();
 }

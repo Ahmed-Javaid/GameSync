@@ -99,12 +99,19 @@
       <ControlTemplate>
         <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}"
                 BackgroundSizing="OuterBorderEdge" CornerRadius="999">
-          <c:GsIcon Icon="{TemplateBinding Icon}" Size="{TemplateBinding IconSize}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+          <c:GsIcon Icon="{TemplateBinding Icon}" Size="{TemplateBinding IconSize}" Filled="{TemplateBinding IsOn}" HorizontalAlignment="Center" VerticalAlignment="Center" />
         </Border>
       </ControlTemplate>
     </Setter>
     <Style Selector="^:pointerover">
       <Setter Property="Background" Value="{DynamicResource bg-400}" />
+    </Style>
+    <!-- A toggle that's on (the favourite star): its icon fills in secondary, or in on-art on the art -->
+    <Style Selector="^:on">
+      <Setter Property="Foreground" Value="{DynamicResource secondary}" />
+    </Style>
+    <Style Selector="^.glass:on">
+      <Setter Property="Foreground" Value="{DynamicResource on-art}" />
     </Style>
     <Style Selector="^.sm">
       <Setter Property="Width" Value="32" />
@@ -121,6 +128,26 @@
     </Style>
     <Style Selector="^:disabled">
       <Setter Property="Opacity" Value="0.45" />
+    </Style>
+  </ControlTheme>
+
+  <!-- A breadcrumb's link back (My games › the game): ink-muted text, ink under the pointer -->
+  <ControlTheme x:Key="CrumbButton" TargetType="Button">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Foreground" Value="{DynamicResource ink-muted}" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="FontWeight" Value="Medium" />
+    <Setter Property="Cursor" Value="Hand" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="FocusAdorner" Value="{StaticResource SmallFocus}" />
+    <Setter Property="Template">
+      <ControlTemplate>
+        <ContentPresenter Background="{TemplateBinding Background}" Content="{TemplateBinding Content}" Padding="{TemplateBinding Padding}" />
+      </ControlTemplate>
+    </Setter>
+    <Style Selector="^:pointerover">
+      <Setter Property="Foreground" Value="{DynamicResource ink}" />
     </Style>
   </ControlTheme>
 

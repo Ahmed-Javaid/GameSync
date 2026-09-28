@@ -12,15 +12,17 @@ public sealed record ArtRefresh(int Copied, int Asked, int Downloaded);
 /// <list type="bullet">
 /// <item>First from the Steam client's own cache on this PC, with no network: games in the person's Steam library have their
 /// art there already.</item>
-/// <item>Steam's store is asked once per new game (by app ID, nothing else), for what kind of app it is and any art the
-/// Steam client hasn't cached, such as for Epic and loose copies of Steam games.</item>
+/// <item>Steam's store is asked once per new game (by app ID, nothing else), for what kind of app it is, its store page's
+/// basics for its About (ART-09), and any art the Steam client hasn't cached, such as for Epic and loose copies of Steam games.</item>
 /// <item>After that it's asked again only a week on while art is missing, and a month on for art it gave, in case Steam changed it.</item>
+/// <item>Steam's list of tag names, the same for every game, is asked for once and again a month on.</item>
 /// </list>
 /// </summary>
 public sealed class ArtCache : IDisposable
 {
     private static readonly TimeSpan MissingAskAgain = TimeSpan.FromDays(7);
     private static readonly TimeSpan DownloadedAskAgain = TimeSpan.FromDays(30);
+    private static readonly TimeSpan TagsAskAgain = TimeSpan.FromDays(30);
     private static readonly ArtKind[] Kinds = [ArtKind.Cover, ArtKind.Hero, ArtKind.Logo];
     private static readonly string[] Extensions = [".jpg", ".png", ".webp"];
 
@@ -54,6 +56,42 @@ public sealed class ArtCache : IDisposable
         return Extensions.Select(e => Path.Combine(folder, Name(kind) + e)).FirstOrDefault(File.Exists);
     }
 
+    /// <summary>What the app's Steam store page says about it, once Steam's store has been asked (ART-09).</summary>
+    public SteamStoreInfo? Info(long appId)
+    {
+        var file = Path.Combine(AppFolder(appId), "info.json");
+        try
+        {
+            return File.Exists(file) ? JsonSerializer.Deserialize<SteamStoreInfo>(File.ReadAllText(file)) : null;
+        }
+        catch (Exception e) when (e is JsonException or IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>Steam's names for its tags, as far as they've been asked for; empty before.</summary>
+    public IReadOnlyDictionary<int, string> TagNames()
+    {
+        try
+        {
+            return File.Exists(TagsFile) ? JsonSerializer.Deserialize<Dictionary<int, string>>(File.ReadAllText(TagsFile)) ?? [] : new Dictionary<int, string>();
+        }
+        catch (Exception e) when (e is JsonException or IOException or UnauthorizedAccessException)
+        {
+            return new Dictionary<int, string>();
+        }
+    }
+
+    /// <summary>A game's top tags by name, as its About shows them (ART-09); the ones Steam hasn't named are left out.</summary>
+    public IReadOnlyList<string> TagsOf(SteamStoreInfo info)
+    {
+        var names = TagNames();
+        return info.Tags.Select(t => names.GetValueOrDefault(t)).OfType<string>().ToList();
+    }
+
+    private string TagsFile => Path.Combine(Folder, "tags.json");
+
     /// <summary>
     /// Whether Steam's store lists the app as software (Wallpaper Engine, Lossless Scaling), or as the demo of software
     /// (3DMark Demo), rather than a game, as far as it's been asked.
@@ -75,6 +113,7 @@ public sealed class ArtCache : IDisposable
         foreach (var batch in due.Chunk(SteamArt.Batch))
         {
             IReadOnlyList<SteamAssets> known;
+            IReadOnlyList<SteamStoreInfo> infos;
             try
             {
                 using var reply = await _http.GetAsync(SteamArt.AssetsRequest(batch), ct);
@@ -83,7 +122,9 @@ public sealed class ArtCache : IDisposable
                     continue;
                 }
 
-                known = SteamArt.ParseAssets(await reply.Content.ReadAsStringAsync(ct));
+                var json = await reply.Content.ReadAsStringAsync(ct);
+                known = SteamArt.ParseAssets(json);
+                infos = SteamArt.ParseInfo(json);
             }
             catch (Exception e) when (e is HttpRequestException or TaskCanceledException or JsonException && !ct.IsCancellationRequested)
             {
@@ -97,11 +138,46 @@ public sealed class ArtCache : IDisposable
             {
                 var assets = known.FirstOrDefault(a => a.AppId == appId);
                 var parentType = assets?.ParentAppId is { } parent ? parentTypes.GetValueOrDefault(parent, -1) : (int?)null;
-                Interlocked.Add(ref downloaded, await SaveAsync(appId, assets, parentType, token));
+                Interlocked.Add(ref downloaded, await SaveAsync(appId, assets, parentType, infos.FirstOrDefault(i => i.AppId == appId), token));
             });
         }
 
+        // Steam's tag names, only once some game has tags to name.
+        if (ids.Any(id => Info(id) is { Tags.Count: > 0 }))
+        {
+            await RefreshTagNamesAsync(ct);
+        }
+
         return new ArtRefresh(copied, asked, downloaded);
+    }
+
+    /// <summary>Steam's tag names, when there are none yet or they're a month old; offline, the old ones stay.</summary>
+    private async Task RefreshTagNamesAsync(CancellationToken ct)
+    {
+        if (File.Exists(TagsFile) && _utcNow() - File.GetLastWriteTimeUtc(TagsFile) < TagsAskAgain && TagNames().Count > 0)
+        {
+            return;
+        }
+
+        try
+        {
+            using var reply = await _http.GetAsync(SteamArt.TagListRequest(), ct);
+            if (reply.StatusCode != HttpStatusCode.OK)
+            {
+                return;
+            }
+
+            var names = SteamArt.ParseTags(await reply.Content.ReadAsStringAsync(ct));
+            if (names.Count > 0)
+            {
+                Directory.CreateDirectory(Folder);
+                await File.WriteAllTextAsync(TagsFile, JsonSerializer.Serialize(names), ct);
+            }
+        }
+        catch (Exception e) when (e is HttpRequestException or TaskCanceledException or JsonException && !ct.IsCancellationRequested)
+        {
+            // The About shows no genres until the next try.
+        }
     }
 
     /// <summary>
@@ -183,8 +259,11 @@ public sealed class ArtCache : IDisposable
         }
     }
 
-    /// <summary>Downloads the kinds of art this cache doesn't have, and the ones it downloaded before that Steam has changed since.</summary>
-    private async Task<int> SaveAsync(long appId, SteamAssets? assets, int? parentType, CancellationToken ct)
+    /// <summary>
+    /// Downloads the kinds of art this cache doesn't have, and the ones it downloaded before that Steam has changed since;
+    /// keeps what the store page says about the app for its About.
+    /// </summary>
+    private async Task<int> SaveAsync(long appId, SteamAssets? assets, int? parentType, SteamStoreInfo? info, CancellationToken ct)
     {
         Directory.CreateDirectory(AppFolder(appId));
         var previous = Record(appId);
@@ -209,8 +288,13 @@ public sealed class ArtCache : IDisposable
             }
         }
 
+        if (info is not null)
+        {
+            await File.WriteAllTextAsync(Path.Combine(AppFolder(appId), "info.json"), JsonSerializer.Serialize(info), ct);
+        }
+
         // -1: Steam didn't say what kind of app it is, which isn't worth asking again about.
-        var record = new ArtRecord(assets?.LastModified, _utcNow(), assets is null ? null : assets.StoreType ?? -1, parentType, downloaded.Order().ToList());
+        var record = new ArtRecord(assets?.LastModified, _utcNow(), assets is null ? null : assets.StoreType ?? -1, parentType, downloaded.Order().ToList(), AskedInfo: true);
         await File.WriteAllTextAsync(Path.Combine(AppFolder(appId), "art.json"), JsonSerializer.Serialize(record), ct);
         return saved;
     }
@@ -263,9 +347,9 @@ public sealed class ArtCache : IDisposable
     }
 
     /// <summary>
-    /// Whether to ask Steam's store about the app: never asked; asked before GameSync noted what kind of app each is;
-    /// a demo whose parent isn't known; still missing its cover a week on; or holding art Steam gave, a month on.
-    /// An app whose art all came from the Steam client isn't asked again.
+    /// Whether to ask Steam's store about the app: never asked; asked before GameSync noted what kind of app each is, or
+    /// before it kept the store page's basics (once more, for the About); a demo whose parent isn't known; still missing its
+    /// cover a week on; or holding art Steam gave, a month on. An app whose art all came from the Steam client isn't asked again.
     /// </summary>
     private bool Due(long appId)
     {
@@ -276,6 +360,7 @@ public sealed class ArtCache : IDisposable
 
         var age = _utcNow() - record.CheckedUtc;
         return (record.LastModified is not null && record.StoreType is null) ||
+            (record.StoreType is not null && !record.AskedInfo) ||
             (record.StoreType == SteamAssets.Demo && record.ParentType is null) ||
             (Find(appId, ArtKind.Cover) is null && age > MissingAskAgain) ||
             (record.Downloaded is { Count: > 0 } && age > DownloadedAskAgain);
@@ -302,5 +387,7 @@ public sealed class ArtCache : IDisposable
 
     /// <param name="ParentType">A demo's parent app's store type; -1 when Steam didn't say.</param>
     /// <param name="Downloaded">The kinds of art that came from Steam's store rather than the Steam client.</param>
-    private sealed record ArtRecord(long? LastModified, DateTime CheckedUtc, int? StoreType = null, int? ParentType = null, IReadOnlyList<ArtKind>? Downloaded = null);
+    /// <param name="AskedInfo">Asked with the store page's basics, which records made before ART-09 weren't.</param>
+    private sealed record ArtRecord(long? LastModified, DateTime CheckedUtc, int? StoreType = null, int? ParentType = null, IReadOnlyList<ArtKind>? Downloaded = null,
+        bool AskedInfo = false);
 }

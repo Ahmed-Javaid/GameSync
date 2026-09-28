@@ -168,7 +168,9 @@ public static partial class Cli
                 ?? throw new UsageException($"There's no game '{game}' in the library. See them with 'gamesync library'.");
             var folder = engine.InstallDirs.GetValueOrDefault(game) ?? entry?.InstallDir;
             var programs = folder is not null && Directory.Exists(folder) ? GamePrograms.For(game, folder) : null;
-            return (title, programs, command.Count > 0 ? Wrapped(command) : Route(title, entry, folder), definition is not null);
+            var start = command.Count > 0 ? Wrapped(command)
+                : Route(title, entry, folder, GameLaunch.PickedProgram(engine.State, game), GameLaunch.Options(engine.State, game));
+            return (title, programs, start, definition is not null);
         }
 
         string title;
@@ -371,24 +373,30 @@ public static partial class Cli
         return engine.Games.FirstOrDefault(g => g.Id == game)?.Roots.Values.Where(Directory.Exists).ToList() ?? [];
     }
 
-    /// <summary>PLAY-02: the store's own link for store games, so their DRM and anti-cheat start normally; a loose game's main program otherwise.</summary>
-    private static ProcessStartInfo Route(string title, LibraryEntry? entry, string? folder)
+    /// <summary>
+    /// PLAY-02: the store's own link for store games, so their DRM and anti-cheat start normally; a game in its own folder
+    /// from its program, the one picked for it on this PC or else its main one, with its launch options (PLAY-11).
+    /// </summary>
+    private static ProcessStartInfo Route(string title, LibraryEntry? entry, string? folder, string? program, string? options)
     {
-        switch (entry)
+        if (GameLaunch.StoreLink(entry) is { } link)
         {
-            case { Store: StoreKind.Steam, StoreId: { Length: > 0 } app }:
-                return new ProcessStartInfo($"steam://rungameid/{app}") { UseShellExecute = true };
-            case { Store: StoreKind.Epic, StoreId: { Length: > 0 } app }:
-                return new ProcessStartInfo($"com.epicgames.launcher://apps/{Uri.EscapeDataString(app)}?action=launch&silent=true") { UseShellExecute = true };
+            return new ProcessStartInfo(link) { UseShellExecute = true };
         }
 
-        if (folder is null || !Directory.Exists(folder))
+        if (program is null && (folder is null || !Directory.Exists(folder)))
         {
             throw new UsageException($"{title} has no install folder on this PC to start it from. Set one with: gamesync set install-dir <game> <folder>");
         }
 
-        var exe = Fingerprinter.MainExe(folder) ?? throw new UsageException($"No program was found in {folder} to start {title} with.");
-        return new ProcessStartInfo(exe) { UseShellExecute = false, WorkingDirectory = Path.GetDirectoryName(exe)! };
+        var exe = GameLaunch.Program(folder, program) ?? throw new UsageException($"No program was found in {folder} to start {title} with.");
+        var start = new ProcessStartInfo(exe) { UseShellExecute = false, WorkingDirectory = Path.GetDirectoryName(exe)! };
+        if (options is { Length: > 0 })
+        {
+            start.Arguments = options;
+        }
+
+        return start;
     }
 
     /// <summary>PLAY-08: the command after "--", as Steam passes <c>%command%</c>, run as given from its own folder.</summary>

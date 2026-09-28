@@ -46,6 +46,28 @@
     <Setter Property="Foreground" Value="{DynamicResource ink-muted}" />
   </Style>
 
+  <!-- Menus (design system → Menu): 36px rows on radius-sm inside the dialog's surface; their icons in ink-muted. -->
+  <Style Selector="MenuItem">
+    <Setter Property="CornerRadius" Value="6" />
+    <Setter Property="MinHeight" Value="36" />
+    <Setter Property="FontSize" Value="14" />
+  </Style>
+  <Style Selector="MenuItem c|GsIcon">
+    <Setter Property="Foreground" Value="{DynamicResource ink-muted}" />
+  </Style>
+  <Style Selector="MenuItem:checked c|GsIcon">
+    <Setter Property="Foreground" Value="{DynamicResource secondary}" />
+  </Style>
+
+  <!-- SearchField: a 40px text field on radius-md with the search icon in front (design system → SearchField). -->
+  <Style Selector="TextBox.search">
+    <Setter Property="MinHeight" Value="40" />
+    <Setter Property="CornerRadius" Value="10" />
+    <Setter Property="FontSize" Value="14" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+    <Setter Property="Padding" Value="8,0,4,0" />
+  </Style>
+
   <!-- Every window: the ground, ink and the sans face, which everything inside inherits. -->
   <Style Selector="Window">
     <Setter Property="Background" Value="{DynamicResource bg-100}" />
@@ -75,11 +97,12 @@
     <Setter Property="FontSize" Value="12" />
     <Setter Property="LineHeight" Value="16" />
   </Style>
+  <!-- 0.12em, as the design system's overline -->
   <Style Selector="TextBlock.overline">
     <Setter Property="FontSize" Value="11" />
     <Setter Property="LineHeight" Value="14" />
     <Setter Property="FontWeight" Value="SemiBold" />
-    <Setter Property="LetterSpacing" Value="0.88" />
+    <Setter Property="LetterSpacing" Value="1.32" />
   </Style>
   <Style Selector="TextBlock.mono-stat">
     <Setter Property="FontFamily" Value="{DynamicResource font-mono}" />
@@ -91,6 +114,11 @@
     <Setter Property="FontFamily" Value="{DynamicResource font-mono}" />
     <Setter Property="FontSize" Value="13" />
     <Setter Property="LineHeight" Value="20" />
+  </Style>
+  <!-- A fact that's a path, a build or an option -->
+  <Style Selector="TextBlock.mono-fact">
+    <Setter Property="FontFamily" Value="{DynamicResource font-mono}" />
+    <Setter Property="FontSize" Value="12" />
   </Style>
   <Style Selector="TextBlock.mono-small">
     <Setter Property="FontFamily" Value="{DynamicResource font-mono}" />

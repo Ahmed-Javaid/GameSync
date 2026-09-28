@@ -31,9 +31,9 @@
   ],
   "lastChange": {
     "by": "Vulsight",
-    "at": "2026-09-28T18:21:27Z",
+    "at": "2026-09-28T22:22:44Z",
     "via": "Claude Code",
-    "note": "Glossy and Solid: a Surface choice, three glass strengths over a game's art, edges and on-art tints; every screen in both surfaces; First run without Ludusavi."
+    "note": "Version 17: the drawings match the app as built. A game page has no top-right buttons (Home keeps them), its Saves card says what was found in one line, and a needs-you action reads See where or See why until Add a place and Retry are built; the hero gear is Properties; a Needs you button opens the games saves; Properties greys a game not syncing yet."
   },
   "layout": "files",
   "libraries": [

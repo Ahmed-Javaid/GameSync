@@ -135,6 +135,75 @@ public class LauncherTests
         Assert.Equal("Synced by its store", UI.Controls.GsStatusBadge.Describe(GameStatus.BackupOnly).Word);
     }
 
+    [Fact]
+    public void LIB_15_search_ignores_case_accents_punctuation_and_spaces_and_takes_first_letters()
+    {
+        Assert.True(Launcher.Matches("Black Myth: Wukong", "black myth"));
+        Assert.True(Launcher.Matches("Black Myth: Wukong", "MYTH WU"));
+        Assert.True(Launcher.Matches("Ragnarök", "ragnarok"));
+        Assert.True(Launcher.Matches("Slay the Spire 2", "slaythe"));
+        Assert.True(Launcher.Matches("Slay the Spire 2", "sts"));
+        Assert.True(Launcher.Matches("Slay the Spire 2", "sts2"));
+        Assert.True(Launcher.Matches("Counter-Strike 2", "cs2"));
+        Assert.True(Launcher.Matches("Counter-Strike 2", "counter strike"));
+        Assert.True(Launcher.Matches("Anything", "  "));
+        Assert.False(Launcher.Matches("Slay the Spire 2", "stp"));
+        Assert.False(Launcher.Matches("Terraria", "tera"));
+    }
+
+    [Fact]
+    public void LIB_16_the_library_sorts_by_recent_play_name_hours_or_when_it_was_found_and_the_choice_is_kept()
+    {
+        LauncherGame Game(string title, int daysAgo, int hours, int addedDaysAgo) => new()
+        {
+            Id = Library.NewId(title, []),
+            Title = title,
+            LastPlayedUtc = daysAgo < 0 ? null : Now.AddDays(-daysAgo).ToUniversalTime(),
+            Playtime = TimeSpan.FromHours(hours),
+            AddedUtc = addedDaysAgo < 0 ? null : Now.AddDays(-addedDaysAgo).ToUniversalTime(),
+        };
+        var games = new[]
+        {
+            Game("Valheim", 6, 215, 30),
+            Game("apex Legends", 20, 1090, 10),
+            Game("Risk of Rain 2", 3, 218, 30),
+            Game("Minecraft server world", -1, 0, -1),
+            Game("Balatro", -1, 20, 2),
+        };
+
+        Assert.Equal(["Risk of Rain 2", "Valheim", "apex Legends", "Balatro", "Minecraft server world"], Launcher.Sort(games, LibrarySort.RecentlyPlayed).Select(g => g.Title));
+        Assert.Equal(["apex Legends", "Balatro", "Minecraft server world", "Risk of Rain 2", "Valheim"], Launcher.Sort(games, LibrarySort.Name).Select(g => g.Title));
+        Assert.Equal(["apex Legends", "Risk of Rain 2", "Valheim", "Balatro", "Minecraft server world"], Launcher.Sort(games, LibrarySort.HoursPlayed).Select(g => g.Title));
+        Assert.Equal(["Balatro", "apex Legends", "Risk of Rain 2", "Valheim", "Minecraft server world"], Launcher.Sort(games, LibrarySort.RecentlyAdded).Select(g => g.Title));
+
+        using var world = new TestWorld();
+        var data = Path.Combine(world.Root, "data");
+        Assert.Equal(LibrarySort.RecentlyPlayed, LauncherData.ReadSort(data));
+        LauncherData.SetSort(data, LibrarySort.Name);
+        Assert.Equal(LibrarySort.Name, LauncherData.ReadSort(data));
+    }
+
+    [Fact]
+    public void LIB_17_a_favourite_is_kept_on_this_PC_and_the_library_knows_when_each_game_was_found()
+    {
+        using var world = new TestWorld();
+        var data = Path.Combine(world.Root, "data");
+        var found = Now.AddDays(-4).ToUniversalTime();
+        LauncherData.SetFavourite(data, GameId.Parse("terraria"), true);
+        LauncherData.SetFavourite(data, GameId.Parse("valheim"), true);
+        LauncherData.SetFavourite(data, GameId.Parse("valheim"), false);
+
+        using var state = new StateStore(data);
+        var games = Launcher.Games([Entry("terraria", "Terraria", StoreKind.Steam, "105600") with { FirstSeenUtc = found }, Entry("valheim", "Valheim", StoreKind.Steam, "892970")],
+            [(GameId.Parse("minecraft-server-world"), "Minecraft server world")], state, null, new Dictionary<long, SteamPlay>(), null);
+
+        Assert.True(games.Single(g => g.Title == "Terraria").IsFavourite);
+        Assert.False(games.Single(g => g.Title == "Valheim").IsFavourite);
+        Assert.Equal(found, games.Single(g => g.Title == "Terraria").AddedUtc);
+        Assert.Null(games.Single(g => g.Title == "Valheim").AddedUtc);
+        Assert.Null(games.Single(g => g.Title == "Minecraft server world").AddedUtc);
+    }
+
     private static LibraryEntry Entry(string id, string title, StoreKind store, string? storeId) => new()
     {
         Id = GameId.Parse(id),
