@@ -1,10 +1,10 @@
 # GameSync requirements
 
-> Snapshot of the live [GameSync requirements](https://claude.ai/code/artifact/44d3a52e-5ad7-4d90-9eba-2818c484f613) doc, 27 Sep 2026. Record Pass, Fail or Blocked in the live doc; when rows change there, copy them here. Tests and issues refer to requirements by ID.
+> Snapshot of the live [GameSync requirements](https://claude.ai/code/artifact/44d3a52e-5ad7-4d90-9eba-2818c484f613) doc, 28 Sep 2026. Record Pass, Fail or Blocked in the live doc; when rows change there, copy them here. Tests and issues refer to requirements by ID.
 
 ## How to use this doc
 
-There are 189 requirements in ten areas, each with an ID, a priority and a test: run the test and set Result as you go. Anything you expected that has no row here is a gap, so add it to the last section.
+There are 200 requirements in ten areas, each with an ID, a priority and a test: run the test and set Result as you go. Anything you expected that has no row here is a gap, so add it to the last section.
 
 - **ID**: area plus number, for example `FOLD-04`. IDs are never reused, so test notes and GitHub issues can point at them.
 - **Priority**: **Must** means v1 doesn't ship without it. **Should** means v1 unless it slips. **Later** means designed for now, built after v1.
@@ -22,15 +22,16 @@ GameSync builds its library from each store's records plus the game folders you 
 | LIB-01 | Detects Steam games in every Steam library, from `libraryfolders.vdf` and `appmanifest_*.acf`. | Must | Games in both `E:\Steam` and `G:\SteamLibrary` appear with the right titles. |  |
 | LIB-02 | Detects Epic games from the launcher's `*.item` manifests. | Must | Every installed Epic game appears, on C: and E:. |  |
 | LIB-03 | Detects EA app games from `__Installer\installerdata.xml`. | Should | An EA game in `C:\Program Files\EA Games` appears. |  |
-| LIB-04 | Detects Xbox and Microsoft Store games and marks them Backup only. | Should | An Xbox game appears with the Backup only badge. |  |
+| LIB-04 | Detects Xbox and Microsoft Store games and marks them Synced by Xbox: Xbox syncs them, and GameSync keeps backups. | Should | An Xbox game appears with the Synced by Xbox badge. |  |
 | LIB-05 | Scans the loose game folders you add and matches games by folder and exe names. | Must | Add `E:\Games`: the loose games from the spike appear. |  |
 | LIB-06 | Matches by store ID, then install folder, then letters-and-digits names; a fuzzy title match is only a suggestion you confirm. | Must | "Slay the Spire 2" matches `SlayTheSpire2`; a fuzzy match asks first. |  |
 | LIB-07 | Merges, splits, renames and hand-added games survive rescans and restarts. | Must | Merge "Spacewar" into its real game, rescan, restart: still merged. |  |
 | LIB-08 | A game that disappears becomes Not installed, never deleted, and its saves stay in the cloud. | Must | Uninstall a synced game: it shows Not available and every version remains. |  |
 | LIB-09 | Flags games that ship an anti-cheat, from the install folder, PCGamingWiki, or by hand. | Must | Apex Legends, Helldivers 2, Rocket League and GTA V Enhanced are flagged. |  |
-| LIB-10 | Marks store-cloud games Backup only and leaves probably-online-only games unticked. | Must | Cyberpunk 2077 shows Backup only; Apex Legends starts unticked. |  |
+| LIB-10 | Marks store-cloud games Synced by their store (the badge names it: Synced by Steam) and leaves probably-online-only games unticked. The wording replaced "Backup only" on 28 Sep. | Must | Cyberpunk 2077 shows Synced by Steam; Apex Legends starts unticked. |  |
 | LIB-11 | Every game shows art in every slot, or a title cover; the Cover art rows below say where the art comes from. | Should | Scroll the whole library: no tile is empty. |  |
 | LIB-12 | Rescans at startup, when a store's records change, and on demand. | Must | Install a Steam game with GameSync open: it appears without a restart. |  |
+| LIB-13 | *New.* Add a game or folder of your own, in first run and the library: a name, a folder, and optionally the program that uses it. It syncs like a game: when that program closes, or without one once the folder has been quiet for 5 minutes. Program files in it are never copied (R1). | Must | Add `D:\Servers\Minecraft\world` as "Minecraft server world" with no program: 5 minutes after the server's last autosave, the new version reaches LAPTOP. |  |
 | PLAY-01 | *New.* Launcher home shows the last-played game as the hero with its save status, plus Needs you, Jump back in and Activity. | Must | Play Sekiro and quit: the hero shows Sekiro with "Save synced" and the time. |  |
 | PLAY-02 | Play starts store games through the store's own link and loose games from their main exe in their own folder, never as admin. | Must | Launch a Steam, an Epic and a loose game; the loose game's process isn't elevated. |  |
 | PLAY-03 | Before launching, GameSync pulls a newer cloud save, and warns if the game is open on another PC. | Must | Play on LAPTOP and quit, then press Play on DESKTOP: the laptop's progress loads. |  |
@@ -160,6 +161,8 @@ v1 keeps everything in your own Google Drive, in one GameSync folder that the ap
 | CLOUD-09 | The first big upload shows progress and survives restarts; later uploads send only changed files. | Must | Import the Ludusavi backups: progress shows, and the next sync uploads only changes. |  |
 | CLOUD-10 | Encrypted mode, as a later opt-in: a recovery code, AES-256-GCM on every file and record, HMAC file IDs, and no readable `latest` copy. Shared saves are decrypted on this PC before packing. Drive stays unencrypted until then (decided 27 Sep 2026). | Later | Turn it on: Drive shows no readable save files, and LAPTOP works after entering the code. |  |
 | CLOUD-11 | S3-style buckets (R2, B2) and the GameSync server plug in behind the same two interfaces. | Later | The same sync tests pass against each backend. |  |
+| CLOUD-12 | *New.* Release builds carry GameSync's own Google client, kept out of the public repository, so a friend signs in with one click and never makes a Google Cloud project (decided 28 Sep 2026). | Must | A friend's fresh install signs in to Drive with no file to pick. |  |
+| CLOUD-13 | *New.* One Google account per PC in v1; changing it means signing out and in again (decided 28 Sep 2026). | Must | Sign out and sign in with another account: GameSync uses the new one's Drive only. |  |
 
 ## Save manager and sharing saves
 
@@ -176,8 +179,8 @@ The save manager is the dense, console-style view of every game's saves, and sha
 | SHARE-01 | *New.* Share selected opens the share window with those games ticked; ticking a game takes its latest version. | Must | Tick 2 rows and press Share: both are ticked, with 1 version each. |  |
 | SHARE-02 | *New.* In the share window you can open a game and pick exact versions, older and pinned ones included. | Must | Add Sekiro's "before update" version: the counts and the size update. |  |
 | SHARE-03 | *New.* The footer shows games, versions, the zip name and total size as the selection changes. | Must | The size shown is within 5% of the finished zip. |  |
-| SHARE-04 | *New.* Share all packs the whole backup folder into one zip and shows its size before starting. | Must | The zip holds every game in the backup folder. |  |
-| SHARE-05 | *New.* Share all can be limited to the latest save of each game. | Should | Tick "latest only": the zip is smaller and holds one version per game. |  |
+| SHARE-04 | *New.* Share all packs the current save of every game that can be shared into one zip, and shows its size before starting (reworded 28 Sep 2026: sharing is mostly of current saves, and should be quick). | Must | The zip holds one version per shareable game, each the current one. |  |
+| SHARE-05 | *New.* Any version can be shared, including one only in the cloud: the share window lists versions from their small version records, and downloads only the files of the versions picked (reworded 28 Sep 2026). | Must | On LAPTOP, pick a version that only DESKTOP kept: only its files download, and the zip holds it. |  |
 | SHARE-06 | *New.* Only save data goes in: every file passes the same program-file check as backups (R1). | Must | Plant `a.dll` in a save folder: it's left out and the game shows a warning. |  |
 | SHARE-07 | *New.* Games with an anti-cheat or flagged online-only can't be shared (R16), and the window says why. | Must | Apex Legends is greyed out with the reason; Share all leaves it out and says so. |  |
 | SHARE-08 | *New.* The zip holds a manifest (games, IDs, versions, portable paths, hashes, GameSync version) and a README with manual restore steps. | Must | Open the zip: both are there, and the README steps work without GameSync. |  |
@@ -204,6 +207,8 @@ The save manager is the dense, console-style view of every game's saves, and sha
 | LOOK-09 | Every theme in every mode meets contrast: 4.5:1 for text, 3:1 for large text, icons, focus rings and control borders. An automated check covers them all. | Must | The contrast test passes; spot-check one theme with a contrast tool. |  |
 | LOOK-10 | Reset to default returns to Arcade, Dark, pure black off. | Should | Change everything, then reset. |  |
 | LOOK-11 | The theme covers every GameSync window; Windows notifications and the tray menu follow Windows. | Must | Walk every screen in Sakura, Light: no dark panels left over. |  |
+| LOOK-17 | *New.* Two surface modes, Glossy and Solid, picked under Appearance and saved per PC; a fresh install starts in Glossy (the owner, 28 Sep 2026). Glossy shows a blurred copy of the game's art through the app: full glass on game detail, conflict and the save manager, a step more solid on Home, a soft glow at the top on first run and settings. Solid is the plain look. | Must | Switch between them: every screen repaints live with no restart, and a restart keeps the choice. A fresh install opens in Glossy. |  |
+| LOOK-18 | *New.* Glossy keeps text at 4.5:1 and controls at 3:1 on every surface over any art, darkening bright art more. It falls back to Solid when Windows' transparency effects are off, with pure black, and on a page with no art. | Must | The contrast test runs over worst-case pictures (white, black, saturated). Turn off Transparency effects in Windows: GameSync goes solid. |  |
 | LOOK-12 | Custom colours: any primary or secondary by hex code or colour picker. A colour that fails contrast is adjusted, and the new value is shown. | Later | Enter #202020 as the primary in dark mode: it's lightened until it passes, and the note shows the new value. |  |
 | LOOK-13 | A custom primary close to a status colour gets a note that statuses keep their icon and word. | Later | Enter #F2B544: the note appears. |  |
 | LOOK-14 | Export and import a theme as a small file, to share with friends. | Later | Export Sakura with a custom primary and import it on LAPTOP: identical. |  |
@@ -219,19 +224,20 @@ First run takes four steps; after that the tray app works quietly and speaks up 
 | ONB-01 | First run has four steps: scan this PC, choose games, connect cloud, daily backup time. | Must | A fresh install walks through all four and ends on the launcher. |  |
 | ONB-02 | Found games are grouped: Sync, Back up only, Probably online-only (unticked), Saves found but game not installed, and No saves found yet (watched on first play). | Must | The owner's PC shows each group with the games from the onboarding mockup. |  |
 | ONB-03 | Each game shows its save path and how it was found (save list, engine rule, name search). | Must | Wukong shows "engine rule". |  |
-| ONB-04 | The Ludusavi import brings custom games, the ignore list, and each game's latest backup into its history as a named save kept aside, never current by itself. | Should | The Ludusavi backups of synced games show as "Ludusavi backup (date)" in each game's saves; the 32 ignored games stay ignored. |  |
+| ONB-04 | The Ludusavi import brings custom games, the ignore list, and each game's latest backup into its history as a named save kept aside, never current by itself. From the command line only (`gamesync import-ludusavi`); first run doesn't offer it (28 Sep: almost nobody migrates that way). | Should | The Ludusavi backups of synced games show as "Ludusavi backup (date)" in each game's saves; the 32 ignored games stay ignored. |  |
 | ONB-05 | Anti-cheat games are explained up front: no learn mode, and they launch through their own launcher. | Must | The note names the flagged games. |  |
 | SET-01 | *New.* Settings has sections for Appearance, Storage and folders, Backup and sync, Cloud, Devices, Notifications and Safety. | Must | Every section opens, by mouse and by keyboard. |  |
 | SET-02 | You set the daily backup time; a missed run catches up about 10 minutes after the next sign-in. | Must | Set 20:00 with the PC off at 20:00: the backup runs about 10 minutes after sign-in. |  |
 | SET-03 | Settings shows the last daily run: time, games checked, uploads. | Must | The line matches the log. |  |
 | SET-04 | Safety settings: allow learn mode to ask for admin, and later, encrypt everything in the cloud. | Must | Each setting survives a restart. |  |
-| BG-01 | The tray app starts with Windows for your user and runs as a single instance. | Must | Sign in: one tray icon. Start the exe again: the open window comes forward. |  |
+| SET-05 | *New.* Copy diagnostics puts the logs and each game's version list on the clipboard for a bug report; never sign-in tokens or save files (decided 28 Sep 2026). | Should | Press it and paste into Notepad: logs and versions, no token. |  |
+| BG-01 | GameSync starts in the tray when you sign in, through your own Run key, so Task Manager's Startup apps lists it; it runs once per Windows user, and starting it again brings its window forward (reworded 28 Sep 2026). | Must | Sign in: one tray icon and no window. Start GameSync again: its window comes forward. Turn it off in Startup apps: Settings shows it off. |  |
 | BG-02 | A Task Scheduler entry runs the daily backup (`GameSync.Tray.exe daily`) with no window, or hands the job to the tray app when it's running. | Must | The task exists and its last run shows in the log. |  |
 | BG-03 | The daily run skips running games, backs up and uploads changed games, checks for game updates, refreshes the save list weekly, and logs one line per game. | Must | Read the log after a daily run. |  |
 | BG-04 | Failed jobs retry after 1 minute, doubling up to 1 hour, and survive restarts. | Must | Go offline: retries back off. Reboot: the job resumes. |  |
 | BG-05 | Windows notifications only for what needs you (a conflict, an expired sign-in, saves not found, a blocked file), plus an optional daily summary. | Must | A healthy sync shows no notification. |  |
 | BG-06 | Notifications are held while a fullscreen game runs and shown after it closes. | Must | Cause a conflict during a fullscreen game: the notification appears after you quit. |  |
-| BG-07 | The tray icon shows synced, working, needs you or offline, and hovering shows the counts. | Must | Trigger each state and hover. |  |
+| BG-07 | The tray icon is the GameSync mark in the taskbar's own white or black, with a badge in the status colours for working, needs you, offline and playing, each with its own symbol; hovering shows the news and the counts (the owner's choice, 28 Sep 2026). | Must | Trigger each state on a light and a dark taskbar, and hover. |  |
 | BG-08 | No hashing or uploads during play; only the watcher, and learn mode when you start it, run. | Must | Resource Monitor during a session: no GameSync disk activity beyond the watcher. |  |
 | BG-09 | The command-line verbs `sync --all`, `plan`, `launch <game>` and `restore <game> <version>` work with the app closed and hand off to it when it's open. | Must | Run each both ways. |  |
 
@@ -256,7 +262,7 @@ Each rule from `design.md` keeps its ID and gets an automated test; the check be
 | R13 | Game processes are opened with query-limited access at most: no memory access, injection, suspension, hooks, debugging or overlays. | Must | Audit GameSync's handles to a running game: query-limited only. |  |
 | R14 | No kernel driver; learn mode uses its own uniquely named ETW session, never the NT Kernel Logger. | Must | `logman query -ets` during learn mode lists only GameSync's session. |  |
 | R15 | Learn mode is off for games with an anti-cheat, and those games launch only through their official route. | Must | Learn mode is unavailable on Apex Legends, and Play goes through its store's launcher. |  |
-| R16 | Saves are never edited, and never moved between accounts for online games, including by sharing. | Must | Hashes match before and after a sync; SHARE-07 passes. |  |
+| R16 | Saves are never edited. Saves of games with an anti-cheat, or that play only online, are never moved between accounts, sharing included; single-player saves and multiplayer world files of other games can be shared (widened 28 Sep 2026). | Must | Hashes match before and after a sync; SHARE-07 passes; a Valheim world shares. |  |
 | R17 | The main app never runs as admin. | Must | Task Manager shows GameSync as not elevated. |  |
 | R18 | The tracer runs only during learn mode, lives under Program Files, is signature-checked before it starts, listens only on a pipe limited to your user, and accepts no command that writes. | Must | Connect to the pipe as another user: refused. |  |
 | R19 | Releases are code-signed through SignPath, and the updater checks the signature before installing. | Must | Tamper with an installer: the updater refuses it. |  |
@@ -265,7 +271,7 @@ Each rule from `design.md` keeps its ID and gets an automated test; the check be
 
 ## Accessibility, performance, packaging and updates
 
-GameSync must be usable without colour or a mouse, stay light while games run, and install for friends with one prompt. The performance numbers are proposed targets; nothing in `design.md` sets them yet.
+GameSync must be usable without colour or a mouse, stay light while games run, and install for friends with one prompt. The performance targets were accepted on 28 Sep 2026.
 
 | ID | Requirement | Priority | How to test | Result |
 | --- | --- | --- | --- | --- |
@@ -273,33 +279,26 @@ GameSync must be usable without colour or a mouse, stay light while games run, a
 | A11Y-02 | Everything works from the keyboard, with a visible focus ring. | Must | Share two saves and change the theme using only the keyboard. |  |
 | A11Y-03 | Screen readers get names for icon buttons, tables, progress bars and dialogs. | Should | Narrator reads "Share 2 selected", the dialog title and the packing percentage. |  |
 | A11Y-04 | GameSync follows Windows text size and the Animation effects setting. | Should | At 150% text size nothing is clipped; with animations off, nothing moves. |  |
-| PERF-01 | Proposed: the tray app idles under 150 MB of memory and near 0% CPU with 50 games. | Should | Task Manager after an hour idle. |  |
-| PERF-02 | Proposed: the main window opens from the tray in under 2 seconds. | Should | Time it five times. |  |
-| PERF-03 | Proposed: the save manager stays smooth with 500 games and a 10,000-line log. | Should | Scroll both with a generated library. |  |
+| PERF-01 | The app idles in the tray under 150 MB of memory and near 0% CPU with 50 games. | Should | Task Manager after an hour idle. |  |
+| PERF-02 | The main window opens from the tray in under 2 seconds. | Should | Time it five times. |  |
+| PERF-03 | The save manager stays smooth with 500 games and a 10,000-line log. | Should | Scroll both with a generated library. |  |
 | PKG-01 | One per-machine installer (Inno Setup) under Program Files, with one admin prompt. | Must | Install on a clean Windows 11 VM: one prompt. |  |
 | PKG-02 | A self-contained .NET publish, so friends don't need .NET installed. | Must | Run it on a VM without .NET. |  |
 | PKG-03 | The updater checks GitHub Releases, downloads the signed installer and verifies it before running it. | Must | Publish a test release: it installs. A tampered one is refused (R19). |  |
 | PKG-04 | A portable zip runs without installing, with the admin tracer turned off. | Should | Run it from a USB folder: learn mode works without the tracer. |  |
 | PKG-05 | *New.* Uninstalling removes the app, its startup entry and the scheduled task, but never the backup folder or the cloud copy. | Must | Uninstall: the backups and the Drive files remain. |  |
 | PKG-06 | Runs on Windows 11 and Windows 10 22H2 (decided 28 Sep 2026). | Must | The full test pass on Windows 11, and first run, a sync and a launch on Windows 10 22H2. |  |
+| PKG-07 | *New.* v1 is in English only (decided 28 Sep 2026). | Must | Every screen, notification and message reads in English. |  |
 
 ## Gaps
 
-Fourteen things are not designed or decided yet; each row names the requirements it affects.
+Six things are not designed or decided yet; each row names the requirements it affects. Settled on 28 Sep 2026 and gone from here: the old wireframes (every screen is now designed), Windows 10 (PKG-06), the tray icon (BG-07), your own backup folder and full history (FOLD-02, FOLD-06, BAK-17 stand), Share all and sharing any version (SHARE-04, SHARE-05), what can be shared between friends (R16), the performance targets, Copy diagnostics (SET-05), one Google account per PC (CLOUD-13) and English only (PKG-07).
 
 | Gap | Affects | Suggested next step |
 | --- | --- | --- |
 | The Import saves window is designed, but not how a zip reaches it (file picker, drag and drop, opening the zip from Explorer). | SHARE-10 to SHARE-13 | File picker and drag and drop in v1; opening a zip from Explorer later. |
-| `design.md` gives the tray icon green, blue, amber and grey, but in the app Synced is cyan and status colours never change with the theme. | BG-07, LOOK-08 | Use the app's status colours for the tray icon too. |
-| Choosing your own backup folder and keeping full history on this PC are new; `design.md` treats local history as a 10-version, 2 GB cache. | FOLD-02, FOLD-06, BAK-17 | Confirm both. |
-| Share all packs the backup folder, which only holds what this PC keeps; older versions that are only in the cloud are left out. | SHARE-04, SHARE-05 | Decide: the folder as it is, or download the missing versions first. |
-| Sharing moves single-player saves between people's accounts; R16 only forbids that for online games. | SHARE-07, SHARE-12, R16 | Confirm single-player sharing is fine and add it to R16's wording. |
-| No performance targets exist. | PERF-01 to PERF-03 | Accept or change the proposed numbers. |
 | Uninstall behaviour isn't in `design.md`. | PKG-05 | Add it. |
-| Friends have no way to send logs with a bug report. | none yet | Add Copy diagnostics in Settings: logs and version lists, never tokens. |
-| More than one Google account, or switching accounts, isn't covered. | CLOUD-02, CLOUD-07 | One account per PC for v1. |
 | Screenshots: ignore, back up or sync is still open. | FIND-09 | Decide; they stay off meanwhile. |
 | The "GameSync" name isn't checked on GitHub yet. | none | Check before the repo goes public. |
-| English only is assumed. | none | Confirm. |
 | SteamGridDB needs an API key, and a key built into an open-source app would be public. | ART-04, ART-06 | Each person pastes their own free key in Settings, optional; later the GameSync server can fetch art for everyone. |
 | Reading achievements from Steam's local files (`appcache\stats`) is unproven. | ACH-01, ACH-02 | A spike on three games before building; the person's own Steam Web API key is the fallback. |

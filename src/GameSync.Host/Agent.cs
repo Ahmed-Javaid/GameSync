@@ -10,8 +10,8 @@ using GameSync.Windows;
 
 namespace GameSync.Host;
 
-/// <summary>Where the agent says what it did: the terminal for <c>gamesync agent</c>, notifications for the background app.</summary>
-internal interface IAgentOutput
+/// <summary>Where the agent says what it did: the terminal for <c>gamesync agent</c>, the app's window, tray icon and notifications.</summary>
+public interface IAgentOutput
 {
     void Say(string line);
 
@@ -25,6 +25,21 @@ internal interface IAgentOutput
 
     /// <summary>Called every round: shows what was held back while a fullscreen game ran (BG-06).</summary>
     void Flush()
+    {
+    }
+
+    /// <summary>BG-07: the agent starts (true) or finishes (false) work that reads saves or talks to the cloud.</summary>
+    void Working(bool busy)
+    {
+    }
+
+    /// <summary>A sync finished, with each game's result.</summary>
+    void Synced(IReadOnlyList<GameResult> results)
+    {
+    }
+
+    /// <summary>A game started (true) or stopped (false) being played.</summary>
+    void Played(GameId game, string title, bool playing)
     {
     }
 }
@@ -57,6 +72,7 @@ internal sealed class Agent(string dataDir, IAgentOutput output) : IDisposable
     private DateTime _syncAt = DateTime.MinValue;
     private DateTime _retryAt = DateTime.MinValue;
     private TimeSpan _retryWait = FirstRetry;
+    private int _syncSoon;
 
     public const string DailyRequestKey = "daily.requested";
 
@@ -64,6 +80,9 @@ internal sealed class Agent(string dataDir, IAgentOutput output) : IDisposable
 
     /// <summary>The games playing now, with when each session started.</summary>
     public IReadOnlyDictionary<GameId, DateTime> Playing => _tracker.Playing;
+
+    /// <summary>Sync now, from the window or the tray: every game syncs at the next round with nothing playing (BG-08). Any thread.</summary>
+    public void SyncSoon() => Interlocked.Exchange(ref _syncSoon, 1);
 
     public void Dispose()
     {
@@ -161,15 +180,20 @@ internal sealed class Agent(string dataDir, IAgentOutput output) : IDisposable
 
         if (_ended.Count > 0)
         {
-            await SyncEndedAsync(ct);
+            await WorkAsync(() => SyncEndedAsync(ct));
         }
 
         // BG-02: the scheduled daily run hands itself to the agent when it's running.
         if (_state.GetSetting(DailyRequestKey) is { Length: > 0 })
         {
             _state.SetSetting(DailyRequestKey, "");
-            await Daily.RunAsync(dataDir, output, IsRunningNow, ct);
+            await WorkAsync(() => Daily.RunAsync(dataDir, output, IsRunningNow, ct));
             _syncAt = nowUtc + SyncEvery;
+        }
+
+        if (Interlocked.Exchange(ref _syncSoon, 0) == 1)
+        {
+            _syncAt = DateTime.MinValue;
         }
 
         if (nowUtc >= _syncAt)
@@ -185,6 +209,20 @@ internal sealed class Agent(string dataDir, IAgentOutput output) : IDisposable
         {
             _buildsAt = nowUtc;
             await CheckBuildsAsync(ct);
+        }
+    }
+
+    /// <summary>Work that reads saves or talks to the cloud, with the tray icon showing it (BG-07).</summary>
+    private async Task WorkAsync(Func<Task> work)
+    {
+        output.Working(true);
+        try
+        {
+            await work();
+        }
+        finally
+        {
+            output.Working(false);
         }
     }
 
@@ -227,6 +265,7 @@ internal sealed class Agent(string dataDir, IAgentOutput output) : IDisposable
         _state.SetStatus(game, GameStatus.Playing, $"Playing since {started.StartUtc.ToLocalTime():HH:mm}.");
         _activity[game] = new SaveActivity(_games.TryGetValue(game, out var known) ? known.Folders : []);
         output.Say($"{Title(game)}: playing since {started.StartUtc.ToLocalTime():HH:mm:ss}.");
+        output.Played(game, Title(game), playing: true);
         try
         {
             await Markers.SetAsync(dataDir, game, started.StartUtc, ct);
@@ -250,6 +289,7 @@ internal sealed class Agent(string dataDir, IAgentOutput output) : IDisposable
         _ended[ended.Game] = ended.Session;
         var minutes = Math.Max(1, (int)Math.Round((ended.Session.EndUtc - ended.Session.StartUtc).TotalMinutes));
         output.Say($"{Title(ended.Game)}: session over after {minutes} min{(ended.ByHand ? ", ended by hand" : "")}.");
+        output.Played(ended.Game, Title(ended.Game), playing: false);
     }
 
     /// <summary>The games whose sessions ended sync, their markers go, and each is checked for saves that moved.</summary>
@@ -295,13 +335,16 @@ internal sealed class Agent(string dataDir, IAgentOutput output) : IDisposable
             return;
         }
 
-        var (service, recovered) = await engine.OpenServiceAsync(new SyncOptions { IsRunning = IsRunningNow }, ct);
-        var results = recovered.Concat(await service.SyncAsync(null, ct)).ToList();
-        await Markers.ClearAsync(engine, service, IsRunningNow, ct);
-        Report(output, results);
-        (_retryWait, _retryAt) = results.Any(r => r.Status is GameStatus.UploadPending or GameStatus.NewerInCloud)
-            ? (FirstRetry, nowUtc + FirstRetry)
-            : (FirstRetry, _syncAt);
+        await WorkAsync(async () =>
+        {
+            var (service, recovered) = await engine.OpenServiceAsync(new SyncOptions { IsRunning = IsRunningNow }, ct);
+            var results = recovered.Concat(await service.SyncAsync(null, ct)).ToList();
+            await Markers.ClearAsync(engine, service, IsRunningNow, ct);
+            Report(output, results);
+            (_retryWait, _retryAt) = results.Any(r => r.Status is GameStatus.UploadPending or GameStatus.NewerInCloud)
+                ? (FirstRetry, nowUtc + FirstRetry)
+                : (FirstRetry, _syncAt);
+        });
     }
 
     /// <summary>BG-04: games whose upload or download waits (offline, Drive full) try again after 1 minute, then 2, 4, up to an hour.</summary>
@@ -317,12 +360,15 @@ internal sealed class Agent(string dataDir, IAgentOutput output) : IDisposable
         }
 
         using var engineLock = await EngineLock.AcquireAsync(dataDir, null, ct);
-        var (service, _) = await engine.OpenServiceAsync(new SyncOptions { IsRunning = IsRunningNow }, ct);
-        var results = await service.SyncAsync(waiting, ct);
-        Report(output, results);
-        var stillWaiting = results.Any(r => r.Status is GameStatus.UploadPending or GameStatus.NewerInCloud);
-        _retryWait = stillWaiting ? TimeSpan.FromTicks(Math.Min(_retryWait.Ticks * 2, LongestRetry.Ticks)) : FirstRetry;
-        _retryAt = nowUtc + _retryWait;
+        await WorkAsync(async () =>
+        {
+            var (service, _) = await engine.OpenServiceAsync(new SyncOptions { IsRunning = IsRunningNow }, ct);
+            var results = await service.SyncAsync(waiting, ct);
+            Report(output, results);
+            var stillWaiting = results.Any(r => r.Status is GameStatus.UploadPending or GameStatus.NewerInCloud);
+            _retryWait = stillWaiting ? TimeSpan.FromTicks(Math.Min(_retryWait.Ticks * 2, LongestRetry.Ticks)) : FirstRetry;
+            _retryAt = nowUtc + _retryWait;
+        });
     }
 
     /// <summary>BAK-06: a synced game whose build changed since it was last seen keeps its save before the new build runs.</summary>
@@ -336,8 +382,11 @@ internal sealed class Agent(string dataDir, IAgentOutput output) : IDisposable
         }
 
         using var engineLock = await EngineLock.AcquireAsync(dataDir, null, ct);
-        var (service, _) = await engine.OpenServiceAsync(new SyncOptions { IsRunning = IsRunningNow }, ct);
-        await Builds.KeepAsync(engine, service, changed, output, ct);
+        await WorkAsync(async () =>
+        {
+            var (service, _) = await engine.OpenServiceAsync(new SyncOptions { IsRunning = IsRunningNow }, ct);
+            await Builds.KeepAsync(engine, service, changed, output, ct);
+        });
     }
 
     /// <summary>
@@ -379,7 +428,8 @@ internal sealed class Agent(string dataDir, IAgentOutput output) : IDisposable
     /// </summary>
     internal static void Report(IAgentOutput output, IReadOnlyList<GameResult> results)
     {
-        static bool SignedOut(GameResult result) => result.Message.Contains("sign in again", StringComparison.OrdinalIgnoreCase);
+        static bool SignedOut(GameResult result) =>
+            result.CloudProblem == CloudErrorKind.SignInExpired || result.Message.Contains("sign in again", StringComparison.OrdinalIgnoreCase);
 
         foreach (var result in results)
         {
@@ -406,6 +456,8 @@ internal sealed class Agent(string dataDir, IAgentOutput output) : IDisposable
         {
             output.Fine("GameSync");
         }
+
+        output.Synced(results);
     }
 
     private bool IsRunningNow(GameId game) => _tracker.Playing.ContainsKey(game) || _running.Any(p => p.Game == game);

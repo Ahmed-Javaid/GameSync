@@ -1,5 +1,8 @@
 using System.Globalization;
+using System.Windows.Input;
 using Avalonia.Media;
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using GameSync.Core.Model;
 using GameSync.Core.State;
 using GameSync.Host;
@@ -7,13 +10,20 @@ using GameSync.UI.Controls;
 
 namespace GameSync.UI.ViewModels;
 
+/// <summary>What the launcher's pages ask of the app. Pages made without it (the snapshot tool) only show.</summary>
+/// <param name="Play">Starts a game, with the check before playing when it syncs (PLAY-02, PLAY-03).</param>
+/// <param name="SyncNow">Every game syncs at the agent's next round with nothing playing.</param>
+/// <param name="Show">Opens a page by its rail id, on a tab when given: <c>("library", "attn")</c>.</param>
+/// <param name="SetHidden">Hides a game from the launcher on this PC, or shows it again.</param>
+public sealed record LauncherActions(Action<GameId> Play, Action SyncNow, Action<string, string?> Show, Action<GameId, bool> SetHidden);
+
 /// <summary>A game tile: its cover (or none, for a title cover), status and meta line, and hiding it from the launcher.</summary>
 public sealed record TileItem(GameId Id, string Title, IImage? Art, GameStatus? Status, string? Meta)
 {
     public bool IsHidden { get; init; }
 
     /// <summary>Hides the game from the launcher on this PC, or shows it again; null where the page can't.</summary>
-    public System.Windows.Input.ICommand? ToggleHidden { get; init; }
+    public ICommand? ToggleHidden { get; init; }
 
     public string HideLabel => IsHidden ? "Show in the launcher" : "Hide from the launcher";
 }
@@ -21,9 +31,46 @@ public sealed record TileItem(GameId Id, string Title, IImage? Art, GameStatus? 
 /// <summary>A row of the Needs you card: a small cover, the game, its status and the button that deals with it.</summary>
 public sealed record NeedsYouItem(GameId Id, string Title, IImage? Art, string Initial, GameStatus? Status, string Action);
 
-/// <summary>The launcher home (PLAY-01): the hero, Needs you, Jump back in and this month's activity.</summary>
-public sealed class HomeViewModel
+/// <summary>
+/// The launcher home (PLAY-01): the hero, Needs you, Jump back in and this month's activity. Its pill tabs are the
+/// library's views, as the design system labels them: Recently played is this page, and My games or Needs you open the
+/// library on that view.
+/// </summary>
+public sealed partial class HomeViewModel : ObservableObject
 {
+    public const string ThisPage = "recent";
+
+    [ObservableProperty]
+    private string _selectedTab = ThisPage;
+
+    public HomeViewModel()
+    {
+        PlayCommand = new RelayCommand(() =>
+        {
+            if (HeroId is { } game)
+            {
+                Actions?.Play(game);
+            }
+        });
+        SyncNowCommand = new RelayCommand(() => Actions?.SyncNow());
+        OpenLibraryCommand = new RelayCommand(() => Actions?.Show("library", "all"));
+        OpenSavesCommand = new RelayCommand(() => Actions?.Show("saves", null));
+    }
+
+    /// <summary>What the page asks of the app; without it, the buttons do nothing.</summary>
+    public LauncherActions? Actions { get; init; }
+
+    /// <summary>Continue playing: the hero game, the way its store starts it.</summary>
+    public ICommand PlayCommand { get; }
+
+    public ICommand SyncNowCommand { get; }
+
+    /// <summary>All games, from Jump back in; and Choose games to sync, until first run's own list exists.</summary>
+    public ICommand OpenLibraryCommand { get; }
+
+    /// <summary>The save manager, from the Needs you card.</summary>
+    public ICommand OpenSavesCommand { get; }
+
     public string Greeting { get; init; } = "Welcome back";
 
     public string Subtitle { get; init; } = "Here’s where you left off";
@@ -79,17 +126,19 @@ public sealed class HomeViewModel
 
     public int StartWeekday { get; init; }
 
-    /// <param name="setHidden">Hides a game from the launcher or shows it again; null where the page can't.</param>
-    public static HomeViewModel From(LauncherHome home, IReadOnlyList<LauncherGame> all, DateTime nowLocal, Action<GameId, bool>? setHidden = null)
+    /// <param name="actions">What the page asks of the app; null where it only shows, as in the snapshot tool.</param>
+    public static HomeViewModel From(LauncherHome home, IReadOnlyList<LauncherGame> all, DateTime nowLocal, LauncherActions? actions = null)
     {
         var games = all.Where(g => g.Shown).ToList();
         var hero = home.Hero;
         var needsYouCount = games.Count(g => g.NeedsYou);
+        var setHidden = actions?.SetHidden;
         return new HomeViewModel
         {
+            Actions = actions,
             Tabs =
             [
-                new NavItem("recent", "Recently played"),
+                new NavItem(ThisPage, "Recently played"),
                 new NavItem("all", "My games"),
                 new NavItem("attn", "Needs you", Count: needsYouCount > 0 ? needsYouCount.ToString(CultureInfo.InvariantCulture) : null),
             ],
@@ -114,6 +163,18 @@ public sealed class HomeViewModel
             Days = home.MonthDays,
             StartWeekday = home.MonthStartWeekday,
         };
+    }
+
+    /// <summary>My games and Needs you open the library on that view; Recently played stays chosen here for when you come back.</summary>
+    partial void OnSelectedTabChanged(string value)
+    {
+        if (value == ThisPage || Actions is null)
+        {
+            return;
+        }
+
+        Actions.Show("library", value);
+        SelectedTab = ThisPage;
     }
 
     public static TileItem Tile(LauncherGame game, DateTime nowLocal, int width = 320, bool withMeta = true, Action<GameId, bool>? setHidden = null) =>
@@ -163,56 +224,69 @@ public sealed class HomeViewModel
     };
 }
 
-/// <summary>Every game with its art (LIB-11): a cover from Steam or a title cover, never an empty tile.</summary>
-public sealed class LibraryViewModel
+/// <summary>
+/// Every game with its art (LIB-11): a cover from Steam or a title cover, never an empty tile. Its pill tabs switch the
+/// view in place: all games, those that need you, Steam's software, and games hidden from the launcher.
+/// </summary>
+public sealed partial class LibraryViewModel : ObservableObject
 {
+    private IReadOnlyDictionary<string, IReadOnlyList<TileItem>> _views = new Dictionary<string, IReadOnlyList<TileItem>>();
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(Tiles))]
+    private string _selectedTab = "all";
+
     public string Title { get; init; } = "My games";
 
     public string Subtitle { get; init; } = "";
 
     public IReadOnlyList<NavItem> Tabs { get; init; } = [];
 
-    public IReadOnlyList<TileItem> Tiles { get; init; } = [];
+    /// <summary>The chosen view's tiles.</summary>
+    public IReadOnlyList<TileItem> Tiles => _views.TryGetValue(SelectedTab, out var tiles) ? tiles : [];
 
     /// <param name="tab"><c>all</c> for the games, <c>attn</c> for those that need you, <c>software</c> for Steam's software, <c>hidden</c> for games hidden from the launcher.</param>
-    /// <param name="setHidden">Hides a game from the launcher or shows it again; null where the page can't.</param>
-    public static LibraryViewModel From(IReadOnlyList<LauncherGame> all, DateTime nowLocal, string tab = "all", Action<GameId, bool>? setHidden = null)
+    /// <param name="actions">What the page asks of the app; null where it only shows, as in the snapshot tool.</param>
+    public static LibraryViewModel From(IReadOnlyList<LauncherGame> all, DateTime nowLocal, string tab = "all", LauncherActions? actions = null)
     {
-        var games = all.Where(g => g.Shown).ToList();
-        var software = all.Count(g => g.IsSoftware && !g.IsHidden);
-        var hidden = all.Count(g => g.IsHidden);
-        var withArt = games.Count(g => g.CoverPath is not null);
-        var needsYou = games.Count(g => g.NeedsYou);
-        var shown = tab switch
+        // Each game's picture is decoded once, whichever views show it.
+        var tiles = new Dictionary<GameId, TileItem>();
+        foreach (var game in all)
         {
-            "attn" => games.Where(g => g.NeedsYou),
-            "software" => all.Where(g => g.IsSoftware && !g.IsHidden),
-            "hidden" => all.Where(g => g.IsHidden),
-            _ => games,
+            tiles.TryAdd(game.Id, HomeViewModel.Tile(game, nowLocal, setHidden: actions?.SetHidden));
+        }
+
+        IReadOnlyList<TileItem> Of(IEnumerable<LauncherGame> games) => games.Select(g => tiles[g.Id]).Distinct().ToList();
+        var games = all.Where(g => g.Shown).ToList();
+        var views = new Dictionary<string, IReadOnlyList<TileItem>>
+        {
+            ["all"] = Of(games),
+            ["attn"] = Of(games.Where(g => g.NeedsYou)),
+            ["software"] = Of(all.Where(g => g.IsSoftware && !g.IsHidden)),
+            ["hidden"] = Of(all.Where(g => g.IsHidden)),
         };
+        var needsYou = views["attn"].Count;
         var tabs = new List<NavItem>
         {
             new("all", "All games"),
             new("attn", "Needs you", Count: needsYou > 0 ? needsYou.ToString(CultureInfo.InvariantCulture) : null),
         };
-        if (software > 0)
+        if (views["software"].Count > 0)
         {
             tabs.Add(new NavItem("software", "Software"));
         }
 
-        if (hidden > 0)
+        if (views["hidden"].Count > 0)
         {
             tabs.Add(new NavItem("hidden", "Hidden"));
         }
 
         return new LibraryViewModel
         {
-            Subtitle = $"{games.Count} games · {withArt} with Steam’s art",
+            Subtitle = $"{games.Count} games · {games.Count(g => g.CoverPath is not null)} with Steam’s art",
             Tabs = tabs,
-            SelectedTab = tab,
-            Tiles = shown.Select(g => HomeViewModel.Tile(g, nowLocal, setHidden: setHidden)).ToList(),
+            _views = views,
+            SelectedTab = tabs.Any(t => t.Id == tab) ? tab : "all",
         };
     }
-
-    public string SelectedTab { get; init; } = "all";
 }

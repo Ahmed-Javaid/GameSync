@@ -46,6 +46,11 @@ public class AgentTests
         Assert.Contains(said.Lines, l => l.StartsWith("Fake Game: playing since", StringComparison.Ordinal));
         Assert.Contains(said.Lines, l => l.StartsWith("Fake Game: session over after", StringComparison.Ordinal));
 
+        // BG-07: the app's window and tray icon heard the session start and end, and the sync that followed.
+        Assert.Equal([(Fake, "Fake Game", true), (Fake, "Fake Game", false)], said.Plays);
+        Assert.Contains(said.Syncs, results => results.Any(r => r.Game == Fake && r.Action == Core.Sync.SyncAction.Upload));
+        Assert.Equal(said.Working.Count(w => w), said.Working.Count(w => !w));
+
         using (var agent = new Agent(laptop.Data, new TestOutput()))
         {
             await agent.TickAsync(DateTime.UtcNow, CancellationToken.None);
@@ -77,6 +82,61 @@ public class AgentTests
         Assert.True(EngineLock.AgentRunning(data));
     }
 
+    [Fact]
+    public async Task Sync_now_syncs_every_game_at_the_next_round_and_the_tray_sees_the_work()
+    {
+        using var world = new TestWorld();
+        var desktop = Pc(world, "DESKTOP", installDir: null);
+        File.WriteAllText(Path.Combine(desktop.Saves, "slot.sav"), "a save");
+        var said = new TestOutput();
+        using var agent = new Agent(desktop.Data, said);
+
+        await agent.TickAsync(DateTime.UtcNow, CancellationToken.None);
+        Assert.Single(said.Syncs);
+        Assert.Equal([true, false], said.Working);
+
+        await agent.TickAsync(DateTime.UtcNow, CancellationToken.None);
+        Assert.Single(said.Syncs);
+
+        agent.SyncSoon();
+        await agent.TickAsync(DateTime.UtcNow, CancellationToken.None);
+        Assert.Equal(2, said.Syncs.Count);
+    }
+
+    [Fact]
+    public async Task BG_01_the_apps_agent_waits_while_a_terminal_agent_runs_and_takes_over_when_it_stops()
+    {
+        using var world = new TestWorld();
+        var desktop = Pc(world, "DESKTOP", installDir: null);
+        var said = new TestOutput();
+        var agent = new AppAgent(desktop.Data, said);
+        using var stop = new CancellationTokenSource();
+        Task running;
+
+        using (EngineLock.TryAcquireAgent(desktop.Data))
+        {
+            running = agent.RunAsync(stop.Token);
+            Assert.True(await Eventually(() => said.Lines.Any(l => l.StartsWith("Another GameSync agent is running", StringComparison.Ordinal))));
+            Assert.False(agent.IsRunning);
+        }
+
+        agent.Kick();
+        Assert.True(await Eventually(() => agent.IsRunning));
+        stop.Cancel();
+        await running.WaitAsync(TimeSpan.FromSeconds(30));
+        Assert.False(agent.IsRunning);
+    }
+
+    private static async Task<bool> Eventually(Func<bool> done)
+    {
+        for (var i = 0; i < 100 && !done(); i++)
+        {
+            await Task.Delay(100);
+        }
+
+        return done();
+    }
+
     private static Task<IReadOnlyList<VersionRecord>> Versions(TestWorld world) => new FolderVersionLog(world.Cloud).ListAsync(Fake, CancellationToken.None);
 
     /// <summary>A PC's data folder: games.json with the fake game, synced through the test's cloud folder.</summary>
@@ -103,6 +163,12 @@ public class AgentTests
     {
         public List<string> Lines { get; } = [];
 
+        public List<bool> Working { get; } = [];
+
+        public List<IReadOnlyList<Core.Sync.GameResult>> Syncs { get; } = [];
+
+        public List<(GameId Game, string Title, bool Playing)> Plays { get; } = [];
+
         public void Say(string line)
         {
             lock (Lines)
@@ -112,5 +178,11 @@ public class AgentTests
         }
 
         public void NeedsYou(string title, string message) => Say($"! {title}: {message}");
+
+        void IAgentOutput.Working(bool busy) => Working.Add(busy);
+
+        void IAgentOutput.Synced(IReadOnlyList<Core.Sync.GameResult> results) => Syncs.Add(results);
+
+        void IAgentOutput.Played(GameId game, string title, bool playing) => Plays.Add((game, title, playing));
     }
 }

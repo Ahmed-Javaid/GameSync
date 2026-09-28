@@ -2,6 +2,7 @@
 //   dotnet run --project tools/GameSync.Snapshots -- <output folder> [--data <data folder>] [page ...]
 // Pages: gallery, gallery2, gallery3, and with --data, home and library from that data folder's games and art.
 // Themes: every page in Arcade dark, Arcade light and Sakura dark.
+// "icons" writes gamesync.ico (copy it to src/GameSync.Tray/Assets) and a sheet of the tray icon in every state.
 
 using Avalonia;
 using Avalonia.Controls;
@@ -19,6 +20,18 @@ var dataDir = TakeOption(list, "--data");
 var output = Path.GetFullPath(list.Count > 0 ? list[0] : "snapshots");
 var wanted = list.Skip(1).ToHashSet(StringComparer.OrdinalIgnoreCase);
 Directory.CreateDirectory(output);
+if (wanted.Remove("icons"))
+{
+    foreach (var file in Icons.Write(output))
+    {
+        Console.WriteLine(file);
+    }
+
+    if (wanted.Count == 0)
+    {
+        return;
+    }
+}
 
 AppBuilder.Configure<GsApp>()
     .UseSkia()

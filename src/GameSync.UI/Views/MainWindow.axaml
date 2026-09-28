@@ -1,0 +1,12 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:v="using:GameSync.UI.Views"
+        xmlns:vm="using:GameSync.UI.ViewModels"
+        x:Class="GameSync.UI.Views.MainWindow"
+        x:DataType="vm:ShellViewModel"
+        Title="GameSync"
+        Width="1280" Height="800" MinWidth="1024" MinHeight="640"
+        WindowStartupLocation="CenterScreen">
+  <!-- GameSync's window: the side rail and its pages. Closing it leaves GameSync running in the tray. -->
+  <v:Shell />
+</Window>

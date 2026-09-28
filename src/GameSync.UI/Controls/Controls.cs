@@ -329,7 +329,11 @@ public interface IHasId
 }
 
 /// <summary>A pill tab or a settings section: an id, a label, an icon, and a count (Needs you) or badge.</summary>
-public sealed record NavItem(string Id, string Label, string? Icon = null, string? Count = null) : IHasId;
+public sealed record NavItem(string Id, string Label, string? Icon = null, string? Count = null) : IHasId
+{
+    /// <summary>What a screen reader says for the tab (A11Y-03): its label, and the count when there is one.</summary>
+    public override string ToString() => Count is null ? Label : $"{Label}, {Count}";
+}
 
 /// <summary>Pill tabs that switch a view in place; the selected one fills with <c>secondary-soft</c>. Bind <see cref="SelectedId"/>.</summary>
 public class GsPillTabs : ListBox

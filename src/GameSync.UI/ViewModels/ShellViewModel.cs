@@ -10,7 +10,7 @@ namespace GameSync.UI.ViewModels;
 /// </summary>
 public sealed partial class ShellViewModel : ObservableObject
 {
-    private readonly Dictionary<string, Func<object?>> _pages;
+    private Func<string, object?> _makePage;
 
     [ObservableProperty]
     private string _current;
@@ -18,14 +18,21 @@ public sealed partial class ShellViewModel : ObservableObject
     [ObservableProperty]
     private object? _page;
 
+    [ObservableProperty]
+    private IReadOnlyList<RailItem> _rail = DefaultRail(null, null);
+
     public ShellViewModel(Dictionary<string, Func<object?>> pages, string current = "home")
+        : this(id => pages.TryGetValue(id, out var make) ? make() : null, current)
     {
-        _pages = pages;
-        _current = current;
-        _page = pages.TryGetValue(current, out var make) ? make() : null;
     }
 
-    public IReadOnlyList<RailItem> Rail { get; init; } = DefaultRail(null, null);
+    /// <param name="makePage">Makes a page's view model from its rail id.</param>
+    public ShellViewModel(Func<string, object?> makePage, string current = "home")
+    {
+        _makePage = makePage;
+        _current = current;
+        _page = makePage(current);
+    }
 
     /// <summary>Home, the library, the save manager, the console, and settings at the bottom; dots say a game runs or needs you.</summary>
     public static IReadOnlyList<RailItem> DefaultRail(string? playing, int? needYou) =>
@@ -38,10 +45,24 @@ public sealed partial class ShellViewModel : ObservableObject
         new RailItem("settings", "settings", "Settings", Bottom: true),
     ];
 
+    /// <summary>Makes the page shown now again, from fresh data; with <paramref name="makePage"/>, every page from now on too.</summary>
+    public void Reload(Func<string, object?>? makePage = null)
+    {
+        if (makePage is not null)
+        {
+            _makePage = makePage;
+        }
+
+        Page = _makePage(Current);
+    }
+
+    /// <summary>Opens a page as its rail button does, as when a page's own button leads to another.</summary>
+    public void Open(string id) => Navigate(id);
+
     [RelayCommand]
     private void Navigate(string id)
     {
         Current = id;
-        Page = _pages.TryGetValue(id, out var make) ? make() : null;
+        Page = _makePage(id);
     }
 }

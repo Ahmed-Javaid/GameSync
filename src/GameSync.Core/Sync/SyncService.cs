@@ -176,7 +176,7 @@ public sealed partial class SyncService
                 }
 
                 result = Settle(plan.Stream, result with { Warnings = [.. result.Warnings, .. upload.Warnings] },
-                    plan.Cloud.Problem is null ? upload.Problem : null, log: true);
+                    plan.Cloud.Problem is null ? upload.Problem : null, log: true) with { CloudProblem = (plan.Cloud.Problem ?? upload.Problem)?.Kind };
                 _state.FinishJob(job);
                 results.Add(result);
             }
@@ -682,7 +682,7 @@ public sealed partial class SyncService
             await TryWriteLatestAsync(stream, ct);
         }
 
-        return Settle(stream, result with { Warnings = [.. result.Warnings, .. warnings] }, problem, log: false);
+        return Settle(stream, result with { Warnings = [.. result.Warnings, .. warnings] }, problem, log: false) with { CloudProblem = problem?.Kind };
     }
 
     /// <summary>CLOUD-03: the plain <c>latest/</c> copy follows the current version. Each PC writes the ones it made.</summary>
@@ -1067,7 +1067,7 @@ public sealed partial class SyncService
         };
         _state.SetStatus(stream.Id, status, message);
         _state.Log(stream.Id, "error", message);
-        return new GameResult(stream.Id, stream.Definition.Title, null, status, message);
+        return new GameResult(stream.Id, stream.Definition.Title, null, status, message) { CloudProblem = (e as CloudException)?.Kind ?? plan.Cloud.Problem?.Kind };
     }
 
     private static string Describe(CloudException e) => e.Kind switch

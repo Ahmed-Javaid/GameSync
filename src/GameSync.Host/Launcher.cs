@@ -49,8 +49,7 @@ public sealed record LauncherGame
     public bool Shown => !IsSoftware && !IsHidden;
 
     /// <summary>A status that waits for the person (a conflict, a review, a missing folder, a blocked file).</summary>
-    public bool NeedsYou => Status is GameStatus.Conflict or GameStatus.HeldForReview or GameStatus.FilesInUse or GameStatus.SavesMissing
-        or GameStatus.Blocked or GameStatus.Error;
+    public bool NeedsYou => SyncCounts.NeedsYou(Status);
 }
 
 /// <summary>What the launcher home shows (PLAY-01): the last-played game, what needs you, what to jump back into, and this month's play.</summary>

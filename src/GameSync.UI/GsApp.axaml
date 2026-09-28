@@ -12,6 +12,12 @@
     <DataTemplate DataType="vm:LibraryViewModel">
       <v:LibraryPage />
     </DataTemplate>
+    <DataTemplate DataType="vm:ConsoleViewModel">
+      <v:ConsolePage />
+    </DataTemplate>
+    <DataTemplate DataType="vm:PlaceholderViewModel">
+      <v:PlaceholderPage />
+    </DataTemplate>
   </Application.DataTemplates>
   <Application.Resources>
     <ResourceDictionary>

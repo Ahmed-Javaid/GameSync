@@ -97,6 +97,7 @@ public static partial class Cli
         Playing
           launch <game>              checks for a newer save on your other PCs, then starts the game the way its
                                      store does. With the background app off, this waits and syncs it after.
+                                     A game found but not synced just starts.
           launch <game> -- <command> runs the command instead, as Steam's launch options give it: put
                                      "<folder>\GameSync.Tray.exe" launch <game> -- %command% there
           done <game>                ends a session a launcher keeps open after you quit ("I'm done playing")
@@ -106,7 +107,7 @@ public static partial class Cli
         Background
           schedule                   what Windows runs for GameSync, and the last daily run
           schedule daily <20:00|off> the daily backup, and a catch-up after sign-in when the PC was off then
-          schedule background on|off starts the background app (GameSync.Tray.exe) when you sign in
+          schedule background on|off starts GameSync (GameSync.Tray.exe) in the tray when you sign in
           daily [--if-missed]        the daily backup now; the background app runs it when it's running
           art [--refresh]            each game's cover, hero and logo for the launcher: from Steam's own cache on
                                      this PC first, and from Steam's store only for new games and missing art

@@ -1,11 +1,13 @@
+using GameSync.Core.Model;
+using GameSync.Core.Sync;
 using GameSync.Windows;
 
 namespace GameSync.Host;
 
 /// <summary>
-/// The background app's start (<c>GameSync.Tray.exe</c>): with no command, the agent, once per user (BG-01); with a
-/// command, such as <c>daily</c> from Task Scheduler or <c>launch &lt;game&gt; -- %command%</c> from Steam, that
-/// command, with no window. With no window to print to, what goes wrong goes to the log and a notification.
+/// The app's jobs with no window (<c>GameSync.Tray.exe</c> with a command): <c>daily</c> from Task Scheduler,
+/// <c>launch &lt;game&gt; -- %command%</c> from Steam, and any other command as the command line runs it. With no window
+/// to print to, what goes wrong goes to the log and a notification.
 /// </summary>
 public static class Background
 {
@@ -17,10 +19,8 @@ public static class Background
         var output = new BackgroundOutput(dataDir, notify);
         try
         {
-            switch (list.Count == 0 ? "agent" : list[0])
+            switch (list.Count == 0 ? "" : list[0])
             {
-                case "agent":
-                    return await RunAgentAsync(dataDir, output);
                 case "daily":
                     return await Cli.DailyAsync(dataDir, list.Skip(1).ToList(), output);
                 case "launch":
@@ -41,24 +41,6 @@ public static class Background
             output.NeedsYou("GameSync stopped", e.Message);
             return 1;
         }
-    }
-
-    private static async Task<int> RunAgentAsync(string dataDir, BackgroundOutput output)
-    {
-        if (!File.Exists(AppConfig.PathIn(dataDir)))
-        {
-            return 2;
-        }
-
-        using var agentLock = EngineLock.TryAcquireAgent(dataDir);
-        if (agentLock is null)
-        {
-            return 0;
-        }
-
-        using var agent = new Agent(dataDir, output);
-        await agent.RunAsync(CancellationToken.None);
-        return 0;
     }
 }
 
@@ -92,6 +74,69 @@ internal sealed class BackgroundOutput(string dataDir, Action<string, string> no
     public void Fine(string title) => _notifications.Forget(title);
 
     public void Flush() => _notifications.Flush();
+}
+
+/// <summary>
+/// The agent's output inside GameSync's app: the background app's log file and notifications, and events the window
+/// and the tray icon follow (BG-07). Events come on the agent's thread; the app moves them to its own.
+/// </summary>
+public sealed class AppOutput(string dataDir, Action<string, string> notify) : IAgentOutput
+{
+    private readonly BackgroundOutput _inner = new(dataDir, notify);
+
+    /// <summary>A line of the agent's log, as it's written.</summary>
+    public event Action<string>? Line;
+
+    /// <summary>The agent started (true) or finished (false) work on saves or the cloud.</summary>
+    public event Action<bool>? WorkingChanged;
+
+    /// <summary>A sync finished, with each game's result.</summary>
+    public event Action<IReadOnlyList<GameResult>>? SyncFinished;
+
+    /// <summary>A game started (true) or stopped (false) being played.</summary>
+    public event Action<GameId, string, bool>? PlayChanged;
+
+    public void Say(string line)
+    {
+        lock (_inner)
+        {
+            _inner.Say(line);
+        }
+
+        Line?.Invoke(line);
+    }
+
+    public void NeedsYou(string title, string message)
+    {
+        lock (_inner)
+        {
+            _inner.NeedsYou(title, message);
+        }
+
+        Line?.Invoke($"! {title}: {message}");
+    }
+
+    public void Fine(string title)
+    {
+        lock (_inner)
+        {
+            _inner.Fine(title);
+        }
+    }
+
+    public void Flush()
+    {
+        lock (_inner)
+        {
+            _inner.Flush();
+        }
+    }
+
+    public void Working(bool busy) => WorkingChanged?.Invoke(busy);
+
+    public void Synced(IReadOnlyList<GameResult> results) => SyncFinished?.Invoke(results);
+
+    public void Played(GameId game, string title, bool playing) => PlayChanged?.Invoke(game, title, playing);
 }
 
 /// <summary>
@@ -132,7 +177,7 @@ internal sealed class NotificationQueue(Func<bool> busy, Action<string, string> 
         if (_held.Count > OneByOne)
         {
             var titles = _held.Select(n => n.Title).Distinct().ToList();
-            show("GameSync needs you", $"{string.Join(", ", titles.Take(5))}{(titles.Count > 5 ? $" and {titles.Count - 5} more" : "")}. See what each needs with: gamesync games");
+            show("GameSync needs you", $"{string.Join(", ", titles.Take(5))}{(titles.Count > 5 ? $" and {titles.Count - 5} more" : "")}. Open GameSync to see what each needs.");
         }
         else
         {

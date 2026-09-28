@@ -10,6 +10,9 @@ public sealed record ThemeCard(string Id, string Name, IReadOnlyDictionary<strin
 {
     public string Label => FollowsAccent ? $"{Name}, follows your Windows accent colour" : Name;
 
+    /// <summary>What a screen reader says for the card (A11Y-03).</summary>
+    public override string ToString() => Label;
+
     /// <summary>Every preset in one mode, as the picker shows them (LOOK-05).</summary>
     public static IReadOnlyList<ThemeCard> For(ThemeMode mode, bool pureBlack, string? accent) =>
         ThemeEngine.Presets.Select(p => new ThemeCard(p.Id, p.Name, ThemeEngine.Build(new ThemeChoice(p.Id, mode, pureBlack, Accent: accent)), p.FollowsAccent)).ToList();
@@ -21,6 +24,9 @@ public sealed record SwatchCard(string Id, string Name, Color Fill, Color OnFill
     public IBrush FillBrush => new SolidColorBrush(Fill);
 
     public IBrush OnFillBrush => new SolidColorBrush(OnFill);
+
+    /// <summary>What a screen reader says for the swatch (A11Y-03).</summary>
+    public override string ToString() => Name;
 
     /// <summary>Every swatch as primary or secondary of <paramref name="choice"/> (LOOK-06).</summary>
     public static IReadOnlyList<SwatchCard> For(ThemeChoice choice, bool secondary) =>

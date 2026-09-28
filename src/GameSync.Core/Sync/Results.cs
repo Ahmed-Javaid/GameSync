@@ -57,6 +57,9 @@ public sealed record GameResult(GameId Game, string Title, SyncAction? Action, G
     public IReadOnlyList<string> Warnings { get; init; } = [];
 
     public VersionId? NewVersion { get; init; }
+
+    /// <summary>Why the cloud couldn't be used for this game this time, if it couldn't: offline, a sign-in to renew, a full Drive. The tray icon tells offline from what needs the person by it (BG-07).</summary>
+    public CloudErrorKind? CloudProblem { get; init; }
 }
 
 /// <summary>A restore or upload refused by a safety rule or a damaged file; the game shows Blocked.</summary>

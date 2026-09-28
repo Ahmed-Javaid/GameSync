@@ -6,19 +6,24 @@ using System.Xml;
 namespace GameSync.Host;
 
 /// <summary>
-/// The Windows Task Scheduler tasks GameSync keeps for this user (BG-01, BG-02, SET-02): the daily backup, a catch-up
-/// about 10 minutes after sign-in when the PC was off at the daily time, and the background app at sign-in. They run as
-/// this user, without admin rights, at below-normal priority, and never wake the PC.
+/// The Windows Task Scheduler tasks GameSync keeps for this user (BG-02, SET-02): the daily backup, and a catch-up about
+/// 10 minutes after sign-in when the PC was off at the daily time. They run as this user, without admin rights, at
+/// below-normal priority, and never wake the PC. The app itself starts at sign-in from the person's Run key (BG-01).
 /// </summary>
 internal static class Schedule
 {
     public const string DailyTask = "GameSync daily backup";
     public const string CatchUpTask = "GameSync catch-up";
+
+    /// <summary>Milestone 4 started the background app with this task; the Run key does it now, and the task is removed.</summary>
     public const string BackgroundTask = "GameSync background";
     public static readonly TimeSpan CatchUpDelay = TimeSpan.FromMinutes(10);
 
-    /// <summary>The background app, next to this program.</summary>
+    /// <summary>The app, next to this program.</summary>
     public static string BackgroundProgram => Path.Combine(AppContext.BaseDirectory, "GameSync.Tray.exe");
+
+    /// <summary>BG-01: what the Run key starts at sign-in: the app in the tray, with its window closed.</summary>
+    public static string SignInCommand(string program, string dataDir) => $"\"{program}\" {Arguments("--background", dataDir)}";
 
     public static string DailyTrigger(TimeOnly at, DateTime todayLocal) =>
         $"<CalendarTrigger><StartBoundary>{(todayLocal.Date + at.ToTimeSpan()).ToString("yyyy-MM-ddTHH:mm:ss", System.Globalization.CultureInfo.InvariantCulture)}</StartBoundary>" +

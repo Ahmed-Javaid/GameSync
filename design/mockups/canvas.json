@@ -2,68 +2,39 @@
   "v": 3,
   "attachments": {},
   "boards": {
-    "Conflict.dc.html": {
-      "h": 800,
-      "title": "Conflict",
-      "w": 1280,
-      "x": 1360,
-      "y": 1200
-    },
-    "GameDetail.dc.html": {
-      "h": 800,
-      "title": "Game detail",
-      "w": 1280,
-      "x": 0,
-      "y": 1200
-    },
-    "Logbook.dc.html": {
-      "h": 800,
-      "title": "C · Logbook",
-      "w": 1280,
-      "x": 2720,
-      "y": 0
-    },
-    "Main.dc.html": {
-      "h": 800,
-      "title": "A · Console",
-      "w": 1280,
-      "x": 0,
-      "y": 0
-    },
-    "Onboarding.dc.html": {
-      "h": 800,
-      "title": "First run",
-      "w": 1280,
-      "x": 2720,
-      "y": 1200
-    },
-    "Plan.dc.html": {
-      "h": 800,
-      "title": "Plan",
-      "w": 1280,
-      "x": 0,
-      "y": 2120
-    },
-    "Settings.dc.html": {
-      "h": 800,
-      "title": "Settings",
-      "w": 1280,
-      "x": 1360,
-      "y": 2120
-    },
-    "Shelf.dc.html": {
-      "h": 800,
-      "title": "B · Shelf",
-      "w": 1280,
-      "x": 1360,
-      "y": 0
-    }
+    "Main.dc.html": { "h": 800, "title": "A · Console", "w": 1280, "x": 0, "y": 0 },
+    "Shelf.dc.html": { "h": 800, "title": "B · Shelf", "w": 1280, "x": 1360, "y": 0 },
+    "Logbook.dc.html": { "h": 800, "title": "C · Logbook", "w": 1280, "x": 2720, "y": 0 },
+
+    "Home.dc.html": { "h": 800, "title": "Home · Glossy", "w": 1280, "x": 0, "y": 1200 },
+    "GameDetail.dc.html": { "h": 800, "title": "Game detail · Glossy", "w": 1280, "x": 1360, "y": 1200 },
+    "Conflict.dc.html": { "h": 800, "title": "Conflict · Glossy", "w": 1280, "x": 2720, "y": 1200 },
+    "Onboarding.dc.html": { "h": 800, "title": "First run · Glossy", "w": 1280, "x": 4080, "y": 1200 },
+    "Plan.dc.html": { "h": 800, "title": "Plan · Glossy", "w": 1280, "x": 5440, "y": 1200 },
+    "Settings.dc.html": { "h": 800, "title": "Settings · Glossy", "w": 1280, "x": 6800, "y": 1200 },
+    "AddGame.dc.html": { "h": 800, "title": "Add a game or folder · Glossy", "w": 1280, "x": 8160, "y": 1200 },
+
+    "Home-Solid.dc.html": { "h": 800, "title": "Home · Solid", "w": 1280, "x": 0, "y": 2400 },
+    "GameDetail-Solid.dc.html": { "h": 800, "title": "Game detail · Solid", "w": 1280, "x": 1360, "y": 2400 },
+    "Conflict-Solid.dc.html": { "h": 800, "title": "Conflict · Solid", "w": 1280, "x": 2720, "y": 2400 },
+    "Onboarding-Solid.dc.html": { "h": 800, "title": "First run · Solid", "w": 1280, "x": 4080, "y": 2400 },
+    "Plan-Solid.dc.html": { "h": 800, "title": "Plan · Solid", "w": 1280, "x": 5440, "y": 2400 },
+    "Settings-Solid.dc.html": { "h": 800, "title": "Settings · Solid", "w": 1280, "x": 6800, "y": 2400 },
+    "AddGame-Solid.dc.html": { "h": 800, "title": "Add a game or folder · Solid", "w": 1280, "x": 8160, "y": 2400 }
   },
   "createdOnFiles": {
     "at": "2026-09-27T13:15:00Z",
     "v": 1
   },
-  "designSystems": [],
+  "designSystems": [
+    {
+      "title": "GameSync",
+      "namespace": "gamesync",
+      "artifact": "https://claude.ai/code/artifact/6a117b31-dc9a-4cd7-be46-037c91f1f074",
+      "version": "1790609579-31c7",
+      "copiedAt": "2026-09-28T16:07:27Z"
+    }
+  ],
   "launch": {
     "view": "canvas"
   },
@@ -78,22 +49,47 @@
     },
     "screens": {
       "kind": "title1",
-      "maxW": 4000,
-      "text": "The other screens, as wireframes",
+      "maxW": 9440,
+      "text": "Glossy: your game’s art shows through the app",
       "w": 240,
       "x": 0,
       "y": 940
+    },
+    "solid": {
+      "kind": "title1",
+      "maxW": 9440,
+      "text": "Solid: plain surfaces, as the app looks today",
+      "w": 240,
+      "x": 0,
+      "y": 2140
+    },
+    "glass": {
+      "x": 9520,
+      "y": 1200,
+      "w": 320,
+      "size": "m",
+      "fill": "teal",
+      "text": "Two modes, one row each. In Glossy, Game detail, Conflict and Plan are full glass, Home is a step more solid, and First run, Settings and dialogs keep a soft glow. Each board’s Look tweak switches between the two."
     }
   },
   "order": [
     "Main.dc.html",
     "Shelf.dc.html",
     "Logbook.dc.html",
+    "Home.dc.html",
     "GameDetail.dc.html",
     "Conflict.dc.html",
     "Onboarding.dc.html",
     "Plan.dc.html",
-    "Settings.dc.html"
+    "Settings.dc.html",
+    "AddGame.dc.html",
+    "Home-Solid.dc.html",
+    "GameDetail-Solid.dc.html",
+    "Conflict-Solid.dc.html",
+    "Onboarding-Solid.dc.html",
+    "Plan-Solid.dc.html",
+    "Settings-Solid.dc.html",
+    "AddGame-Solid.dc.html"
   ],
   "pages": [],
   "title": "GameSync UI mockups"

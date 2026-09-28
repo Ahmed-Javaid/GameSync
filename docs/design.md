@@ -60,7 +60,7 @@ flowchart TB
 Only one engine ever touches saves at a time. The tray app and the command line take the same lock, a file in the data folder that Windows lets go of if its program dies. A command waits while the tray app finishes a sync, and says so. The daily run and "I'm done playing" are handed to the tray app when it's running. The highlighted tracer is the only part that runs as admin.
 
 - **GameSync.Core**: all the logic and no UI: game detection, save rules, sync decisions, sessions, safety checks, storage interfaces. Testable without Windows or a cloud.
-- **Tray app** (`GameSync.Tray.exe`): Avalonia UI, library and launcher, process watcher, job queue and notifications. Starts at sign-in. It also runs single jobs with no window, such as the daily run from Task Scheduler and launches from Steam's launch options.
+- **Tray app** (`GameSync.Tray.exe`): Avalonia UI, library and launcher, the agent with its process watcher, Windows' own tray icon and menu, and notifications. Starts at sign-in and runs once per Windows user; closing its window leaves it in the tray (see Background work). It also runs single jobs with no window, such as the daily run from Task Scheduler and launches from Steam's launch options.
 - **Command line** (`gamesync.exe`): the same verbs in a terminal (`sync --all`, `plan`, `launch <game>`, `restore <game> <version>`). It's a second program because a Windows program either opens with no window or prints to a terminal, not both.
 - **Learn-mode tracer**: a separate small exe, started as admin only for a learn session. It streams file events to the tray app and writes nothing.
 - **Local store**: `%LOCALAPPDATA%\GameSync\` holds `state.db`, `history\`, `art\` (cached cover art) and `logs\`. You can move `history\`, the backup folder, anywhere on your PC (Settings, Storage and folders).
@@ -91,10 +91,12 @@ Each game keeps every ID it has (GameSync ID, store IDs, manifest title, install
 **Flags set during detection**
 
 - **Anti-cheat**: EasyAntiCheat, BattlEye, GameGuard, EA AntiCheat or XIGNCODE files in the install folder, PCGamingWiki's anti-cheat info, or set by hand. Turns off learn mode and forces the official launch route. Example from the owner's PC: Apex Legends, Helldivers 2, Rocket League, GTA V Enhanced.
-- **Store cloud**: the manifest's cloud info (Steam, Epic, GOG, Ubisoft, EA) and every Xbox game. Makes the game backup only.
+- **Store cloud**: the manifest's cloud info (Steam, Epic, GOG, Ubisoft, EA) and every Xbox game. The store moves these saves between PCs, so GameSync keeps a backup of every version and leaves the syncing to it. The status reads "Synced by Steam" (or Epic, Xbox), since "Backup only" confused the owner (28 Sep 2026).
 - **Probably online-only**: only settings files found, or progress known to live on servers. Unticked by default.
 
 **Your fixes stick.** Merge two entries ("Spacewar" into the real game), split one, rename, or add a game by hand; the mapping survives rescans.
+
+**Your own games and folders** (LIB-13, asked for by the owner, 28 Sep 2026): Add a game or folder, in first run and the library, takes a name and a folder, such as a game GameSync didn't find or a Minecraft server's world, and syncs it like any game. A session is when the program you pick (optional) runs; without one, the folder counts as quiet, and syncs, once nothing in it has changed for 5 minutes, so a server's world syncs between its autosaves and when it stops. All the usual guards apply: the files have to settle before a copy, program files are never copied (R1: pick the world, not the server folder), a folder that shrinks by over half or empties is held, and every version is kept. Two PCs changing the same world is a conflict like any other.
 
 **Rescans** run at startup, when a store's records change, and on demand. A game that disappears becomes "not installed", never deleted, and its saves stay in the cloud.
 
@@ -103,14 +105,14 @@ Each game keeps every ID it has (GameSync ID, store IDs, manifest title, install
 | Group | Ticked by default | Why |
 | --- | --- | --- |
 | Sync | yes | saves found, no store cloud |
-| Back up only | yes | Steam, Epic or Xbox already syncs it |
+| Synced by their store | yes | Steam, Epic or Xbox already syncs it; GameSync keeps a backup of every version |
 | Probably online-only | no | only settings files found |
 | Saves found, game not installed | yes | keeps history until you decide |
 | Installed, no saves found yet | watching | the first session may reveal them |
 
 "Saves found, game not installed" comes from checking every game in the save list for saves on this PC, from its paths that don't need an install folder (built in Milestone 3; Cyberpunk 2077, The Witcher 3 and Forza Horizon 6 on the owner's PC). In the command line, `confirm --all` also leaves out games only the name search found, since it goes by names alone.
 
-**Moving from Ludusavi** (ONB-04, decided 28 Sep 2026): the import takes over Ludusavi's ignore list (games already confirmed in GameSync stay synced) and the games added by hand in it, and brings each game's latest Ludusavi backup into its history as a named save, "Ludusavi backup (date)": kept aside and pinned, never current by itself. An older backup as a game's first current version would win that game's first sync over the live save, so it isn't one. A game no longer installed gets its backup as history under the save list's rules. Ludusavi's own files are never changed.
+**Moving from Ludusavi** (ONB-04, decided 28 Sep 2026; since later that day a command-line tool only, `gamesync import-ludusavi`, because almost nobody migrates that way, so first run doesn't offer it): the import takes over Ludusavi's ignore list (games already confirmed in GameSync stay synced) and the games added by hand in it, and brings each game's latest Ludusavi backup into its history as a named save, "Ludusavi backup (date)": kept aside and pinned, never current by itself. An older backup as a game's first current version would win that game's first sync over the live save, so it isn't one. A game no longer installed gets its backup as history under the save list's rules. Ludusavi's own files are never changed.
 
 ## Save discovery
 
@@ -345,6 +347,8 @@ public interface IVersionLog
 - Other apps can put files into GameSync's folders, such as a Drive sync client on another PC. `drive.file` hides those files from GameSync, and Drive then won't let GameSync trash the folder. Nothing in normal syncing trashes a folder, and a merged copy that can't be trashed just stays, renamed and unmarked.
 - Each upload is checked against the MD5 Drive reports; a mismatch is thrown away and tried again.
 - Sign-in: a "Desktop app" OAuth client with PKCE and a redirect to 127.0.0.1. The Google project is set to "In production", because "Testing" expires sign-ins after 7 days.
+- Release builds carry GameSync's own client ID and secret, so friends sign in with one click and never make a Google Cloud project (decided 28 Sep 2026). They're kept out of the public repository and added when a release is built; Google treats a desktop app's client secret as not confidential, since anyone can read it out of the program. A build from source asks for a client JSON, as today.
+- One Google account per PC in v1: changing it means signing out and in again (decided 28 Sep 2026).
 - Errors are typed (quota full, sign-in expired, rate limited, offline), retried with backoff where that helps, and shown on the game's status.
 - Files Google flags as malware are never downloaded. The app doesn't set `acknowledgeAbuse`; it shows the error on the game.
 - Drive handles many small files slowly, so a first upload of about 1,300 save files takes minutes. Later uploads send only changed files; bundling small files is a later optimisation.
@@ -393,14 +397,14 @@ Each PC is a named device with its own base per game, and paths travel in portab
 
 The tray app does the work while it runs, a daily backup covers the rest, and neither ever interrupts a fullscreen game.
 
-- **Tray app**: starts at sign-in for your user through a Task Scheduler entry, runs as a single instance (a lock file of its own), and holds the watcher, the job queue and the UI.
+- **Tray app**: starts at sign-in from your own Run key (`GameSync.Tray.exe --background`), with no admin, so Task Manager's Startup apps lists it and can turn it off. It runs once per Windows user and data folder, held by a named mutex; starting it again asks the running one, over a pipe only your Windows user can open, to bring its window forward, and the command line's jobs will come the same way (BG-09). It holds the agent (the watcher and the syncs), the tray icon and the UI. Closing the window leaves it in the tray and lets go of the window's pictures, so it waits small (PERF-01); Quit is in the tray menu.
 - **Between sessions**: every game syncs every 15 minutes and when the tray app starts, so what another PC played comes down without a click. Each synced game's build is read every minute, so its save is kept before an update runs.
 - **Daily backup**: each person picks the time in Settings; setup suggests an evening hour when the PC is usually on. A Task Scheduler entry runs `GameSync.Tray.exe daily` with no window, or hands the job to the tray app when it's running. It runs as you, without admin rights, at below-normal priority, and never wakes the PC.
 - **Missed runs catch up**: if the PC was off at that time, the backup runs about 10 minutes after the next sign-in (a second entry, which runs only then). Most syncing happens at game exit anyway; the daily run is the safety net.
 - **What the daily run does**: skips games that are running, backs up and uploads changed games, checks for game updates, refreshes the save list weekly, and writes one line per game to the activity log.
 - **Retries**: failed jobs wait 1 minute, then double the wait each time, up to 1 hour. Jobs survive restarts.
 - **Notifications**: Windows toasts only for things that need you (a conflict needing a decision, an expired sign-in, saves not found, a blocked file, saves that may have moved), plus an optional daily summary. They're held while a fullscreen game runs (checked with `SHQueryUserNotificationState`) and shown after it closes. Each shows once while its problem lasts, an expired sign-in is one toast for all games, and more than three at once become one.
-- **Tray icon**: green when everything is synced, blue while working, amber when something needs you, grey when offline. Hovering shows the counts.
+- **Tray icon** (the owner's choice, 28 Sep 2026): the GameSync mark in the taskbar's own white or black, like Windows' own icons, with nothing else when every game is synced. Anything else is a small badge in the fixed status colours, its symbol cut out so the taskbar shows through: an up arrow in cyan while working, "!" in amber when something needs you, a dash in grey when offline (the mark greys too), and a play sign in violet while a game runs. When several apply, needs you wins, then offline, playing, working. Hovering shows the news and the counts ("GameSync: 2 games need you", "41 of 44 synced · 2 need you · 1 waiting"). A click opens the window; the right-click menu is Windows' own, in Windows' light or dark (LOOK-11): Open GameSync, Sync now, Quit GameSync.
 - **No disk work during play**: hashing and uploads wait for the session to end. Only the watcher, and learn mode when you start it, run while you play.
 
 ## UI
@@ -409,12 +413,12 @@ Eight screens share one idea: every game shows exactly one status, and every sta
 
 | Screen | Shows | Actions |
 | --- | --- | --- |
-| Onboarding | detected games in their groups, save paths found, Ludusavi import, cloud sign-in, daily backup time | tick or untick, confirm paths, connect Google Drive |
+| Onboarding | detected games in their groups, save paths found, cloud sign-in, daily backup time | tick or untick, confirm paths, Add a game or folder, connect Google Drive |
 | Library | cover grid or list, with a status badge, playtime and last played per game | Play, filter by status, Sync now |
 | Game detail | save rules and resolved paths, named saves by date, a version timeline across PCs, the activity log | Save as… (asks for a name), Restore a named save, Rename, Import kept saves, Back up, Upload, Download, Restore a version, Export, Open folder, Learn mode |
 | Plan | what the next sync would do for each game, and why | Run, skip a game |
 | Conflict | both sides: changed files, sizes, save times, PCs, playtime | Keep this PC's, Keep the cloud's, Compare files, Decide later |
-| Settings | appearance, storage and folders (backup folder, history to keep, game folders to scan, extra and ID-named save folders, where shared zips go), daily backup time and conflict default, cloud, devices, notifications, safety | pick a theme and colours, change or move a folder, add or remove a folder, rename a device, sign out |
+| Settings | appearance, storage and folders (backup folder, history to keep, game folders to scan, extra and ID-named save folders, where shared zips go), daily backup time and conflict default, cloud, devices, notifications, safety | pick a theme and colours, change or move a folder, add or remove a folder, rename a device, sign out, start at sign-in on or off, Copy diagnostics (logs and version lists, never tokens) |
 | Launcher home | the last-played game as a hero with its save status and newest named save, Needs you, Jump back in, play activity by day | Continue playing, Save as…, Restore a named save, Manage saves, Resolve or Review |
 | Save manager | every game's saves in a dense console-style table (status, path, versions, size, last backup), a stats strip, the live log | select, Share selected, Share all, Import saves, Sync now |
 
@@ -432,11 +436,12 @@ Eight screens share one idea: every game shows exactly one status, and every sta
 | Saves not found | every path that was tried | Add path, Learn mode |
 | Not available | drive disconnected or game not installed | none |
 | Blocked | antivirus, a Google malware flag, or a failed safety check | Details |
-| Backup only | a store cloud syncs this game | Back up now |
+| Synced by Steam (or Epic, Xbox) | the store's cloud syncs this game; GameSync keeps a backup of every version | Back up now |
 
 - **Look** (chosen 2026-09-27): the launcher follows the owner's reference images in `Design inspirations/` (dark rounded cards, pill tabs, a cover-art hero, a play-activity calendar), and the save manager uses the Console look, because it shows more detail. Tokens, components and showcase screens live in the GameSync design system (link in `CLAUDE.md`).
 - **Theming**: Dark (default), Light or Match Windows; pure black backgrounds for OLED screens in dark mode; six preset themes (Arcade, the default cyan, then Moss, Tidal, Sakura, Citrus, Mono) plus one that follows the Windows accent colour. Each preset sets a primary and a secondary colour and a faint surface tint, and either colour can be swapped from 11 curated swatches. One engine derives every colour from those choices and keeps text at 4.5:1 and controls at 3:1 in every combination. Status colours never change with the theme. Choices are saved per PC and apply live. Later: any custom colour (adjusted until it passes contrast), theme export and import, tinting a game's pages from its cover art.
-- **Sharing saves**: Share selected packs the ticked games (latest version each, or exact versions picked in the share window) into one zip; Share all packs the whole backup folder, optionally latest saves only. Only save data goes in (R1), games with an anti-cheat or an online mode are locked out (R16), and the zip carries a manifest plus a README with manual restore steps. **Import saves** adds a shared zip's saves as pinned versions, never current ones, after the same checks as a restore (R1, R3, R6, R7); saves that embed another account's ID get a warning.
+- **Glossy and Solid** (the owner's choice, 28 Sep 2026, drawn on the mockups canvas): two surface modes, picked under Appearance → Surface and saved per PC; a fresh install starts in Glossy (the owner, 28 Sep 2026) (LOOK-17). **Glossy** puts each page on a blurred, darkened copy of a game's art (the page's own game on game detail and conflict, otherwise the last one played) and lets it show through the surfaces, in three strengths: full glass on game detail, conflict and the save manager; a step more solid on Home; a soft glow at the top of the page over nearly solid cards on first run and settings. **Solid** is the plain look the app has today. The app makes the backdrop once per game on the CPU (a small blurred bitmap, no live blur), so it runs on Windows 10 and 11 with the app's CPU drawing. Bright art is darkened more, so text keeps 4.5:1 on every surface over any picture (LOOK-18). Glossy falls back to Solid when Windows' transparency effects are off, with pure black, and on a page with no art; it is dark mode only until a light version is designed. Which mode is the default is the owner's call (Glossy proposed).
+- **Sharing saves** (reworked 28 Sep 2026: sharing is mostly of current saves, and should be quick): Share selected packs the ticked games (the current save each, or exact versions picked in the share window) into one zip; Share all packs the current save of every game that can be shared. Any version can be picked, including one that only the cloud or another PC kept: the share window lists versions from their version records, which are small, and downloads only the files of the versions picked. Only save data goes in (R1). Single-player saves and multiplayer world files can be shared; games with an anti-cheat, or that play only online, are locked out (R16). The zip carries a manifest plus a README with manual restore steps. **Import saves** adds a shared zip's saves as pinned versions, never current ones, after the same checks as a restore (R1, R3, R6, R7); saves that embed another account's ID get a warning.
 - **Cover art**: official Steam art for every game with a Steam app ID, taken from the store's records or from the save list's Steam ID, so Epic and loose copies of Steam games get it too. Image file names come from Steam's store API (`IStoreBrowseService/GetItems` with `include_assets`, no key needed), because newer games keep their art under hashed paths that can't be guessed from the app ID. Tiles use the 600×900 library capsule; the hero uses the library hero with the game's `logo.png` over it, since Steam's hero art never contains text; rows use the 300×450 capsule.
   - Games with no Steam art use SteamGridDB only if the person has added their own free API key in Settings. Otherwise, and whenever nothing matches, the tile shows a title cover: the game's name on a themed tile, never an empty box. The person can pick another cover per game, including an image file of their own.
   - Art is cached in `art\`, works offline, refreshes when Steam's image timestamp changes, and never goes to the cloud or into a shared zip. Downloaded images are untrusted: JPEG, PNG or WebP only, size-limited, checked by content.
@@ -473,7 +478,7 @@ Only save data ever moves, restores can write only inside a game's approved fold
 - **R13.** Game processes are opened with query-limited access at most: never memory access, injection, suspension, hooks, debugging or overlays.
 - **R14.** No kernel driver. Learn mode uses ETW in its own uniquely named session, never the shared NT Kernel Logger, and never touches other sessions.
 - **R15.** Learn mode is off for games with an anti-cheat, and those games launch only through their official route.
-- **R16.** Saves are never edited, and never moved between accounts for online games.
+- **R16.** Saves are never edited. Saves of games with an anti-cheat, or that play only online, are never moved between accounts, sharing included; single-player saves and multiplayer world files of other games can be shared (widened 28 Sep 2026).
 
 **Admin helper**
 
@@ -559,7 +564,7 @@ GameSync is C# on .NET 10 with an Avalonia UI, shipped as one signed installer, 
 | Need | Choice |
 | --- | --- |
 | Runtime | .NET 10 (LTS), C# |
-| UI and tray | Avalonia, with the owner's own styles |
+| UI and tray | Avalonia, with the owner's own styles, drawn by Skia on the CPU so the app waits small in the tray (about 70 MB, against about 120 MB with the GPU); Windows' own tray icon and menu |
 | Local database | SQLite through Microsoft.Data.Sqlite |
 | Google Drive | Google.Apis.Drive.v3 |
 | S3, R2, B2 | AWSSDK.S3 |
@@ -578,7 +583,8 @@ GameSync.sln
     GameSync.Storage.S3/      S3/R2 backend (v2)
     GameSync.Windows/         process watcher, known folders, registry, AMSI, DPAPI, the fullscreen check
     GameSync.Host/            the engine as a program: verbs, the agent, the daily run, Task Scheduler entries
-    GameSync.Tray/            GameSync.Tray.exe: the agent with no window, toasts; the Avalonia UI and tray icon join it
+    GameSync.Tray/            GameSync.Tray.exe: the app (window, tray icon, the agent inside), and jobs with no window
+    GameSync.UI/              the screens, the theme engine and the design system's components
     GameSync.App/             gamesync.exe: the command line
     GameSync.Tracer/          the learn-mode helper
     GameSync.Server/          later
@@ -625,7 +631,7 @@ Milestone 1 can use the owner's Ludusavi backup folder (about 1 GB across 46 gam
 
 ## Open questions
 
-Nine decisions are still open; four are settled. Until chosen, the design assumes the first option in each. The requirements doc (link in `CLAUDE.md`) lists every testable requirement and the remaining gaps.
+Six decisions are still open; eight are settled. Until chosen, the design assumes the first option in each. The requirements doc (link in `CLAUDE.md`) lists every testable requirement and the remaining gaps.
 
 - [x] **UI look**: the reference-image launcher plus the Console save manager, with preset themes (see UI).
 - [ ] **Name**: keep "GameSync" (check it isn't taken on GitHub first), or pick another?
@@ -636,7 +642,8 @@ Nine decisions are still open; four are settled. Until chosen, the design assume
 - [ ] **Screenshots**: ignore them, back them up, or sync them?
 - [ ] **Friends' setups**: Windows only, or does anyone need Steam Deck or Linux early?
 - [ ] **Server**: build it after v1, or only if Drive falls short?
-- [ ] **Sharing between friends**: is moving single-player saves to a friend's account fine? The design assumes yes, with online and anti-cheat games locked out.
-- [ ] **Share all**: pack the backup folder as it is, or first download versions that only exist in the cloud?
-- [ ] **Tray icon colours**: switch to the app's status colours (cyan synced, amber needs you, grey offline)?
+- [x] **Sharing between friends** (28 Sep 2026): single-player saves and multiplayer world files can be shared; games with an anti-cheat, or that play only online, stay locked out (R16).
+- [x] **Share all** (28 Sep 2026): the current save of each game; any single version, even one only in the cloud, can be picked, and only its files download (see UI → Sharing saves).
+- [x] **Tray icon** (28 Sep 2026): the mark in the taskbar's own ink, with a badge in the status colours (see Background work).
+- [x] **Friends' sign-in, accounts, language, diagnostics, speed** (28 Sep 2026): release builds carry GameSync's Google client; one Google account per PC; English only in v1; Copy diagnostics in Settings (SET-05); the performance targets PERF-01 to PERF-03 stand.
 - [ ] **SteamGridDB key**: each person adds their own free key (assumed), or the future server fetches art for everyone?

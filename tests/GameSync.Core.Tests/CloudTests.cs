@@ -129,6 +129,7 @@ public class CloudTests
 
         Assert.Equal(GameStatus.UploadPending, waiting.Status);
         Assert.Contains(message, waiting.Message);
+        Assert.Equal(kind, waiting.CloudProblem);
         if (kind == CloudErrorKind.SignInExpired)
         {
             Assert.Contains("gamesync signin", waiting.Message);

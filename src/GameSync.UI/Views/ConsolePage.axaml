@@ -1,0 +1,15 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="using:GameSync.UI.Controls"
+             xmlns:vm="using:GameSync.UI.ViewModels"
+             x:Class="GameSync.UI.Views.ConsolePage"
+             x:DataType="vm:ConsoleViewModel">
+  <!-- The agent's log as it happens (design system → ConsoleLog), filling the page. -->
+  <DockPanel Margin="24,20">
+    <StackPanel DockPanel.Dock="Top" Margin="0,0,0,20">
+      <TextBlock Text="{Binding Title}" FontSize="15" LineHeight="20" FontWeight="SemiBold" />
+      <TextBlock Classes="caption faint" Text="{Binding Subtitle}" TextTrimming="CharacterEllipsis" />
+    </StackPanel>
+    <c:GsConsoleLog Lines="{Binding Lines}" Live="True" />
+  </DockPanel>
+</UserControl>

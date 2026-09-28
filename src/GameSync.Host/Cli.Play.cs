@@ -47,7 +47,7 @@ public static partial class Cli
             case "":
                 var time = state.GetSetting(DailyTimeKey) is { Length: > 0 } at ? $"every day at {at}, and about 10 minutes after sign-in when the PC was off then" : "off";
                 Console.WriteLine($"Daily backup:    {time}");
-                Console.WriteLine($"Background app:  {(Schedule.Exists(Schedule.BackgroundTask) ? "starts at sign-in" : "off")}{(EngineLock.AgentRunning(dataDir) ? ", running now" : "")}");
+                Console.WriteLine($"GameSync app:    {(SignInStart.ForThisUser().IsOn || Schedule.Exists(Schedule.BackgroundTask) ? "starts at sign-in" : "doesn't start at sign-in")}{(EngineLock.AgentRunning(dataDir) ? ", running now" : "")}");
                 Console.WriteLine(Daily.Last(state) is { } last
                     ? $"Last daily run:  {last.AtUtc.ToLocalTime():yyyy-MM-dd HH:mm}: {last.Games} games checked, {last.Uploads} uploaded{(last.NeedYou > 0 ? $", {last.NeedYou} need you" : "")}"
                     : "Last daily run:  none yet");
@@ -76,15 +76,15 @@ public static partial class Cli
                 return 0;
 
             case "background" when Arg(rest, 1, "on or off") == "on":
-                Schedule.Register(Schedule.BackgroundTask, Schedule.TaskXml(
-                    "GameSync: watches your games in the background and syncs each after you play.",
-                    Schedule.SignInTrigger(null), BackgroundProgram(), Schedule.Arguments("agent", dataDir), unlimited: true));
-                Console.WriteLine("GameSync's background app starts at sign-in from now on. Start it now with: GameSync.Tray.exe");
+                SignInStart.ForThisUser().TurnOn(Schedule.SignInCommand(BackgroundProgram(), dataDir));
+                Schedule.Remove(Schedule.BackgroundTask);
+                Console.WriteLine("GameSync starts in the tray when you sign in; Task Manager's Startup apps lists it as GameSync. Start it now with: GameSync.Tray.exe");
                 return 0;
 
             case "background" when rest[1] == "off":
+                SignInStart.ForThisUser().TurnOff();
                 Schedule.Remove(Schedule.BackgroundTask);
-                Console.WriteLine("GameSync's background app no longer starts at sign-in.");
+                Console.WriteLine("GameSync no longer starts when you sign in.");
                 return 0;
 
             default:
@@ -147,9 +147,10 @@ public static partial class Cli
     /// PLAY-02, PLAY-03, PLAY-08: the pre-launch check, then the game's official route: Steam's or Epic's link, or a loose
     /// game's main program from its own folder, never as admin. After "--", the command Steam gives a launch option
     /// (<c>%command%</c>) runs instead, and it runs even when GameSync can't check first: GameSync never stands between
-    /// you and the game. When the agent isn't running, this stays until the game closes and syncs it.
+    /// you and the game. When the agent isn't running, this stays until the game closes and syncs it. A game found but
+    /// not synced starts the same way, with nothing to check or sync.
     /// </summary>
-    /// <param name="background">For the background app, which has no window: lines go to its log, warnings become notifications.</param>
+    /// <param name="background">For the app and its jobs, which have no terminal: lines go to their log, warnings become notifications.</param>
     internal static async Task<int> LaunchAsync(string dataDir, List<string> rest, IAgentOutput? background = null)
     {
         var separator = rest.IndexOf("--");
@@ -158,21 +159,22 @@ public static partial class Cli
         var output = background ?? new LaunchConsole();
         var ct = CancellationToken.None;
 
-        (string Title, GamePrograms? Programs, ProcessStartInfo Start) Look()
+        (string Title, GamePrograms? Programs, ProcessStartInfo Start, bool Syncs) Look()
         {
             using var engine = Engine.Open(dataDir);
-            var definition = engine.Games.FirstOrDefault(g => g.Id == game)
-                ?? throw new UsageException($"There's no game '{game}' that syncs. See them with 'gamesync games'.");
-            var folder = engine.InstallDirs.GetValueOrDefault(game);
+            var entry = engine.Library.All().FirstOrDefault(e => e.Id == game && e.State != LibraryState.Ignored && e.MergedInto is null);
+            var definition = engine.Games.FirstOrDefault(g => g.Id == game);
+            var title = definition?.Title ?? entry?.DisplayTitle
+                ?? throw new UsageException($"There's no game '{game}' in the library. See them with 'gamesync library'.");
+            var folder = engine.InstallDirs.GetValueOrDefault(game) ?? entry?.InstallDir;
             var programs = folder is not null && Directory.Exists(folder) ? GamePrograms.For(game, folder) : null;
-            return (definition.Title, programs,
-                command.Count > 0 ? Wrapped(command) : Route(definition.Title, engine.Library.All().FirstOrDefault(e => e.Id == game), folder));
+            return (title, programs, command.Count > 0 ? Wrapped(command) : Route(title, entry, folder), definition is not null);
         }
 
         string title;
         GamePrograms? programs;
         ProcessStartInfo start;
-        var checkFirst = true;
+        bool checkFirst;
         if (command.Count == 0)
         {
             if (IsElevated())
@@ -180,7 +182,7 @@ public static partial class Cli
                 throw new UsageException("GameSync is running as administrator, so the game would too. Start GameSync normally and launch again.");
             }
 
-            (title, programs, start) = Look();
+            (title, programs, start, checkFirst) = Look();
             if (programs is not null && new ProcessWatcher().Find([programs]).Count > 0)
             {
                 throw new UsageException($"{title} is already running.");
@@ -191,7 +193,7 @@ public static partial class Cli
             // Steam's launch option: Steam already knows whether the game runs, and the game starts whatever GameSync's trouble.
             try
             {
-                (title, programs, start) = Look();
+                (title, programs, start, checkFirst) = Look();
             }
             catch (Exception e) when (e is not OperationCanceledException)
             {

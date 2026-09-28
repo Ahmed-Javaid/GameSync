@@ -1,0 +1,17 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="using:GameSync.UI.Controls"
+             xmlns:vm="using:GameSync.UI.ViewModels"
+             x:Class="GameSync.UI.Views.PlaceholderPage"
+             x:DataType="vm:PlaceholderViewModel">
+  <!-- A screen that has its place on the rail but isn't built yet. -->
+  <DockPanel Margin="24,20">
+    <TextBlock DockPanel.Dock="Top" Text="{Binding Title}" FontSize="15" LineHeight="20" FontWeight="SemiBold" Margin="0,0,0,20" />
+    <c:GsCard VerticalAlignment="Top" MaxWidth="560" HorizontalAlignment="Left">
+      <StackPanel Orientation="Horizontal" Spacing="16">
+        <c:GsIcon Icon="{Binding Icon}" Size="28" Foreground="{DynamicResource secondary}" VerticalAlignment="Top" />
+        <TextBlock Text="{Binding Text}" TextWrapping="Wrap" MaxWidth="460" Foreground="{DynamicResource ink-muted}" />
+      </StackPanel>
+    </c:GsCard>
+  </DockPanel>
+</UserControl>

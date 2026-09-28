@@ -1,15 +1,25 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- GameSync's background app: no window for now; the tray icon and the UI join it in Milestone 5. -->
+  <!-- GameSync's app: the window, the tray icon and the agent inside; with a command such as "daily" or "launch", that job with no window. -->
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
     <AssemblyName>GameSync.Tray</AssemblyName>
     <RootNamespace>GameSync.Tray</RootNamespace>
+    <ApplicationIcon>Assets\gamesync.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Avalonia.HarfBuzz" Version="12.1.3" />
+    <PackageReference Include="Avalonia.Skia" Version="12.1.3" />
+    <PackageReference Include="Avalonia.Win32" Version="12.1.3" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\GameSync.Host\GameSync.Host.csproj" />
+    <ProjectReference Include="..\GameSync.UI\GameSync.UI.csproj" />
   </ItemGroup>
 
 </Project>
