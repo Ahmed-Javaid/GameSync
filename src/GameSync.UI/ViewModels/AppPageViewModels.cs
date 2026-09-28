@@ -1,18 +1,33 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
 using GameSync.UI.Controls;
+using GameSync.UI.Theming;
 
 namespace GameSync.UI.ViewModels;
 
+/// <summary>
+/// How much of Glossy's backdrop a page lets through (LOOK-17): full glass on game detail, conflict and the save
+/// manager; Home's strength on the launcher; the glow on first run and settings.
+/// </summary>
+public interface IPageSurface
+{
+    GlassStrength Strength { get; }
+}
+
 /// <summary>A screen the window has a place for but that isn't built yet: its name and what it will hold.</summary>
-public sealed record PlaceholderViewModel(string Title, string Icon, string Text);
+public sealed record PlaceholderViewModel(string Title, string Icon, string Text) : IPageSurface
+{
+    public GlassStrength Strength => GlassStrength.Glow;
+}
 
 /// <summary>
 /// The Console page: the agent's log as it happens, today's lines first, newest at the bottom. It keeps the last
-/// 2,000 lines; the day's full log stays in the data folder's <c>logs</c>.
+/// 2,000 lines; the day's full log stays in the data folder's <c>logs</c>. Full glass, like the save manager it goes with.
 /// </summary>
-public sealed class ConsoleViewModel
+public sealed class ConsoleViewModel : IPageSurface
 {
+    public GlassStrength Strength => GlassStrength.Glass;
+
     public const int Keep = 2000;
 
     public string Title { get; init; } = "Console";

@@ -23,7 +23,7 @@
         </ItemsControl.ItemsPanel>
         <ItemsControl.ItemTemplate>
           <DataTemplate x:DataType="vm:TileItem">
-            <c:GsGameTile Width="NaN" Title="{Binding Title}" Art="{Binding Art}" Status="{Binding Status}" Meta="{Binding Meta}">
+            <c:GsGameTile Width="NaN" Title="{Binding Title}" Art="{Binding Art}" Status="{Binding Status}" StatusLabel="{Binding StatusLabel}" Meta="{Binding Meta}">
               <c:GsGameTile.ContextMenu>
                 <ContextMenu IsVisible="{Binding ToggleHidden, Converter={x:Static ObjectConverters.IsNotNull}}">
                   <MenuItem Header="{Binding HideLabel}" Command="{Binding ToggleHidden}" />

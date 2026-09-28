@@ -9,7 +9,8 @@
     <Setter Property="FontSize" Value="13" />
     <Setter Property="Template">
       <ControlTemplate>
-        <Border Background="{TemplateBinding Background}" CornerRadius="16" ClipToBounds="True">
+        <Border Background="{TemplateBinding Background}" BorderBrush="{DynamicResource edge-console}" BorderThickness="1" BackgroundSizing="OuterBorderEdge"
+                CornerRadius="16" ClipToBounds="True">
           <DockPanel>
             <Border Name="PART_Bar" DockPanel.Dock="Top" BorderBrush="{DynamicResource line-100}" BorderThickness="0,0,0,1" Padding="16,12" IsVisible="False">
               <Grid ColumnDefinitions="*,Auto">
@@ -109,7 +110,8 @@
     <Setter Property="FontSize" Value="12" />
     <Setter Property="Template">
       <ControlTemplate>
-        <Border Background="{TemplateBinding Background}" CornerRadius="16" Padding="0,12" ClipToBounds="True">
+        <Border Background="{TemplateBinding Background}" BorderBrush="{DynamicResource edge-console}" BorderThickness="1" BackgroundSizing="OuterBorderEdge"
+                CornerRadius="16" Padding="0,12" ClipToBounds="True">
           <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
             <ItemsControl ItemsSource="{TemplateBinding Lines}">
               <ItemsControl.ItemsPanel>

@@ -18,8 +18,11 @@
   <ControlTheme x:Key="{x:Type c:GsButton}" TargetType="c:GsButton">
     <Setter Property="Height" Value="{DynamicResource control-height}" />
     <Setter Property="Padding" Value="20,0" />
-    <Setter Property="CornerRadius" Value="{DynamicResource radius-pill}" />
+    <!-- A pill is half its height round: with the background under the border, a larger radius draws an ellipse. -->
+    <Setter Property="CornerRadius" Value="20" />
     <Setter Property="Background" Value="{DynamicResource bg-300}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource edge-control}" />
+    <Setter Property="BorderThickness" Value="1" />
     <Setter Property="Foreground" Value="{DynamicResource ink}" />
     <Setter Property="FontSize" Value="14" />
     <Setter Property="FontWeight" Value="SemiBold" />
@@ -29,7 +32,8 @@
     <Setter Property="FocusAdorner" Value="{StaticResource PillFocus}" />
     <Setter Property="Template">
       <ControlTemplate>
-        <Border Name="PART_Border" Background="{TemplateBinding Background}" CornerRadius="{TemplateBinding CornerRadius}" Padding="{TemplateBinding Padding}">
+        <Border Name="PART_Border" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}"
+                BackgroundSizing="OuterBorderEdge" CornerRadius="{TemplateBinding CornerRadius}" Padding="{TemplateBinding Padding}">
           <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center" VerticalAlignment="Center">
             <c:GsIcon Icon="{TemplateBinding Icon}" Size="{TemplateBinding IconSize}" VerticalAlignment="Center"
                       IsVisible="{Binding $parent[c:GsButton].Icon, Converter={x:Static ObjectConverters.IsNotNull}}" />
@@ -46,6 +50,7 @@
     <Style Selector="^.primary">
       <Setter Property="Background" Value="{DynamicResource primary}" />
       <Setter Property="Foreground" Value="{DynamicResource on-primary}" />
+      <Setter Property="BorderThickness" Value="0" />
     </Style>
     <Style Selector="^.primary:pointerover">
       <Setter Property="Background" Value="{DynamicResource primary-strong}" />
@@ -53,6 +58,7 @@
     <Style Selector="^.ghost">
       <Setter Property="Background" Value="Transparent" />
       <Setter Property="Foreground" Value="{DynamicResource ink-muted}" />
+      <Setter Property="BorderThickness" Value="0" />
       <Setter Property="Padding" Value="12,0" />
     </Style>
     <Style Selector="^.ghost:pointerover">
@@ -65,6 +71,7 @@
     </Style>
     <Style Selector="^.sm">
       <Setter Property="Height" Value="32" />
+      <Setter Property="CornerRadius" Value="16" />
       <Setter Property="Padding" Value="16,0" />
       <Setter Property="FontSize" Value="13" />
       <Setter Property="IconSize" Value="16" />
@@ -82,13 +89,16 @@
     <Setter Property="Width" Value="{DynamicResource control-height}" />
     <Setter Property="Height" Value="{DynamicResource control-height}" />
     <Setter Property="Background" Value="{DynamicResource bg-300}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource edge-control}" />
+    <Setter Property="BorderThickness" Value="1" />
     <Setter Property="Foreground" Value="{DynamicResource ink}" />
     <Setter Property="Cursor" Value="Hand" />
     <Setter Property="VerticalAlignment" Value="Center" />
     <Setter Property="FocusAdorner" Value="{StaticResource PillFocus}" />
     <Setter Property="Template">
       <ControlTemplate>
-        <Border Background="{TemplateBinding Background}" CornerRadius="999">
+        <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}"
+                BackgroundSizing="OuterBorderEdge" CornerRadius="999">
           <c:GsIcon Icon="{TemplateBinding Icon}" Size="{TemplateBinding IconSize}" HorizontalAlignment="Center" VerticalAlignment="Center" />
         </Border>
       </ControlTemplate>
@@ -103,6 +113,7 @@
     </Style>
     <Style Selector="^.glass">
       <Setter Property="Background" Value="{DynamicResource glass}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource glass-edge}" />
       <Setter Property="Foreground" Value="{DynamicResource on-art}" />
     </Style>
     <Style Selector="^.glass:pointerover">
@@ -113,14 +124,17 @@
     </Style>
   </ControlTheme>
 
-  <!-- Card -->
+  <!-- Card: in Glossy, a hairline edge and a lit top edge (lift) over the backdrop; both are clear in Solid -->
   <ControlTheme x:Key="{x:Type c:GsCard}" TargetType="c:GsCard">
     <Setter Property="Background" Value="{DynamicResource bg-200}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource edge-card}" />
+    <Setter Property="BorderThickness" Value="1" />
     <Setter Property="CornerRadius" Value="{DynamicResource radius-lg}" />
     <Setter Property="Padding" Value="20" />
     <Setter Property="Template">
       <ControlTemplate>
-        <Border Background="{TemplateBinding Background}" CornerRadius="{TemplateBinding CornerRadius}" Padding="{TemplateBinding Padding}">
+        <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}"
+                BackgroundSizing="OuterBorderEdge" BoxShadow="{DynamicResource lift-card}" CornerRadius="{TemplateBinding CornerRadius}" Padding="{TemplateBinding Padding}">
           <DockPanel>
             <Grid Name="PART_Header" DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,16" IsVisible="False">
               <StackPanel VerticalAlignment="Center">
@@ -184,6 +198,22 @@
       <Setter Property="Background" Value="Transparent" />
       <Setter Property="Padding" Value="0" />
       <Setter Property="Height" Value="NaN" />
+    </Style>
+    <!-- On cover art: a deep tint that keeps 4.5:1 over any art, in both surfaces -->
+    <Style Selector="^.art:ok">
+      <Setter Property="Background" Value="{DynamicResource ok-art}" />
+    </Style>
+    <Style Selector="^.art:warn">
+      <Setter Property="Background" Value="{DynamicResource warn-art}" />
+    </Style>
+    <Style Selector="^.art:play">
+      <Setter Property="Background" Value="{DynamicResource play-art}" />
+    </Style>
+    <Style Selector="^.art:danger">
+      <Setter Property="Background" Value="{DynamicResource danger-art}" />
+    </Style>
+    <Style Selector="^.art:neutral">
+      <Setter Property="Background" Value="{DynamicResource neutral-art}" />
     </Style>
   </ControlTheme>
 
@@ -467,7 +497,7 @@
         <Border Background="{TemplateBinding Background}" CornerRadius="{DynamicResource radius-md}">
           <Panel>
             <c:GsIcon Icon="{TemplateBinding Icon}" Size="20" HorizontalAlignment="Center" VerticalAlignment="Center" />
-            <Ellipse Width="12" Height="12" Fill="{DynamicResource bg-100}" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,5,5,0"
+            <Ellipse Width="12" Height="12" Fill="{DynamicResource dot-ring}" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,5,5,0"
                      IsVisible="{Binding $parent[c:GsRailButton].DotBrush, Converter={x:Static ObjectConverters.IsNotNull}}" />
             <Ellipse Width="8" Height="8" Fill="{TemplateBinding DotBrush}" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,7,7,0"
                      IsVisible="{Binding $parent[c:GsRailButton].DotBrush, Converter={x:Static ObjectConverters.IsNotNull}}" />

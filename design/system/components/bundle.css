@@ -16,17 +16,17 @@
 .gs-btn { display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2); height: var(--control-height); padding: 0 var(--space-5); border: 0; border-radius: var(--radius-pill); font: 600 14px/20px var(--font-sans); cursor: pointer; white-space: nowrap; transition: background-color .12s; }
 .gs-btn-primary { background: var(--primary); color: var(--on-primary); }
 .gs-btn-primary:hover { background: var(--primary-strong); }
-.gs-btn-secondary { background: var(--bg-300); color: var(--ink); }
+.gs-btn-secondary { background: var(--bg-300); color: var(--ink); border: 1px solid var(--edge-control); }
 .gs-btn-secondary:hover { background: var(--bg-400); }
 .gs-btn-ghost { background: transparent; color: var(--ink-muted); padding: 0 var(--space-3); }
 .gs-btn-ghost:hover { color: var(--ink); background: var(--bg-300); }
-.gs-btn-danger { background: var(--danger-soft); color: var(--danger); }
+.gs-btn-danger { background: var(--danger-soft); color: var(--danger); border: 1px solid var(--edge-control); }
 .gs-btn-sm { height: 32px; padding: 0 var(--space-4); font-size: 13px; }
 .gs-btn[disabled] { opacity: .45; cursor: not-allowed; }
-.gs-iconbtn { display: inline-flex; align-items: center; justify-content: center; width: var(--control-height); height: var(--control-height); border-radius: var(--radius-pill); border: 0; background: var(--bg-300); color: var(--ink); cursor: pointer; position: relative; flex-shrink: 0; }
+.gs-iconbtn { display: inline-flex; align-items: center; justify-content: center; width: var(--control-height); height: var(--control-height); border-radius: var(--radius-pill); border: 1px solid var(--edge-control); background: var(--bg-300); color: var(--ink); cursor: pointer; position: relative; flex-shrink: 0; }
 .gs-iconbtn:hover { background: var(--bg-400); }
 .gs-iconbtn-sm { width: 32px; height: 32px; }
-.gs-iconbtn-glass { background: var(--glass); color: var(--on-art); }
+.gs-iconbtn-glass { background: var(--glass); border-color: var(--glass-edge); color: var(--on-art); }
 .gs-iconbtn-glass:hover { background: var(--art-scrim); }
 
 /* ---------- PillTabs ---------- */
@@ -44,19 +44,19 @@
 .gs-rail-btn { position: relative; width: 40px; height: 40px; border-radius: var(--radius-md); border: 0; background: transparent; color: var(--ink-faint); display: grid; place-items: center; cursor: pointer; }
 .gs-rail-btn:hover { color: var(--ink); background: var(--bg-300); }
 .gs-rail-btn[aria-current="page"] { color: var(--secondary); background: var(--secondary-soft); }
-.gs-rail-btn .gs-dot { position: absolute; top: 7px; right: 7px; width: 8px; height: 8px; border-radius: 50%; border: 2px solid var(--bg-100); box-sizing: content-box; }
+.gs-rail-btn .gs-dot { position: absolute; top: 7px; right: 7px; width: 8px; height: 8px; border-radius: 50%; border: 2px solid var(--dot-ring); box-sizing: content-box; }
 .gs-rail-spacer { flex: 1; }
 .gs-tip { position: absolute; left: 52px; top: 50%; transform: translateY(-50%); background: var(--ink); color: var(--bg-100); font: 500 12px/16px var(--font-sans); padding: 6px 10px; border-radius: var(--radius-sm); white-space: nowrap; box-shadow: var(--shadow-dialog); pointer-events: none; z-index: 5; display: flex; flex-direction: column; text-align: left; }
 .gs-tip-sub { font-weight: 400; opacity: .8; }
 
 /* ---------- Card ---------- */
-.gs-card { background: var(--bg-200); border-radius: var(--radius-lg); padding: var(--space-5); display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
+.gs-card { background: var(--bg-200); border: 1px solid var(--edge-card); box-shadow: var(--lift-card); border-radius: var(--radius-lg); padding: var(--space-5); display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
 .gs-card-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
 .gs-card-title { margin: 0; font: 500 18px/24px var(--font-sans); }
 .gs-card-sub { margin: 2px 0 0; font: 400 12px/16px var(--font-sans); color: var(--ink-muted); }
 
 /* ---------- HeroBanner (text sits on cover art, so it uses the fixed on-art colours in every theme) ---------- */
-.gs-hero { position: relative; border-radius: var(--radius-lg); overflow: hidden; min-height: 280px; display: flex; flex-direction: column; justify-content: space-between; padding: var(--space-5); background-color: var(--glass); background-size: cover; background-position: center; color: var(--on-art); }
+.gs-hero { position: relative; border-radius: var(--radius-lg); overflow: hidden; min-height: 280px; display: flex; flex-direction: column; justify-content: space-between; padding: var(--space-5); background-color: var(--glass); background-size: cover; background-position: center; color: var(--on-art); box-shadow: 0 0 0 1px var(--edge-art); }
 .gs-hero::before { content: ""; position: absolute; inset: 0 0 65% 0; background: linear-gradient(to bottom, rgba(5, 6, 8, 0.45), rgba(5, 6, 8, 0)); pointer-events: none; }
 .gs-hero::after { content: ""; position: absolute; inset: 35% 0 0 0; background: linear-gradient(to top, var(--art-scrim), rgba(5, 6, 8, 0)); pointer-events: none; }
 .gs-hero-empty { background-color: var(--glass); }
@@ -69,7 +69,7 @@
 .gs-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 .gs-hero-blurb { margin: 0; color: var(--on-art); opacity: .88; font-size: 13px; line-height: 19px; }
 .gs-hero-actions { display: flex; gap: var(--space-2); align-items: center; flex-shrink: 0; }
-.gs-chip { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; border-radius: var(--radius-pill); font: 500 12px/16px var(--font-sans); background: var(--glass); color: var(--on-art); align-self: flex-start; }
+.gs-chip { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; border-radius: var(--radius-pill); font: 500 12px/16px var(--font-sans); background: var(--glass); border: 1px solid var(--glass-edge); color: var(--on-art); align-self: flex-start; }
 /* No art found: a title cover, never an empty box */
 .gs-title-cover { background: var(--bg-300); padding: 12px; }
 .gs-title-cover::after { content: attr(data-initial); position: absolute; right: -4%; bottom: -10%; font: 700 128px/1 var(--font-sans); color: var(--bg-400); pointer-events: none; }
@@ -84,10 +84,16 @@
 .gs-status-play { background: var(--play-soft); color: var(--play); }
 .gs-status-neutral { background: var(--bg-300); color: var(--neutral); }
 .gs-status-plain { background: transparent; padding: 0; height: auto; }
+/* On cover art: a deep tint that keeps 4.5:1 over any art, in both surfaces */
+:where(.gs-hero, .gs-tile-art) .gs-status-ok { background: var(--ok-art); }
+:where(.gs-hero, .gs-tile-art) .gs-status-warn { background: var(--warn-art); }
+:where(.gs-hero, .gs-tile-art) .gs-status-danger { background: var(--danger-art); }
+:where(.gs-hero, .gs-tile-art) .gs-status-play { background: var(--play-art); }
+:where(.gs-hero, .gs-tile-art) .gs-status-neutral { background: var(--neutral-art); }
 
 /* ---------- GameTile ---------- */
 .gs-tile { display: flex; flex-direction: column; gap: var(--space-2); width: 160px; cursor: pointer; background: none; border: 0; padding: 0; color: inherit; text-align: left; font: inherit; }
-.gs-tile-art { position: relative; aspect-ratio: 2 / 3; border-radius: var(--radius-lg); overflow: hidden; background-size: cover; background-position: center; }
+.gs-tile-art { position: relative; aspect-ratio: 2 / 3; border-radius: var(--radius-lg); overflow: hidden; background-size: cover; background-position: center; box-shadow: 0 0 0 1px var(--edge-art); }
 .gs-tile:hover .gs-tile-art { outline: 2px solid var(--bg-400); outline-offset: 2px; }
 .gs-tile-art .gs-status { position: absolute; left: 8px; bottom: 8px; max-width: calc(100% - 16px); overflow: hidden; }
 .gs-tile-name { font: 500 13px/18px var(--font-sans); }
@@ -130,7 +136,7 @@
 .gs-switch[disabled] { opacity: .45; cursor: not-allowed; }
 
 /* ---------- ConsoleTable ---------- */
-.gs-console { background: var(--bg-000); border-radius: var(--radius-lg); overflow: hidden; font-family: var(--font-mono); font-size: 13px; line-height: 20px; }
+.gs-console { background: var(--bg-000); border: 1px solid var(--edge-console); border-radius: var(--radius-lg); overflow: hidden; font-family: var(--font-mono); font-size: 13px; line-height: 20px; }
 .gs-console-bar { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--line-100); color: var(--ink-muted); font-size: 12px; }
 .gs-console-prompt { color: var(--primary); }
 .gs-ctable { width: 100%; border-collapse: collapse; }
@@ -145,7 +151,7 @@
 
 /* ---------- ConsoleLog ---------- */
 .gs-log-grow { flex: 1; min-height: 0; }
-.gs-log { background: var(--bg-000); border-radius: var(--radius-lg); padding: var(--space-3) 0; font: 400 12px/18px var(--font-mono); overflow: auto; }
+.gs-log { background: var(--bg-000); border: 1px solid var(--edge-console); border-radius: var(--radius-lg); padding: var(--space-3) 0; font: 400 12px/18px var(--font-mono); overflow: auto; }
 .gs-log-line { display: grid; grid-template-columns: 76px 84px 1fr; gap: var(--space-3); padding: 1px var(--space-4); }
 .gs-log-line time { color: var(--ink-faint); }
 .gs-log-lvl { font-weight: 500; }
@@ -159,7 +165,7 @@
 
 /* ---------- Dialogs: share and import ---------- */
 .gs-scrim { background: var(--scrim); padding: var(--space-6); display: grid; place-items: center; }
-.gs-dialog { width: 640px; max-width: 100%; background: var(--bg-200); border-radius: var(--radius-lg); box-shadow: var(--shadow-dialog); display: flex; flex-direction: column; overflow: hidden; }
+.gs-dialog { width: 640px; max-width: 100%; background: var(--surface-dialog); border: 1px solid var(--edge-dialog); border-radius: var(--radius-lg); box-shadow: var(--shadow-dialog); display: flex; flex-direction: column; overflow: hidden; }
 .gs-dialog-head { padding: var(--space-6) var(--space-6) var(--space-4); display: flex; flex-direction: column; gap: var(--space-4); }
 .gs-dialog-title { margin: 0; font: 500 18px/24px var(--font-sans); }
 .gs-dialog-sub { margin: 4px 0 0; color: var(--ink-muted); }
@@ -228,7 +234,7 @@
 .gs-folder.is-missing .gs-folder-msg { background: var(--warn-soft); color: var(--warn); }
 .gs-folder.is-refused .gs-folder-msg { background: var(--danger-soft); color: var(--danger); }
 .gs-flist { display: flex; flex-direction: column; gap: var(--space-2); }
-.gs-flist-row { display: flex; align-items: center; gap: var(--space-3); padding: 6px 6px 6px var(--space-3); border-radius: var(--radius-md); background: var(--bg-300); min-height: 44px; }
+.gs-flist-row { display: flex; align-items: center; gap: var(--space-3); padding: 6px 6px 6px var(--space-3); border-radius: var(--radius-md); background: var(--surface-well); border: 1px solid var(--edge-well); min-height: 44px; }
 .gs-flist-row .gs-btn-ghost:hover { background: var(--bg-400); }
 .gs-flist-row .gs-tag { background: var(--bg-400); }
 .gs-flist-text { flex: 1; min-width: 0; }
@@ -267,7 +273,13 @@
 .gs-custom { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-3); border-radius: var(--radius-md); background: var(--bg-300); max-width: 440px; }
 .gs-custom-field { display: flex; align-items: center; gap: var(--space-2); }
 .gs-custom-dot { width: 24px; height: 24px; border-radius: 50%; border: 1.5px solid var(--line-200); flex-shrink: 0; }
-.gs-input { height: 36px; padding: 0 12px; border-radius: var(--radius-md); border: 1.5px solid var(--line-200); background: var(--bg-200); color: var(--ink); font: 400 13px/20px var(--font-mono); width: 140px; }
+.gs-input { height: 36px; padding: 0 12px; border-radius: var(--radius-md); border: 1.5px solid var(--line-200); background: var(--surface-field); color: var(--ink); font: 400 13px/20px var(--font-mono); width: 140px; }
 .gs-input::placeholder { color: var(--ink-faint); }
 .gs-input:focus { outline: 2px solid var(--primary); outline-offset: 1px; }
 .gs-custom-note { font: 400 12px/16px var(--font-sans); color: var(--ink-muted); }
+
+/* ---------- Surface: Glossy puts the page on a blurred copy of the game's art (ThemeScope with surface, strength, art) ---------- */
+.gs-glossy { position: relative; isolation: isolate; }
+.gs-backdrop { position: absolute; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; border-radius: inherit; }
+.gs-backdrop-art { position: absolute; inset: -140px; background-size: cover; background-position: center; filter: blur(64px) saturate(1.3); }
+.gs-backdrop-scrim { position: absolute; inset: 0; }

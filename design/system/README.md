@@ -4,7 +4,7 @@
 >
 > For building: `tokens.json` holds every colour, type style, spacing and radius, per theme; `Theming.md` says how themes are generated; each `components/<Name>/README.md` is that component's spec. `components/bundle.js` and `bundle.css` are a React reference implementation for the previews, not app code; the app itself is Avalonia.
 
-GameSync is a Windows game launcher that also keeps every game's saves backed up and synced across the owner's PCs. The system has two registers that share one palette: the **Launcher**, soft and art-led, for picking a game and playing it; and the **Console**, dense and monospaced, for managing saves, where the extra detail is the point. Dark first, with Light, Match Windows and pure black modes and six preset themes; the Theming section has the rules.
+GameSync is a Windows game launcher that also keeps every game's saves backed up and synced across the owner's PCs. The system has two registers that share one palette: the **Launcher**, soft and art-led, for picking a game and playing it; and the **Console**, dense and monospaced, for managing saves, where the extra detail is the point. Dark first, with Light, Match Windows and pure black modes and six preset themes, and two surfaces: Glossy, the default, where each page sits on a blurred copy of the game's art, and Solid; the Theming section has the rules.
 
 ## Voice and copy
 
@@ -19,13 +19,14 @@ GameSync is a Windows game launcher that also keeps every game's saves backed up
 ## Colour
 
 - The ground is `bg-100`; everything sits on `bg-200` cards with `radius-lg` corners. Cards are told apart by surface, not borders or shadows.
+- In **Glossy**, the default surface, the page sits on a blurred, darkened copy of the game's art and the surfaces let it through at the screen's strength; cards, controls and console panes gain a hairline edge (`edge-card`, `edge-control`, `edge-console`), dialogs stay nearly opaque (`surface-dialog`), and rows set into a card become darker wells (`surface-well`). In **Solid** the edges are clear. Theming → Surface has the values.
 - Controls inside a card sit on `bg-300`; hover goes to `bg-400`.
 - Every theme has two colours. `primary` (cyan in the default Arcade theme) is for the one primary button per view, progress fills, the busiest activity days, checkbox and switch fills, the console prompt, the logo and focus rings. Text on a primary fill is always `on-primary`.
 - `secondary` marks where you are and what you picked: `secondary-soft` fills selected rows, ticked share and import items, the current rail button, the selected tab and settings section; `secondary` itself tints their icons, the tab count chip and 2 to 4 hour activity days. Never use it for an action.
-- Status colours are fixed meanings and never change with the theme: `ok` = fine or moving (Synced, Upload pending, Newer in cloud); `warn` = needs you (Conflict, Held for review, Files in use, Saves not found); `play` = a game is running; `danger` = Blocked only; `neutral` = Backup only, Not available. Each has a `-soft` background for chips and banners.
+- Status colours are fixed meanings and never change with the theme: `ok` = fine or moving (Synced, Upload pending, Newer in cloud); `warn` = needs you (Conflict, Held for review, Files in use, Saves not found); `play` = a game is running; `danger` = Blocked only; `neutral` = Synced by its store (say which: "Synced by Steam"), Not available. Each has a `-soft` background for chips and banners, and an `-art` tint for a badge on cover art.
 - The Console panes (save table, log) use `bg-000`, so they read as a terminal set into the app.
 - Text: `ink` for content, `ink-muted` for secondary, `ink-faint` for timestamps and labels. All three pass 4.5:1 on `bg-000` to `bg-300`, `secondary-soft` and `primary-soft` in every theme.
-- Anything on cover art (the hero's title, eyebrow, chip and glass buttons) uses `on-art`, `glass` and `art-scrim`, which stay the same in every theme.
+- Anything on cover art (the hero's title, eyebrow, chip and glass buttons) uses `on-art`, `glass`, `glass-edge` and `art-scrim`, which stay the same in every theme and surface; a status badge on art takes its `-art` tint. In Glossy, art gets a 1px `edge-art` ring so it stays apart from the backdrop.
 
 ## Type
 
@@ -39,7 +40,7 @@ GameSync is a Windows game launcher that also keeps every game's saves backed up
 - Everything clickable that isn't a row is a pill (`radius-pill`): buttons, tabs, chips, status badges. Icon buttons are 40px circles.
 - Cards, tiles, the hero and dialogs use `radius-lg`; activity cells and inputs `radius-md`; checkboxes and console selection `radius-sm`.
 - Page gutters `space-6`, card padding `space-5`, gaps between cards `space-4`. Buttons are `control-height` (40px); console rows `row-height` (36px).
-- Only dialogs and tooltips cast `shadow-dialog`. Everything else is flat.
+- Only dialogs and tooltips cast `shadow-dialog`. Everything else is flat; in Glossy, cards add a lit top edge (`lift-card`).
 - Hatching (a 135° stripe of `bg-400`) means "some, but not much": light activity days. Never use it as decoration or for missing art.
 
 ## Layout
@@ -48,11 +49,11 @@ GameSync is a Windows game launcher that also keeps every game's saves backed up
 - **Save manager**: same rail and top bar; a strip of `mono-stat` numbers; a selectable `ConsoleTable` of every game's saves; a live `ConsoleLog` beneath it. The top bar holds **Share N selected** (secondary, disabled until a row is ticked), **Share all** (secondary) and **Sync now** (primary).
 - **Sharing**: both share buttons open `ShareSavesDialog`. From a selection it opens on "Choose saves" with those games ticked; Share all opens on "Share all", which packages the whole save folder, optionally latest saves only. Games with an anti-cheat or an online mode are shown locked, with the reason, and left out. The result is one zip with a path the person can copy or show in Explorer.
 - **Importing**: the download icon button in the save manager opens `ImportSavesDialog`. Imported saves become pinned versions, never current ones; unknown games can't be imported.
-- **Settings**: the rail's Settings button opens a two-column screen: `SettingsNav` on the left (Appearance, Storage and folders, Backup and sync, Cloud, Devices, Notifications, Safety), `Card`s of `SettingsRow`s on the right. Appearance holds `ThemePicker` and `ColorSwatchPicker`; Storage and folders holds the backup folder (`FolderField`), history to keep, game folders to scan and extra save folders (`FolderList`), and where shared zips go.
+- **Settings**: the rail's Settings button opens a two-column screen: `SettingsNav` on the left (Appearance, Storage and folders, Backup and sync, Cloud, Devices, Notifications, Safety), `Card`s of `SettingsRow`s on the right. Appearance holds the Surface (Glossy or Solid), `ThemePicker` and `ColorSwatchPicker`; Storage and folders holds the backup folder (`FolderField`), history to keep, game folders to scan and extra save folders (`FolderList`), and where shared zips go.
 - **Game detail**: a breadcrumb in the top bar; a shorter `HeroBanner` with the game's status and Play (the status's own action takes the primary when the game needs you); then Named saves and Where the saves are as `Card`s on the left, and the version history as a `ConsoleTable` over the game's `ConsoleLog` on the right.
 - **Conflict**: the game's name and what happened as the title, a suggestion `Card` that says why GameSync asked, the two sides as `Card`s with the suggested side's Keep button as the primary, Compare files opening a `ConsoleTable`, and Decide later.
 - **Plan**: a tab of the save manager. Run N changes replaces Sync now; one `ConsoleTable` of the changes, each ticked, and one of the games that won't run, each with its status and button.
-- **First run**: no rail; a `SettingsNav` of the four steps (Scan this PC, Choose games, Connect the cloud, Backups and startup) with a `check` on finished steps, one primary button per step, and grouped game `Card`s with a checkbox per group and per game.
+- **First run**: no rail; a `SettingsNav` of the four steps (Scan this PC, Choose games, Connect the cloud, Backups and startup) with a `check` on finished steps, one primary button per step, and grouped game `Card`s with a checkbox per group and per game. Choose games takes the full width: Sync, Synced by their store, Probably online-only, Saves found but game not installed and No saves found yet, then Something missing? with Add a game or folder; the anti-cheat note sits beside Back and Continue.
 
 ## Iconography
 

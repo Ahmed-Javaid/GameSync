@@ -20,7 +20,7 @@ Started 28 Sep 2026.
 
 Not in this milestone: learn mode and its tracer (FIND-04, FIND-05, Milestone 6), the installer, updater and signing (PKG-01, PKG-03, R19: Milestone 6), `gamesync://` links (R12, registered by the installer), achievements (ACH-01 to ACH-04, after v1).
 
-The screens are designed: the Launcher, Save manager and Settings since 27 Sep, and Game detail, Conflict, Plan and First run since 28 Sep, all in the design system (link in `CLAUDE.md`, snapshot in `design/system/`).
+The screens are designed: the Launcher, Save manager and Settings since 27 Sep, and Game detail, Conflict, Plan and First run since 28 Sep, all in the design system (link in `CLAUDE.md`, snapshot in `design/system/`), each in Glossy and Solid since version 13.
 
 ## How it's built
 
@@ -34,7 +34,7 @@ The screens are designed: the Launcher, Save manager and Settings since 27 Sep, 
 
 **Themes** (LOOK-01 to LOOK-11): the design system's theme engine, ported to C#, turns the four choices (mode, pure black, preset, swatches) into every colour. A test compares its output with the design system's own engine for every preset, mode and swatch, and checks every contrast pair (LOOK-09). Match Windows and the Windows accent follow Windows live. Choices are saved per PC.
 
-**Glossy and Solid** (LOOK-17, LOOK-18; the owner, 28 Sep; a fresh install starts in Glossy): the theme engine gains a fifth choice, the surface mode. Glossy swaps the surface colours for see-through ones in three strengths (full glass, Home's, and the soft glow of first run and settings, as drawn on the mockups canvas) and adds a backdrop behind the pages: the game's hero art, blurred once into a small bitmap and darkened as much as that picture needs for contrast. Solid is today's look. Both are tested like the themes, with worst-case pictures added to the contrast test.
+**Glossy and Solid** (LOOK-17, LOOK-18; the owner, 28 Sep; a fresh install starts in Glossy): the theme engine gains a fifth choice, the surface. Glossy swaps the surface colours for see-through ones in three strengths (full glass, Home's, and the soft glow of first run and settings, as drawn on the mockups canvas), laid over the theme's for the window's frame and page only, and adds a backdrop behind them: the last-played game's hero art, blurred once into a 160 × 100 picture off the UI thread, and darkened row by row as much as that picture needs for every text colour to keep 4.5:1. Each page says its strength, and the frame follows it. Solid is the look from before, unchanged: its edges are clear. Both are tested like the themes: the engine against the design system's for every choice, and the backdrop's contrast over worst-case pictures for every dark theme and strength. Glossy goes Solid in light mode, with pure black, with Windows' transparency effects off, and with no art.
 
 **The look**: the design system's tokens become Avalonia resources, and each component (buttons, pill tabs, cards, status badges, the rail, tiles, the hero, console tables and logs, settings rows, folder fields) becomes a styled control with the same name. The icons come from the design system's own set. Onest and JetBrains Mono ship inside the app, with Segoe UI Variable and Cascadia Mono as fallbacks.
 
@@ -56,6 +56,11 @@ The screens are designed: the Launcher, Save manager and Settings since 27 Sep, 
 
 - 28 Sep, last: Home and the library work. The library's tabs switch its view in place; Home's tabs are the library's views (the design system labels them "Library view"), so My games and Needs you open the library there; Sync now, the card arrows and Continue playing work, and Play launches like `gamesync launch`, which now also starts games found but not synced. Checked in the real window through UI Automation on the scratch folder (Play left alone: it starts the real game). A screen-reader bug found on the way: pill tabs read as "NavItem { Id = … }"; list items now read their labels.
 
+- 28 Sep, night: **Glossy and Solid** (LOOK-17, LOOK-18). First the design system (version 13): the engine's `glass()` with its three strengths and six more tokens the boards needed (the art ring, the rail dot's ring, the dialog edge, wells, fields), edges and a lit top on cards, the boards' new look for things on cover art in both surfaces, the Surface choice on the Settings screen, which every screen follows, and First run without Ludusavi as on the canvas. Then the app, from the same values: the surface per PC (`gamesync set surface glossy|solid`, which an open app follows at once), the backdrop, the fallbacks, and the store-cloud status reading "Synced by Steam" instead of "Backup only" (LIB-10). Checked on the scratch folder: the window opens in Glossy over Risk of Rain 2's art; the console switches to full glass; `set surface solid` repaints the open window and `glossy` brings it back; idle CPU 0.07% of the machine; with the window open about 3 MB more than Solid (208 against 205 MB private), and nothing once it closes. The contrast test runs every dark theme and strength over 12 worst-case pictures and checks every pixel of the result; a bright picture's backdrop takes about 6 ms to make. Not yet checked: turning off Windows' transparency effects on a real PC (the code reads the setting and follows Windows' change message).
+
+- 29 Sep: from the owner's review at full screen: the pills drawn as ellipses (a regression from Glossy's edges) and the flickering ring on covers are fixed; the window has no separate title bar any more (the page and Glossy's art run to the top, with GameSync's own caption buttons, which keep Windows 11's snap layouts); Home's banner grows with the window and Jump back in shows as many covers as fit; Home says "No games yet" before any scan instead of an empty banner. The owner's own data folder was scanned for the first time (19 installed games, 52 in the library; nothing confirmed).
+- 29 Sep, later: Home fills any window. The first scaling grew the banner with the window's width only, so a taller screen (1920 × 1200 against 1920 × 1080) left gaps again; now the cards take what their content needs at the width and the banner the rest, the side cards keep a readable width, and Jump back in shows more covers on wider screens. Checked at eight window sizes from 1024 × 640 to 3440 × 1440. The page header sits 16px closer to the top.
+
 ## How to try the app
 
 ```powershell
@@ -65,7 +70,7 @@ $gs = "src\GameSync.App\bin\Debug\net10.0-windows10.0.19041.0"
 & "$gs\gamesync.exe" schedule background on    # start it at sign-in, from your Run key (Task Manager lists it)
 ```
 
-It uses `%LOCALAPPDATA%\GameSync` like the command line, so on the owner's PC it syncs the confirmed games and signs in to Drive as `gamesync` does. With `--data <folder>` it uses another data folder. Windows 11 puts a new tray icon in the hidden overflow (the ^ by the clock); drag it onto the taskbar, or turn it on under Settings → Personalization → Taskbar → Other system tray icons.
+It uses `%LOCALAPPDATA%\GameSync` like the command line, so on the owner's PC it syncs the confirmed games and signs in to Drive as `gamesync` does. `gamesync set surface solid` (or `glossy`) switches the look, and an open window repaints. With `--data <folder>` it uses another data folder. Windows 11 puts a new tray icon in the hidden overflow (the ^ by the clock); drag it onto the taskbar, or turn it on under Settings → Personalization → Taskbar → Other system tray icons.
 
 ## Build order
 

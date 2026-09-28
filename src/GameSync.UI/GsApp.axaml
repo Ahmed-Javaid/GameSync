@@ -27,6 +27,7 @@
         <ResourceInclude Source="avares://GameSync.UI/Styles/Launcher.axaml" />
         <ResourceInclude Source="avares://GameSync.UI/Styles/Console.axaml" />
         <ResourceInclude Source="avares://GameSync.UI/Styles/Settings.axaml" />
+        <ResourceInclude Source="avares://GameSync.UI/Styles/Window.axaml" />
       </ResourceDictionary.MergedDictionaries>
     </ResourceDictionary>
   </Application.Resources>

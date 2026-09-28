@@ -320,14 +320,14 @@ public static partial class Cli
         Group("Syncing", live.Where(e => e.State == LibraryState.Synced), e =>
             string.Join("; ", new[]
             {
-                e.Confirmed?.Mode == GameMode.BackupOnly ? "backed up only" : null,
+                e.Confirmed?.Mode == GameMode.BackupOnly ? $"{Lower(StoreNames.SyncedBy(e.Store))}; GameSync keeps its backups" : null,
                 e.Installed ? null : "not installed here",
                 e.HasSuggestion ? $"new place found, see: gamesync show {e.Id}" : null,
             }.OfType<string>()));
         Group("Found: syncs once you confirm it", found.Where(e => e is { Installed: true, StoreCloud: false, ProbablyOnlineOnly: false }), Evidence);
-        Group("Found: backed up only once you confirm it (the store's own cloud syncs it)", found.Where(e => e is { Installed: true, StoreCloud: true, ProbablyOnlineOnly: false }), Evidence);
+        Group("Found: synced by their store; GameSync backs them up once you confirm them", found.Where(e => e is { Installed: true, StoreCloud: true, ProbablyOnlineOnly: false }), Evidence);
         Group("Saves found, game not installed: confirming keeps them as history", found.Where(e => e is { Installed: false, ProbablyOnlineOnly: false }), e =>
-            (e.StoreCloud ? "backed up only; " : "") + Evidence(e));
+            (e.StoreCloud ? $"{Lower(StoreNames.SyncedBy(e.Store))}; " : "") + Evidence(e));
         Group("Saves in the cloud from another PC: confirm takes up that PC's rules and brings the save down", fromCloud, e =>
             $"from {cloud[e.Id].Newest.Device.Name}, {cloud[e.Id].Newest.CreatedUtc.ToLocalTime():yyyy-MM-dd}");
         Group("Probably online-only: only settings found, so 'confirm --all' leaves these out", found.Where(e => e.ProbablyOnlineOnly), e =>
@@ -374,6 +374,9 @@ public static partial class Cli
     }
 
     private static bool FoundAnything(LibraryEntry entry) => entry.Proposals.Count > 0 || entry.RegistryProposals.Count > 0;
+
+    /// <summary>A status as it reads mid-sentence: "synced by Steam".</summary>
+    private static string Lower(string text) => text.Length == 0 ? text : char.ToLowerInvariant(text[0]) + text[1..];
 
     private static string Evidence(LibraryEntry entry)
     {
@@ -439,7 +442,7 @@ public static partial class Cli
         Console.WriteLine($"  Anti-cheat:  {(entry.AntiCheatByHand is { } byHand ? (byHand ? "yes, marked by hand" : "no, marked by hand") : entry.AntiCheat ?? "none found")}");
         if (entry.SaveListTitle is { } listed)
         {
-            Console.WriteLine($"  Save list:   {listed}{(entry.StoreCloud ? ", and the store's own cloud syncs it, so it's backed up only" : "")}");
+            Console.WriteLine($"  Save list:   {listed}{(entry.StoreCloud ? $", and it's {Lower(StoreNames.SyncedBy(entry.Store))}, so GameSync keeps its backups" : "")}");
         }
 
         Console.WriteLine($"  Status:      {entry.State switch { LibraryState.Synced => "syncing", LibraryState.Ignored => "ignored", _ => "found, not confirmed" }}");
@@ -569,7 +572,7 @@ public static partial class Cli
 
             entries[entry.Id] = confirmed;
             confirmedCount++;
-            var mode = portable.Mode == GameMode.BackupOnly ? ", backed up only" : "";
+            var mode = portable.Mode == GameMode.BackupOnly ? $", {Lower(StoreNames.SyncedBy(entry.Store))} (GameSync keeps its backups)" : "";
             Console.WriteLine($"  {confirmed.DisplayTitle}{mode}, with {source}:");
             foreach (var line in PortableRules.From(portable).Describe())
             {

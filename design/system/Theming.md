@@ -1,11 +1,11 @@
 # Theming
 
-A theme is four choices: a **mode** (Dark, Light or Match Windows), **pure black** (dark mode only), a **preset** (a primary colour, a secondary colour and a faint surface tint), and, if the person wants, their own **primary** or **secondary** from the swatches. One engine, `GameSync.theme.build()`, turns those choices into every colour token, so presets, swatches, the Windows accent and later custom colours all go through the same rules.
+A theme is four choices: a **mode** (Dark, Light or Match Windows), **pure black** (dark mode only), a **preset** (a primary colour, a secondary colour and a faint surface tint), and, if the person wants, their own **primary** or **secondary** from the swatches. One engine, `GameSync.theme.build()`, turns those choices into every colour token, so presets, swatches, the Windows accent and later custom colours all go through the same rules. A fifth choice, the **surface** (Glossy or Solid), sets how the page sits on the game's art; see Surface below.
 
 ## What never changes
 
 - Status colours: `ok`, `warn`, `danger`, `play`, `neutral` and their `-soft` grounds have one value per mode and ignore the preset. A Conflict is amber with its warning icon in every theme.
-- Cover-art colours: `on-art`, `glass` and `art-scrim` are the same in every mode, because they sit on game art, not on the theme.
+- Cover-art colours: `on-art`, `glass`, `glass-edge` and `art-scrim` are the same in every mode, because they sit on game art, not on the theme. A status badge on art takes its `-art` tint (`ok-art` and the rest): the same in every dark theme and both surfaces, and the opaque `-soft` in light mode.
 - Shapes, type, spacing and radii. A theme only recolours.
 
 ## Presets
@@ -41,9 +41,27 @@ Primary and secondary can each be swapped for one of eleven swatches: Cyan, Aqua
 - A custom colour within about 22 degrees of amber, red or violet gets a note that statuses keep their icon and word.
 - Themes export and import as a small file of these four choices.
 
+## Surface: Glossy or Solid
+
+Picked under Appearance → Surface, saved per PC; a fresh install starts in **Glossy**.
+
+- **Solid** is the plain look: every surface is opaque and cards sit apart by surface alone. The edge tokens (`edge-card`, `edge-control`, `edge-console`, `edge-well`, `edge-dialog`, `edge-art`) are clear and `lift-card` is none, so Solid looks exactly as it did before Glossy existed.
+- **Glossy** puts each page on a blurred, darkened copy of a game's art: the page's own game on game detail and conflict, otherwise the last one played. The art is blurred 64px and saturated 1.3, reaching 140px past each edge of the window, then a scrim darkens it from top to bottom. `GameSync.theme.glass(choice, strength)` gives what changes: the surfaces become see-through, the edges appear (white at 4 to 9%), cards get a lit top edge, dialogs stay nearly opaque.
+- Three **strengths**, by screen:
+
+| Strength | Screens | Page ground | Cards | Rail | Scrim from top to bottom |
+| --- | --- | --- | --- | --- | --- |
+| `glass` | game detail, conflict, the save manager and its Plan tab | `bg-000` | white at 5.5% | white at 3% | 44%, 70% at 40%, 84% |
+| `home` | Home and the game library | `bg-000` | the card colour at 60% | `bg-100` at 25% | 48%, 77% at 40%, 86% at 68%, 88% |
+| `glow` | first run, settings | `bg-100` | `bg-200` at 82% | `bg-100` at 50% | 56%, 84% at 36%, 93% at 60%, 95% |
+
+- **Contrast holds over any art** (LOOK-18). The scrim's stops are the least darkening; the app measures each picture and darkens a row further wherever the art is bright, just enough that every text colour keeps 4.5:1, and controls and borders 3:1, on every surface over every pixel. Dark art keeps the design's gradient exactly. Its test runs every dark theme and strength over white, black, saturated colours, a bright sky, hard stripes and noise. These previews show the design's stops over dark sample art.
+- **When Glossy goes Solid**: in light mode (a light Glossy isn't designed yet), with pure black, when Windows' transparency effects are off, and on a page with no art. The Surface choice stays; the page follows it again when those change.
+- In the previews, `ThemeScope` with `art` and `strength` draws a page in the Surface picked on the Settings screen, which every screen follows; `surface` fixes it for one scope.
+
 ## In the app
 
-- Build the colour resources from the four choices at start-up and whenever one changes; nothing restarts.
+- Build the colour resources from the four choices at start-up and whenever one changes; nothing restarts. In Glossy, a page's strength lays its see-through surfaces over those resources for the window's frame and page, and the backdrop is made once per game, strength and theme, off the UI thread, as a small blurred picture (no live blur), so it runs on Windows 10 and 11 alike.
 - Match Windows follows the Windows light or dark setting and changes live when Windows does; the Windows accent preset reads the accent colour the same way.
 - Save the choices per PC, not in the cloud: each PC keeps its own look.
 - Windows notifications and the tray menu belong to Windows and follow its theme, not GameSync's.

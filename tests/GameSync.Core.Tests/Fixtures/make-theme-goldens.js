@@ -20,6 +20,14 @@ for (const s of theme.swatches) for (const m of modes) {
 for (const accent of ['#0078d4', '#e81123', '#107c10', '#ffb900', '#744da9', '#2d2d2d', '#ffffff'])
   for (const m of modes) cases.push({ preset: 'windows', ...m, accent });
 
-const out = cases.map(c => ({ choice: c, tokens: theme.build(c) }));
+// Glossy (LOOK-17): each strength's tokens and backdrop, for the choices that have them (dark, not pure black).
+const out = cases.map(c => {
+  const glass = {};
+  for (const s of theme.strengths) {
+    const g = theme.glass(c, s);
+    if (g) glass[s] = g;
+  }
+  return Object.keys(glass).length ? { choice: c, tokens: theme.build(c), glass } : { choice: c, tokens: theme.build(c) };
+});
 fs.writeFileSync(path.join(__dirname, 'theme-goldens.json'), JSON.stringify(out, null, 1) + '\n');
 console.log(`${out.length} theme choices written.`);

@@ -3,10 +3,12 @@ using System.Windows.Input;
 using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using GameSync.Core.Discovery;
 using GameSync.Core.Model;
 using GameSync.Core.State;
 using GameSync.Host;
 using GameSync.UI.Controls;
+using GameSync.UI.Theming;
 
 namespace GameSync.UI.ViewModels;
 
@@ -20,6 +22,9 @@ public sealed record LauncherActions(Action<GameId> Play, Action SyncNow, Action
 /// <summary>A game tile: its cover (or none, for a title cover), status and meta line, and hiding it from the launcher.</summary>
 public sealed record TileItem(GameId Id, string Title, IImage? Art, GameStatus? Status, string? Meta)
 {
+    /// <summary>The badge's words when the status's own aren't enough: which store syncs it (LIB-10).</summary>
+    public string? StatusLabel { get; init; }
+
     public bool IsHidden { get; init; }
 
     /// <summary>Hides the game from the launcher on this PC, or shows it again; null where the page can't.</summary>
@@ -36,9 +41,12 @@ public sealed record NeedsYouItem(GameId Id, string Title, IImage? Art, string I
 /// library's views, as the design system labels them: Recently played is this page, and My games or Needs you open the
 /// library on that view.
 /// </summary>
-public sealed partial class HomeViewModel : ObservableObject
+public sealed partial class HomeViewModel : ObservableObject, IPageSurface
 {
     public const string ThisPage = "recent";
+
+    /// <summary>Glossy's Home strength: a step more solid than full glass (LOOK-17).</summary>
+    public GlassStrength Strength => GlassStrength.Home;
 
     [ObservableProperty]
     private string _selectedTab = ThisPage;
@@ -78,6 +86,15 @@ public sealed partial class HomeViewModel : ObservableObject
     public IReadOnlyList<NavItem> Tabs { get; init; } = [];
 
     public GameId? HeroId { get; init; }
+
+    /// <summary>There's a game to put in the banner: the last one played, or else one that's installed.</summary>
+    public bool HasHero => HeroId is not null;
+
+    /// <summary>GameSync hasn't found any games on this PC yet (it hasn't scanned): Home says so instead of an empty banner.</summary>
+    public bool NoGames { get; init; }
+
+    /// <summary>There are games to choose from, so the Needs you card can offer to choose the ones to sync.</summary>
+    public bool CanChoose => NoneSyncing && !NoGames;
 
     public IImage? HeroArt { get; init; }
 
@@ -143,13 +160,14 @@ public sealed partial class HomeViewModel : ObservableObject
                 new NavItem("attn", "Needs you", Count: needsYouCount > 0 ? needsYouCount.ToString(CultureInfo.InvariantCulture) : null),
             ],
             HeroId = hero?.Id,
+            NoGames = games.Count == 0,
             HeroArt = ArtImages.Load(hero?.HeroPath, 1920),
             HeroLogo = ArtImages.Load(hero?.LogoPath, 760),
             HeroTitle = hero?.Title,
             HeroEyebrow = hero is null ? null : LastPlayedPhrase(hero, nowLocal),
             HeroChip = hero is null || hero.Playtime <= TimeSpan.Zero ? null : HoursPlayed(hero.Playtime),
             HeroStatus = hero?.Syncs == true ? hero.Status ?? GameStatus.Synced : null,
-            HeroStatusLabel = hero is { Syncs: true, Status: null or GameStatus.Synced } ? "Save synced" : null,
+            HeroStatusLabel = hero is { Syncs: true, Status: null or GameStatus.Synced } ? "Save synced" : StatusLabel(hero),
             HeroBlurb = hero is null ? null : Blurb(hero),
             HeroPlayLabel = hero?.LastPlayedUtc is null ? "Play" : "Continue playing",
             NeedsYou = home.NeedsYou.Select(g => new NeedsYouItem(g.Id, g.Title, ArtImages.Load(g.CoverPath, 96), GsGameTile.InitialOf(g.Title), g.Status, ActionFor(g.Status))).ToList(),
@@ -180,9 +198,13 @@ public sealed partial class HomeViewModel : ObservableObject
     public static TileItem Tile(LauncherGame game, DateTime nowLocal, int width = 320, bool withMeta = true, Action<GameId, bool>? setHidden = null) =>
         new(game.Id, game.Title, ArtImages.Load(game.CoverPath, width), game.Status, withMeta ? Launcher.Meta(game, nowLocal) : null)
         {
+            StatusLabel = StatusLabel(game),
             IsHidden = game.IsHidden,
             ToggleHidden = setHidden is null ? null : new CommunityToolkit.Mvvm.Input.RelayCommand(() => setHidden(game.Id, !game.IsHidden)),
         };
+
+    /// <summary>LIB-10: a game its store's cloud syncs names the store ("Synced by Steam"); other statuses say their own word.</summary>
+    public static string? StatusLabel(LauncherGame? game) => game?.Status == GameStatus.BackupOnly ? StoreNames.SyncedBy(game.Store) : null;
 
     /// <summary>"Last played today, 21:04", "Last played yesterday", "Last played on 20 Sep".</summary>
     public static string LastPlayedPhrase(LauncherGame game, DateTime nowLocal)
@@ -228,9 +250,12 @@ public sealed partial class HomeViewModel : ObservableObject
 /// Every game with its art (LIB-11): a cover from Steam or a title cover, never an empty tile. Its pill tabs switch the
 /// view in place: all games, those that need you, Steam's software, and games hidden from the launcher.
 /// </summary>
-public sealed partial class LibraryViewModel : ObservableObject
+public sealed partial class LibraryViewModel : ObservableObject, IPageSurface
 {
     private IReadOnlyDictionary<string, IReadOnlyList<TileItem>> _views = new Dictionary<string, IReadOnlyList<TileItem>>();
+
+    /// <summary>The launcher's other page, at Home's strength.</summary>
+    public GlassStrength Strength => GlassStrength.Home;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(Tiles))]

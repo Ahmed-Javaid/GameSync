@@ -52,7 +52,7 @@ export function HeroBanner(props: {
   onPlay?: () => void; onSaves?: () => void; onSettings?: () => void;
 }): JSX.Element;
 
-/** One game status as icon + word. */
+/** One game status as icon + word. On cover art (a tile, the hero) it takes a deep tint that reads over any art. `backup-only` reads "Synced by its store": pass `label` "Synced by Steam" (or Epic, Xbox) when the store is known. */
 export function StatusBadge(props: { status: Status; label?: string; plain?: boolean; className?: string }): JSX.Element;
 
 /** 2:3 cover tile (Steam's 600x900 library capsule). No art: a title cover with the game's name. No badge when synced. */
@@ -138,8 +138,20 @@ export interface ThemeChoice { preset?: PresetId; mode?: "dark" | "light"; pureB
 export type PresetId = "arcade" | "moss" | "tidal" | "sakura" | "citrus" | "mono" | "windows";
 export type SwatchId = "cyan" | "aqua" | "sky" | "blue" | "green" | "mint" | "lime" | "pink" | "steel" | "grey" | "white";
 
-/** Sets every colour token for its children. */
-export function ThemeScope(props: { theme: ThemeChoice; className?: string; style?: CSSProperties; children?: ReactNode }): JSX.Element;
+export type Surface = "glossy" | "solid";
+/** How much of Glossy's backdrop a page lets through: glass (game detail, conflict, the save manager and its tabs, the console), home (Home and the library), glow (first run, settings). */
+export type Strength = "glass" | "home" | "glow";
+
+/** Sets every colour token for its children: `theme`, or the page's theme, followed live. With `art` and the Glossy surface (`surface`, else the one picked in Settings; Glossy by default), the page sits on a Backdrop of that art at `strength`'s see-through surfaces; light mode and pure black stay Solid. */
+export function ThemeScope(props: { theme?: ThemeChoice; surface?: Surface; strength?: Strength; art?: string; className?: string; style?: CSSProperties; children?: ReactNode }): JSX.Element;
+
+/** The art blurred behind a Glossy page (64px, saturated 1.3, reaching 140px past the edges), under its strength's scrim. ThemeScope draws it; `backdrop` comes from theme.glass(). */
+export function Backdrop(props: { art: string; backdrop: GlassBackdrop }): JSX.Element;
+
+export interface GlassBackdrop { base: string; scrim: string; stops: [number, number][] }
+
+/** The Surface choice, one for every screen, as the Settings screen picks it: kept in this browser, and followed live by every ThemeScope. */
+export const surface: { get(): Surface; set(value: Surface): void; use(): Surface };
 
 /** Preset cards with a live mini preview each, in the current mode. */
 export function ThemePicker(props: { value: PresetId; onChange?: (id: PresetId) => void; mode?: "dark" | "light"; pureBlack?: boolean; accent?: string; label?: string }): JSX.Element;
@@ -155,6 +167,11 @@ export const theme: {
   presets: { id: PresetId; name: string; primary: SwatchId | null; secondary: SwatchId | null; tint: [number, number] | null; dynamic?: boolean; note: string }[];
   swatches: { id: SwatchId; name: string; hex: string }[];
   build(choice: ThemeChoice): Record<string, string>;
+  strengths: Strength[];
+  /** Glossy: the tokens a strength makes see-through (they override build()'s in its scope) and its backdrop. Null in light mode and with pure black, which stay Solid. */
+  glass(choice: ThemeChoice, strength: Strength): { tokens: Record<string, string>; backdrop: GlassBackdrop } | null;
+  hsl(h: number, s: number, l: number): string;
+  rgba(hex: string, alpha: number): string;
   /** What a custom colour becomes in this theme: the value used, whether it was adjusted, its contrast on cards, and a nearby status colour if any. */
   check(hex: string, role: "primary" | "secondary", choice?: ThemeChoice): { valid: boolean; message?: string; input?: string; used?: string; adjusted?: boolean; ratio?: number; near?: "warn" | "danger" | "play" | null };
   apply(el: HTMLElement, vars: Record<string, string>): void;

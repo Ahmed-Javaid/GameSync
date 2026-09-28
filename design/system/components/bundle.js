@@ -59,12 +59,13 @@
     }
     function hueOf(hex) { return toHsl(hex)[0]; }
     function satOf(hex) { return toHsl(hex)[1]; }
+    function rgba(hex, a) { var c = hexToRgb(hex); return "rgba(" + c[0] + ", " + c[1] + ", " + c[2] + ", " + a + ")"; }
 
     var STATUS = {
       dark: { ok: "#7fe6f2", "ok-soft": "#0f3035", warn: "#f2b544", "warn-soft": "#2a2213", danger: "#ff8a7d", "danger-soft": "#2e1917", play: "#b9a3ff", "play-soft": "#231d38", neutral: "#9aa1a9" },
       light: { ok: "#006b77", "ok-soft": "#d8f3f6", warn: "#855600", "warn-soft": "#fbeed3", danger: "#b3261e", "danger-soft": "#fde4e1", play: "#6547d1", "play-soft": "#ece7ff", neutral: "#58616b" }
     };
-    var FIXED = { "on-art": "#f5f7f9", "art-scrim": "rgba(5, 6, 8, 0.72)", glass: "rgba(16, 18, 21, 0.72)" };
+    var FIXED = { "on-art": "#f5f7f9", "art-scrim": "rgba(5, 6, 8, 0.72)", glass: "rgba(12, 14, 17, 0.58)", "glass-edge": "rgba(255, 255, 255, 0.16)" };
 
     var SWATCHES = [
       { id: "cyan", name: "Cyan", hex: "#7fe6f2" },
@@ -159,8 +160,71 @@
         v.scrim = "rgba(16, 20, 26, 0.45)";
         v["shadow-dialog"] = "0 24px 64px rgba(16, 24, 40, 0.18)";
       }
+      // The surfaces Glossy makes see-through (glass() below). Solid has no edges, lift or ring: its surfaces are the plain
+      // ones, and its edges are clear, so a hovered control shows no ring (the background runs under the border, as in CSS).
+      var clear = rgba("#000000", 0);
+      ["edge-card", "edge-control", "edge-console", "edge-well", "edge-dialog", "edge-art"].forEach(function (k) { v[k] = clear; });
+      v["lift-card"] = "none";
+      v["surface-dialog"] = v["bg-200"];
+      v["surface-well"] = v["bg-300"];
+      v["surface-field"] = v["bg-200"];
+      v["dot-ring"] = v["bg-100"];
+      // A status badge on cover art: in dark mode a deep tint of its status at 82% (neutral 88%), so it keeps 4.5:1 over
+      // any art in both surfaces; light mode keeps its opaque tints.
+      ["ok", "warn", "danger", "play"].forEach(function (k) {
+        v[k + "-art"] = mode === "dark" ? rgba(hsl(hueOf(STATUS.dark[k + "-soft"]), 65, 10), 0.82) : v[k + "-soft"];
+      });
+      v["neutral-art"] = mode === "dark" ? rgba(hsl(th, ts, 10), 0.88) : v["bg-300"];
       Object.assign(v, FIXED);
       return v;
+    }
+
+    /* Glossy (LOOK-17, LOOK-18): what a page's surfaces become so a blurred, darkened copy of a game's art shows
+       through, in three strengths: "glass" on game detail, conflict and the save manager; "home", a step more solid;
+       "glow" on first run and settings, a soft glow at the top over nearly solid cards. Returns the tokens to lay over
+       build()'s and the backdrop: its base colour, then the art, then the scrim colour at alpha stops [position,
+       alpha] from top to bottom. Dark mode only, and never with pure black: then it's null and the page stays Solid.
+       The app darkens bright art further, until text keeps 4.5:1 on every surface. */
+    var STRENGTHS = ["glass", "home", "glow"];
+    function glass(opts, strength) {
+      opts = opts || {};
+      if (opts.mode === "light" || opts.pureBlack) return null;
+      var p = preset(opts.preset || "arcade");
+      var accent = opts.accent || "#0078d4";
+      var th = p.dynamic ? hueOf(accent) : p.tint[0];
+      var ts = p.dynamic ? 10 : p.tint[1];
+      var v = build(opts);
+      function white(a) { return "rgba(255, 255, 255, " + a + ")"; }
+      if (strength === "glow") {
+        return {
+          tokens: {
+            "bg-000": rgba(v["bg-000"], 0.88), "bg-100": rgba(v["bg-100"], 0.5), "bg-200": rgba(v["bg-200"], 0.82),
+            "bg-300": white(0.07), "bg-400": white(0.13), "line-100": white(0.07), "secondary-soft": rgba(v.secondary, 0.15),
+            "edge-card": white(0.05), "edge-control": white(0.04), "edge-console": white(0.05),
+            "edge-well": white(0.04), "edge-dialog": white(0.07), "edge-art": white(0.06),
+            "lift-card": "inset 0 1px 0 " + white(0.04), "surface-dialog": rgba(hsl(th, ts, 11.6), 0.96),
+            "surface-well": rgba("#000000", 0.28), "surface-field": rgba("#000000", 0.3), "dot-ring": rgba(v["bg-100"], 0.95)
+          },
+          backdrop: { base: v["bg-100"], scrim: v["bg-100"], stops: [[0, 0.56], [0.36, 0.84], [0.6, 0.93], [1, 0.95]] }
+        };
+      }
+      var home = strength === "home";
+      return {
+        tokens: {
+          "bg-000": rgba(hsl(th, ts * 2.4, 2.7), 0.6),
+          "bg-100": home ? rgba(v["bg-100"], 0.25) : white(0.03),
+          "bg-200": home ? rgba(hsl(th, ts * 1.15, 12.75), 0.6) : white(0.055),
+          "bg-300": white(0.08), "bg-400": white(0.14), "line-100": white(0.07), "secondary-soft": rgba(v.secondary, 0.16),
+          "ok-soft": rgba(v.ok, 0.13), "warn-soft": rgba(v.warn, 0.15), "play-soft": rgba(v.play, 0.16), "danger-soft": rgba(v.danger, 0.15),
+          "edge-card": white(0.075), "edge-control": white(0.06), "edge-console": white(0.06),
+          "edge-well": white(0.05), "edge-dialog": white(0.09), "edge-art": white(0.09),
+          "lift-card": "inset 0 1px 0 " + white(0.05), "surface-dialog": rgba(hsl(th, ts, 11.6), 0.94),
+          "surface-well": rgba("#000000", 0.26), "surface-field": rgba("#000000", 0.3), "dot-ring": rgba(hsl(th, ts * 1.15, 6.5), 0.95)
+        },
+        backdrop: home
+          ? { base: v["bg-000"], scrim: hsl(th, ts * 1.2, 5.5), stops: [[0, 0.48], [0.4, 0.77], [0.68, 0.86], [1, 0.88]] }
+          : { base: v["bg-000"], scrim: hsl(th, ts * 1.7, 3.9), stops: [[0, 0.44], [0.4, 0.7], [1, 0.84]] }
+      };
     }
 
     /* Custom colours (later): report what a picked colour becomes and why. */
@@ -193,7 +257,7 @@
     };
     function fromThemeId(id) { return Object.assign({ preset: "arcade", mode: "dark", pureBlack: false }, THEME_IDS[id] || {}); }
 
-    return { presets: PRESETS, swatches: SWATCHES, build: build, apply: apply, check: check, contrast: contrast, hsl: hsl, fromThemeId: fromThemeId, preset: preset, swatch: swatch };
+    return { presets: PRESETS, swatches: SWATCHES, strengths: STRENGTHS, build: build, glass: glass, apply: apply, check: check, contrast: contrast, hsl: hsl, rgba: rgba, fromThemeId: fromThemeId, preset: preset, swatch: swatch };
   })();
 
   function cx() { return Array.prototype.filter.call(arguments, Boolean).join(" "); }
@@ -205,6 +269,35 @@
   // First letter or digit of a title, for title covers.
   function initialOf(name) { var m = String(name || "").match(/[A-Za-z0-9]/); return m ? m[0].toUpperCase() : "?"; }
   function varsStyle(vars) { var s = {}; Object.keys(vars).forEach(function (k) { s["--" + k] = vars[k]; }); return s; }
+  // The page's theme, followed when the page switches it.
+  function useDocTheme() {
+    var st = useState(docTheme);
+    useEffect(function () {
+      if (typeof MutationObserver === "undefined") return undefined;
+      var mo = new MutationObserver(function () { st[1](docTheme()); });
+      mo.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+      return function () { mo.disconnect(); };
+    }, []);
+    return st[0];
+  }
+
+  /* ---------- Surface: Glossy (the default) or Solid, one choice for every screen, as in Settings ---------- */
+  var SURFACE_KEY = "gamesync.surface";
+  function getSurface() { try { return window.localStorage.getItem(SURFACE_KEY) === "solid" ? "solid" : "glossy"; } catch (e) { return "glossy"; } }
+  function setSurface(value) {
+    try { window.localStorage.setItem(SURFACE_KEY, value === "solid" ? "solid" : "glossy"); } catch (e) { /* previews without storage stay Glossy */ }
+    try { window.dispatchEvent(new Event("gamesync-surface")); } catch (e) { /* old browsers */ }
+  }
+  function useSurface() {
+    var st = useState(getSurface);
+    useEffect(function () {
+      function on() { st[1](getSurface()); }
+      window.addEventListener("storage", on);
+      window.addEventListener("gamesync-surface", on);
+      return function () { window.removeEventListener("storage", on); window.removeEventListener("gamesync-surface", on); };
+    }, []);
+    return st[0];
+  }
 
   /* ---------- Icon: 24px grid, 1.75 stroke, round caps ---------- */
   var P = {
@@ -350,7 +443,7 @@
     "not-found": ["warn", "search", "Saves not found"],
     "not-available": ["neutral", "unplug", "Not available"],
     blocked: ["danger", "block", "Blocked"],
-    "backup-only": ["neutral", "archive", "Backup only"]
+    "backup-only": ["neutral", "archive", "Synced by its store"]
   };
   function StatusBadge(props) {
     var s = STATUS[props.status] || STATUS.synced;
@@ -700,10 +793,32 @@
       props.onAdd ? h("div", null, h(Button, { size: "sm", variant: "secondary", icon: "plus", onClick: props.onAdd }, props.addLabel || "Add folder")) : null);
   }
 
-  /* ---------- Theming: scope, picker, swatches ---------- */
+  /* ---------- Theming: scope, backdrop, picker, swatches ---------- */
+  // Every colour token for what's inside: the theme given, or the page's. In Glossy, with art, the strength's
+  // see-through surfaces over a Backdrop of that art; light mode, pure black and no art stay Solid.
   function ThemeScope(props) {
-    var vars = Theme.build(props.theme || {});
-    return h("div", { className: cx("gs-scope", props.className), style: Object.assign(varsStyle(vars), props.style), "data-gs-theme": (props.theme && props.theme.preset) || "arcade" }, props.children);
+    var pageTheme = useDocTheme();
+    var storedSurface = useSurface();
+    var theme = props.theme || pageTheme;
+    var surface = props.surface || storedSurface;
+    var vars = Theme.build(theme);
+    var glass = surface === "glossy" && props.art ? Theme.glass(theme, props.strength || "home") : null;
+    if (glass) Object.assign(vars, glass.tokens);
+    var style = Object.assign(varsStyle(vars), glass ? { background: glass.backdrop.base } : null, props.style);
+    return h("div", { className: cx("gs-scope", glass && "gs-glossy", props.className), style: style, "data-gs-theme": theme.preset || "arcade", "data-gs-surface": glass ? "glossy" : "solid" },
+      glass ? h(Backdrop, { art: props.art, backdrop: glass.backdrop }) : null,
+      props.children);
+  }
+
+  // The art blurred behind a Glossy page, with its strength's scrim from top to bottom. The app darkens bright art
+  // further, row by row, until text keeps 4.5:1; these previews use art dark enough not to need it.
+  function Backdrop(props) {
+    var b = props.backdrop;
+    var art = /^(url|linear-gradient|radial-gradient|repeating-)/.test(props.art) ? props.art : "url(" + props.art + ")";
+    var scrim = "linear-gradient(180deg, " + b.stops.map(function (s) { return Theme.rgba(b.scrim, s[1]) + " " + Math.round(s[0] * 100) + "%"; }).join(", ") + ")";
+    return h("div", { className: "gs-backdrop", "aria-hidden": "true" },
+      h("div", { className: "gs-backdrop-art", style: { backgroundImage: art } }),
+      h("div", { className: "gs-backdrop-scrim", style: { background: scrim } }));
   }
 
   function MiniApp(props) {
@@ -777,7 +892,8 @@
     StatusBadge: StatusBadge, GameTile: GameTile, ProgressBar: ProgressBar, ActivityGrid: ActivityGrid, Checkbox: Checkbox, Switch: Switch,
     ConsoleTable: ConsoleTable, ConsoleLog: ConsoleLog, ShareSavesDialog: ShareSavesDialog, ImportSavesDialog: ImportSavesDialog,
     SettingsNav: SettingsNav, SettingsRow: SettingsRow, FolderField: FolderField, FolderList: FolderList,
-    ThemeScope: ThemeScope, ThemePicker: ThemePicker, ColorSwatchPicker: ColorSwatchPicker,
+    ThemeScope: ThemeScope, Backdrop: Backdrop, ThemePicker: ThemePicker, ColorSwatchPicker: ColorSwatchPicker,
+    surface: { get: getSurface, set: setSurface, use: useSurface },
     formatBytes: fmt, theme: Theme
   };
   window.GameSync = Object.assign(window.GameSync || {}, api);

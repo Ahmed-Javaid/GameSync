@@ -68,6 +68,8 @@ public static partial class Cli
           set install-dir <game> <folder>      where a game is installed on this PC, for <installDir>
           set account steamUser|epicUser <id>  this PC's account IDs, for <steamUser> and <epicUser>
           set anti-cheat <game> yes|no|auto    marks a game as shipping an anti-cheat, or not, or as found
+          set surface glossy|solid             Glossy shows the last-played game's art through the app (in dark
+                                               mode); Solid is the plain look. An open app repaints at once.
 
         Sync
           plan [<game>...]           what the next sync would do for each game, and why
@@ -692,8 +694,24 @@ public static partial class Cli
                 return 0;
             }
 
+            case "surface":
+            {
+                var surface = Arg(rest, 1, "glossy or solid");
+                if (surface is not ("glossy" or "solid"))
+                {
+                    throw new UsageException("Choose glossy or solid.");
+                }
+
+                state.SetSetting("look.surface", surface);
+                var told = AppPipe.SendAsync(dataDir, "look", TimeSpan.FromMilliseconds(500)).GetAwaiter().GetResult() == "ok";
+                Console.WriteLine((surface == "glossy"
+                    ? "GameSync shows each page over the last-played game's art on this PC, in dark mode with Windows' transparency effects on."
+                    : "GameSync uses the plain look on this PC.") + (told ? " The open app has repainted." : ""));
+                return 0;
+            }
+
             default:
-                throw new UsageException("Settings: history-folder, history-keep, install-dir, account, anti-cheat. Run 'gamesync help'.");
+                throw new UsageException("Settings: history-folder, history-keep, install-dir, account, anti-cheat, surface. Run 'gamesync help'.");
         }
     }
 

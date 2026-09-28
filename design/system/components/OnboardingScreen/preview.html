@@ -9,15 +9,15 @@
 <script>
 var G = window.GameSync, h = React.createElement;
 
+var ART = "data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%201200%20500%27%20preserveAspectRatio%3D%27xMidYMid%20slice%27%3E%3Crect%20width%3D%271200%27%20height%3D%27500%27%20fill%3D%27%231b2a33%27/%3E%3Ccircle%20cx%3D%27860%27%20cy%3D%27150%27%20r%3D%2770%27%20fill%3D%27%237fe6f2%27%20opacity%3D%27.35%27/%3E%3Cpath%20d%3D%27M0%20330%20L180%20200%20L330%20300%20L520%20150%20L700%20290%20L880%20190%20L1200%20320%20V500%20H0Z%27%20fill%3D%27%23223640%27/%3E%3Cpath%20d%3D%27M0%20400%20L220%20290%20L420%20380%20L640%20270%20L860%20370%20L1040%20300%20L1200%20360%20V500%20H0Z%27%20fill%3D%27%23182730%27/%3E%3Cpath%20d%3D%27M0%20460%20L300%20390%20L600%20450%20L900%20380%20L1200%20440%20V500%20H0Z%27%20fill%3D%27%2310191f%27/%3E%3C/svg%3E";
+
 var COVERS = ["data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%20200%20300%27%3E%3Crect%20width%3D%27200%27%20height%3D%27300%27%20fill%3D%27%231d2a24%27/%3E%3Ccircle%20cx%3D%27140%27%20cy%3D%2790%27%20r%3D%2738%27%20fill%3D%27%237fd1a6%27%20opacity%3D%27.5%27/%3E%3Cpath%20d%3D%27M0%20220%20L70%20160%20L130%20210%20L200%20150%20V300%20H0Z%27%20fill%3D%27%237fd1a6%27%20opacity%3D%27.35%27/%3E%3C/svg%3E", "data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%20200%20300%27%3E%3Crect%20width%3D%27200%27%20height%3D%27300%27%20fill%3D%27%232b2220%27/%3E%3Ccircle%20cx%3D%27140%27%20cy%3D%2790%27%20r%3D%2738%27%20fill%3D%27%23e0b36a%27%20opacity%3D%27.5%27/%3E%3Cpath%20d%3D%27M0%20220%20L70%20160%20L130%20210%20L200%20150%20V300%20H0Z%27%20fill%3D%27%23e0b36a%27%20opacity%3D%27.35%27/%3E%3C/svg%3E", "data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%20200%20300%27%3E%3Crect%20width%3D%27200%27%20height%3D%27300%27%20fill%3D%27%23221f33%27/%3E%3Ccircle%20cx%3D%27140%27%20cy%3D%2790%27%20r%3D%2738%27%20fill%3D%27%23b9a3ff%27%20opacity%3D%27.5%27/%3E%3Cpath%20d%3D%27M0%20220%20L70%20160%20L130%20210%20L200%20150%20V300%20H0Z%27%20fill%3D%27%23b9a3ff%27%20opacity%3D%27.35%27/%3E%3C/svg%3E", "data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%20200%20300%27%3E%3Crect%20width%3D%27200%27%20height%3D%27300%27%20fill%3D%27%232c2519%27/%3E%3Ccircle%20cx%3D%27140%27%20cy%3D%2790%27%20r%3D%2738%27%20fill%3D%27%23f2b544%27%20opacity%3D%27.5%27/%3E%3Cpath%20d%3D%27M0%20220%20L70%20160%20L130%20210%20L200%20150%20V300%20H0Z%27%20fill%3D%27%23f2b544%27%20opacity%3D%27.35%27/%3E%3C/svg%3E"];
 var STEPS=[{id:'scan',label:'Scan this PC',icon:'search'},{id:'choose',label:'Choose games',icon:'library'},{id:'cloud',label:'Connect the cloud',icon:'cloud'},{id:'daily',label:'Backups and startup',icon:'clock'}];
 var SYNC=[
   {name:'Terraria',art:COVERS[0],path:'Documents\\My Games\\Terraria',how:'save list'},
-  {name:'Sekiro: Shadows Die Twice',art:COVERS[1],path:'AppData\\Roaming\\Sekiro',how:'save list'},
   {name:'Slay the Spire 2',art:COVERS[2],path:'AppData\\Roaming\\SlayTheSpire2',how:'name search'},
   {name:'Black Myth: Wukong',art:COVERS[3],path:'game folder\\b1\\Saved\\SaveGames',how:'engine rule'},
-  {name:'Stick Fight: The Game',path:'Registry: HKCU\\Software\\Landfall Games\\Stick Fight',how:'engine rule'},
-  {name:'Guacamelee! STCE',path:'Documents\\GuacameleeSTCE',how:'name search'}];
+  {name:'Stick Fight: The Game',path:'Registry: HKCU\\Software\\Landfall Games\\Stick Fight',how:'engine rule'}];
 
 function Cover(p){return p.art?h('div',{'aria-hidden':'true',style:{width:24,height:36,borderRadius:6,background:'url('+p.art+') center/cover'}}):h('div',{'aria-hidden':'true',className:'gs-cover-empty',style:{width:24,height:36,borderRadius:6,fontSize:12}},p.name.charAt(0));}
 function Group(p){
@@ -31,14 +31,14 @@ function Group(p){
     h('span',{className:'ob-cut',style:{fontWeight:500}},g.name),
     h('span',{className:'gs-mono gs-muted ob-cut',style:{fontSize:12},title:g.path},g.path),
     h('span',{className:'gs-faint',style:{fontSize:12}},g.how));}),
-   h(G.Button,{size:'sm',variant:'ghost',iconAfter:'chevronDown',style:{alignSelf:'flex-start',marginLeft:18}},'Show 16 more')):null);
+   h(G.Button,{size:'sm',variant:'ghost',iconAfter:'chevronDown',style:{alignSelf:'flex-start',marginLeft:18}},'Show 18 more')):null);
 }
 function Page(p){return h('div',{style:{display:'flex',flexDirection:'column',gap:16,flex:1,minWidth:0,minHeight:0}},h('header',null,h('h1',{className:'page-title',style:{margin:0}},p.title),h('p',{className:'gs-muted',style:{margin:'4px 0 0',maxWidth:720}},p.sub)),p.children);}
 function Foot(p){return h('div',{className:'gs-row',style:{marginTop:'auto',justifyContent:'flex-end',gap:12}},p.back?h(G.Button,{variant:'ghost',onClick:p.back},'Back'):null,h(G.Button,{variant:p.quiet?'secondary':'primary',iconAfter:p.done?null:'chevronRight',icon:p.done?'check':null,onClick:p.next},p.label));}
 
 function App(){
  var st=React.useState(function(){var a=location.hash.slice(1);return STEPS.some(function(s){return s.id===a})?a:'choose';}), step=st[0], go=st[1], idx=STEPS.findIndex(function(s){return s.id===step});
- var online=React.useState(false), ignore=React.useState(true), keepLudu=React.useState(true), signed=React.useState(false), startup=React.useState(true), daily=React.useState(true);
+ var online=React.useState(false), signed=React.useState(false), startup=React.useState(true), daily=React.useState(true);
  var views={
   scan:function(){return h(Page,{title:'Scan this PC',sub:'GameSync reads what Steam, Epic and EA know, and looks through the game folders you add. It only reads; nothing is copied yet.'},
     h(G.ProgressBar,{value:100,label:'Scan finished in 2 seconds: 46 games, saves found for 43',right:'100%'}),
@@ -50,21 +50,20 @@ function App(){
      h(G.Card,{title:'Your game folders',subtitle:'For games outside Steam, Epic and EA.'},
       h(G.FolderList,{items:[{path:'E:\\Games',meta:'16 games'},{path:'G:\\',meta:'3 games'}],addLabel:'Add a game folder'}))),
     h(Foot,{next:function(){go('choose')},label:'Choose games'}));},
-  choose:function(){return h('div',{style:{display:'flex',gap:24,flex:1,minHeight:0}},
-    h(Page,{title:'Choose what to sync',sub:'46 games found. Ticked games are backed up now and synced from then on; you can change this any time.'},
+  choose:function(){return h(Page,{title:'Choose what to sync',sub:'46 games found. Ticked games are backed up now and synced from then on; you can change this any time.'},
      h(Group,{title:'Sync',count:22,why:'saves found, no store cloud',on:true,rows:SYNC}),
-     h(Group,{title:'Back up only',count:9,why:'Steam or Epic already syncs these \u00b7 Cyberpunk 2077, Dark Souls III and 7 more',on:true}),
-     h(Group,{title:'Probably online-only',count:12,why:'only settings files found \u00b7 Apex Legends, Rocket League and 10 more',on:online[0],onTick:online[1]}),
-     h(Group,{title:'Saves found, game not installed',count:5,why:'kept safe, offered back if you install them \u00b7 Forza Horizon 6 and 4 more',on:true}),
-     h(Group,{title:'No saves found yet',count:3,why:'ROUNDS, COD, OG \u00b7 watched the first time you play',watch:true})),
-    h('aside',{style:{width:320,flexShrink:0,display:'flex',flexDirection:'column',gap:16}},
-     h(G.Card,{title:'Bring over from Ludusavi',subtitle:'Found in E:\\Saves and Backups\\Games\\Ludusavi'},
-      h('div',{className:'gs-muted',style:{display:'flex',flexDirection:'column',gap:2}},h('span',null,'3 custom games'),h('span',null,'32 games you ignored'),h('span',null,'Backups of 28 games, about 1 GB')),
-      h(G.SettingsRow,{title:'Use my ignore list'},h(G.Switch,{label:'Use my ignore list',checked:ignore[0],onChange:ignore[1]})),
-      h(G.SettingsRow,{title:'Keep each backup as a named save',description:'Kept aside in the game\u2019s history, never made current by itself.'},h(G.Switch,{label:'Keep each backup as a named save',checked:keepLudu[0],onChange:keepLudu[1]}))),
-     h(G.Card,{title:'Games with an anti-cheat',subtitle:'They launch only through their own launcher, and learn mode never runs on them.'},
-      h('div',{className:'gs-note'},h(G.Icon,{name:'shield',size:16}),'Apex Legends, Helldivers 2, Rocket League and GTA V Enhanced.')),
-     h(Foot,{back:function(){go('scan')},next:function(){go('cloud')},label:'Continue'})));},
+     h(Group,{title:'Synced by their store',count:9,why:'Steam or Epic syncs these between PCs; GameSync keeps a backup of every version',on:true}),
+     h(Group,{title:'Probably online-only',count:12,why:'only settings files found · Apex Legends, Rocket League and 10 more',on:online[0],onTick:online[1]}),
+     h(Group,{title:'Saves found, game not installed',count:5,why:'kept safe, offered back if you install them · Forza Horizon 6 and 4 more',on:true}),
+     h(Group,{title:'No saves found yet',count:3,why:'ROUNDS, COD, OG · watched the first time you play',watch:true}),
+     h(G.Card,{style:{padding:'12px 16px'}},
+      h('div',{className:'gs-row',style:{flexWrap:'nowrap',gap:12}},
+       h(G.Icon,{name:'folder',size:18,className:'gs-faint'}),
+       h('div',{style:{flex:1,minWidth:0}},h('div',{style:{fontWeight:600}},'Something missing?'),h('div',{className:'gs-muted',style:{fontSize:12,lineHeight:'16px'}},'Add a game or folder of your own, like a game server’s world, and GameSync keeps it in step on every PC.')),
+       h(G.Button,{size:'sm',variant:'secondary',icon:'plus'},'Add a game or folder'))),
+     h('div',{className:'gs-row',style:{marginTop:'auto',justifyContent:'space-between',gap:24,flexWrap:'nowrap'}},
+      h('div',{className:'gs-note',style:{maxWidth:620}},h(G.Icon,{name:'shield',size:16}),'Apex Legends, Helldivers 2, Rocket League and GTA V Enhanced have an anti-cheat: they launch only through their own launcher, and learn mode never runs on them.'),
+      h('div',{className:'gs-row',style:{gap:12,flexWrap:'nowrap'}},h(G.Button,{variant:'ghost',onClick:function(){go('scan')}},'Back'),h(G.Button,{variant:'primary',iconAfter:'chevronRight',onClick:function(){go('cloud')}},'Continue'))));},
   cloud:function(){return h(Page,{title:'Connect the cloud',sub:'Your saves go to your own Google Drive, in one folder GameSync makes. It can see that folder and nothing else in your Drive.'},
     h(G.Card,{title:'Google Drive'},
      signed[0]?h(G.SettingsRow,{title:'Signed in',description:'The GameSync folder is ready. The first upload is about 1.1 GB and carries on in the background.'},h(G.StatusBadge,{status:'synced',label:'Connected'}))
@@ -83,8 +82,8 @@ function App(){
      h('div',{className:'gs-note'},h(G.Icon,{name:'upload',size:16}),'The first backup, about 1.1 GB, runs in the background once you start. You can play meanwhile.')),
     h(Foot,{back:function(){go('cloud')},next:function(){},label:'Start using GameSync',done:true}));}
  };
- return h('div',{style:{width:1280,height:800,display:'flex',background:'var(--bg-100)'}},
-  h('aside',{style:{width:280,flexShrink:0,padding:'28px 16px 24px',display:'flex',flexDirection:'column',gap:24,borderRight:'1px solid var(--line-100)'}},
+ return h(G.ThemeScope,{strength:'glow',art:ART,style:{width:1280,height:800,display:'flex'}},
+  h('aside',{style:{width:280,flexShrink:0,padding:'28px 16px 24px',display:'flex',flexDirection:'column',gap:24,background:'var(--bg-100)',borderRight:'1px solid var(--line-100)'}},
    h('div',{className:'gs-row',style:{gap:12,padding:'0 12px',flexWrap:'nowrap'}},h(G.Icon,{name:'logo',size:28}),h('div',null,h('div',{style:{font:'600 15px/20px var(--font-sans)'}},'Set up GameSync'),h('div',{className:'gs-faint',style:{fontSize:12}},'Four steps, about two minutes'))),
    h(G.SettingsNav,{label:'Setup steps',current:step,onChange:go,items:STEPS.map(function(s,i){return {id:s.id,label:s.label,icon:i<idx?'check':s.icon};})}),
    h('div',{className:'gs-note',style:{marginTop:'auto',padding:'0 12px'}},h(G.Icon,{name:'info',size:16}),'Nothing syncs until you finish, and your saves stay where they are.')),

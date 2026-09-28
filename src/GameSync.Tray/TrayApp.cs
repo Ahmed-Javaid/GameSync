@@ -42,9 +42,13 @@ internal sealed class TrayApp
     private ShellViewModel? _shell;
     private Pages? _pages;
     private string _page = "home";
+    private readonly Backdrops _backdrops;
     private Look _look = new();
+    private ThemeChoice _choice = new();
     private IReadOnlyDictionary<string, string> _tokens = new Dictionary<string, string>();
     private bool _dark = true;
+    private bool _transparency = true;
+    private string? _backdropArt;
     private bool _setUp;
     private SyncCounts _counts = SyncCounts.None;
     private bool _working;
@@ -61,11 +65,17 @@ internal sealed class TrayApp
         _output = new AppOutput(_dataDir, Toasts.Show);
         _agent = new AppAgent(_dataDir, _output);
         _refresh = new DispatcherTimer(TimeSpan.FromMilliseconds(400), DispatcherPriority.Background, (_, _) => Refresh());
+        _backdrops = new Backdrops(e => _output.Say($"! Glossy's backdrop couldn't be made, so the window stays Solid: {e.Message}"));
+        _backdrops.Made += ShowSurface;
 
         _tray = new TrayIcon();
         _tray.Opened += Bring;
         _tray.Picked += Picked;
-        _tray.LookChanged += DrawTray;
+        _tray.LookChanged += () =>
+        {
+            DrawTray();
+            FollowTransparency();
+        };
         _tray.Failed += e => _output.Say($"! The tray icon: {e.Message}");
         _tray.SessionEnding += () => Stop(TimeSpan.FromSeconds(4));
         _tray.Menu = () =>
@@ -139,8 +149,15 @@ internal sealed class TrayApp
 
         if (_window is null)
         {
-            _shell = new ShellViewModel(MakePage, _page) { Rail = _pages?.Rail ?? ShellViewModel.DefaultRail(null, null) };
-            var window = new MainWindow { DataContext = _shell };
+            var shell = new ShellViewModel(MakePage, _page) { Rail = _pages?.Rail ?? ShellViewModel.DefaultRail(null, null) };
+            shell.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName == nameof(ShellViewModel.Strength))
+                {
+                    ShowSurface();
+                }
+            };
+            var window = new MainWindow { DataContext = shell };
             window.Opened += (_, _) => window.PaintFrame(_tokens, _dark);
             window.Closed += (_, _) =>
             {
@@ -150,7 +167,8 @@ internal sealed class TrayApp
                 _pages = null;
                 LetGoSoon(force: true);
             };
-            _window = window;
+            (_window, _shell) = (window, shell);
+            ShowSurface();
             RefreshSoon();
         }
 
@@ -217,13 +235,19 @@ internal sealed class TrayApp
 
     /// <summary>
     /// What comes over the pipe: a second start (<c>show</c>), an installer closing GameSync for an update (<c>quit</c>),
-    /// or the tray icon's state and hover text (<c>status</c>).
+    /// the tray icon's state and hover text (<c>status</c>), or a changed look from <c>gamesync set surface</c> (<c>look</c>).
     /// </summary>
     private async Task<string> Answer(string message) => message switch
     {
         "show" => await Dispatcher.UIThread.InvokeAsync(() =>
         {
             Bring();
+            return "ok";
+        }),
+        "look" => await Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            LoadLook();
+            ApplyTheme();
             return "ok";
         }),
         "status" => await Dispatcher.UIThread.InvokeAsync(() =>
@@ -263,8 +287,10 @@ internal sealed class TrayApp
             if (_shell is not null && pages is not null)
             {
                 _pages = pages;
+                _backdropArt = pages.BackdropArt;
                 _shell.Rail = pages.Rail;
                 _shell.Reload();
+                ShowSurface();
             }
         }
         catch (Exception e) when (e is not OperationCanceledException)
@@ -321,6 +347,16 @@ internal sealed class TrayApp
     /// <summary>The person's look on this PC, applied now and again whenever Windows' mode or accent changes (LOOK-01, LOOK-04).</summary>
     private void FollowTheme()
     {
+        LoadLook();
+        ApplyTheme();
+        if (Application.Current?.PlatformSettings is { } platform)
+        {
+            platform.ColorValuesChanged += (_, _) => Dispatcher.UIThread.Post(ApplyTheme);
+        }
+    }
+
+    private void LoadLook()
+    {
         try
         {
             using var state = new StateStore(_dataDir);
@@ -330,12 +366,6 @@ internal sealed class TrayApp
         {
             _output.Say($"! Your appearance choices couldn't be read, so GameSync uses its default look: {e.Message}");
         }
-
-        ApplyTheme();
-        if (Application.Current?.PlatformSettings is { } platform)
-        {
-            platform.ColorValuesChanged += (_, _) => Dispatcher.UIThread.Post(ApplyTheme);
-        }
     }
 
     private void ApplyTheme()
@@ -343,10 +373,46 @@ internal sealed class TrayApp
         var app = Application.Current!;
         var colors = app.PlatformSettings?.GetColorValues();
         var accent = colors?.AccentColor1 is { } a ? $"#{a.R:x2}{a.G:x2}{a.B:x2}" : null;
-        var choice = _look.Resolve(colors?.ThemeVariant == PlatformThemeVariant.Light, accent);
-        _tokens = ThemeService.Apply(app, choice);
-        _dark = choice.Mode == ThemeMode.Dark;
+        _choice = _look.Resolve(colors?.ThemeVariant == PlatformThemeVariant.Light, accent);
+        _tokens = ThemeService.Apply(app, _choice);
+        _dark = _choice.Mode == ThemeMode.Dark;
+        _transparency = WindowsLook.TransparencyOn();
         _window?.PaintFrame(_tokens, _dark);
+        ShowSurface();
+    }
+
+    /// <summary>LOOK-18: with Windows' transparency effects turned off, Glossy goes Solid, and back when they're on again.</summary>
+    private void FollowTransparency()
+    {
+        if (WindowsLook.TransparencyOn() != _transparency)
+        {
+            _transparency = !_transparency;
+            ShowSurface();
+        }
+    }
+
+    /// <summary>
+    /// Glossy or Solid for the open window (LOOK-17, LOOK-18): Glossy shows the last-played game's art behind the page, at
+    /// the page's strength, when the person chose it, the theme is dark and not pure black, Windows' transparency effects
+    /// are on, and there's art. While a backdrop is being made, the window keeps what it shows.
+    /// </summary>
+    private void ShowSurface()
+    {
+        if (_window is null || _shell is null)
+        {
+            return;
+        }
+
+        var strength = _shell.Strength;
+        var glass = _backdropArt is not null && _look.ShowsGlossy(_choice, _transparency) ? ThemeEngine.Glass(_choice, strength) : null;
+        if (glass is null)
+        {
+            _window.ShowSurface(null, null);
+        }
+        else if (_backdrops.TryGet(_backdropArt!, strength, _choice, glass, _tokens, out var backdrop))
+        {
+            _window.ShowSurface(backdrop is null ? null : glass, backdrop);
+        }
     }
 
     /// <summary>Today's log so far, so the Console page starts with what the agent already did.</summary>
@@ -457,8 +523,11 @@ internal sealed class TrayApp
         _tray.Dispose();
     }
 
-    /// <summary>What the launcher's pages show, read off the UI thread: the games, the home screen, and their pictures at the size they're shown.</summary>
-    private sealed record Pages(HomeViewModel Home, LibraryViewModel Library, IReadOnlyList<RailItem> Rail)
+    /// <summary>
+    /// What the launcher's pages show, read off the UI thread: the games, the home screen, and their pictures at the size
+    /// they're shown; and Glossy's art, the last-played game's (LOOK-17).
+    /// </summary>
+    private sealed record Pages(HomeViewModel Home, LibraryViewModel Library, IReadOnlyList<RailItem> Rail, string? BackdropArt)
     {
         /// <param name="libraryTab">The library's view, kept when the pages are read again.</param>
         public static Pages Read(string dataDir, LauncherActions actions, string libraryTab)
@@ -468,7 +537,8 @@ internal sealed class TrayApp
             return new Pages(
                 HomeViewModel.From(home, games, now, actions),
                 LibraryViewModel.From(games, now, libraryTab, actions),
-                ShellViewModel.DefaultRail(games.FirstOrDefault(g => g.Status == GameStatus.Playing)?.Title, games.Count(g => g.NeedsYou)));
+                ShellViewModel.DefaultRail(games.FirstOrDefault(g => g.Status == GameStatus.Playing)?.Title, games.Count(g => g.NeedsYou)),
+                home.Hero?.HeroPath ?? home.Hero?.CoverPath);
         }
     }
 }

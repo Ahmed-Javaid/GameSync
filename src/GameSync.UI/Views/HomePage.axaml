@@ -4,8 +4,9 @@
              xmlns:vm="using:GameSync.UI.ViewModels"
              x:Class="GameSync.UI.Views.HomePage"
              x:DataType="vm:HomeViewModel">
-  <!-- The launcher home (design system → Launcher home): the top bar, the last-played game, then Needs you, Jump back in and Activity. -->
-  <Grid RowDefinitions="Auto,Auto,*" RowSpacing="16" Margin="24,20">
+  <!-- The launcher home (design system → Launcher home): the top bar, the last-played game, then Needs you, Jump back in and
+       Activity. HomeLayout fills any window: the cards take what their content needs and the banner the rest. -->
+  <c:HomeLayout Margin="24,20" Spacing="16">
     <Grid ColumnDefinitions="*,Auto,*">
       <StackPanel VerticalAlignment="Center">
         <TextBlock Text="{Binding Greeting}" FontSize="15" LineHeight="20" FontWeight="SemiBold" />
@@ -19,11 +20,23 @@
       </StackPanel>
     </Grid>
 
-    <c:GsHeroBanner Grid.Row="1" MinHeight="340" Art="{Binding HeroArt}" Logo="{Binding HeroLogo}" Title="{Binding HeroTitle}"
+    <Panel>
+    <c:GsHeroBanner MinHeight="0" Art="{Binding HeroArt}" Logo="{Binding HeroLogo}" Title="{Binding HeroTitle}"
                     Eyebrow="{Binding HeroEyebrow}" Chip="{Binding HeroChip}" Status="{Binding HeroStatus}" StatusLabel="{Binding HeroStatusLabel}"
-                    Blurb="{Binding HeroBlurb}" PlayLabel="{Binding HeroPlayLabel}" PlayCommand="{Binding PlayCommand}" />
+                    Blurb="{Binding HeroBlurb}" PlayLabel="{Binding HeroPlayLabel}" PlayCommand="{Binding PlayCommand}" IsVisible="{Binding HasHero}" />
+    <c:GsCard Title="No games yet" Subtitle="GameSync hasn't looked for games on this PC." IsVisible="{Binding NoGames}">
+      <c:GsNote Icon="search" MaxWidth="640" HorizontalAlignment="Left" VerticalAlignment="Top"
+                Text="First run will do it for you. Until it's built, run gamesync scan: it reads what Steam, Epic and EA know and changes nothing, and nothing syncs until you choose games. Then gamesync art brings their covers, and Home shows your last-played game." />
+    </c:GsCard>
+    </Panel>
 
-    <Grid Grid.Row="2" ColumnDefinitions="0.95*,1.5*,0.95*" ColumnSpacing="16">
+    <!-- Needs you and Activity keep a readable width; Jump back in takes the rest and shows more covers on wider screens -->
+    <Grid ColumnSpacing="16">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="0.95*" MinWidth="280" MaxWidth="440" />
+        <ColumnDefinition Width="1.5*" />
+        <ColumnDefinition Width="0.95*" MinWidth="280" MaxWidth="440" />
+      </Grid.ColumnDefinitions>
       <c:GsCard Title="Needs you">
         <c:GsCard.Action>
           <c:GsIconButton Icon="chevronRight" Label="Open the save manager" Command="{Binding OpenSavesCommand}" />
@@ -33,7 +46,7 @@
                         IsVisible="{Binding AnySyncing}" />
           <StackPanel DockPanel.Dock="Bottom" Spacing="12" IsVisible="{Binding NoneSyncing}">
             <TextBlock Classes="mono-small muted" Text="{Binding SyncedLabel}" />
-            <c:GsButton Classes="sm" Icon="check" Content="Choose games to sync" Command="{Binding OpenLibraryCommand}" />
+            <c:GsButton Classes="sm" Icon="check" Content="Choose games to sync" Command="{Binding OpenLibraryCommand}" IsVisible="{Binding CanChoose}" />
           </StackPanel>
           <Panel>
             <c:GsNote Icon="check" Text="Nothing needs you. Every game that syncs is fine." IsVisible="{Binding AllFine}" VerticalAlignment="Top" />
@@ -75,12 +88,12 @@
         <ItemsControl ItemsSource="{Binding JumpBackIn}">
           <ItemsControl.ItemsPanel>
             <ItemsPanelTemplate>
-              <c:ColumnsPanel Columns="3" Gap="12" />
+              <c:ShelfPanel Gap="12" />
             </ItemsPanelTemplate>
           </ItemsControl.ItemsPanel>
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="vm:TileItem">
-              <c:GsGameTile Classes="compact" Width="NaN" Title="{Binding Title}" Art="{Binding Art}" Status="{Binding Status}" Meta="{Binding Meta}">
+              <c:GsGameTile Classes="compact" Width="NaN" Title="{Binding Title}" Art="{Binding Art}" Status="{Binding Status}" StatusLabel="{Binding StatusLabel}" Meta="{Binding Meta}">
               <c:GsGameTile.ContextMenu>
                 <ContextMenu IsVisible="{Binding ToggleHidden, Converter={x:Static ObjectConverters.IsNotNull}}">
                   <MenuItem Header="{Binding HideLabel}" Command="{Binding ToggleHidden}" />
@@ -99,5 +112,5 @@
         </StackPanel>
       </c:GsCard>
     </Grid>
-  </Grid>
+  </c:HomeLayout>
 </UserControl>

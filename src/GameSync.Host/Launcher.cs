@@ -98,19 +98,22 @@ public static class Launcher
     }
 
     /// <summary>
-    /// The home screen: the most recently played installed game as the hero, up to three that need you, the next three
-    /// played, and this month's play per day from GameSync's sessions (Steam keeps no daily record).
+    /// The home screen: the most recently played installed game as the hero, up to three that need you, the next
+    /// <see cref="JumpBackInAtMost"/> played (Home shows as many as fit), and this month's play per day from GameSync's
+    /// sessions (Steam keeps no daily record).
     /// </summary>
+    public const int JumpBackInAtMost = 12;
+
     public static LauncherHome Home(IReadOnlyList<LauncherGame> all, StateStore state, DateTime nowLocal)
     {
         // The home is about games; software such as Wallpaper Engine stays in the library's Software tab, and hidden games in Hidden.
         var games = all.Where(g => g.Shown).ToList();
         var played = games.Where(g => g.LastPlayedUtc is not null).ToList();
         var hero = played.FirstOrDefault(g => g.Installed) ?? games.FirstOrDefault(g => g.Installed);
-        var jump = played.Where(g => g != hero).Take(3).ToList();
-        if (jump.Count < 3)
+        var jump = played.Where(g => g != hero).Take(JumpBackInAtMost).ToList();
+        if (jump.Count < JumpBackInAtMost)
         {
-            jump.AddRange(games.Where(g => g != hero && !jump.Contains(g)).Take(3 - jump.Count));
+            jump.AddRange(games.Where(g => g != hero && !jump.Contains(g)).Take(JumpBackInAtMost - jump.Count));
         }
 
         var first = new DateTime(nowLocal.Year, nowLocal.Month, 1);

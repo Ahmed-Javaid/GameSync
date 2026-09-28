@@ -23,6 +23,23 @@ public sealed record ThemeChoice(
 
 public sealed record Swatch(string Id, string Name, string Hex);
 
+/// <summary>
+/// How much of the backdrop a Glossy page lets through (LOOK-17): full glass on game detail, conflict and the save
+/// manager; Home a step more solid; a soft glow at the top over nearly solid cards on first run and settings.
+/// </summary>
+public enum GlassStrength
+{
+    Glass,
+    Home,
+    Glow,
+}
+
+/// <summary>
+/// A Glossy page: the tokens laid over the theme's, and its backdrop: the base colour, then the art, then the scrim
+/// colour at alpha stops (position from top to bottom, 0 to 1). The app darkens bright art further (LOOK-18).
+/// </summary>
+public sealed record GlassSurface(IReadOnlyDictionary<string, string> Tokens, string Base, string Scrim, IReadOnlyList<(double At, double Alpha)> Stops);
+
 /// <summary>A preset: its primary and secondary swatches and its surface tint (hue, saturation); the Windows accent preset has none of these.</summary>
 public sealed record ThemePreset(string Id, string Name, string? Primary, string? Secondary, (double Hue, double Saturation)? Tint, string Note)
 {
@@ -79,7 +96,8 @@ public static class ThemeEngine
 
     private static readonly Dictionary<string, string> Fixed = new()
     {
-        ["on-art"] = "#f5f7f9", ["art-scrim"] = "rgba(5, 6, 8, 0.72)", ["glass"] = "rgba(16, 18, 21, 0.72)",
+        ["on-art"] = "#f5f7f9", ["art-scrim"] = "rgba(5, 6, 8, 0.72)", ["glass"] = "rgba(12, 14, 17, 0.58)",
+        ["glass-edge"] = "rgba(255, 255, 255, 0.16)",
     };
 
     public static ThemePreset Preset(string id) => Presets.FirstOrDefault(p => p.Id == id) ?? Presets[0];
@@ -154,8 +172,89 @@ public static class ThemeEngine
             v["shadow-dialog"] = "0 24px 64px rgba(16, 24, 40, 0.18)";
         }
 
+        // The surfaces Glossy makes see-through (Glass below). Solid has no edges, lift or ring: its surfaces are the plain
+        // ones, and its edges are clear, so a hovered control shows no ring (the background runs under the border).
+        foreach (var edge in (string[])["edge-card", "edge-control", "edge-console", "edge-well", "edge-dialog", "edge-art"])
+        {
+            v[edge] = Rgba("#000000", 0);
+        }
+
+        v["lift-card"] = "none";
+        v["surface-dialog"] = v["bg-200"];
+        v["surface-well"] = v["bg-300"];
+        v["surface-field"] = v["bg-200"];
+        v["dot-ring"] = v["bg-100"];
+
+        // A status badge on cover art: in dark mode a deep tint of its status at 82% (neutral 88%), so it keeps 4.5:1 over
+        // any art in both surfaces; light mode keeps its opaque tints.
+        foreach (var status in (string[])["ok", "warn", "danger", "play"])
+        {
+            v[status + "-art"] = light ? v[status + "-soft"] : Rgba(Hsl(HueOf(StatusDark[status + "-soft"]), 65, 10), 0.82);
+        }
+
+        v["neutral-art"] = light ? v["bg-300"] : Rgba(Hsl(th, ts, 10), 0.88);
         Add(v, Fixed);
         return v;
+    }
+
+    /// <summary>
+    /// Glossy (LOOK-17, LOOK-18; <c>GameSync.theme.glass()</c> in the design system): what a page's surfaces become so a
+    /// blurred, darkened copy of a game's art shows through, in three strengths, with the backdrop's base colour, scrim
+    /// colour and alpha stops from top to bottom. Null in light mode and with pure black: the page stays Solid.
+    /// </summary>
+    public static GlassSurface? Glass(ThemeChoice choice, GlassStrength strength)
+    {
+        if (choice.Mode == ThemeMode.Light || choice.PureBlack)
+        {
+            return null;
+        }
+
+        var preset = Preset(choice.Preset);
+        var accent = HexOf(choice.Accent) ?? DefaultAccent;
+        var th = preset.Tint?.Hue ?? HueOf(accent);
+        var ts = preset.Tint?.Saturation ?? 10;
+        var v = Build(choice);
+        static string White(double a) => Rgba("#ffffff", a);
+
+        if (strength == GlassStrength.Glow)
+        {
+            return new GlassSurface(
+                new Dictionary<string, string>
+                {
+                    ["bg-000"] = Rgba(v["bg-000"], 0.88), ["bg-100"] = Rgba(v["bg-100"], 0.5), ["bg-200"] = Rgba(v["bg-200"], 0.82),
+                    ["bg-300"] = White(0.07), ["bg-400"] = White(0.13), ["line-100"] = White(0.07), ["secondary-soft"] = Rgba(v["secondary"], 0.15),
+                    ["edge-card"] = White(0.05), ["edge-control"] = White(0.04), ["edge-console"] = White(0.05),
+                    ["edge-well"] = White(0.04), ["edge-dialog"] = White(0.07), ["edge-art"] = White(0.06),
+                    ["lift-card"] = "inset 0 1px 0 " + White(0.04), ["surface-dialog"] = Rgba(Hsl(th, ts, 11.6), 0.96),
+                    ["surface-well"] = Rgba("#000000", 0.28), ["surface-field"] = Rgba("#000000", 0.3), ["dot-ring"] = Rgba(v["bg-100"], 0.95),
+                },
+                v["bg-100"], v["bg-100"], [(0, 0.56), (0.36, 0.84), (0.6, 0.93), (1, 0.95)]);
+        }
+
+        var home = strength == GlassStrength.Home;
+        return new GlassSurface(
+            new Dictionary<string, string>
+            {
+                ["bg-000"] = Rgba(Hsl(th, ts * 2.4, 2.7), 0.6),
+                ["bg-100"] = home ? Rgba(v["bg-100"], 0.25) : White(0.03),
+                ["bg-200"] = home ? Rgba(Hsl(th, ts * 1.15, 12.75), 0.6) : White(0.055),
+                ["bg-300"] = White(0.08), ["bg-400"] = White(0.14), ["line-100"] = White(0.07), ["secondary-soft"] = Rgba(v["secondary"], 0.16),
+                ["ok-soft"] = Rgba(v["ok"], 0.13), ["warn-soft"] = Rgba(v["warn"], 0.15), ["play-soft"] = Rgba(v["play"], 0.16), ["danger-soft"] = Rgba(v["danger"], 0.15),
+                ["edge-card"] = White(0.075), ["edge-control"] = White(0.06), ["edge-console"] = White(0.06),
+                ["edge-well"] = White(0.05), ["edge-dialog"] = White(0.09), ["edge-art"] = White(0.09),
+                ["lift-card"] = "inset 0 1px 0 " + White(0.05), ["surface-dialog"] = Rgba(Hsl(th, ts, 11.6), 0.94),
+                ["surface-well"] = Rgba("#000000", 0.26), ["surface-field"] = Rgba("#000000", 0.3), ["dot-ring"] = Rgba(Hsl(th, ts * 1.15, 6.5), 0.95),
+            },
+            v["bg-000"],
+            home ? Hsl(th, ts * 1.2, 5.5) : Hsl(th, ts * 1.7, 3.9),
+            home ? [(0, 0.48), (0.4, 0.77), (0.68, 0.86), (1, 0.88)] : [(0, 0.44), (0.4, 0.7), (1, 0.84)]);
+    }
+
+    /// <summary><c>rgba(r, g, b, a)</c> of a <c>#rrggbb</c> colour, written as the design system writes it.</summary>
+    public static string Rgba(string hex, double alpha)
+    {
+        var c = HexToRgb(hex) ?? throw new ArgumentException($"'{hex}' isn't a colour like #7fe6f2.", nameof(hex));
+        return $"rgba({c.R}, {c.G}, {c.B}, {alpha.ToString(CultureInfo.InvariantCulture)})";
     }
 
     /// <summary>WCAG 2 contrast ratio of two <c>#rrggbb</c> colours.</summary>

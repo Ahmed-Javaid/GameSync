@@ -3,14 +3,23 @@ using GameSync.Core.State;
 namespace GameSync.UI.Theming;
 
 /// <summary>
-/// The person's appearance choices on this PC (LOOK-01 to LOOK-07, LOOK-10), kept in state.db and never synced, so
-/// each PC keeps its own look. The mode can be Dark, Light or Match Windows, which follows Windows' app mode.
+/// The person's appearance choices on this PC (LOOK-01 to LOOK-07, LOOK-10, LOOK-17), kept in state.db and never synced,
+/// so each PC keeps its own look. The mode can be Dark, Light or Match Windows, which follows Windows' app mode; the
+/// surface is Glossy, the default, or Solid.
 /// </summary>
-public sealed record Look(string Mode = Look.Dark, bool PureBlack = false, string Preset = "arcade", string? Primary = null, string? Secondary = null)
+public sealed record Look(
+    string Mode = Look.Dark,
+    bool PureBlack = false,
+    string Preset = "arcade",
+    string? Primary = null,
+    string? Secondary = null,
+    string Surface = Look.Glossy)
 {
     public const string Dark = "dark";
     public const string Light = "light";
     public const string MatchWindows = "windows";
+    public const string Glossy = "glossy";
+    public const string Solid = "solid";
 
     private const string Prefix = "look.";
 
@@ -23,7 +32,8 @@ public sealed record Look(string Mode = Look.Dark, bool PureBlack = false, strin
             state.GetSetting(Prefix + "black") is { Length: > 0 },
             preset is { Length: > 0 } && ThemeEngine.Presets.Any(p => p.Id == preset) ? preset : "arcade",
             Nonempty(state.GetSetting(Prefix + "primary")),
-            Nonempty(state.GetSetting(Prefix + "secondary")));
+            Nonempty(state.GetSetting(Prefix + "secondary")),
+            state.GetSetting(Prefix + "surface") == Solid ? Solid : Glossy);
     }
 
     public void Save(StateStore state)
@@ -33,6 +43,7 @@ public sealed record Look(string Mode = Look.Dark, bool PureBlack = false, strin
         state.SetSetting(Prefix + "preset", Preset);
         state.SetSetting(Prefix + "primary", Primary ?? "");
         state.SetSetting(Prefix + "secondary", Secondary ?? "");
+        state.SetSetting(Prefix + "surface", Surface);
     }
 
     /// <summary>The theme to build now, given Windows' light or dark app mode and its accent colour (<c>#rrggbb</c>).</summary>
@@ -43,6 +54,13 @@ public sealed record Look(string Mode = Look.Dark, bool PureBlack = false, strin
         Primary,
         Secondary,
         windowsAccent);
+
+    /// <summary>
+    /// LOOK-17, LOOK-18: whether pages show Glossy now. It needs the person's choice, dark mode (a light Glossy isn't
+    /// designed yet), no pure black, and Windows' transparency effects on; otherwise the app is Solid.
+    /// </summary>
+    public bool ShowsGlossy(ThemeChoice resolved, bool transparencyOn) =>
+        Surface == Glossy && resolved.Mode == ThemeMode.Dark && !resolved.PureBlack && transparencyOn;
 
     private static string? Nonempty(string? value) => value is { Length: > 0 } ? value : null;
 }

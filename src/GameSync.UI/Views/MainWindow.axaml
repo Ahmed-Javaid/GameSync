@@ -1,12 +1,21 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:c="using:GameSync.UI.Controls"
         xmlns:v="using:GameSync.UI.Views"
         xmlns:vm="using:GameSync.UI.ViewModels"
         x:Class="GameSync.UI.Views.MainWindow"
         x:DataType="vm:ShellViewModel"
         Title="GameSync"
         Width="1280" Height="800" MinWidth="1024" MinHeight="640"
-        WindowStartupLocation="CenterScreen">
-  <!-- GameSync's window: the side rail and its pages. Closing it leaves GameSync running in the tray. -->
-  <v:Shell />
+        WindowStartupLocation="CenterScreen"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaTitleBarHeightHint="32"
+        WindowDecorationsTheme="{StaticResource GsWindowDecorations}">
+  <!-- GameSync's window: the side rail and its pages. Closing it leaves GameSync running in the tray. In Glossy, a
+       blurred, darkened copy of a game's art sits behind them (LOOK-17). The page reaches up into the title bar, which is
+       GameSync's own (Styles/Window.axaml): a strip to drag by and three caption buttons in the theme's ink. -->
+  <Panel>
+    <c:GsCoverImage x:Name="Art" IsHitTestVisible="False" RenderOptions.BitmapInterpolationMode="HighQuality" />
+    <v:Shell x:Name="Frame" />
+  </Panel>
 </Window>

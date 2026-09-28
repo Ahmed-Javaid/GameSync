@@ -15,7 +15,8 @@
       <ControlTemplate>
         <StackPanel Spacing="8" Background="{TemplateBinding Background}">
           <c:AspectPanel Ratio="1.5">
-            <Border Name="PART_Art" CornerRadius="16" ClipToBounds="True" Background="{DynamicResource bg-300}" BorderBrush="Transparent" BorderThickness="2">
+            <Panel>
+            <Border Name="PART_Art" CornerRadius="16" ClipToBounds="True" Background="{DynamicResource bg-300}">
               <Panel>
                 <c:GsCoverImage Source="{TemplateBinding Art}" />
                 <Panel Name="PART_TitleCover">
@@ -24,10 +25,14 @@
                   <TextBlock Text="{TemplateBinding Title}" Margin="10" FontSize="15" LineHeight="19" FontWeight="SemiBold" TextWrapping="Wrap"
                              MaxLines="4" TextTrimming="CharacterEllipsis" Foreground="{DynamicResource ink}" />
                 </Panel>
-                <c:GsStatusBadge Status="{TemplateBinding Status}" IsVisible="{TemplateBinding ShowsStatus}"
-                                 HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="6" />
+                <c:GsStatusBadge Classes="art" Status="{TemplateBinding Status}" Label="{TemplateBinding StatusLabel}" IsVisible="{TemplateBinding ShowsStatus}"
+                                 HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="8" />
               </Panel>
             </Border>
+            <!-- Glossy's 1px ring just outside the art (clear in Solid), and the hover outline 2px further out, as in the design system -->
+            <Border CornerRadius="17" Margin="-1" BorderThickness="1" BorderBrush="{DynamicResource edge-art}" IsHitTestVisible="False" />
+            <Border Name="PART_Hover" CornerRadius="20" Margin="-4" BorderThickness="2" BorderBrush="Transparent" IsHitTestVisible="False" />
+            </Panel>
           </c:AspectPanel>
           <TextBlock Name="PART_Name" Text="{TemplateBinding Title}" FontSize="13" LineHeight="18" FontWeight="Medium" TextTrimming="CharacterEllipsis" />
           <TextBlock Name="PART_Meta" Text="{TemplateBinding Meta}" FontSize="12" LineHeight="16" Foreground="{DynamicResource ink-faint}" Margin="0,-4,0,0"
@@ -42,18 +47,19 @@
       <Setter Property="FontSize" Value="12" />
       <Setter Property="LineHeight" Value="16" />
     </Style>
-    <Style Selector="^:pointerover /template/ Border#PART_Art">
+    <Style Selector="^:pointerover /template/ Border#PART_Hover">
       <Setter Property="BorderBrush" Value="{DynamicResource bg-400}" />
     </Style>
   </ControlTheme>
 
-  <!-- Chip: on cover art, the same in every theme -->
+  <!-- Chip: on cover art, the same in every theme and surface -->
   <ControlTheme x:Key="{x:Type c:GsChip}" TargetType="c:GsChip">
     <Setter Property="HorizontalAlignment" Value="Left" />
     <Setter Property="Foreground" Value="{DynamicResource on-art}" />
     <Setter Property="Template">
       <ControlTemplate>
-        <Border Background="{DynamicResource glass}" CornerRadius="999" Height="26" Padding="10,0">
+        <Border Background="{DynamicResource glass}" BorderBrush="{DynamicResource glass-edge}" BorderThickness="1" BackgroundSizing="OuterBorderEdge"
+                CornerRadius="13" Height="26" Padding="10,0">
           <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
             <c:GsIcon Icon="{TemplateBinding Icon}" Size="14" VerticalAlignment="Center"
                       IsVisible="{Binding $parent[c:GsChip].Icon, Converter={x:Static ObjectConverters.IsNotNull}}" />
@@ -70,6 +76,7 @@
     <Setter Property="Foreground" Value="{DynamicResource on-art}" />
     <Setter Property="Template">
       <ControlTemplate>
+        <Panel>
         <Border CornerRadius="16" ClipToBounds="True" Background="{DynamicResource glass}">
           <Panel>
             <c:GsCoverImage Source="{TemplateBinding Art}" />
@@ -95,13 +102,25 @@
               <TextBlock DockPanel.Dock="Top" Text="{TemplateBinding Eyebrow}" TextTrimming="CharacterEllipsis" />
               <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Bottom">
                 <StackPanel Spacing="8" MaxWidth="560" HorizontalAlignment="Left" VerticalAlignment="Bottom">
-                  <c:GsChip Icon="clock" Text="{TemplateBinding Chip}"
-                            IsVisible="{Binding $parent[c:GsHeroBanner].Chip, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                  <c:GsChip Icon="clock" Text="{TemplateBinding Chip}">
+                    <c:GsChip.IsVisible>
+                      <MultiBinding Converter="{x:Static BoolConverters.And}">
+                        <Binding Path="$parent[c:GsHeroBanner].Chip" Converter="{x:Static ObjectConverters.IsNotNull}" />
+                        <Binding Path="$parent[c:GsHeroBanner].HasRoom" />
+                      </MultiBinding>
+                    </c:GsChip.IsVisible>
+                  </c:GsChip>
                   <Image Name="PART_Logo" Source="{TemplateBinding Logo}" MaxWidth="380" MaxHeight="112" Stretch="Uniform" HorizontalAlignment="Left" IsVisible="False" />
                   <TextBlock Name="PART_Title" Classes="hero-title" Text="{TemplateBinding Title}" TextWrapping="Wrap" />
-                  <c:GsStatusBadge Status="{TemplateBinding Status}" Label="{TemplateBinding StatusLabel}" />
-                  <TextBlock Text="{TemplateBinding Blurb}" FontSize="13" LineHeight="19" Opacity="0.88" TextWrapping="Wrap"
-                             IsVisible="{Binding $parent[c:GsHeroBanner].Blurb, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                  <c:GsStatusBadge Classes="art" Status="{TemplateBinding Status}" Label="{TemplateBinding StatusLabel}" />
+                  <TextBlock Text="{TemplateBinding Blurb}" FontSize="13" LineHeight="19" Opacity="0.88" TextWrapping="Wrap">
+                    <TextBlock.IsVisible>
+                      <MultiBinding Converter="{x:Static BoolConverters.And}">
+                        <Binding Path="$parent[c:GsHeroBanner].Blurb" Converter="{x:Static ObjectConverters.IsNotNull}" />
+                        <Binding Path="$parent[c:GsHeroBanner].HasRoom" />
+                      </MultiBinding>
+                    </TextBlock.IsVisible>
+                  </TextBlock>
                 </StackPanel>
                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Bottom" Margin="20,0,0,0">
                   <c:GsIconButton Classes="glass" Icon="saves" Label="Manage saves" Command="{TemplateBinding SavesCommand}" />
@@ -112,6 +131,8 @@
             </DockPanel>
           </Panel>
         </Border>
+        <Border CornerRadius="17" Margin="-1" BorderBrush="{DynamicResource edge-art}" BorderThickness="1" IsHitTestVisible="False" />
+        </Panel>
       </ControlTemplate>
     </Setter>
     <Style Selector="^:logo /template/ Image#PART_Logo">

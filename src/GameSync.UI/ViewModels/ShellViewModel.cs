@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using GameSync.UI.Controls;
+using GameSync.UI.Theming;
 
 namespace GameSync.UI.ViewModels;
 
@@ -21,6 +22,10 @@ public sealed partial class ShellViewModel : ObservableObject
     [ObservableProperty]
     private IReadOnlyList<RailItem> _rail = DefaultRail(null, null);
 
+    /// <summary>How much of Glossy's backdrop the page shown lets through, and the rail with it (LOOK-17).</summary>
+    [ObservableProperty]
+    private GlassStrength _strength;
+
     public ShellViewModel(Dictionary<string, Func<object?>> pages, string current = "home")
         : this(id => pages.TryGetValue(id, out var make) ? make() : null, current)
     {
@@ -32,7 +37,13 @@ public sealed partial class ShellViewModel : ObservableObject
         _makePage = makePage;
         _current = current;
         _page = makePage(current);
+        _strength = StrengthOf(_page);
     }
+
+    /// <summary>A page's strength; pages that don't say take the glow, the calmest.</summary>
+    public static GlassStrength StrengthOf(object? page) => (page as IPageSurface)?.Strength ?? GlassStrength.Glow;
+
+    partial void OnPageChanged(object? value) => Strength = StrengthOf(value);
 
     /// <summary>Home, the library, the save manager, the console, and settings at the bottom; dots say a game runs or needs you.</summary>
     public static IReadOnlyList<RailItem> DefaultRail(string? playing, int? needYou) =>

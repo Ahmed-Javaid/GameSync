@@ -183,7 +183,7 @@ public class GsStatusBadge : TemplatedControl
         GameStatus.SavesMissing or GameStatus.NoSaves => ("warn", "search", "Saves not found"),
         GameStatus.NotAvailable => ("neutral", "unplug", "Not available"),
         GameStatus.Blocked or GameStatus.Error => ("danger", "block", "Blocked"),
-        GameStatus.BackupOnly => ("neutral", "archive", "Backup only"),
+        GameStatus.BackupOnly => ("neutral", "archive", "Synced by its store"),
         null => ("neutral", "cloud", "Not syncing yet"),
         _ => ("ok", "check", "Synced"),
     };

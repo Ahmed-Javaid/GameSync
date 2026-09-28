@@ -1,4 +1,4 @@
-<!-- @dsCard group="Screens" height=800 width=1280 page=true subtitle="Settings: Appearance re-themes the whole screen live; Storage and folders" -->
+<!-- @dsCard group="Screens" height=800 width=1280 page=true subtitle="Settings: Appearance re-themes the whole screen live, its Surface included (every screen follows it); Storage and folders" -->
 <!doctype html>
 <html lang="en">
 <head><meta charset="utf-8"><title>preview</title>
@@ -49,6 +49,7 @@ function App(){
  var sec=React.useState('appearance');
  var mode=th.system?(window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches?'light':'dark'):th.mode;
  var opts={preset:th.preset,mode:mode,pureBlack:th.pureBlack&&mode==='dark',primary:th.primary,secondary:th.secondary,accent:'#0078d4'};
+ var surface=G.surface.use();
  var pre=G.theme.preset(th.preset);
  var pv=th.primary||pre.primary, sv=th.secondary||pre.secondary;
  var backup=React.useState({path:'E:\\Saves and Backups\\Games\\GameSync',state:'ok',progress:0});
@@ -62,7 +63,8 @@ function App(){
   appearance:function(){return h(Page,{title:'Appearance',sub:'Changes apply straight away and are saved on this PC only.'},
     h(G.Card,{title:'Theme',subtitle:pre.dynamic?'Follows your Windows accent colour.':pre.note,action:h(G.PillTabs,{label:'Mode',value:th.system?'system':th.mode,onChange:function(v){set(v==='system'?{system:true}:{system:false,mode:v})},items:[{id:'dark',label:'Dark',icon:'moon'},{id:'light',label:'Light',icon:'sun'},{id:'system',label:'Match Windows',icon:'monitor'}]})},
       h(G.ThemePicker,{value:th.preset,mode:mode,pureBlack:opts.pureBlack,accent:opts.accent,onChange:function(id){set({preset:id,primary:null,secondary:null})}}),
-      h(G.SettingsRow,{title:'Pure black backgrounds',description:mode==='light'?'Dark mode only.':'For OLED screens: the page and side rail turn fully black.',disabled:mode==='light'},h(G.Switch,{label:'Pure black backgrounds',checked:opts.pureBlack,disabled:mode==='light',onChange:function(v){set({pureBlack:v})}}))),
+      h(G.SettingsRow,{title:'Surface',tag:'New',description:mode==='light'?'Glossy lets your game’s art show through GameSync, in dark mode; light mode stays Solid for now.':'Glossy lets your game’s art show through GameSync; Solid keeps every surface plain. Glossy turns off when Windows’ transparency effects are off.'},h(G.PillTabs,{label:'Surface',value:surface,onChange:G.surface.set,items:[{id:'glossy',label:'Glossy'},{id:'solid',label:'Solid'}]})),
+      h(G.SettingsRow,{title:'Pure black backgrounds',description:mode==='light'?'Dark mode only.':'For OLED screens: the page and side rail turn fully black, never glossy.',disabled:mode==='light'},h(G.Switch,{label:'Pure black backgrounds',checked:opts.pureBlack,disabled:mode==='light',onChange:function(v){set({pureBlack:v})}}))),
     h(G.Card,{title:'Colours',subtitle:'Each theme sets both; change either one here.',action:h(G.Button,{size:'sm',variant:'ghost',icon:'reset',onClick:function(){t[1]({preset:'arcade',mode:'dark',pureBlack:false,primary:null,secondary:null,system:false})}},'Reset to default')},
       h(G.SettingsRow,{title:'Primary',description:'Main buttons, progress, focus rings and your busiest days.'},h(G.ColorSwatchPicker,{role:'primary',value:pv,theme:opts,onChange:function(id){set({primary:id})}})),
       h(G.SettingsRow,{title:'Secondary',description:'Selection, the page you\u2019re on and tab counts.'},h(G.ColorSwatchPicker,{role:'secondary',value:sv,theme:opts,onChange:function(id){set({secondary:id})}})),
@@ -103,9 +105,9 @@ function App(){
     h(G.Card,{title:'Games with an anti-cheat',subtitle:'No learn mode and no sharing; they launch only through their own launcher.'},
       h(G.FolderList,{items:[{path:'Apex Legends',icon:'shield',tag:'EasyAntiCheat'},{path:'Helldivers 2',icon:'shield',tag:'GameGuard'},{path:'Rocket League',icon:'shield',tag:'EasyAntiCheat'},{path:'GTA V Enhanced',icon:'shield',tag:'BattlEye'}]})));}
  };
- return h(G.ThemeScope,{theme:opts,style:{width:1280,height:800,display:'flex',overflow:'hidden'}},
+ return h(G.ThemeScope,{theme:opts,strength:'glow',art:ART,style:{width:1280,height:800,display:'flex',overflow:'hidden'}},
   rail('settings'),
-  h('div',{style:{width:248,flexShrink:0,padding:'24px 12px',borderRight:'1px solid var(--line-100)',display:'flex',flexDirection:'column',gap:16}},
+  h('div',{style:{width:248,flexShrink:0,padding:'24px 12px',background:'var(--bg-100)',borderRight:'1px solid var(--line-100)',display:'flex',flexDirection:'column',gap:16}},
     h('div',{style:{font:'600 15px/20px var(--font-sans)',padding:'0 12px'}},'Settings'),
     h(G.SettingsNav,{items:SECTIONS,current:sec[0],onChange:sec[1]})),
   h('main',{style:{flex:1,minWidth:0,padding:'24px 32px',overflow:'auto'}},views[sec[0]]()));

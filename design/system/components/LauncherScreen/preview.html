@@ -1,4 +1,4 @@
-<!-- @dsCard group="Screens" height=800 width=1280 page=true subtitle="Launcher home" -->
+<!-- @dsCard group="Screens" height=800 width=1280 page=true subtitle="Launcher home, Glossy or Solid as picked in Settings" -->
 <!doctype html>
 <html lang="en">
 <head><meta charset="utf-8"><title>preview</title>
@@ -40,7 +40,7 @@ function topbar(title,sub,tabs,right){return h('header',{style:{display:'flex',a
 
 function App(){
  var needs=GAMES.filter(function(g){return ['conflict','held'].indexOf(g.status)>=0});
- return h('div',{style:{width:1280,height:800,display:'flex',background:'var(--bg-100)'}},
+ return h(G.ThemeScope,{strength:'home',art:ART,style:{width:1280,height:800,display:'flex'}},
   rail('home'),
   h('main',{style:{flex:1,minWidth:0,padding:'20px 24px',display:'flex',flexDirection:'column',gap:16}},
    topbar('Welcome back','Here\u2019s where you left off',

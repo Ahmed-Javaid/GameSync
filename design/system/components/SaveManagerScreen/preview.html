@@ -41,7 +41,7 @@ function topbar(title,sub,tabs,right){return h('header',{style:{display:'flex',a
 function Stat(p){return h('div',{style:{display:'flex',flexDirection:'column',gap:2}},h('span',{className:'gs-faint',style:{font:'500 11px/14px var(--font-mono)',letterSpacing:'.08em',textTransform:'uppercase'}},p.k),h('span',{style:{font:'500 28px/32px var(--font-mono)'}},p.v))}
 function App(){
  var s=React.useState(['sekiro','cuphead']), d=React.useState(null);
- return h('div',{style:{width:1280,height:800,display:'flex',background:'var(--bg-100)',position:'relative'}},
+ return h(G.ThemeScope,{strength:'glass',art:ART,style:{width:1280,height:800,display:'flex',position:'relative'}},
   rail('saves'),
   h('main',{style:{flex:1,minWidth:0,padding:'20px 24px',display:'flex',flexDirection:'column',gap:16}},
    topbar('Save manager','DESKTOP \u00b7 daily backup 20:00',

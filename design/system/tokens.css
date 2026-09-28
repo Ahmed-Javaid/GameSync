@@ -5,8 +5,18 @@
   --bg-200: #16191c;
   --bg-300: #1f2226;
   --bg-400: #2a2e33;
+  --surface-dialog: var(--bg-200);
+  --surface-well: var(--bg-300);
+  --surface-field: var(--bg-200);
   --line-100: #22262b;
   --line-200: #6e757f;
+  --edge-card: rgba(0, 0, 0, 0);
+  --edge-control: rgba(0, 0, 0, 0);
+  --edge-console: rgba(0, 0, 0, 0);
+  --edge-well: rgba(0, 0, 0, 0);
+  --edge-dialog: rgba(0, 0, 0, 0);
+  --edge-art: rgba(0, 0, 0, 0);
+  --dot-ring: var(--bg-100);
   --ink: #f0f1f2;
   --ink-muted: #a5abb3;
   --ink-faint: #8d959d;
@@ -26,11 +36,18 @@
   --play: #b9a3ff;
   --play-soft: #231d38;
   --neutral: #9aa1a9;
+  --ok-art: rgba(9, 38, 42, 0.82);
+  --warn-art: rgba(42, 31, 9, 0.82);
+  --danger-art: rgba(42, 12, 9, 0.82);
+  --play-art: rgba(16, 9, 42, 0.82);
+  --neutral-art: rgba(22, 25, 29, 0.88);
   --scrim: rgba(5, 6, 8, 0.72);
   --art-scrim: rgba(5, 6, 8, 0.72);
   --on-art: #f5f7f9;
-  --glass: rgba(16, 18, 21, 0.72);
+  --glass: rgba(12, 14, 17, 0.58);
+  --glass-edge: rgba(255, 255, 255, 0.16);
   --shadow-dialog: 0 24px 64px rgba(0, 0, 0, 0.6);
+  --lift-card: none;
 }
 [data-theme="light"] {
   --bg-000: #e9ecf0;
@@ -38,8 +55,18 @@
   --bg-200: #fefefe;
   --bg-300: #e6eaee;
   --bg-400: #d8dde3;
+  --surface-dialog: var(--bg-200);
+  --surface-well: var(--bg-300);
+  --surface-field: var(--bg-200);
   --line-100: #d9dee5;
   --line-200: #76818e;
+  --edge-card: rgba(0, 0, 0, 0);
+  --edge-control: rgba(0, 0, 0, 0);
+  --edge-console: rgba(0, 0, 0, 0);
+  --edge-well: rgba(0, 0, 0, 0);
+  --edge-dialog: rgba(0, 0, 0, 0);
+  --edge-art: rgba(0, 0, 0, 0);
+  --dot-ring: var(--bg-100);
   --ink: #15191e;
   --ink-muted: #485463;
   --ink-faint: #5b6573;
@@ -59,11 +86,18 @@
   --play: #6547d1;
   --play-soft: #ece7ff;
   --neutral: #58616b;
+  --ok-art: var(--ok-soft);
+  --warn-art: var(--warn-soft);
+  --danger-art: var(--danger-soft);
+  --play-art: var(--play-soft);
+  --neutral-art: var(--bg-300);
   --scrim: rgba(16, 20, 26, 0.45);
   --art-scrim: rgba(5, 6, 8, 0.72);
   --on-art: #f5f7f9;
-  --glass: rgba(16, 18, 21, 0.72);
+  --glass: rgba(12, 14, 17, 0.58);
+  --glass-edge: rgba(255, 255, 255, 0.16);
   --shadow-dialog: 0 24px 64px rgba(16, 24, 40, 0.18);
+  --lift-card: none;
 }
 [data-theme="black"] {
   --bg-000: #070809;
@@ -71,8 +105,18 @@
   --bg-200: #0d0f11;
   --bg-300: #17191c;
   --bg-400: #212429;
+  --surface-dialog: var(--bg-200);
+  --surface-well: var(--bg-300);
+  --surface-field: var(--bg-200);
   --line-100: #1a1d21;
   --line-200: #666d75;
+  --edge-card: rgba(0, 0, 0, 0);
+  --edge-control: rgba(0, 0, 0, 0);
+  --edge-console: rgba(0, 0, 0, 0);
+  --edge-well: rgba(0, 0, 0, 0);
+  --edge-dialog: rgba(0, 0, 0, 0);
+  --edge-art: rgba(0, 0, 0, 0);
+  --dot-ring: var(--bg-100);
   --ink: #f0f1f2;
   --ink-muted: #a5abb3;
   --ink-faint: #8d959d;
@@ -92,11 +136,18 @@
   --play: #b9a3ff;
   --play-soft: #231d38;
   --neutral: #9aa1a9;
+  --ok-art: rgba(9, 38, 42, 0.82);
+  --warn-art: rgba(42, 31, 9, 0.82);
+  --danger-art: rgba(42, 12, 9, 0.82);
+  --play-art: rgba(16, 9, 42, 0.82);
+  --neutral-art: rgba(22, 25, 29, 0.88);
   --scrim: rgba(5, 6, 8, 0.72);
   --art-scrim: rgba(5, 6, 8, 0.72);
   --on-art: #f5f7f9;
-  --glass: rgba(16, 18, 21, 0.72);
+  --glass: rgba(12, 14, 17, 0.58);
+  --glass-edge: rgba(255, 255, 255, 0.16);
   --shadow-dialog: 0 24px 64px rgba(0, 0, 0, 0.6);
+  --lift-card: none;
 }
 [data-theme="moss"] {
   --bg-000: #0b0f0d;
@@ -104,8 +155,18 @@
   --bg-200: #161b19;
   --bg-300: #1f2522;
   --bg-400: #2b322e;
+  --surface-dialog: var(--bg-200);
+  --surface-well: var(--bg-300);
+  --surface-field: var(--bg-200);
   --line-100: #232b27;
   --line-200: #6b7871;
+  --edge-card: rgba(0, 0, 0, 0);
+  --edge-control: rgba(0, 0, 0, 0);
+  --edge-console: rgba(0, 0, 0, 0);
+  --edge-well: rgba(0, 0, 0, 0);
+  --edge-dialog: rgba(0, 0, 0, 0);
+  --edge-art: rgba(0, 0, 0, 0);
+  --dot-ring: var(--bg-100);
   --ink: #f0f2f1;
   --ink-muted: #a5b1ab;
   --ink-faint: #8c9993;
@@ -125,11 +186,18 @@
   --play: #b9a3ff;
   --play-soft: #231d38;
   --neutral: #9aa1a9;
+  --ok-art: rgba(9, 38, 42, 0.82);
+  --warn-art: rgba(42, 31, 9, 0.82);
+  --danger-art: rgba(42, 12, 9, 0.82);
+  --play-art: rgba(16, 9, 42, 0.82);
+  --neutral-art: rgba(23, 28, 26, 0.88);
   --scrim: rgba(5, 6, 8, 0.72);
   --art-scrim: rgba(5, 6, 8, 0.72);
   --on-art: #f5f7f9;
-  --glass: rgba(16, 18, 21, 0.72);
+  --glass: rgba(12, 14, 17, 0.58);
+  --glass-edge: rgba(255, 255, 255, 0.16);
   --shadow-dialog: 0 24px 64px rgba(0, 0, 0, 0.6);
+  --lift-card: none;
 }
 [data-theme="tidal"] {
   --bg-000: #0b0c10;
@@ -137,8 +205,18 @@
   --bg-200: #15171d;
   --bg-300: #1e2127;
   --bg-400: #282c34;
+  --surface-dialog: var(--bg-200);
+  --surface-well: var(--bg-300);
+  --surface-field: var(--bg-200);
   --line-100: #21242d;
   --line-200: #798091;
+  --edge-card: rgba(0, 0, 0, 0);
+  --edge-control: rgba(0, 0, 0, 0);
+  --edge-console: rgba(0, 0, 0, 0);
+  --edge-well: rgba(0, 0, 0, 0);
+  --edge-dialog: rgba(0, 0, 0, 0);
+  --edge-art: rgba(0, 0, 0, 0);
+  --dot-ring: var(--bg-100);
   --ink: #eff0f3;
   --ink-muted: #b1b6c0;
   --ink-faint: #9a9fac;
@@ -158,11 +236,18 @@
   --play: #b9a3ff;
   --play-soft: #231d38;
   --neutral: #9aa1a9;
+  --ok-art: rgba(9, 38, 42, 0.82);
+  --warn-art: rgba(42, 31, 9, 0.82);
+  --danger-art: rgba(42, 12, 9, 0.82);
+  --play-art: rgba(16, 9, 42, 0.82);
+  --neutral-art: rgba(21, 24, 30, 0.88);
   --scrim: rgba(5, 6, 8, 0.72);
   --art-scrim: rgba(5, 6, 8, 0.72);
   --on-art: #f5f7f9;
-  --glass: rgba(16, 18, 21, 0.72);
+  --glass: rgba(12, 14, 17, 0.58);
+  --glass-edge: rgba(255, 255, 255, 0.16);
   --shadow-dialog: 0 24px 64px rgba(0, 0, 0, 0.6);
+  --lift-card: none;
 }
 [data-theme="sakura"] {
   --bg-000: #0e0c0d;
@@ -170,8 +255,18 @@
   --bg-200: #1b1719;
   --bg-300: #252022;
   --bg-400: #322b2e;
+  --surface-dialog: var(--bg-200);
+  --surface-well: var(--bg-300);
+  --surface-field: var(--bg-200);
   --line-100: #2a2327;
   --line-200: #897b82;
+  --edge-card: rgba(0, 0, 0, 0);
+  --edge-control: rgba(0, 0, 0, 0);
+  --edge-console: rgba(0, 0, 0, 0);
+  --edge-well: rgba(0, 0, 0, 0);
+  --edge-dialog: rgba(0, 0, 0, 0);
+  --edge-art: rgba(0, 0, 0, 0);
+  --dot-ring: var(--bg-100);
   --ink: #f2f0f1;
   --ink-muted: #bbb2b6;
   --ink-faint: #a69ba1;
@@ -191,11 +286,18 @@
   --play: #b9a3ff;
   --play-soft: #231d38;
   --neutral: #9aa1a9;
+  --ok-art: rgba(9, 38, 42, 0.82);
+  --warn-art: rgba(42, 31, 9, 0.82);
+  --danger-art: rgba(42, 12, 9, 0.82);
+  --play-art: rgba(16, 9, 42, 0.82);
+  --neutral-art: rgba(28, 23, 26, 0.88);
   --scrim: rgba(5, 6, 8, 0.72);
   --art-scrim: rgba(5, 6, 8, 0.72);
   --on-art: #f5f7f9;
-  --glass: rgba(16, 18, 21, 0.72);
+  --glass: rgba(12, 14, 17, 0.58);
+  --glass-edge: rgba(255, 255, 255, 0.16);
   --shadow-dialog: 0 24px 64px rgba(0, 0, 0, 0.6);
+  --lift-card: none;
 }
 [data-theme="citrus"] {
   --bg-000: #0d0e0c;
@@ -203,8 +305,18 @@
   --bg-200: #1a1b17;
   --bg-300: #232420;
   --bg-400: #2f312c;
+  --surface-dialog: var(--bg-200);
+  --surface-well: var(--bg-300);
+  --surface-field: var(--bg-200);
   --line-100: #282924;
   --line-200: #7a7e74;
+  --edge-card: rgba(0, 0, 0, 0);
+  --edge-control: rgba(0, 0, 0, 0);
+  --edge-console: rgba(0, 0, 0, 0);
+  --edge-well: rgba(0, 0, 0, 0);
+  --edge-dialog: rgba(0, 0, 0, 0);
+  --edge-art: rgba(0, 0, 0, 0);
+  --dot-ring: var(--bg-100);
   --ink: #f1f2f0;
   --ink-muted: #b1b4ac;
   --ink-faint: #9a9e95;
@@ -224,11 +336,18 @@
   --play: #b9a3ff;
   --play-soft: #231d38;
   --neutral: #9aa1a9;
+  --ok-art: rgba(9, 38, 42, 0.82);
+  --warn-art: rgba(42, 31, 9, 0.82);
+  --danger-art: rgba(42, 12, 9, 0.82);
+  --play-art: rgba(16, 9, 42, 0.82);
+  --neutral-art: rgba(26, 27, 24, 0.88);
   --scrim: rgba(5, 6, 8, 0.72);
   --art-scrim: rgba(5, 6, 8, 0.72);
   --on-art: #f5f7f9;
-  --glass: rgba(16, 18, 21, 0.72);
+  --glass: rgba(12, 14, 17, 0.58);
+  --glass-edge: rgba(255, 255, 255, 0.16);
   --shadow-dialog: 0 24px 64px rgba(0, 0, 0, 0.6);
+  --lift-card: none;
 }
 [data-theme="mono"] {
   --bg-000: #0d0d0d;
@@ -236,8 +355,18 @@
   --bg-200: #191919;
   --bg-300: #222222;
   --bg-400: #2e2e2e;
+  --surface-dialog: var(--bg-200);
+  --surface-well: var(--bg-300);
+  --surface-field: var(--bg-200);
   --line-100: #272727;
   --line-200: #757575;
+  --edge-card: rgba(0, 0, 0, 0);
+  --edge-control: rgba(0, 0, 0, 0);
+  --edge-console: rgba(0, 0, 0, 0);
+  --edge-well: rgba(0, 0, 0, 0);
+  --edge-dialog: rgba(0, 0, 0, 0);
+  --edge-art: rgba(0, 0, 0, 0);
+  --dot-ring: var(--bg-100);
   --ink: #f1f1f1;
   --ink-muted: #ababab;
   --ink-faint: #939393;
@@ -257,11 +386,18 @@
   --play: #b9a3ff;
   --play-soft: #231d38;
   --neutral: #9aa1a9;
+  --ok-art: rgba(9, 38, 42, 0.82);
+  --warn-art: rgba(42, 31, 9, 0.82);
+  --danger-art: rgba(42, 12, 9, 0.82);
+  --play-art: rgba(16, 9, 42, 0.82);
+  --neutral-art: rgba(26, 26, 26, 0.88);
   --scrim: rgba(5, 6, 8, 0.72);
   --art-scrim: rgba(5, 6, 8, 0.72);
   --on-art: #f5f7f9;
-  --glass: rgba(16, 18, 21, 0.72);
+  --glass: rgba(12, 14, 17, 0.58);
+  --glass-edge: rgba(255, 255, 255, 0.16);
   --shadow-dialog: 0 24px 64px rgba(0, 0, 0, 0.6);
+  --lift-card: none;
 }
 :root {
   --space-1: 4px;

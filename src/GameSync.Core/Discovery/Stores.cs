@@ -11,6 +11,19 @@ public enum StoreKind
     Loose,
 }
 
+/// <summary>What a game's status says when its store's own cloud moves its saves (LIB-10).</summary>
+public static class StoreNames
+{
+    /// <summary>"Synced by Steam", or "Synced by its store" when the store isn't known; never "Backup only" (28 Sep 2026).</summary>
+    public static string SyncedBy(StoreKind? store) => store switch
+    {
+        StoreKind.Steam => "Synced by Steam",
+        StoreKind.Epic => "Synced by Epic",
+        StoreKind.Ea => "Synced by EA",
+        _ => "Synced by its store",
+    };
+}
+
 /// <summary>A game a store says is installed, or a folder that looks like one (LIB-01 to LIB-05).</summary>
 public sealed record InstalledGame
 {

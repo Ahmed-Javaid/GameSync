@@ -57,6 +57,8 @@ public class GsGameTile : Button
 
     public static readonly StyledProperty<GameStatus?> StatusProperty = AvaloniaProperty.Register<GsGameTile, GameStatus?>(nameof(Status));
 
+    public static readonly StyledProperty<string?> StatusLabelProperty = AvaloniaProperty.Register<GsGameTile, string?>(nameof(StatusLabel));
+
     public static readonly StyledProperty<string?> MetaProperty = AvaloniaProperty.Register<GsGameTile, string?>(nameof(Meta));
 
     public static readonly DirectProperty<GsGameTile, string> InitialProperty =
@@ -84,6 +86,13 @@ public class GsGameTile : Button
     {
         get => GetValue(StatusProperty);
         set => SetValue(StatusProperty, value);
+    }
+
+    /// <summary>The badge's words in place of the status's own, such as "Synced by Steam".</summary>
+    public string? StatusLabel
+    {
+        get => GetValue(StatusLabelProperty);
+        set => SetValue(StatusLabelProperty, value);
     }
 
     public string? Meta
@@ -250,10 +259,29 @@ public class GsHeroBanner : TemplatedControl
         set => SetValue(SettingsCommandProperty, value);
     }
 
+    public static readonly DirectProperty<GsHeroBanner, bool> HasRoomProperty =
+        AvaloniaProperty.RegisterDirect<GsHeroBanner, bool>(nameof(HasRoom), b => b.HasRoom);
+
+    /// <summary>Under this height the banner drops its playtime chip and blurb, so the title, status and Play still fit.</summary>
+    public const double RoomyHeight = 280;
+
+    private bool _hasRoom = true;
+
+    /// <summary>Tall enough for the playtime chip and the blurb.</summary>
+    public bool HasRoom
+    {
+        get => _hasRoom;
+        private set => SetAndRaise(HasRoomProperty, ref _hasRoom, value);
+    }
+
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
         base.OnPropertyChanged(change);
-        if (change.Property == LogoProperty)
+        if (change.Property == BoundsProperty)
+        {
+            HasRoom = Bounds.Height >= RoomyHeight;
+        }
+        else if (change.Property == LogoProperty)
         {
             PseudoClasses.Set(":logo", Logo is not null);
         }
@@ -287,6 +315,9 @@ public class GsActivityGrid : Control
         AffectsRender<GsActivityGrid>(DaysProperty, StartWeekdayProperty);
         AffectsMeasure<GsActivityGrid>(DaysProperty, StartWeekdayProperty, CellRatioProperty);
     }
+
+    /// <summary>The cells take their colours when drawn, so they're drawn again when Glossy or Solid swaps the colours.</summary>
+    public GsActivityGrid() => ResourcesChanged += (_, _) => InvalidateVisual();
 
     /// <summary>Each day's level, 0 to 3, from the first of the month.</summary>
     public IReadOnlyList<int> Days
@@ -410,6 +441,8 @@ public sealed class GsLevelDot : Control
 
     static GsLevelDot() => AffectsRender<GsLevelDot>(LevelProperty);
 
+    public GsLevelDot() => ResourcesChanged += (_, _) => InvalidateVisual();
+
     public int Level
     {
         get => GetValue(LevelProperty);
@@ -454,6 +487,177 @@ public sealed class GsCoverImage : Control
 }
 
 /// <summary>Lays out children in fixed columns with a gap, wrapping to rows, for tiles in a card or a library grid.</summary>
+/// <summary>
+/// One row of tiles, as many as fit across and never fewer than <see cref="MinColumns"/>: none wider than
+/// <see cref="MaxItemWidth"/>, and when the height is limited, none taller than it; the rest are hidden. Home's Jump
+/// back in: a bigger window shows more games, not the same ones bigger.
+/// </summary>
+public sealed class ShelfPanel : Panel
+{
+    public static readonly StyledProperty<double> GapProperty = AvaloniaProperty.Register<ShelfPanel, double>(nameof(Gap), 12);
+
+    public static readonly StyledProperty<int> MinColumnsProperty = AvaloniaProperty.Register<ShelfPanel, int>(nameof(MinColumns), 3);
+
+    public static readonly StyledProperty<double> MaxItemWidthProperty = AvaloniaProperty.Register<ShelfPanel, double>(nameof(MaxItemWidth), 200);
+
+    public static readonly StyledProperty<double> BelowArtProperty = AvaloniaProperty.Register<ShelfPanel, double>(nameof(BelowArt), 24);
+
+    private int _columns = 3;
+
+    static ShelfPanel() => AffectsMeasure<ShelfPanel>(GapProperty, MinColumnsProperty, MaxItemWidthProperty, BelowArtProperty);
+
+    public double Gap
+    {
+        get => GetValue(GapProperty);
+        set => SetValue(GapProperty, value);
+    }
+
+    public int MinColumns
+    {
+        get => GetValue(MinColumnsProperty);
+        set => SetValue(MinColumnsProperty, value);
+    }
+
+    public double MaxItemWidth
+    {
+        get => GetValue(MaxItemWidthProperty);
+        set => SetValue(MaxItemWidthProperty, value);
+    }
+
+    /// <summary>A tile's height under its 2:3 art: the name, and the gap above it.</summary>
+    public double BelowArt
+    {
+        get => GetValue(BelowArtProperty);
+        set => SetValue(BelowArtProperty, value);
+    }
+
+    /// <summary>How many tiles share the width: enough that none is wider than the most, nor taller than a limited height.</summary>
+    public static int Columns(Size available, double gap, double maxItemWidth, double belowArt, int minColumns)
+    {
+        if (double.IsInfinity(available.Width))
+        {
+            return minColumns;
+        }
+
+        int Across(double widest) => (int)Math.Min(12, Math.Ceiling((available.Width + gap) / (Math.Max(widest, 1) + gap)));
+        var byHeight = double.IsInfinity(available.Height) ? minColumns : Across((available.Height - belowArt) / 1.5);
+        return Math.Max(minColumns, Math.Max(Across(maxItemWidth), byHeight));
+    }
+
+    protected override Size MeasureOverride(Size availableSize)
+    {
+        var columns = _columns = Columns(availableSize, Gap, MaxItemWidth, BelowArt, MinColumns);
+        var width = double.IsInfinity(availableSize.Width) ? columns * 160 + (columns - 1) * Gap : availableSize.Width;
+        var cell = (width - Gap * (columns - 1)) / columns;
+        double height = 0;
+        for (var i = 0; i < Children.Count; i++)
+        {
+            var child = Children[i];
+            child.IsVisible = i < columns;
+            if (child.IsVisible)
+            {
+                child.Measure(new Size(cell, double.PositiveInfinity));
+                height = Math.Max(height, child.DesiredSize.Height);
+            }
+        }
+
+        return new Size(width, height);
+    }
+
+    protected override Size ArrangeOverride(Size finalSize)
+    {
+        var shown = Children.Where(c => c.IsVisible).ToList();
+        var cell = (finalSize.Width - Gap * (_columns - 1)) / _columns;
+        for (var i = 0; i < shown.Count; i++)
+        {
+            shown[i].Arrange(new Rect(i * (cell + Gap), 0, cell, shown[i].DesiredSize.Height));
+        }
+
+        return finalSize;
+    }
+}
+
+/// <summary>
+/// Home at any window size: the top bar, the banner and the row of cards, in that order. The top bar and the cards take
+/// the height their content needs at this width (covers keep their 2:3 shape, so they can't stretch to fill); the banner,
+/// whose art is cropped to fit, takes the rest, so the page is always full. In a window too short for that, the cards
+/// give way instead, down to the banner's least height.
+/// </summary>
+public sealed class HomeLayout : Panel
+{
+    public static readonly StyledProperty<double> SpacingProperty = AvaloniaProperty.Register<HomeLayout, double>(nameof(Spacing), 16);
+
+    public static readonly StyledProperty<double> MinBannerProperty = AvaloniaProperty.Register<HomeLayout, double>(nameof(MinBanner), 200);
+
+    private double _banner;
+
+    static HomeLayout() => AffectsMeasure<HomeLayout>(SpacingProperty, MinBannerProperty);
+
+    public double Spacing
+    {
+        get => GetValue(SpacingProperty);
+        set => SetValue(SpacingProperty, value);
+    }
+
+    public double MinBanner
+    {
+        get => GetValue(MinBannerProperty);
+        set => SetValue(MinBannerProperty, value);
+    }
+
+    /// <summary>The banner's height for a page: what the top bar and the cards leave, at least the least, at most 3:4 of the width.</summary>
+    public static double Banner(double width, double height, double top, double cards, double spacing, double least) =>
+        double.IsInfinity(height)
+            ? Math.Max(least, width / 3.4)
+            : Math.Min(Math.Max(least, height - top - cards - 2 * spacing), width * 0.75);
+
+    protected override Size MeasureOverride(Size availableSize)
+    {
+        if (Children.Count != 3)
+        {
+            return base.MeasureOverride(availableSize);
+        }
+
+        var (top, banner, cards) = (Children[0], Children[1], Children[2]);
+        var width = availableSize.Width;
+        top.Measure(new Size(width, double.PositiveInfinity));
+        cards.Measure(new Size(width, double.PositiveInfinity));
+        _banner = Banner(width, availableSize.Height, top.DesiredSize.Height, cards.DesiredSize.Height, Spacing, Math.Max(MinBanner, banner.MinHeight));
+        if (!double.IsInfinity(availableSize.Height))
+        {
+            var left = availableSize.Height - top.DesiredSize.Height - _banner - 2 * Spacing;
+            if (left < cards.DesiredSize.Height)
+            {
+                // Too short for the cards at their natural size: they shrink to what the least banner leaves.
+                cards.Measure(new Size(width, Math.Max(0, left)));
+            }
+        }
+
+        banner.Measure(new Size(width, _banner));
+        var height = double.IsInfinity(availableSize.Height)
+            ? top.DesiredSize.Height + _banner + cards.DesiredSize.Height + 2 * Spacing
+            : availableSize.Height;
+        return new Size(width, height);
+    }
+
+    protected override Size ArrangeOverride(Size finalSize)
+    {
+        if (Children.Count != 3)
+        {
+            return base.ArrangeOverride(finalSize);
+        }
+
+        var (top, banner, cards) = (Children[0], Children[1], Children[2]);
+        var y = 0.0;
+        top.Arrange(new Rect(0, y, finalSize.Width, top.DesiredSize.Height));
+        y += top.DesiredSize.Height + Spacing;
+        banner.Arrange(new Rect(0, y, finalSize.Width, _banner));
+        y += _banner + Spacing;
+        cards.Arrange(new Rect(0, y, finalSize.Width, Math.Max(0, finalSize.Height - y)));
+        return finalSize;
+    }
+}
+
 public sealed class ColumnsPanel : Panel
 {
     public static readonly StyledProperty<int> ColumnsProperty = AvaloniaProperty.Register<ColumnsPanel, int>(nameof(Columns), 3);

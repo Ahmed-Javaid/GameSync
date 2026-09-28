@@ -9,6 +9,8 @@
 <script>
 var G = window.GameSync, h = React.createElement;
 
+var ART = "data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%201200%20500%27%20preserveAspectRatio%3D%27xMidYMid%20slice%27%3E%3Crect%20width%3D%271200%27%20height%3D%27500%27%20fill%3D%27%231b2a33%27/%3E%3Ccircle%20cx%3D%27860%27%20cy%3D%27150%27%20r%3D%2770%27%20fill%3D%27%237fe6f2%27%20opacity%3D%27.35%27/%3E%3Cpath%20d%3D%27M0%20330%20L180%20200%20L330%20300%20L520%20150%20L700%20290%20L880%20190%20L1200%20320%20V500%20H0Z%27%20fill%3D%27%23223640%27/%3E%3Cpath%20d%3D%27M0%20400%20L220%20290%20L420%20380%20L640%20270%20L860%20370%20L1040%20300%20L1200%20360%20V500%20H0Z%27%20fill%3D%27%23182730%27/%3E%3Cpath%20d%3D%27M0%20460%20L300%20390%20L600%20450%20L900%20380%20L1200%20440%20V500%20H0Z%27%20fill%3D%27%2310191f%27/%3E%3C/svg%3E";
+
 function rail(cur){return h(G.SideRail,{current:cur,items:[
   {id:'search',icon:'search',label:'Search'},
   {id:'home',icon:'home',label:'Home',sep:true},
@@ -32,7 +34,7 @@ var WAIT=[
 function why(r){return h('span',{className:'pl-why'},r.why);}
 function App(){
  var sel=React.useState(RUN.map(function(r){return r.id})), n=sel[0].length;
- return h('div',{style:{width:1280,height:800,display:'flex',background:'var(--bg-100)'}},
+ return h(G.ThemeScope,{strength:'glass',art:ART,style:{width:1280,height:800,display:'flex'}},
   rail('saves'),
   h('main',{style:{flex:1,minWidth:0,padding:'20px 24px',display:'flex',flexDirection:'column',gap:16}},
    topbar('Save manager','DESKTOP · syncs after each game, every 15 minutes, and daily at 20:00',

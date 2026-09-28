@@ -43,7 +43,7 @@ function Actions(r){return h('span',{className:'gs-row',style:{gap:4,flexWrap:'n
   h(G.Button,{size:'sm',variant:'ghost'},'Export'));}
 
 function App(){
- return h('div',{style:{width:1280,height:800,display:'flex',background:'var(--bg-100)'}},
+ return h(G.ThemeScope,{strength:'glass',art:ART,style:{width:1280,height:800,display:'flex'}},
   rail('library'),
   h('main',{style:{flex:1,minWidth:0,padding:'20px 24px',display:'flex',flexDirection:'column',gap:16}},
    topbar(crumb('Game library','Black Myth: Wukong'),

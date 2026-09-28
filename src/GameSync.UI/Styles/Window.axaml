@@ -1,0 +1,119 @@
+<!-- The window's own title bar: a strip the page shows through (Glossy's art reaches the top edge), dragged to move the
+     window, with Windows' three caption buttons drawn in the theme's ink. Replaces Fluent's drawn decorations, which put
+     the window title over the rail and add a full-screen button. -->
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <!-- 46 × 32 as Windows' own, so the maximize button keeps Windows 11's snap layouts (its role maps to HTMAXBUTTON). -->
+  <ControlTheme x:Key="GsCaptionButton" TargetType="Button">
+    <Setter Property="Width" Value="46" />
+    <Setter Property="Height" Value="32" />
+    <Setter Property="VerticalAlignment" Value="Top" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Foreground" Value="{DynamicResource ink-muted}" />
+    <Setter Property="(WindowDecorationProperties.ElementRole)" Value="DecorationsElement" />
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border Background="{TemplateBinding Background}">
+          <ContentPresenter Content="{TemplateBinding Content}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+        </Border>
+      </ControlTemplate>
+    </Setter>
+    <Style Selector="^:pointerover">
+      <Setter Property="Background">
+        <SolidColorBrush Color="{DynamicResource ink-color}" Opacity="0.09" />
+      </Setter>
+      <Setter Property="Foreground" Value="{DynamicResource ink}" />
+    </Style>
+    <Style Selector="^:pressed">
+      <Setter Property="Background">
+        <SolidColorBrush Color="{DynamicResource ink-color}" Opacity="0.05" />
+      </Setter>
+    </Style>
+    <!-- Close turns Windows' red, in every theme -->
+    <Style Selector="^.close:pointerover">
+      <Setter Property="Background" Value="#c42b1c" />
+      <Setter Property="Foreground" Value="#ffffff" />
+    </Style>
+    <Style Selector="^.close:pressed">
+      <Setter Property="Background" Value="#b3261e" />
+      <Setter Property="Foreground" Value="#ffffff" />
+    </Style>
+  </ControlTheme>
+
+  <ControlTheme x:Key="GsWindowDecorations" TargetType="WindowDrawnDecorations">
+    <Setter Property="DefaultTitleBarHeight" Value="32" />
+    <Setter Property="DefaultFrameThickness" Value="1" />
+    <Setter Property="DefaultShadowThickness" Value="8" />
+    <Setter Property="Template">
+      <WindowDrawnDecorationsTemplate>
+        <WindowDrawnDecorationsContent>
+
+          <WindowDrawnDecorationsContent.Underlay>
+            <Panel x:Name="PART_UnderlayWrapper">
+              <Border x:Name="PART_WindowBorder" BorderThickness="{TemplateBinding FrameThickness}" BorderBrush="{DynamicResource line-100}"
+                      IsHitTestVisible="False" />
+              <!-- The drag area; the page draws the strip itself, so it stays clear here -->
+              <Panel x:Name="PART_TitleBar" VerticalAlignment="Top" Height="{TemplateBinding TitleBarHeight}" Background="Transparent"
+                     IsVisible="{TemplateBinding HasTitleBar}" WindowDecorationProperties.ElementRole="TitleBar" />
+            </Panel>
+          </WindowDrawnDecorationsContent.Underlay>
+
+          <WindowDrawnDecorationsContent.Overlay>
+            <Panel x:Name="PART_OverlayWrapper">
+              <StackPanel x:Name="PART_OverlayPanel" VerticalAlignment="Top" HorizontalAlignment="Right" Height="{TemplateBinding TitleBarHeight}"
+                          IsVisible="{TemplateBinding HasTitleBar}" Orientation="Horizontal">
+                <Button x:Name="PART_MinimizeButton" Theme="{StaticResource GsCaptionButton}" WindowDecorationProperties.ElementRole="MinimizeButton"
+                        AutomationProperties.Name="Minimize">
+                  <Path Width="10" Height="10" Stretch="Uniform" Fill="{Binding $parent[Button].Foreground}" Data="M2048 1229v-205h-2048v205h2048z" />
+                </Button>
+                <Button x:Name="PART_MaximizeButton" Theme="{StaticResource GsCaptionButton}" WindowDecorationProperties.ElementRole="MaximizeButton"
+                        AutomationProperties.Name="Maximize">
+                  <Path Name="RestoreButtonPath" Width="10" Height="10" Stretch="Uniform" Fill="{Binding $parent[Button].Foreground}"
+                        Data="M2048 2048v-2048h-2048v2048h2048zM1843 1843h-1638v-1638h1638v1638z" />
+                </Button>
+                <Button x:Name="PART_CloseButton" Classes="close" Theme="{StaticResource GsCaptionButton}" WindowDecorationProperties.ElementRole="CloseButton"
+                        AutomationProperties.Name="Close">
+                  <Path Width="10" Height="10" Stretch="Uniform" Fill="{Binding $parent[Button].Foreground}"
+                        Data="M1169 1024l879 -879l-145 -145l-879 879l-879 -879l-145 145l879 879l-879 879l145 145l879 -879l879 879l145 -145z" />
+                </Button>
+              </StackPanel>
+            </Panel>
+          </WindowDrawnDecorationsContent.Overlay>
+
+        </WindowDrawnDecorationsContent>
+      </WindowDrawnDecorationsTemplate>
+    </Setter>
+
+    <Style Selector="^:has-shadow /template/ Panel#PART_UnderlayWrapper">
+      <Setter Property="Margin" Value="{TemplateBinding ShadowThickness}" />
+    </Style>
+    <Style Selector="^:has-shadow /template/ Border#PART_WindowBorder">
+      <Setter Property="BoxShadow" Value="0 2 10 2 #80000000" />
+    </Style>
+    <Style Selector="^:has-shadow /template/ Panel#PART_OverlayWrapper">
+      <Setter Property="Margin" Value="{TemplateBinding ShadowThickness}" />
+    </Style>
+    <Style Selector="^:has-border /template/ Panel#PART_TitleBar">
+      <Setter Property="Margin" Value="1,1,1,0" />
+    </Style>
+    <Style Selector="^:has-border /template/ StackPanel#PART_OverlayPanel">
+      <Setter Property="Margin" Value="0,1,1,0" />
+    </Style>
+    <Style Selector="^:maximized /template/ Path#RestoreButtonPath">
+      <Setter Property="Data" Value="M2048 410h-410v-410h-1638v1638h410v410h1638v-1638zM1434 1434h-1229v-1229h1229v1229zM1843 1843h-1229v-205h1024v-1024h205v1229z" />
+    </Style>
+    <Style Selector="^:maximized /template/ Button#PART_MaximizeButton">
+      <Setter Property="AutomationProperties.Name" Value="Restore" />
+    </Style>
+    <Style Selector="^ /template/ Button:disabled">
+      <Setter Property="Opacity" Value="0.3" />
+    </Style>
+    <Style Selector="^:not(:has-minimize) /template/ Button#PART_MinimizeButton">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <Style Selector="^:not(:has-maximize) /template/ Button#PART_MaximizeButton">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+  </ControlTheme>
+</ResourceDictionary>

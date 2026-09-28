@@ -91,6 +91,50 @@ public class LauncherTests
         Assert.Equal(1, home.MonthStartWeekday);
     }
 
+    [Fact]
+    public void PLAY_01_before_any_scan_home_says_there_are_no_games_instead_of_an_empty_banner()
+    {
+        using var world = new TestWorld();
+        using var state = new StateStore(Path.Combine(world.Root, "data"));
+        var games = Launcher.Games([], [], state, null, new Dictionary<long, SteamPlay>(), null);
+
+        var home = UI.ViewModels.HomeViewModel.From(Launcher.Home(games, state, Now), games, Now);
+
+        Assert.True(home.NoGames);
+        Assert.False(home.HasHero);
+        Assert.False(home.CanChoose);
+    }
+
+    [Fact]
+    public void Home_fills_any_window_the_banner_takes_what_the_cards_leave()
+    {
+        // Jump back in: covers no wider than 200, never fewer than three, at most twelve.
+        int Columns(double width, double height) => UI.Controls.ShelfPanel.Columns(new Avalonia.Size(width, height), 12, 200, 24, 3);
+        Assert.Equal(3, Columns(459, double.PositiveInfinity));
+        Assert.Equal(4, Columns(741, double.PositiveInfinity));
+        Assert.Equal(12, Columns(2374, double.PositiveInfinity));
+        Assert.Equal(6, Columns(741, 200));
+
+        // The banner: whatever the top bar and the cards leave, at least its least, at most 3:4 of the width.
+        double Banner(double width, double height) => UI.Controls.HomeLayout.Banner(width, height, top: 44, cards: 390, spacing: 16, least: 200);
+        Assert.Equal(634, Banner(1808, 1100));
+        Assert.Equal(514, Banner(1808, 980));
+        Assert.Equal(200, Banner(912, 500));
+        Assert.Equal(750, Banner(1000, 3000));
+    }
+
+    [Fact]
+    public void LIB_10_a_game_its_store_syncs_shows_which_store_never_backup_only()
+    {
+        LauncherGame Game(StoreKind? store, GameStatus? status) => new() { Id = GameId.Parse("cyberpunk-2077"), Title = "Cyberpunk 2077", Store = store, Status = status, Syncs = true };
+
+        Assert.Equal("Synced by Steam", UI.ViewModels.HomeViewModel.Tile(Game(StoreKind.Steam, GameStatus.BackupOnly), Now).StatusLabel);
+        Assert.Equal("Synced by Epic", UI.ViewModels.HomeViewModel.StatusLabel(Game(StoreKind.Epic, GameStatus.BackupOnly)));
+        Assert.Equal("Synced by its store", StoreNames.SyncedBy(StoreKind.Loose));
+        Assert.Null(UI.ViewModels.HomeViewModel.StatusLabel(Game(StoreKind.Steam, GameStatus.Conflict)));
+        Assert.Equal("Synced by its store", UI.Controls.GsStatusBadge.Describe(GameStatus.BackupOnly).Word);
+    }
+
     private static LibraryEntry Entry(string id, string title, StoreKind store, string? storeId) => new()
     {
         Id = GameId.Parse(id),

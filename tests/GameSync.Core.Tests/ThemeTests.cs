@@ -33,6 +33,24 @@ public class ThemeTests
                 Assert.True(value == built[token], $"{choice}: {token} is {built[token]}, the design system's engine gives {value}.");
             }
 
+            // LOOK-17: each Glossy strength, where the design system has one; elsewhere the page stays Solid.
+            foreach (var strength in Enum.GetValues<GlassStrength>())
+            {
+                var glass = ThemeEngine.Glass(choice, strength);
+                if (!golden.TryGetProperty("glass", out var glassGoldens) || !glassGoldens.TryGetProperty(strength.ToString().ToLowerInvariant(), out var g))
+                {
+                    Assert.True(glass is null, $"{choice}: {strength} should stay Solid.");
+                    continue;
+                }
+
+                Assert.NotNull(glass);
+                var tokens = g.GetProperty("tokens").EnumerateObject().ToDictionary(t => t.Name, t => t.Value.GetString()!);
+                Assert.Equal(tokens.OrderBy(t => t.Key), glass.Tokens.OrderBy(t => t.Key));
+                var backdrop = g.GetProperty("backdrop");
+                Assert.Equal((backdrop.GetProperty("base").GetString(), backdrop.GetProperty("scrim").GetString()), (glass.Base, glass.Scrim));
+                Assert.Equal(backdrop.GetProperty("stops").EnumerateArray().Select(s => (s[0].GetDouble(), s[1].GetDouble())), glass.Stops);
+            }
+
             checkedChoices++;
         }
 
