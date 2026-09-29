@@ -424,7 +424,7 @@ public static class FirstRun
         FoundBy.NameSearch => "name search",
         FoundBy.IdFolder => "ID folder",
         FoundBy.Ludusavi => "Ludusavi",
-        _ => "by hand",
+        _ => "added by you",
     };
 
     private static bool Inside(string path, string folder)

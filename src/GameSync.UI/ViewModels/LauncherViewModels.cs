@@ -35,6 +35,9 @@ public sealed record LauncherActions(Action<GameId> Play, Action SyncNow, Action
     /// <summary>Locate the game…: the program picked marks a game installed in its folder, and Play starts it (LIB-24).</summary>
     public Action<GameId, string>? Locate { get; init; }
 
+    /// <summary>Add game: Add a game or folder over the library, for one of the person's own (LIB-13).</summary>
+    public Action? OpenAddGame { get; init; }
+
     /// <summary>The space the backups take on this PC's drive, and the drive's free space, off the UI thread (MGR-03).</summary>
     public Func<CancellationToken, Task<BackupSpace?>>? LoadSpace { get; init; }
 

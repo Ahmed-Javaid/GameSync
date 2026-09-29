@@ -83,6 +83,13 @@ The screens are designed: the Launcher, Save manager and Settings since 27 Sep, 
 
   Checked in the real window on a fresh scratch data folder, on the owner's PC with its real stores (read only): the scan took 2 to 7 seconds for 55 games; the stand-in game's folder was added, every real game unticked, the cloud skipped and both switches turned off. Home then came up with Connect the cloud, the dialog connected a scratch folder, and Sync now uploaded the stand-in's two versions (its files kept at its first sync, then its first backup). The Run key and tasks were unchanged. 6 new tests; 383 pass.
 
+- 30 Sep, later: **Add a game or folder** (LIB-13), drawn first (design system version 22, AddGameDialog, from the mockups canvas's board). The library's Add game and first run's Something missing? open it: a name, a folder and optionally the program that uses it, with what the folder holds and the program files in it that are never copied. The command line has it too (`gamesync add`).
+  - With a program, the game is a game in its own folder, watched and played like one.
+  - Without one, the agent watches the folder all the time: a change starts a session, and 5 quiet minutes end it and sync what changed, counted as made in a session rather than held for review. While it changes it's in use (no backup or restore touches it), but it isn't play: no play time, not Home's hero, and other games' syncs carry on.
+  - Rescans keep it. In first run it joins Sync, ticked. The other PC joins by adding its own folder under the same name.
+
+  Checked with 8 new tests (391 pass), the agent's with its clock moved 6 minutes on, and in snapshots. The real window waits: the owner was playing when the test copy opened, so it was stopped at once.
+
 ## How to try the app
 
 ```powershell
@@ -99,7 +106,7 @@ It uses `%LOCALAPPDATA%\GameSync` like the command line, so on the owner's PC it
 1. The foundation: `GameSync.UI` with the theme engine and its tests, tokens as resources, the icon set, and the styled components. **Done.**
 2. The app shell: the tray icon and its states, the main window with the side rail, one instance and the pipe, the agent inside, the theme applied live. **Done 28 Sep.**
 3. Read models for the library, a game, the plan, a conflict and the save manager.
-4. The screens, in order of use: first run (**working since 30 Sep**, with Skip for now), the launcher home and library (**working since 28 Sep**; the library like Steam's since 29 Sep, with Installed and Local views and the game playing now on Home since that night), game detail (**working since 29 Sep**, about the game since the owner's review), the save manager (**a game's saves working since 29 Sep**) with Plan, Versions and Log, the conflict screen (**working since 29 Sep**), settings, and the share and import windows.
+4. The screens, in order of use: first run (**working since 30 Sep**, with Skip for now, and Add a game or folder), the launcher home and library (**working since 28 Sep**; the library like Steam's since 29 Sep, with Installed and Local views and the game playing now on Home since that night), game detail (**working since 29 Sep**, about the game since the owner's review), the save manager (**a game's saves working since 29 Sep**) with Plan, Versions and Log, the conflict screen (**working since 29 Sep**), settings, and the share and import windows.
 5. Cover art and the activity calendar.
 6. The command line handing off to the app.
 7. Accessibility (keyboard, focus, screen-reader names, text size, animations off) and speed with 500 games.

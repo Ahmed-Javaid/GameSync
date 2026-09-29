@@ -75,6 +75,7 @@
           </StackPanel>
         </Grid>
         <ScrollViewer HorizontalScrollBarVisibility="Disabled" Margin="0,0,-12,0" Padding="0,0,12,0">
+          <StackPanel Spacing="12">
           <ItemsControl ItemsSource="{Binding Groups}">
             <ItemsControl.ItemsPanel>
               <ItemsPanelTemplate>
@@ -127,6 +128,19 @@
               </DataTemplate>
             </ItemsControl.ItemTemplate>
           </ItemsControl>
+          <!-- Something missing?: a game or folder of the person's own (LIB-13), like a game server's world -->
+          <c:GsCard Padding="16,12" IsVisible="{Binding CanAddGame}" AutomationProperties.Name="Something missing?">
+            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+              <c:GsIcon Icon="folder" Size="18" Foreground="{DynamicResource ink-faint}" VerticalAlignment="Center" />
+              <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                <TextBlock Text="Something missing?" FontWeight="SemiBold" />
+                <TextBlock Classes="caption muted" TextWrapping="Wrap"
+                           Text="Add a game or folder of your own, like a game server's world, and GameSync keeps it in step on every PC." />
+              </StackPanel>
+              <c:GsButton Grid.Column="2" Classes="sm" Icon="plus" Content="Add a game or folder" Command="{Binding AddGameCommand}" VerticalAlignment="Center" />
+            </Grid>
+          </c:GsCard>
+          </StackPanel>
         </ScrollViewer>
       </DockPanel>
 

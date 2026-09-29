@@ -387,6 +387,12 @@ button.gs-ftree-twisty:hover { color: var(--ink); background: var(--bg-400); }
 /* Add a place and Import kept saves: a roomier dialog body, and the kept copies' rows */
 .gs-dialog-roomy { padding-top: var(--space-2); padding-bottom: var(--space-4); gap: var(--space-4); }
 .gs-place { display: flex; flex-direction: column; gap: var(--space-4); }
+/* AddGameDialog: a game or folder of the person's own (LIB-13) */
+.gs-own-field { display: flex; flex-direction: column; gap: var(--space-2); }
+.gs-own-label { font: 600 13px/18px var(--font-sans); color: var(--ink); }
+.gs-own-help { margin: -4px 0 0; font: 400 12px/16px var(--font-sans); color: var(--ink-muted); }
+.gs-own-field .gs-input-wide { width: 100%; box-sizing: border-box; }
+.gs-own-path { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gs-kept-list { display: flex; flex-direction: column; gap: 2px; }
 .gs-kept-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--space-3); padding: 8px var(--space-3); border-radius: var(--radius-md); color: var(--ink); }
 .gs-kept-row:hover { background: var(--bg-300); }

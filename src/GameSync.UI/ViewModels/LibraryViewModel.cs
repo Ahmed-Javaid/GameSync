@@ -184,9 +184,15 @@ public sealed partial class LibraryViewModel : ObservableObject, IRailPage, IPag
                 Selected = first.Id;
             }
         });
+        AddGameCommand = new RelayCommand(() => Actions?.OpenAddGame?.Invoke());
     }
 
     public LauncherActions? Actions { get; }
+
+    /// <summary>Add game: a game or folder of the person's own (LIB-13), in its dialog over the library.</summary>
+    public ICommand AddGameCommand { get; }
+
+    public bool CanAddGame => Actions?.OpenAddGame is not null;
 
     /// <summary>Home's strength over the covers; a game's page is full glass over that game's own art, as game detail is (LOOK-17).</summary>
     public GlassStrength Strength => Page is null ? GlassStrength.Home : GlassStrength.Glass;

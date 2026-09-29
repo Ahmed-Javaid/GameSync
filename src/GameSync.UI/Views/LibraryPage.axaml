@@ -105,8 +105,10 @@
           </StackPanel>
           <c:GsPillTabs Grid.Column="1" ItemsSource="{Binding Tabs}" SelectedId="{Binding SelectedTab, Mode=TwoWay}" AutomationProperties.Name="Library view"
                         HorizontalAlignment="Center" />
-          <!-- Add game comes with its dialog (LIB-13); until then it isn't shown, as nothing on screen does nothing -->
-          <c:GsButton Grid.Column="2" Icon="plus" Content="Add game" HorizontalAlignment="Right" IsVisible="False" />
+          <!-- Add game: a game or folder of the person's own (LIB-13), in its dialog -->
+          <c:GsButton Grid.Column="2" Icon="plus" Content="Add game" HorizontalAlignment="Right" Command="{Binding AddGameCommand}" IsVisible="{Binding CanAddGame}"
+                      ToolTip.Tip="A game GameSync didn't find, or any folder to keep in step, like a game server's world" />
+
         </Grid>
         <!-- Local: what the view holds, and Scan a folder for games… (LIB-22, LIB-23) -->
         <c:GsCard DockPanel.Dock="Top" Padding="16,12" Margin="0,0,0,16" IsVisible="{Binding IsLocalView}" AutomationProperties.Name="Games in their own folders">

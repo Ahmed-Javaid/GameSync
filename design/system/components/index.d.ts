@@ -251,6 +251,16 @@ export interface NewPlace {
 /** A place a game keeps saves, set by hand (FOLD-01): pick a folder or one file, see how every PC reads it and what's there, pick what it holds, Add this place. Program files in it are never taken. */
 export function AddPlaceDialog(props: { game: string; place?: NewPlace | null; category?: "save" | "config" | "screenshots"; onPick?: (kind: "folder" | "file") => void; onOpen?: () => void; onAdd?: (choice: { path: string; category: string }) => void; onClose?: () => void }): JSX.Element;
 
+export interface OwnFolder {
+  path: string; files?: number; bytes?: number; newest?: string;
+  /** Program files in it, which are never copied (R1). */
+  programs?: number;
+  /** "warn": another game keeps saves there too; "refused": it can't be added, and `message` says why. */
+  state?: "ok" | "warn" | "refused"; message?: string;
+}
+/** Add a game or folder of the person's own (LIB-13): a game GameSync didn't find, or any folder kept in step between PCs, like a game server's world. A name, its folder and, optionally, the program that uses it: with one it syncs when that program closes, without one once the folder has been quiet for 5 minutes. From the library's Add game (Add and sync) and first run's Something missing? (`setup`: Add, and nothing syncs until first run ends). */
+export function AddGameDialog(props: { name?: string; folder?: OwnFolder | null; program?: { path: string } | null; setup?: boolean; onName?: (name: string) => void; onPickFolder?: () => void; onPickProgram?: () => void; onRemoveProgram?: () => void; onOpen?: () => void; onAdd?: (choice: { name: string }) => void; onClose?: () => void }): JSX.Element;
+
 export interface KeptSave {
   id: string; name: string; saved: string; files: number; bytes?: number;
   /** The name of an identical copy here, or a named save: it isn't named again. */

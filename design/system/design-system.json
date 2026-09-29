@@ -31,9 +31,9 @@
   ],
   "lastChange": {
     "by": "Vulsight",
-    "at": "2026-09-29T19:50:21Z",
+    "at": "2026-09-29T20:56:22Z",
     "via": "Claude Code",
-    "note": "Version 21: first run's missing states (the scan under way, a folder chosen as the cloud, Change time's field), Skip for now keeping every version on the PC until Home's new Connect the cloud button, and the Connect cloud dialog it opens."
+    "note": "Version 22: Add a game or folder (AddGameDialog), from the library's Add game and first run's Something missing?: a name, its folder and, optionally, the program that uses it; without one it syncs once the folder has been quiet for 5 minutes."
   },
   "layout": "files",
   "libraries": [

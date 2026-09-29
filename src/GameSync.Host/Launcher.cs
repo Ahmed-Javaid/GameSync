@@ -54,6 +54,15 @@ public sealed record LauncherGame
     /// <summary>Added by hand in games.json, rather than found by a scan.</summary>
     public bool ByHand { get; init; }
 
+    /// <summary>LIB-13: the person added it (Add a game or folder).</summary>
+    public bool IsOwn { get; init; }
+
+    /// <summary>
+    /// LIB-13: one of the person's own with no program on this PC, such as a server's world: nothing to play, and it syncs
+    /// once quiet. Its spells of changes aren't play, so play time and the activity calendar leave them out.
+    /// </summary>
+    public bool IsFolder { get; init; }
+
     /// <summary>
     /// PLAY-12: when the session playing it now started, however the game was started and whether its saves sync or
     /// not; null while it isn't running.
@@ -115,11 +124,14 @@ public static class Launcher
         foreach (var entry in library.Where(e => e.State != LibraryState.Ignored && e.MergedInto is null))
         {
             var steamId = SteamIdOf(entry, saveList);
-            games.Add(Describe(entry.Id, entry.DisplayTitle, entry.State == LibraryState.Synced, entry.Installed, entry.Store, steamId, state, steamPlay, art, marks) with
+            var game = Describe(entry.Id, entry.DisplayTitle, entry.State == LibraryState.Synced, entry.Installed, entry.Store, steamId, state, steamPlay, art, marks) with
             {
                 AddedUtc = entry.FirstSeenUtc == default ? null : entry.FirstSeenUtc,
                 RunningSinceUtc = running?.GetValueOrDefault(entry.Id) is { } since && since != default ? since : null,
-            });
+                IsOwn = entry.IsOwn,
+                IsFolder = entry.IsOwnFolder,
+            };
+            games.Add(game.IsFolder ? game with { Playtime = TimeSpan.Zero } : game);
         }
 
         foreach (var (id, title) in handAdded.Where(g => games.All(x => x.Id != g.Id)))
@@ -148,19 +160,21 @@ public static class Launcher
     public static LauncherHome Home(IReadOnlyList<LauncherGame> all, StateStore state, DateTime nowLocal)
     {
         // The home is about games; software such as Wallpaper Engine stays in the library's Software tab, and hidden games in Hidden.
+        // A folder of the person's own (LIB-13) syncs and can need them, but there's nothing to play in it.
         var games = all.Where(g => g.Shown).ToList();
-        var played = games.Where(g => g.LastPlayedUtc is not null).ToList();
-        var hero = games.Where(g => g.IsRunning).MaxBy(g => g.RunningSinceUtc ?? DateTime.MinValue)
-            ?? played.FirstOrDefault(g => g.Installed) ?? games.FirstOrDefault(g => g.Installed);
+        var playable = games.Where(g => !g.IsFolder).ToList();
+        var played = playable.Where(g => g.LastPlayedUtc is not null).ToList();
+        var hero = playable.Where(g => g.IsRunning).MaxBy(g => g.RunningSinceUtc ?? DateTime.MinValue)
+            ?? played.FirstOrDefault(g => g.Installed) ?? playable.FirstOrDefault(g => g.Installed);
         var jump = played.Where(g => g != hero).Take(JumpBackInAtMost).ToList();
         if (jump.Count < JumpBackInAtMost)
         {
-            jump.AddRange(games.Where(g => g != hero && !jump.Contains(g)).Take(JumpBackInAtMost - jump.Count));
+            jump.AddRange(playable.Where(g => g != hero && !jump.Contains(g)).Take(JumpBackInAtMost - jump.Count));
         }
 
         var first = new DateTime(nowLocal.Year, nowLocal.Month, 1);
         var days = new TimeSpan[DateTime.DaysInMonth(nowLocal.Year, nowLocal.Month)];
-        foreach (var game in games)
+        foreach (var game in playable)
         {
             foreach (var session in state.GetSessions(game.Id))
             {

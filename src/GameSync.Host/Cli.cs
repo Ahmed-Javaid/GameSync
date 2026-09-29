@@ -56,6 +56,10 @@ public static partial class Cli
                                       takes over Ludusavi's ignore list and the games you added to it, and
                                       brings each synced game's latest Ludusavi backup into its history as a
                                       named save. Previews by default; Ludusavi's files are never changed.
+          add <name> <folder> [--program <exe>]
+                                      a game or folder of your own, like a game server's world. It syncs when
+                                      the program closes, or without one once the folder has been quiet for 5
+                                      minutes. On your other PC, add its folder under the same name.
           add-game <id> --title <title> --root <key>=<folder> [--root ...] [--include <pattern>]
                    [--mode sync|backup-only] [--policy newest-wins|always-ask|this-pc-wins]
                    a game by hand, in games.json. A folder may start with <documents>, <publicDocuments>,
@@ -159,6 +163,8 @@ public static partial class Cli
                     return ScheduleCommand(dataDir, rest);
                 case "art":
                     return await ArtAsync(dataDir, rest);
+                case "add":
+                    return await AddOwnAsync(dataDir, rest);
             }
 
             if (command == "add-game")
@@ -762,6 +768,20 @@ public static partial class Cli
         if (skipped > 0)
         {
             Console.WriteLine($"{skipped} damaged files stayed behind; the cloud still has them.");
+        }
+
+        return 0;
+    }
+
+    /// <summary>LIB-13: <c>add &lt;name&gt; &lt;folder&gt; [--program &lt;exe&gt;]</c>, a game or folder of your own, as the app's Add a game or folder.</summary>
+    private static async Task<int> AddOwnAsync(string dataDir, List<string> rest)
+    {
+        var program = TakeOption(rest, "--program");
+        var added = await OwnGames.AddAsync(dataDir, new OwnGame(Arg(rest, 0, "name"), Arg(rest, 1, "folder"), program), new ConsoleAgentOutput(), CancellationToken.None);
+        Console.WriteLine(added.Sentence);
+        if (File.Exists(AppConfig.PathIn(dataDir)))
+        {
+            Console.WriteLine($"Back it up now with: gamesync backup {added.Id}");
         }
 
         return 0;

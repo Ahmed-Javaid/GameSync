@@ -245,6 +245,7 @@ internal sealed class TrayApp
                 _output.NeedsYou(TitleOf(game), e.Message);
             }
         }),
+        OpenAddGame = () => ShowDialog(new AddOwnViewModel(OwnActionsFor(setup: false))),
         LoadSpace = ct => Task.Run(() => SaveOverview.Space(_dataDir), ct),
         ConnectCloud = ConnectCloud,
         OpenGame = OpenGame,
@@ -337,7 +338,49 @@ internal sealed class TrayApp
         Groups: ct => Task.Run(() => FirstRun.Groups(_dataDir), ct),
         AddGameFolder: (folder, ct) => Task.Run(() => FirstRun.AddGameFolder(_dataDir, folder), ct),
         Cloud: CloudActions,
-        Finish: FinishSetupAsync);
+        Finish: FinishSetupAsync)
+    {
+        AddGame = () => ShowDialog(new AddOwnViewModel(OwnActionsFor(setup: true), setup: true)),
+    };
+
+    /// <summary>
+    /// Add a game or folder (LIB-13), the dialog's work. From the library the game syncs at once, the agent watches its
+    /// folder or program, and its page opens; over first run it joins Choose games, ticked.
+    /// </summary>
+    private OwnActions OwnActionsFor(bool setup) => new(
+        Look: (path, ct) => Task.Run(() => OwnGames.Look(_dataDir, path), ct),
+        CheckProgram: (path, ct) => Task.Run(() => OwnGames.ProgramFolder(_dataDir, path), ct),
+        Add: async (game, ct) =>
+        {
+            var added = await Task.Run(() => OwnGames.AddAsync(_dataDir, game, _output, ct), ct);
+            _output.Say(added.Sentence);
+            if (setup)
+            {
+                if (_firstRun is { } firstRun)
+                {
+                    await firstRun.RegroupAsync(added.Id);
+                }
+            }
+            else
+            {
+                _agent.WatchNow();
+                _agent.SyncNow();
+                await RefreshAsync();
+                OpenGame(added.Id);
+            }
+
+            return added;
+        },
+        Close: () =>
+        {
+            if (_shell is not null)
+            {
+                _shell.Dialog = null;
+            }
+        })
+    {
+        OpenFolder = OpenFolder,
+    };
 
     /// <summary>The cloud's two ways, in first run and in Connect the cloud: Google Drive (with GameSync's client) or a folder.</summary>
     private CloudActions CloudActions => new(
@@ -679,7 +722,9 @@ internal sealed class TrayApp
     }
 
     /// <summary>Reads how the games are doing, off the UI thread, then updates the tray icon and, when the window is open, its rail and page.</summary>
-    private async void Refresh()
+    private async void Refresh() => await RefreshAsync();
+
+    private async Task RefreshAsync()
     {
         _refresh.Stop();
         if (_stopped)

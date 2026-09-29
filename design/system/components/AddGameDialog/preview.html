@@ -1,0 +1,27 @@
+<!-- @dsCard group="Launcher" height=700 subtitle="A game or folder of your own, from the library's Add game and first run: a name, its folder and, optionally, the program that uses it" -->
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>preview</title>
+<style>html,body{margin:0;background:var(--bg-100);}</style>
+</head>
+<body class="gs-root">
+<div id="root"></div>
+<script>
+var G = window.GameSync, h = React.createElement;
+// A game server's world with no program, as the library adds it; or #empty (nothing picked yet), #program (an old game
+// with its program), #programs (the whole server folder, programs and all), #refused (a folder too wide to add) and
+// #setup (from first run, where it only joins the list).
+var STATE = location.hash.slice(1);
+var WORLD = {path:'D:\\Servers\\Minecraft\\world', files:142, bytes:40265318, newest:'today 20:55', programs:0};
+var PROPS = STATE === 'empty' ? {}
+  : STATE === 'program' ? {name:'Diablo II', folder:{path:'C:\\Users\\You\\Saved Games\\Diablo II', files:12, bytes:2202009, newest:'yesterday 23:10', programs:0},
+      program:{path:'D:\\Games\\Diablo II\\Game.exe'}}
+  : STATE === 'programs' ? {name:'Minecraft server', folder:{path:'D:\\Servers\\Minecraft', files:318, bytes:71303168, newest:'today 20:55', programs:3}}
+  : STATE === 'refused' ? {name:'My saves', folder:{path:'C:\\Users\\You\\Documents', state:'refused',
+      message:'That\u2019s your whole Documents folder, far more than one game\u2019s saves. Pick the game\u2019s own folder inside it.'}}
+  : {name:'Minecraft server world', folder:WORLD, setup:STATE === 'setup'};
+ReactDOM.createRoot(document.getElementById('root')).render(
+  h('div',{className:'gs-scrim',style:{minHeight:680}},h(G.AddGameDialog,PROPS)));
+</script>
+</body>
+</html>

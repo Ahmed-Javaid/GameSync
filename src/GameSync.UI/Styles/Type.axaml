@@ -93,6 +93,12 @@
   <Style Selector="TextBlock.body-strong">
     <Setter Property="FontWeight" Value="SemiBold" />
   </Style>
+  <!-- A field's name above it in a dialog, as the design system's gs-own-label -->
+  <Style Selector="TextBlock.field-label">
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="LineHeight" Value="18" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
   <Style Selector="TextBlock.caption">
     <Setter Property="FontSize" Value="12" />
     <Setter Property="LineHeight" Value="16" />

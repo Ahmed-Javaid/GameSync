@@ -386,7 +386,14 @@ public sealed partial class GameViewModel : ObservableObject, IPageSurface
             PrimaryLabel = need;
             PrimaryIcon = NeedIcon;
             PrimaryCommand = NeedCommand;
-            ShowsPlayBeside = true;
+            ShowsPlayBeside = !game.IsFolder;
+        }
+        else if (game.IsFolder)
+        {
+            // LIB-13: a folder of the person's own has nothing to play; backing it up now is what it offers.
+            PrimaryLabel = game.Syncs ? "Back up now" : null;
+            PrimaryIcon = "upload";
+            PrimaryCommand = BackUpNowCommand;
         }
         else
         {
@@ -401,14 +408,24 @@ public sealed partial class GameViewModel : ObservableObject, IPageSurface
     }
 
     /// <summary>Last played, Play time and Saves, as the play bar shows them; Achievements join once they're read (after v1).</summary>
-    public static IReadOnlyList<PlayStat> StatsOf(LauncherGame game, DateTime nowLocal) =>
-    [
-        new PlayStat("Last played", game.IsRunning ? "Playing now" : game.LastPlayedUtc is { } at ? Launcher.WhenText(at, nowLocal) ?? "Never" : "Never"),
-        new PlayStat("Play time", game.Playtime <= TimeSpan.Zero ? "None yet"
-            : game.Playtime.TotalHours >= 1 ? $"{Math.Round(game.Playtime.TotalHours).ToString(CultureInfo.InvariantCulture)} hours"
-            : $"{Math.Max(1, (int)Math.Round(game.Playtime.TotalMinutes))} minutes"),
-        new PlayStat("Saves", StatusWord(game), IsStatus: true, Status: game.Syncs ? game.Status ?? GameStatus.Synced : null),
-    ];
+    public static IReadOnlyList<PlayStat> StatsOf(LauncherGame game, DateTime nowLocal)
+    {
+        var saves = new PlayStat("Saves", StatusWord(game), IsStatus: true, Status: game.Syncs ? game.Status ?? GameStatus.Synced : null);
+        if (game.IsFolder)
+        {
+            // LIB-13: a folder of the person's own isn't played: when it last changed, and its saves.
+            return [new PlayStat("Last changed", game.LastPlayedUtc is { } changed ? Launcher.WhenText(changed, nowLocal) ?? "Not yet" : "Not yet"), saves];
+        }
+
+        return
+        [
+            new PlayStat("Last played", game.IsRunning ? "Playing now" : game.LastPlayedUtc is { } at ? Launcher.WhenText(at, nowLocal) ?? "Never" : "Never"),
+            new PlayStat("Play time", game.Playtime <= TimeSpan.Zero ? "None yet"
+                : game.Playtime.TotalHours >= 1 ? $"{Math.Round(game.Playtime.TotalHours).ToString(CultureInfo.InvariantCulture)} hours"
+                : $"{Math.Max(1, (int)Math.Round(game.Playtime.TotalMinutes))} minutes"),
+            saves,
+        ];
+    }
 
     /// <summary>The status in a word or two: "Synced", "Synced by Steam", "Held for review", "Not syncing yet".</summary>
     public static string StatusWord(LauncherGame game) =>
@@ -422,6 +439,7 @@ public sealed partial class GameViewModel : ObservableObject, IPageSurface
         { Status: GameStatus.HeldForReview } => "Its save changed while the game wasn't running, so GameSync held it for you to look at.",
         { NeedsYou: true, StatusDetail: { Length: > 0 } detail } => detail,
         { Status: GameStatus.Playing } => "Running now. Its save syncs a few seconds after you quit.",
+        { IsFolder: true, Syncs: true, NeedsYou: false } => "It syncs once its folder has been quiet for 5 minutes, so a server's world is kept between its autosaves; every version is kept.",
         { Status: GameStatus.BackupOnly } => $"{StoreNames.SyncingStore(game.Store)} syncs its saves between your PCs; GameSync keeps a backup of every version.",
         _ => "Backed up on this PC and in your Google Drive, every version kept.",
     };
@@ -446,7 +464,7 @@ public sealed partial class GameViewModel : ObservableObject, IPageSurface
         {
             StoreKind.Loose when game.Installed => string.Join(" · ", new[] { "In its own folder", detail?.InstallDir, detail?.About.Engine }.OfType<string>()),
             StoreKind.Loose => "In its own folder",
-            _ => game.ByHand ? "Added by hand" : "Found by its saves",
+            _ => game.IsOwn ? "Added by you" : game.ByHand ? "Added by hand" : "Found by its saves",
         };
         return game.Installed ? where : $"Not installed on this PC · {where}";
     }

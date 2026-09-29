@@ -23,9 +23,17 @@ internal sealed class RunningGames(Engine engine)
     /// <summary>The setting the agent keeps while a game's session is open: when it started.</summary>
     public static string OpenSessionKey(GameId game) => $"session.open.{game}";
 
+    public const string QuietOpenPrefix = "quiet.open.";
+
+    /// <summary>
+    /// LIB-13: the setting the agent keeps while a folder of the person's own is changing, from when it started: in use,
+    /// so nothing is restored into it meanwhile, but not played, so Home and the play time leave it out.
+    /// </summary>
+    public static string QuietOpenKey(GameId game) => $"{QuietOpenPrefix}{game}";
+
     public bool IsRunning(GameId game)
     {
-        if (_agent && engine.State.GetSetting(OpenSessionKey(game)) is { Length: > 0 })
+        if (_agent && (engine.State.GetSetting(OpenSessionKey(game)) is { Length: > 0 } || engine.State.GetSetting(QuietOpenKey(game)) is { Length: > 0 }))
         {
             return true;
         }

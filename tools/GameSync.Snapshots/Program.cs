@@ -8,7 +8,8 @@
 // properties-general, -art, -launch, -files, -saves and -sync (its Properties) from that data folder's games and art;
 // first run over that data folder's library, as if it weren't set up (its stores' folders made up): setup-scan (the scan
 // under way), setup, setup-choose, setup-cloud, setup-cloud-folder, setup-daily and setup-daily-time; home-nocloud and
-// connect-cloud (Home after Skip for now, and its Connect the cloud dialog); and the
+// connect-cloud (Home after Skip for now, and its Connect the cloud dialog); add-game, add-game-program and setup-add-game
+// (Add a game or folder over the library and over first run, made up); and the
 // Glossy window (LOOK-17) over the last-played game's art: glossy-home, glossy-library, glossy-game, glossy-saves,
 // glossy-game-saves, glossy-conflict, glossy-properties, glossy-console, glossy-settings, glossy-setup, glossy-setup-choose.
 // Themes: every page in Arcade dark, Arcade light and Sakura dark; Glossy goes Solid in light mode, as the app does.
@@ -100,6 +101,7 @@ if (dataDir is not null)
         SetView = _ => { },
         ScanFolder = (folder, _) => Task.FromResult(new FolderScan(folder, [], 0)),
         Locate = (_, _) => { },
+        OpenAddGame = () => { },
     };
 
     // First run's and Connect the cloud's two ways, answering without signing in or writing: a folder picked becomes
@@ -271,7 +273,10 @@ if (dataDir is not null)
             _ => Task.FromResult(groups),
             (_, _) => Task.FromResult<string?>(null),
             setupCloud,
-            (_, _) => Task.FromResult(new SetupResult(0, 0, []))));
+            (_, _) => Task.FromResult(new SetupResult(0, 0, [])))
+        {
+            AddGame = () => { },
+        });
         setup.Start();
         var steps = state switch { "choose" => 1, "cloud" or "cloud-folder" => 2, "daily" or "daily-time" => 3, _ => 0 };
         for (var i = 0; i < steps; i++)
@@ -315,6 +320,35 @@ if (dataDir is not null)
         return add;
     }
 
+    // Add a game or folder (LIB-13) with a server's world picked, as the design draws it, or an old game with its program;
+    // over the library, or over first run. Made up: the actions only answer.
+    AddOwnViewModel AddGame(bool setup, bool program)
+    {
+        var folder = program ? @"C:\Users\You\Saved Games\Diablo II" : @"D:\Servers\Minecraft\world";
+        var look = new NewPlaceLook
+        {
+            Path = folder,
+            Folder = folder,
+            Portable = folder,
+            Files = program ? 12 : 142,
+            Bytes = program ? 2_202_009 : 40_265_318,
+            NewestUtc = now.Date.AddHours(20).AddMinutes(55).ToUniversalTime(),
+        };
+        var add = new AddOwnViewModel(new OwnActions(
+            (_, _) => Task.FromResult(look),
+            (path, _) => Task.FromResult(Path.GetDirectoryName(path)!),
+            (game, _) => Task.FromResult(new OwnGameAdded(GameId.Parse("game"), game.Name, "")),
+            () => { }), setup);
+        add.LookAt(folder);
+        add.Name = program ? "Diablo II" : "Minecraft server world";
+        if (program)
+        {
+            add.ChooseProgram(@"D:\Games\Diablo II\Game.exe");
+        }
+
+        return add;
+    }
+
     // Import kept saves with a folder read (made up): each copy by name, one the same as another.
     ImportKeptViewModel ImportKept()
     {
@@ -342,6 +376,9 @@ if (dataDir is not null)
                 "add-place" => AddPlace(),
                 "import-kept" => ImportKept(),
                 "connect-cloud" => new ConnectCloudViewModel(setupCloud, (_, _) => Task.CompletedTask, () => { }),
+                "add-game" => AddGame(setup: false, program: false),
+                "add-game-program" => AddGame(setup: false, program: true),
+                "setup-add-game" => AddGame(setup: true, program: false),
                 _ => Properties(dialog),
             },
         },
@@ -368,6 +405,9 @@ if (dataDir is not null)
     pages["import-kept"] = (() => Shell("game-saves", "import-kept"), size.Width, size.Height);
     pages["home-nocloud"] = (() => Shell("home-nocloud"), size.Width, size.Height);
     pages["connect-cloud"] = (() => Shell("home-nocloud", "connect-cloud"), size.Width, size.Height);
+    pages["add-game"] = (() => Shell("library", "add-game"), size.Width, size.Height);
+    pages["add-game-program"] = (() => Shell("library", "add-game-program"), size.Width, size.Height);
+    pages["setup-add-game"] = (() => Shell("setup-choose", "setup-add-game"), size.Width, size.Height);
     foreach (var step in new[] { "setup-scan", "setup", "setup-choose", "setup-cloud", "setup-cloud-folder", "setup-daily", "setup-daily-time" })
     {
         pages[step] = (() => Shell(step), size.Width, size.Height);

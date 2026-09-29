@@ -30,6 +30,9 @@
     <DataTemplate DataType="vm:AddPlaceViewModel">
       <v:AddPlaceDialog />
     </DataTemplate>
+    <DataTemplate DataType="vm:AddOwnViewModel">
+      <v:AddOwnDialog />
+    </DataTemplate>
     <DataTemplate DataType="vm:ImportKeptViewModel">
       <v:ImportKeptDialog />
     </DataTemplate>

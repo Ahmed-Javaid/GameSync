@@ -1127,6 +1127,58 @@
           h(Button, { variant: "primary", icon: "plus", disabled: !place || refused, onClick: function () { if (props.onAdd) props.onAdd({ path: place.path, category: category }); } }, "Add this place"))));
   }
 
+  /* ---------- AddGameDialog: a game or folder of the person's own (LIB-13) ---------- */
+  // folder: { path, files, bytes, newest, programs, state: "ok" | "warn" | "refused", message }; program: { path }
+  function AddGameDialog(props) {
+    var nm = useState(props.name || ""), name = nm[0];
+    var folder = props.folder || null, program = props.program || null;
+    var refused = !!folder && folder.state === "refused";
+    var ready = name.trim().length > 0 && !!folder && !refused;
+    function field(label, id, help, body) {
+      return h("div", { className: "gs-own-field" },
+        id ? h("label", { className: "gs-own-label", htmlFor: id }, label) : h("div", { className: "gs-own-label" }, label),
+        help ? h("p", { className: "gs-own-help" }, help) : null,
+        body);
+    }
+    // Program files are never copied (R1): say so, with how many the folder holds once it's picked.
+    var programs = folder && !refused && folder.programs
+      ? (folder.programs === 1 ? "It holds 1 program file" : "It holds " + folder.programs + " program files") + " (.exe, .jar and the like), and they're never copied: pick the save or world folder rather than the whole game or server."
+      : "Programs in the folder (.exe, .dll, .jar and the like) are never copied, so pick the save or world folder rather than the whole game or server.";
+    return h("div", { className: "gs-dialog", role: "dialog", "aria-modal": "true", "aria-labelledby": "gs-own-title" },
+      h("div", { className: "gs-dialog-head" },
+        h("div", { className: "gs-card-head" },
+          h("div", null, h("h2", { id: "gs-own-title", className: "gs-dialog-title" }, "Add a game or folder"),
+            h("p", { className: "gs-dialog-sub" }, "For a game GameSync didn't find, or any folder you want kept in step between your PCs, like a game server's world.")),
+          h(IconButton, { icon: "x", label: "Close Add a game or folder", onClick: props.onClose }))),
+      h("div", { className: "gs-dialog-body gs-dialog-roomy" },
+        h("div", { className: "gs-place" },
+          field("Name", "gs-own-name", null,
+            h("input", { id: "gs-own-name", className: "gs-input gs-input-wide", value: name, placeholder: "Minecraft server world", maxLength: 80,
+              onChange: function (e) { nm[1](e.target.value); if (props.onName) props.onName(e.target.value); } })),
+          field("Folder", null, null, folder
+            ? h(FolderField, { path: folder.path, state: refused ? "refused" : "ok", message: refused ? folder.message : null,
+                meta: refused ? null : folder.files + (folder.files === 1 ? " file · " : " files · ") + fmt(folder.bytes || 0) + (folder.newest ? " · last changed " + folder.newest : ""),
+                changeLabel: "Change…", onChange: props.onPickFolder, onOpen: props.onOpen })
+            : h("div", { className: "gs-row" }, h(Button, { variant: "secondary", icon: "folder", onClick: props.onPickFolder }, "Choose a folder…"))),
+          field("Program that uses it", null,
+            program ? "GameSync syncs it when this program closes, and Play starts it." : "Optional. With one, GameSync syncs when it closes; without one, once the folder has been quiet for 5 minutes.",
+            program
+              ? h("div", { className: "gs-well-line" }, h(Icon, { name: "play", size: 14 }), h("span", { className: "gs-own-path", title: program.path }, program.path),
+                  h(Button, { size: "sm", variant: "ghost", onClick: props.onRemoveProgram }, "Remove"))
+              : h("div", { className: "gs-row" }, h(Button, { variant: "ghost", icon: "plus", onClick: props.onPickProgram }, "Choose a program…"))),
+          refused ? null : h("div", { className: "gs-note" }, h(Icon, { name: "shield", size: 16 }), programs),
+          !refused && folder && folder.state === "warn" ? h("div", { className: "gs-import-note gs-import-warn" }, h(Icon, { name: "alert", size: 14, strokeWidth: 2 }), folder.message) : null)),
+      h("div", { className: "gs-dialog-foot" },
+        h("div", { className: "gs-note" }, h(Icon, { name: "info", size: 16 }),
+          props.setup ? "It joins Choose games, ticked. Nothing syncs until you start using GameSync."
+            : "It's backed up now and synced from then on. On your other PC, add its folder under the same name."),
+        h("div", { className: "gs-dialog-actions" },
+          h(Button, { variant: "ghost", onClick: props.onClose }, "Cancel"),
+          h(Button, { variant: "primary", icon: "plus", disabled: !ready,
+            title: ready ? null : !folder ? "Choose its folder first" : refused ? "Choose another folder" : "Give it a name first",
+            onClick: function () { if (ready && props.onAdd) props.onAdd({ name: name.trim() }); } }, props.setup ? "Add" : "Add and sync"))));
+  }
+
   /* ---------- ImportKeptSavesDialog: save folders kept by hand, as named saves (BAK-19) ---------- */
   // items: { id, name, saved, files, bytes, same, kept }; skipped: strings
   function ImportKeptSavesDialog(props) {
@@ -1334,7 +1386,7 @@
     SettingsNav: SettingsNav, SettingsRow: SettingsRow, FolderField: FolderField, FolderList: FolderList,
     ThemeScope: ThemeScope, Backdrop: Backdrop, ThemePicker: ThemePicker, ColorSwatchPicker: ColorSwatchPicker,
     PlayBar: PlayBar, Facts: Facts, Select: Select, FileTree: FileTree, GamePropertiesDialog: GamePropertiesDialog,
-    AddPlaceDialog: AddPlaceDialog, ImportKeptSavesDialog: ImportKeptSavesDialog,
+    AddPlaceDialog: AddPlaceDialog, AddGameDialog: AddGameDialog, ImportKeptSavesDialog: ImportKeptSavesDialog,
     fileTree: { toggle: treeToggle, count: treeCount },
     surface: { get: getSurface, set: setSurface, use: useSurface },
     formatBytes: fmt, theme: Theme

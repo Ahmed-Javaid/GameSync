@@ -37,12 +37,13 @@ function Page(p){return h('div',{style:{display:'flex',flexDirection:'column',ga
 function Foot(p){return h('div',{className:'gs-row',style:{marginTop:'auto',justifyContent:'flex-end',gap:12}},p.back?h(G.Button,{variant:'ghost',onClick:p.back},'Back'):null,h(G.Button,{variant:p.quiet?'secondary':'primary',iconAfter:p.done?null:'chevronRight',icon:p.done?'check':null,disabled:p.disabled,title:p.title,onClick:p.next},p.label));}
 
 // A step by its id (#scan, #choose, #cloud, #daily), or a state: #scanning (the scan under way), #cloud-signed,
-// #cloud-folder (a folder chosen instead of Drive), #daily-time (Change time open).
+// #cloud-folder (a folder chosen instead of Drive), #daily-time (Change time open), #add-game (Add a game or folder open
+// over Choose games).
 var HASH=location.hash.slice(1);
-var START={scanning:'scan','cloud-signed':'cloud','cloud-folder':'cloud','daily-time':'daily'}[HASH]||(STEPS.some(function(s){return s.id===HASH})?HASH:'choose');
+var START={scanning:'scan','cloud-signed':'cloud','cloud-folder':'cloud','daily-time':'daily','add-game':'choose'}[HASH]||(STEPS.some(function(s){return s.id===HASH})?HASH:'choose');
 function App(){
  var st=React.useState(START), step=st[0], go=st[1], idx=STEPS.findIndex(function(s){return s.id===step});
- var online=React.useState(false), signed=React.useState(HASH==='cloud-signed'), folder=React.useState(HASH==='cloud-folder'?'D:\\GameSync':null), startup=React.useState(true), daily=React.useState(true), timeOpen=React.useState(HASH==='daily-time');
+ var online=React.useState(false), signed=React.useState(HASH==='cloud-signed'), folder=React.useState(HASH==='cloud-folder'?'D:\\GameSync':null), startup=React.useState(true), daily=React.useState(true), timeOpen=React.useState(HASH==='daily-time'), adding=React.useState(HASH==='add-game');
  var scanning=HASH==='scanning', connected=signed[0]||!!folder[0];
  var views={
   scan:function(){return h(Page,{title:'Scan this PC',sub:'GameSync reads what Steam, Epic and EA know, and looks through the game folders you add. It only reads; nothing is copied yet.'},
@@ -66,7 +67,7 @@ function App(){
       h('div',{className:'gs-row',style:{flexWrap:'nowrap',gap:12}},
        h(G.Icon,{name:'folder',size:18,className:'gs-faint'}),
        h('div',{style:{flex:1,minWidth:0}},h('div',{style:{fontWeight:600}},'Something missing?'),h('div',{className:'gs-muted',style:{fontSize:12,lineHeight:'16px'}},'Add a game or folder of your own, like a game server’s world, and GameSync keeps it in step on every PC.')),
-       h(G.Button,{size:'sm',variant:'secondary',icon:'plus'},'Add a game or folder'))),
+       h(G.Button,{size:'sm',variant:'secondary',icon:'plus',onClick:function(){adding[1](true)}},'Add a game or folder'))),
      h('div',{className:'gs-row',style:{marginTop:'auto',justifyContent:'space-between',gap:24,flexWrap:'nowrap'}},
       h('div',{className:'gs-note',style:{maxWidth:620}},h(G.Icon,{name:'shield',size:16}),'Apex Legends, Helldivers 2, Rocket League and GTA V Enhanced have an anti-cheat: they launch only through their own launcher, and learn mode never runs on them.'),
       h('div',{className:'gs-row',style:{gap:12,flexWrap:'nowrap'}},h(G.Button,{variant:'ghost',onClick:function(){go('scan')}},'Back'),h(G.Button,{variant:'primary',iconAfter:'chevronRight',onClick:function(){go('cloud')}},'Continue'))));},
@@ -93,12 +94,15 @@ function App(){
      h('div',{className:'gs-note'},h(G.Icon,{name:'upload',size:16}),'The first backup, about 1.1 GB, runs in the background once you start. You can play meanwhile.')),
     h(Foot,{back:function(){go('cloud')},next:function(){},label:'Start using GameSync',done:true}));}
  };
- return h(G.ThemeScope,{strength:'glow',art:ART,style:{width:1280,height:800,display:'flex'}},
+ return h(G.ThemeScope,{strength:'glow',art:ART,style:{width:1280,height:800,display:'flex',position:'relative'}},
   h('aside',{style:{width:280,flexShrink:0,padding:'28px 16px 24px',display:'flex',flexDirection:'column',gap:24,background:'var(--bg-100)',borderRight:'1px solid var(--line-100)'}},
    h('div',{className:'gs-row',style:{gap:12,padding:'0 12px',flexWrap:'nowrap'}},h(G.Icon,{name:'logo',size:28}),h('div',null,h('div',{style:{font:'600 15px/20px var(--font-sans)'}},'Set up GameSync'),h('div',{className:'gs-faint',style:{fontSize:12}},'Four steps, about two minutes'))),
    h(G.SettingsNav,{label:'Setup steps',current:step,onChange:go,items:STEPS.map(function(s,i){return {id:s.id,label:s.label,icon:i<idx?'check':s.icon};})}),
    h('div',{className:'gs-note',style:{marginTop:'auto',padding:'0 12px'}},h(G.Icon,{name:'info',size:16}),'Nothing syncs until you finish, and your saves stay where they are.')),
-  h('main',{style:{flex:1,minWidth:0,padding:'28px 32px 24px',display:'flex',flexDirection:'column'}},views[step]()));
+  h('main',{style:{flex:1,minWidth:0,padding:'28px 32px 24px',display:'flex',flexDirection:'column'}},views[step]()),
+  adding[0]?h('div',{className:'gs-scrim',style:{position:'absolute',inset:0,zIndex:5}},h(G.AddGameDialog,{setup:true,name:'Minecraft server world',
+   folder:{path:'D:\\Servers\\Minecraft\\world',files:142,bytes:40265318,newest:'today 20:55',programs:0},
+   onClose:function(){adding[1](false)},onAdd:function(){adding[1](false)}})):null);
 }
 ReactDOM.createRoot(document.getElementById('root')).render(h(App));
 </script>

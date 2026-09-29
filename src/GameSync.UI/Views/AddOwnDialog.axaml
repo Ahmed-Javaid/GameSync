@@ -1,0 +1,89 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="using:GameSync.UI.Controls"
+             xmlns:vm="using:GameSync.UI.ViewModels"
+             x:Class="GameSync.UI.Views.AddOwnDialog"
+             x:DataType="vm:AddOwnViewModel"
+             Width="640">
+  <!-- Add a game or folder (design system → AddGameDialog, LIB-13): a name, a folder picked in Windows' own picker with what's
+       there, and the program that uses it, if there is one. Program files in the folder are never copied. -->
+  <Border Background="{DynamicResource surface-dialog}" BorderBrush="{DynamicResource edge-dialog}" BorderThickness="1" BackgroundSizing="OuterBorderEdge"
+          CornerRadius="16" BoxShadow="{DynamicResource shadow-dialog}" ClipToBounds="True">
+    <DockPanel>
+      <Border DockPanel.Dock="Top" Padding="24,20,24,8">
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
+          <StackPanel>
+            <TextBlock Classes="card-title" Text="Add a game or folder" />
+            <TextBlock Classes="muted" TextWrapping="Wrap"
+                       Text="For a game GameSync didn't find, or any folder you want kept in step between your PCs, like a game server's world." />
+          </StackPanel>
+          <c:GsIconButton Grid.Column="1" Classes="sm" Icon="x" Label="Close Add a game or folder" Command="{Binding CancelCommand}" VerticalAlignment="Top" />
+        </Grid>
+      </Border>
+
+      <Border DockPanel.Dock="Bottom" BorderBrush="{DynamicResource line-100}" BorderThickness="0,1,0,0" Padding="24,14">
+        <StackPanel Spacing="12">
+          <c:GsNote Icon="info" Text="{Binding FootNote}" />
+          <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+            <c:GsButton Classes="ghost" Content="Cancel" Command="{Binding CancelCommand}" />
+            <c:GsButton Classes="primary" Icon="plus" Content="{Binding AddLabel}" Command="{Binding AddCommand}" IsEnabled="{Binding CanAdd}"
+                        ToolTip.Tip="{Binding AddTip}" ToolTip.ShowOnDisabled="True" />
+          </StackPanel>
+        </StackPanel>
+      </Border>
+
+      <StackPanel Margin="24,12,24,20" Spacing="16">
+        <!-- Name: what the library calls it -->
+        <StackPanel Spacing="8">
+          <TextBlock Classes="field-label" Text="Name" />
+          <TextBox Text="{Binding Name}" MaxLength="80" Watermark="Minecraft server world" AutomationProperties.Name="Name" />
+        </StackPanel>
+
+        <!-- Folder: nothing picked yet, or this PC's full path and what's there, Change… and Open in Explorer -->
+        <StackPanel Spacing="8">
+          <TextBlock Classes="field-label" Text="Folder" />
+          <c:GsButton Icon="folder" Content="Choose a folder…" Click="PickFolder" HorizontalAlignment="Left" IsVisible="{Binding NoFolder}" />
+          <Border Background="{DynamicResource surface-well}" BorderBrush="{DynamicResource edge-well}" BorderThickness="1" BackgroundSizing="OuterBorderEdge"
+                  CornerRadius="{DynamicResource radius-md}" Padding="12,10,8,10" IsVisible="{Binding HasFolder}">
+            <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="12">
+              <Border Width="40" Height="40" CornerRadius="{DynamicResource radius-md}" Background="{DynamicResource bg-300}">
+                <c:GsIcon Icon="folder" Size="18" Foreground="{DynamicResource ink-muted}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+              </Border>
+              <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                <TextBlock Classes="mono" Text="{Binding Folder.Path, FallbackValue=''}" TextTrimming="LeadingCharacterEllipsis" ToolTip.Tip="{Binding Folder.Path, FallbackValue=''}" />
+                <TextBlock Classes="caption muted" Text="{Binding Meta}" IsVisible="{Binding !IsRefused}" />
+              </StackPanel>
+              <c:GsButton Grid.Column="2" Classes="sm" Content="Change…" Click="PickFolder" VerticalAlignment="Center" />
+              <c:GsIconButton Grid.Column="3" Classes="sm" Icon="folder" Label="Open in Explorer" Command="{Binding OpenCommand}" VerticalAlignment="Center" />
+            </Grid>
+          </Border>
+          <c:GsNote Icon="search" Text="Looking at what's there…" IsVisible="{Binding Looking}" />
+          <c:GsNote Icon="block" Foreground="{DynamicResource danger}" Text="{Binding Refused}" IsVisible="{Binding IsRefused}" />
+        </StackPanel>
+
+        <!-- Program that uses it, optional -->
+        <StackPanel Spacing="8">
+          <StackPanel Spacing="2">
+            <TextBlock Classes="field-label" Text="Program that uses it" />
+            <TextBlock Classes="caption muted" TextWrapping="Wrap" Text="{Binding ProgramHelp}" />
+          </StackPanel>
+          <c:GsButton Classes="ghost" Icon="plus" Content="Choose a program…" Click="PickProgram" HorizontalAlignment="Left" IsVisible="{Binding NoProgram}" />
+          <Border Background="{DynamicResource surface-well}" BorderBrush="{DynamicResource edge-well}" BorderThickness="1" BackgroundSizing="OuterBorderEdge"
+                  CornerRadius="{DynamicResource radius-md}" Padding="12,4,6,4" MinHeight="40" IsVisible="{Binding HasProgram}">
+            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
+              <c:GsIcon Icon="play" Size="14" Foreground="{DynamicResource ink-muted}" VerticalAlignment="Center" />
+              <TextBlock Grid.Column="1" Classes="mono-small" Text="{Binding Program, FallbackValue=''}" TextTrimming="LeadingCharacterEllipsis"
+                         ToolTip.Tip="{Binding Program, FallbackValue=''}" VerticalAlignment="Center" />
+              <c:GsButton Grid.Column="2" Classes="ghost sm" Content="Remove" Command="{Binding RemoveProgramCommand}" VerticalAlignment="Center"
+                          AutomationProperties.Name="Remove the program" />
+            </Grid>
+          </Border>
+        </StackPanel>
+
+        <c:GsNote Icon="shield" Text="{Binding ProgramsNote}" IsVisible="{Binding ProgramsNote, Converter={x:Static ObjectConverters.IsNotNull}}" />
+        <c:GsNote Icon="alert" Foreground="{DynamicResource warn}" Text="{Binding Warning}" IsVisible="{Binding Warning, Converter={x:Static ObjectConverters.IsNotNull}}" />
+        <c:GsNote Icon="alert" Foreground="{DynamicResource danger}" Text="{Binding Error}" IsVisible="{Binding HasError}" />
+      </StackPanel>
+    </DockPanel>
+  </Border>
+</UserControl>

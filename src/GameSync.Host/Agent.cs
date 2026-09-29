@@ -66,6 +66,8 @@ internal sealed class Agent(string dataDir, IAgentOutput output) : IDisposable
     private readonly SessionTracker _tracker = new();
     private readonly ProcessWatcher _watcher = new();
     private readonly Dictionary<GameId, SaveActivity> _activity = [];
+    private readonly QuietFolderTracker _quiet = new();
+    private readonly Dictionary<GameId, (IReadOnlyList<string> Folders, SaveActivity Activity)> _quietFolders = [];
     private readonly Dictionary<GameId, SessionInfo> _ended = [];
     private readonly Dictionary<GameId, (string Folder, GamePrograms Programs, DateTime At)> _known = [];
     private IReadOnlyList<GamePrograms> _programs = [];
@@ -95,7 +97,7 @@ internal sealed class Agent(string dataDir, IAgentOutput output) : IDisposable
 
     public void Dispose()
     {
-        foreach (var activity in _activity.Values)
+        foreach (var activity in _activity.Values.Concat(_quietFolders.Values.Select(q => q.Activity)))
         {
             activity.Dispose();
         }
@@ -138,13 +140,19 @@ internal sealed class Agent(string dataDir, IAgentOutput output) : IDisposable
             }
         }
 
-        // Stopping (sign-out, shutdown): sessions still open are recorded up to now, and sync at the next start.
+        // Stopping (sign-out, shutdown): sessions still open are recorded up to now, and sync at the next start; a folder
+        // still changing, up to its last change.
         foreach (var game in _tracker.Playing.Keys.ToList())
         {
             if (_tracker.EndByHand(game, DateTime.UtcNow, _running) is { } ended)
             {
                 Record(ended);
             }
+        }
+
+        foreach (var ended in _quiet.EndAll())
+        {
+            RecordQuiet(ended);
         }
     }
 
@@ -178,6 +186,22 @@ internal sealed class Agent(string dataDir, IAgentOutput output) : IDisposable
                     break;
                 case SessionEnded ended:
                     Record(ended);
+                    break;
+            }
+        }
+
+        // LIB-13: the person's own folders with no program here are in use while they change, and sync once quiet.
+        var quietWrites = _quietFolders.Where(q => q.Value.Activity.LastWriteUtc is not null).ToDictionary(q => q.Key, q => q.Value.Activity.LastWriteUtc!.Value);
+        foreach (var change in _quiet.Tick(nowUtc, quietWrites))
+        {
+            switch (change)
+            {
+                case SessionStarted started:
+                    _state.SetSetting(RunningGames.QuietOpenKey(started.Game), started.StartUtc.ToString("O", CultureInfo.InvariantCulture));
+                    output.Say($"{Title(started.Game)}: changing since {started.StartUtc.ToLocalTime():HH:mm:ss}; it syncs once it's been quiet for 5 minutes.");
+                    break;
+                case SessionEnded ended:
+                    RecordQuiet(ended);
                     break;
             }
         }
@@ -280,7 +304,32 @@ internal sealed class Agent(string dataDir, IAgentOutput output) : IDisposable
         _games = engine.Games.ToDictionary(
             g => g.Id,
             g => (g.Title, (IReadOnlyList<string>)g.Roots.Values.Where(f => !RootResolver.IsUnresolved(f) && Directory.Exists(f)).ToList()));
+        WatchOwnFolders(engine.Library.All());
         _gamesAt = nowUtc;
+    }
+
+    /// <summary>
+    /// LIB-13: each folder of the person's own that syncs and has no program on this PC is watched all the time, as a
+    /// playing game's saves are, since its quiet spells are its sessions.
+    /// </summary>
+    private void WatchOwnFolders(IReadOnlyList<LibraryEntry> library)
+    {
+        var own = library.Where(e => e is { IsOwnFolder: true, State: LibraryState.Synced, MergedInto: null } && _games.ContainsKey(e.Id))
+            .ToDictionary(e => e.Id, e => _games[e.Id].Folders);
+        foreach (var (game, folders) in own)
+        {
+            if (!_quietFolders.TryGetValue(game, out var watched) || !watched.Folders.SequenceEqual(folders, StringComparer.OrdinalIgnoreCase))
+            {
+                watched.Activity?.Dispose();
+                _quietFolders[game] = (folders, new SaveActivity(folders));
+            }
+        }
+
+        foreach (var gone in _quietFolders.Keys.Where(g => !own.ContainsKey(g)).ToList())
+        {
+            _quietFolders[gone].Activity.Dispose();
+            _quietFolders.Remove(gone);
+        }
     }
 
     private string Title(GameId game) => _games.TryGetValue(game, out var known) ? known.Title : _titles.GetValueOrDefault(game, game.Value);
@@ -294,10 +343,12 @@ internal sealed class Agent(string dataDir, IAgentOutput output) : IDisposable
     /// </summary>
     private void CloseLeftoverSessions(DateTime nowUtc)
     {
-        foreach (var (key, value) in _state.GetSettings("session.open."))
+        // A folder of the person's own that was still changing (LIB-13) is closed the same way.
+        foreach (var (key, value) in _state.GetSettings("session.open.").Concat(_state.GetSettings(RunningGames.QuietOpenPrefix)))
         {
             _state.SetSetting(key, "");
-            if (GameId.TryParse(key["session.open.".Length..], out var game) &&
+            var id = key.StartsWith(RunningGames.QuietOpenPrefix, StringComparison.Ordinal) ? key[RunningGames.QuietOpenPrefix.Length..] : key["session.open.".Length..];
+            if (GameId.TryParse(id, out var game) &&
                 DateTime.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var start))
             {
                 var session = new SessionInfo(start, SaveActivity.LastWrite(_games.TryGetValue(game, out var known) ? known.Folders : [], start, nowUtc));
@@ -351,6 +402,22 @@ internal sealed class Agent(string dataDir, IAgentOutput output) : IDisposable
         var minutes = Math.Max(1, (int)Math.Round((ended.Session.EndUtc - ended.Session.StartUtc).TotalMinutes));
         output.Say($"{Title(ended.Game)}: session over after {minutes} min{(ended.ByHand ? ", ended by hand" : "")}.");
         output.Played(ended.Game, Title(ended.Game), playing: false);
+    }
+
+    /// <summary>
+    /// LIB-13: a folder of the person's own has been quiet for 5 minutes (or GameSync is stopping): its spell of changes is
+    /// recorded as a session, so they count as made in one, and it syncs once nothing plays.
+    /// </summary>
+    private void RecordQuiet(SessionEnded ended)
+    {
+        _state.AddSession(ended.Game, ended.Session);
+        _state.SetSetting(RunningGames.QuietOpenKey(ended.Game), "");
+        if (Syncs(ended.Game))
+        {
+            _ended[ended.Game] = ended.Session;
+        }
+
+        output.Say($"{Title(ended.Game)}: quiet since {ended.Session.EndUtc.ToLocalTime():HH:mm:ss}; syncing what changed.");
     }
 
     /// <summary>The games whose sessions ended sync, their markers go, and each is checked for saves that moved.</summary>
@@ -524,7 +591,8 @@ internal sealed class Agent(string dataDir, IAgentOutput output) : IDisposable
         output.Synced(results);
     }
 
-    private bool IsRunningNow(GameId game) => _tracker.Playing.ContainsKey(game) || _running.Any(p => p.Game == game);
+    /// <summary>A game playing, or a folder of the person's own still changing (LIB-13): nothing touches its files meanwhile.</summary>
+    private bool IsRunningNow(GameId game) => _tracker.Playing.ContainsKey(game) || _running.Any(p => p.Game == game) || _quiet.Active.ContainsKey(game);
 }
 
 /// <summary>When a playing game's save folders last changed, from file system notifications; nothing is read (BG-08).</summary>

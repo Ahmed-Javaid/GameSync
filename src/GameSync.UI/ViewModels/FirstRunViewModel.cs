@@ -16,7 +16,11 @@ public sealed record SetupActions(
     Func<CancellationToken, Task<IReadOnlyList<SetupGroup>>> Groups,
     Func<string, CancellationToken, Task<string?>> AddGameFolder,
     CloudActions Cloud,
-    Func<SetupChoice, CancellationToken, Task<SetupResult>> Finish);
+    Func<SetupChoice, CancellationToken, Task<SetupResult>> Finish)
+{
+    /// <summary>Something missing?'s Add a game or folder: its dialog over first run (LIB-13).</summary>
+    public Action? AddGame { get; init; }
+}
 
 /// <summary>Connecting the cloud, in first run's step and in the Connect cloud dialog: Google Drive, or a folder.</summary>
 /// <param name="CanSignIn">This copy of GameSync has a Google client, so Sign in with Google can work (CLOUD-12).</param>
@@ -446,7 +450,37 @@ public sealed partial class FirstRunViewModel : ObservableObject, IPageSurface, 
         });
         SaveTimeCommand = new RelayCommand(SaveTime);
         FinishCommand = new AsyncRelayCommand(FinishAsync, () => !IsFinishing);
+        AddGameCommand = new RelayCommand(() => _actions.AddGame?.Invoke());
         BuildSteps();
+    }
+
+    /// <summary>Something missing?: Add a game or folder, for one of the person's own (LIB-13).</summary>
+    public ICommand AddGameCommand { get; }
+
+    public bool CanAddGame => _actions.AddGame is not null;
+
+    /// <summary>
+    /// After Add a game or folder: the groups again, every tick as the person left it, and the group holding the game just
+    /// added opened in full, so it shows, ticked.
+    /// </summary>
+    public async Task RegroupAsync(GameSync.Core.Model.GameId? added = null)
+    {
+        var ticked = Groups.SelectMany(g => g.Rows).ToDictionary(r => r.Game.Id, r => r.IsChecked);
+        var groups = await _actions.Groups(CancellationToken.None);
+        Groups = groups.Select(g => new SetupGroupViewModel(g, Recount)).ToList();
+        foreach (var row in Groups.SelectMany(g => g.Rows).Where(r => r.Tickable && ticked.ContainsKey(r.Game.Id)))
+        {
+            row.IsChecked = ticked[row.Game.Id];
+        }
+
+        if (added is { } id && Groups.FirstOrDefault(g => g.Rows.Any(r => r.Game.Id == id)) is { } group)
+        {
+            group.IsOpen = true;
+            group.ShowsAll = true;
+        }
+
+        AntiCheatNote = AntiCheat(groups);
+        Recount();
     }
 
     public CloudSetupViewModel Cloud { get; }

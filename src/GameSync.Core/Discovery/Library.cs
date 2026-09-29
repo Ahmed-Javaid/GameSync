@@ -45,6 +45,14 @@ public sealed record LibraryEntry
     /// </summary>
     public string? InstallDirByHand { get; init; }
 
+    /// <summary>
+    /// LIB-13: a game or folder the person added by hand (Add a game or folder), such as a game server's world, with the
+    /// folder they picked on this PC. No scan finds it, so rescans keep it and the place it was added with, and it's
+    /// installed while that folder is here. With no program to watch on this PC, the folder's own quiet spells are its
+    /// sessions.
+    /// </summary>
+    public string? OwnFolder { get; init; }
+
     public string? Build { get; init; }
 
     public string? Engine { get; init; }
@@ -80,6 +88,14 @@ public sealed record LibraryEntry
 
     [JsonIgnore]
     public string DisplayTitle => TitleByHand ?? Title;
+
+    /// <summary>The person added it by hand (LIB-13).</summary>
+    [JsonIgnore]
+    public bool IsOwn => OwnFolder is not null;
+
+    /// <summary>One of the person's own with no program on this PC, such as a server's world: it syncs once its folder is quiet.</summary>
+    [JsonIgnore]
+    public bool IsOwnFolder => IsOwn && InstallDir is null;
 
     [JsonIgnore]
     public bool HasAntiCheat => AntiCheatByHand ?? AntiCheat is not null;
@@ -254,13 +270,14 @@ public static class Library
         }
 
         // What this scan didn't find at all is Not installed, and nothing was found for it; confirmed rules stay (LIB-08).
-        // A game the person located stays installed in its folder while the folder is here (LIB-24).
+        // A game the person located stays installed in its folder while the folder is here (LIB-24), and one they added
+        // keeps the place they added it with (LIB-13).
         foreach (var entry in entries.Values.ToList())
         {
             if (!seen.Contains(entry.Id) && !leftSeen.Contains(entry.Id) && entry.MergedInto is null &&
                 (entry.Installed || entry.Proposals.Count > 0 || entry.RegistryProposals.Count > 0))
             {
-                entries[entry.Id] = entry with { Installed = Located(entry), Proposals = [], RegistryProposals = [] };
+                entries[entry.Id] = entry with { Installed = Located(entry), Proposals = ByHand(entry), RegistryProposals = [] };
             }
         }
 
@@ -285,8 +302,39 @@ public static class Library
         LastSeenUtc = nowUtc,
     };
 
-    /// <summary>The person located it in a folder that's on this PC now: an unplugged drive only makes it Not installed for now.</summary>
-    private static bool Located(LibraryEntry entry) => entry.InstallDirByHand is { Length: > 0 } folder && Directory.Exists(folder);
+    /// <summary>
+    /// LIB-13: a game or folder of the person's own joins the library under the name they gave it, with the folder they
+    /// picked as its place (<paramref name="place"/>, as every PC reads it). With a program, it's installed in that
+    /// program's game folder, as Locate the game… does, and starts from there; without one it has nothing to start, and
+    /// its folder being here is what makes it installed. Its ID comes from the name, so the other PC's, added under the
+    /// same name, is the same game.
+    /// </summary>
+    public static LibraryEntry AddOwn(string name, string folder, Proposal place, string? programFolder, IEnumerable<GameId> taken, DateTime nowUtc) => new()
+    {
+        Id = NewId(name, taken),
+        Title = name,
+        TitleByHand = name,
+        Installed = true,
+        Store = programFolder is null ? null : StoreKind.Loose,
+        InstallDir = programFolder,
+        InstallDirByHand = programFolder,
+        OwnFolder = folder,
+        Proposals = [place],
+        FirstSeenUtc = nowUtc,
+        LastSeenUtc = nowUtc,
+    };
+
+    /// <summary>
+    /// The person located it in a folder that's on this PC now, or added it with one: an unplugged drive only makes it Not
+    /// installed for now.
+    /// </summary>
+    private static bool Located(LibraryEntry entry) =>
+        (entry.InstallDirByHand is { Length: > 0 } folder && Directory.Exists(folder)) ||
+        (entry.OwnFolder is { Length: > 0 } own && Directory.Exists(own));
+
+    /// <summary>The places the person added a game of their own with, which no scan finds and every scan keeps (LIB-13).</summary>
+    private static IReadOnlyList<Proposal> ByHand(LibraryEntry entry) =>
+        entry.IsOwn ? entry.Proposals.Where(p => p.FoundBy == FoundBy.ByHand).ToList() : [];
 
     /// <summary>
     /// FIND-06: pins the proposals as the game's save rules; a game its store's cloud syncs is backup only. Confirming
@@ -441,7 +489,7 @@ public static class Library
         StoreCloud = game.StoreCloud,
         ProbablyOnlineOnly = game.ProbablyOnlineOnly,
         SaveListTitle = game.Listed?.Title,
-        Proposals = game.Proposals,
+        Proposals = game.Proposals.Concat(ByHand(entry)).DistinctBy(p => (p.Root, p.Include)).ToList(),
         RegistryProposals = game.Registry,
         LastSeenUtc = nowUtc,
     };
