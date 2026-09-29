@@ -17,8 +17,11 @@
       <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
         <c:GsIconButton Icon="sync" Label="Sync now" Command="{Binding SyncNowCommand}" />
         <!-- Where the saves go and which PCs sync: what the app is doing, a click away (settings for both come with Settings) -->
+        <!-- First run skipped the cloud: every version is kept on this PC until one is connected (design system → ConnectCloudDialog) -->
+        <c:GsButton Classes="sm" Icon="cloud" Content="Connect the cloud" Command="{Binding ConnectCloudCommand}" IsVisible="{Binding NoCloud}"
+                    ToolTip.Tip="Every version is kept on this PC until a cloud is connected" VerticalAlignment="Center" />
         <c:GsIconButton Icon="cloud" Label="{Binding Status.Cloud, StringFormat='Where your saves go: {0}', FallbackValue='Where your saves go'}"
-                        IsVisible="{Binding HasStatus}">
+                        IsVisible="{Binding ShowsCloud}">
           <c:GsIconButton.Flyout>
             <Flyout Placement="BottomEdgeAlignedRight">
               <StackPanel Width="280" Spacing="8" Margin="8">
@@ -54,9 +57,9 @@
                     Eyebrow="{Binding HeroEyebrow}" Chip="{Binding HeroChip}" Status="{Binding HeroStatus}" StatusLabel="{Binding HeroStatusLabel}"
                     Blurb="{Binding HeroBlurb}" PlayLabel="{Binding HeroPlayLabel}" PlayCommand="{Binding PlayCommand}" ShowsPlay="{Binding HeroShowsPlay}" IsVisible="{Binding HasHero}"
                     SavesCommand="{Binding OpenHeroSavesCommand}" SettingsCommand="{Binding OpenHeroPropertiesCommand}" />
-    <c:GsCard Title="No games yet" Subtitle="GameSync hasn't looked for games on this PC." IsVisible="{Binding NoGames}">
+    <c:GsCard Title="No games yet" Subtitle="GameSync hasn't found any games on this PC." IsVisible="{Binding NoGames}">
       <c:GsNote Icon="search" MaxWidth="640" HorizontalAlignment="Left" VerticalAlignment="Top"
-                Text="First run will do it for you. Until it's built, run gamesync scan: it reads what Steam, Epic and EA know and changes nothing, and nothing syncs until you choose games. Then gamesync art brings their covers, and Home shows your last-played game." />
+                Text="Games outside Steam, Epic and EA are found in the folders you give GameSync: the library's Local view scans one, such as G:\ or E:\Games. The scan only reads, and nothing syncs until you choose." />
     </c:GsCard>
     </Panel>
 

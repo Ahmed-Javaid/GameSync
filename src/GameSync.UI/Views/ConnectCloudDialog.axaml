@@ -1,0 +1,36 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="using:GameSync.UI.Controls"
+             xmlns:vm="using:GameSync.UI.ViewModels"
+             xmlns:v="using:GameSync.UI.Views"
+             x:Class="GameSync.UI.Views.ConnectCloudDialog"
+             x:DataType="vm:ConnectCloudViewModel"
+             Width="620">
+  <!-- Connect the cloud after first run skipped it (design system → ConnectCloudDialog): from Home's Connect the cloud -->
+  <Border Background="{DynamicResource surface-dialog}" BorderBrush="{DynamicResource edge-dialog}" BorderThickness="1" BackgroundSizing="OuterBorderEdge"
+          CornerRadius="16" BoxShadow="{DynamicResource shadow-dialog}" ClipToBounds="True">
+    <DockPanel>
+      <Border DockPanel.Dock="Top" Padding="24,20,24,8">
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
+          <StackPanel Spacing="4">
+            <TextBlock Classes="card-title" Text="Connect the cloud" />
+            <TextBlock Classes="muted" TextWrapping="Wrap"
+                       Text="Every version is on this PC for now. Once a cloud is connected, what waited goes up in the background." />
+          </StackPanel>
+          <c:GsIconButton Grid.Column="1" Classes="sm" Icon="x" Label="Close Connect the cloud" Command="{Binding CloseCommand}" VerticalAlignment="Top" />
+        </Grid>
+      </Border>
+      <Border DockPanel.Dock="Bottom" BorderBrush="{DynamicResource line-100}" BorderThickness="0,1,0,0" Padding="24,14">
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
+          <c:GsNote Icon="monitor" Text="Your other PC joins by connecting the same account or folder." VerticalAlignment="Center" />
+          <c:GsButton Grid.Column="1" Classes.primary="{Binding CloseIsMain}" Classes.ghost="{Binding !CloseIsMain}" Content="{Binding CloseLabel}"
+                      Command="{Binding CloseCommand}" />
+        </Grid>
+      </Border>
+      <StackPanel Margin="24,12,24,20" Spacing="12">
+        <v:CloudChoice DataContext="{Binding Cloud}" />
+        <TextBlock Foreground="{DynamicResource warn}" Text="{Binding Error}" TextWrapping="Wrap" IsVisible="{Binding HasError}" />
+      </StackPanel>
+    </DockPanel>
+  </Border>
+</UserControl>

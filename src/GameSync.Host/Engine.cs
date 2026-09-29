@@ -60,10 +60,17 @@ internal sealed class Engine : IDisposable
     public static string DefaultDataDir => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "GameSync");
 
     /// <summary>Opens settings, state and the library; games.json problems stop it, a library game's problem only leaves that game out.</summary>
-    public static Engine Open(string dataDir)
+    public static Engine Open(string dataDir) => Open(dataDir, AppConfig.Load(dataDir)
+        ?? throw new UsageException($"No games.json in {dataDir}. Run 'gamesync init --drive' or 'gamesync init --remote <folder>' first."));
+
+    /// <summary>
+    /// For first run, before GameSync is set up (ONB-01): the same view of this PC with no games.json yet, so it can scan
+    /// and show what it found. No cloud, and nothing syncs.
+    /// </summary>
+    public static Engine OpenForSetup(string dataDir) => Open(dataDir, AppConfig.Load(dataDir) ?? new AppConfig { Remote = AppConfig.NoCloud });
+
+    private static Engine Open(string dataDir, AppConfig config)
     {
-        var config = AppConfig.Load(dataDir)
-            ?? throw new UsageException($"No games.json in {dataDir}. Run 'gamesync init --drive' or 'gamesync init --remote <folder>' first.");
         var state = new StateStore(dataDir);
         LibraryStore? library = null;
         try
@@ -107,7 +114,7 @@ internal sealed class Engine : IDisposable
         }
 
         string? Title(GameId id) => Service?.Streams.FirstOrDefault(s => s.Id == id)?.Definition.Title;
-        Cloud = drive is not null ? new DriveCloud(drive, Title) : new FolderCloud(Config.Remote);
+        Cloud = drive is not null ? new DriveCloud(drive, Title) : Config.HasNoCloud ? new NoCloud() : new FolderCloud(Config.Remote);
         Service = new SyncService(
             Games,
             new LocalHistory(Cli.HistoryFolder(State, DataDir)),

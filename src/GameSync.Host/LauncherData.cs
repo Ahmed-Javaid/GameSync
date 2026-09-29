@@ -49,18 +49,27 @@ public static class LauncherData
     /// <param name="askAll">Ask Steam's store about every game now, not only the ones that are due.</param>
     public static async Task<(int Games, ArtRefresh Refresh)> FetchArtAsync(string dataDir, CancellationToken ct, bool askAll = false)
     {
-        List<long> ids;
-        using (var engine = Engine.Open(dataDir))
-        {
-            var saveList = new SaveListStore(dataDir).Load();
-            ids = engine.Library.All().Where(e => e.State != LibraryState.Ignored && e.MergedInto is null)
-                .Select(e => Launcher.SteamIdOf(e, saveList))
-                .Concat(engine.Config.Games.Select(g => saveList?.ByTitle(g.Title)?.SteamIds.FirstOrDefault()))
-                .OfType<long>().Where(id => id > 0).Distinct().ToList();
-        }
-
+        var ids = SteamIds(dataDir);
         using var art = new ArtCache(dataDir, steamRoot: StoreLocations.SteamRoot());
         return (ids.Count, await art.RefreshAsync(ids, ct, askAll));
+    }
+
+    /// <summary>First run's covers, straight after its scan: only what the Steam client has on this PC, with no network.</summary>
+    public static int CopyArtFromSteam(string dataDir)
+    {
+        using var art = new ArtCache(dataDir, steamRoot: StoreLocations.SteamRoot());
+        return art.CopyFromSteamClient(SteamIds(dataDir));
+    }
+
+    /// <summary>Every game's Steam app ID; before GameSync is set up too, for first run.</summary>
+    private static List<long> SteamIds(string dataDir)
+    {
+        using var engine = Engine.OpenForSetup(dataDir);
+        var saveList = new SaveListStore(dataDir).Load();
+        return engine.Library.All().Where(e => e.State != LibraryState.Ignored && e.MergedInto is null)
+            .Select(e => Launcher.SteamIdOf(e, saveList))
+            .Concat(engine.Config.Games.Select(g => saveList?.ByTitle(g.Title)?.SteamIds.FirstOrDefault()))
+            .OfType<long>().Where(id => id > 0).Distinct().ToList();
     }
 
     /// <summary>Hides a game from Home and the game library on this PC, or shows it again; its saves sync as before.</summary>
@@ -105,9 +114,10 @@ public static class LauncherData
 
     /// <summary>
     /// For Home's top bar: this PC's name, the other PCs that sync with when each was last seen, and where the saves go
-    /// ("Google Drive", or the folder standing in for it). Read from this PC's copy of the records.
+    /// ("Google Drive", or the folder standing in for it; null when no cloud is connected yet). Read from this PC's copy
+    /// of the records.
     /// </summary>
-    public static (string ThisPc, IReadOnlyList<(string Name, DateTime LastSeenUtc)> Others, string Cloud) Devices(string dataDir)
+    public static (string ThisPc, IReadOnlyList<(string Name, DateTime LastSeenUtc)> Others, string? Cloud) Devices(string dataDir)
     {
         using var engine = Engine.Open(dataDir);
         var others = new GameSync.Core.Storage.LocalHistory(Cli.HistoryFolder(engine.State, dataDir)).LoadDevices()
@@ -115,7 +125,7 @@ public static class LauncherData
             .OrderByDescending(d => d.LastSeenUtc)
             .Select(d => (d.Name, d.LastSeenUtc))
             .ToList();
-        return (engine.Device.Name, others, engine.Config.UsesDrive ? "Google Drive" : engine.Config.Remote);
+        return (engine.Device.Name, others, engine.Config.HasNoCloud ? null : engine.Config.UsesDrive ? "Google Drive" : engine.Config.Remote);
     }
 
     private static IReadOnlyDictionary<long, SteamPlay> SteamPlay() =>

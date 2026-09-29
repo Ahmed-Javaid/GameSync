@@ -1,0 +1,49 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="using:GameSync.UI.Controls"
+             xmlns:vm="using:GameSync.UI.ViewModels"
+             x:Class="GameSync.UI.Views.CloudChoice"
+             x:DataType="vm:CloudSetupViewModel">
+  <!-- The cloud's two ways, in first run's Connect the cloud and in the Connect cloud dialog: Google Drive, or a folder -->
+  <StackPanel Spacing="16">
+    <c:GsCard Title="Google Drive">
+      <StackPanel Spacing="8">
+        <!-- Each way in a panel of its own: they take turns, so neither is a second row with a line above it -->
+        <Panel>
+          <c:GsSettingsRow Title="Sign in with Google" IsVisible="{Binding !IsSignedIn}"
+                           Description="Opens your browser. GameSync asks only for its own folder, and you can sign out any time in Settings.">
+            <c:GsButton Classes.primary="{Binding SignInIsMain}" Icon="cloud" Content="{Binding SignInLabel}" Command="{Binding SignInCommand}"
+                        IsEnabled="{Binding CanSignIn}" AutomationProperties.Name="Sign in with Google" />
+          </c:GsSettingsRow>
+        </Panel>
+        <Panel>
+          <c:GsSettingsRow Title="{Binding SignedInTitle}" IsVisible="{Binding IsSignedIn}"
+                           Description="The GameSync folder is ready. The first upload carries on in the background once you start.">
+            <c:GsStatusBadge Label="Connected" />
+          </c:GsSettingsRow>
+        </Panel>
+        <c:GsNote Icon="info" IsVisible="{Binding CannotSignIn}"
+                  Text="This copy of GameSync has no Google client yet, so it can't sign in to Google Drive. A folder works the same way, or skip for now." />
+      </StackPanel>
+    </c:GsCard>
+    <c:GsCard Title="Or a folder">
+      <Panel>
+        <Panel>
+          <c:GsSettingsRow Title="Use a folder instead" Description="A NAS, a USB drive or another disk. Every PC points at the same folder." IsVisible="{Binding NoFolder}">
+            <c:GsButton Icon="folder" Content="Choose a folder" Click="ChooseFolder" />
+          </c:GsSettingsRow>
+        </Panel>
+        <Panel>
+          <c:GsSettingsRow Title="{Binding FolderTitle}" IsVisible="{Binding HasFolder}"
+                           Description="Every PC points at this folder; GameSync keeps its files in a GameSync folder inside it.">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <c:GsStatusBadge Label="Ready" VerticalAlignment="Center" />
+              <c:GsButton Classes="ghost sm" Content="Change…" Command="{Binding ChangeFolderCommand}" AutomationProperties.Name="Change the cloud folder" />
+            </StackPanel>
+          </c:GsSettingsRow>
+        </Panel>
+      </Panel>
+    </c:GsCard>
+    <TextBlock Foreground="{DynamicResource warn}" Text="{Binding Error}" TextWrapping="Wrap" IsVisible="{Binding HasError}" />
+  </StackPanel>
+</UserControl>

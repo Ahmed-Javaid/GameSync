@@ -14,7 +14,7 @@ Started 28 Sep 2026.
 | Save manager and sharing | MGR-01 to MGR-07, SHARE-01 to SHARE-13 |
 | Settings | SET-01 to SET-06, FOLD-02 to FOLD-10, PC-01 and PC-02, CLOUD-05, CLOUD-08, CLOUD-09 |
 | Appearance | LOOK-01 to LOOK-11, LOOK-17 and LOOK-18 Glossy and Solid, LOOK-19 the caption buttons and hover rings |
-| First run | ONB-01 to ONB-05 |
+| First run | ONB-01 to ONB-06 |
 | Tray and background | BG-01 one instance, the window comes forward, BG-07 tray icon, BG-09 the command line hands off to the app |
 | Accessibility and speed | A11Y-01 to A11Y-05, PERF-01 to PERF-03 |
 
@@ -69,6 +69,20 @@ The screens are designed: the Launcher, Save manager and Settings since 27 Sep, 
 
 - 29 Sep, night: **the owner's next wishes**, drawn first (design system version 20). Back from a page the rail reached again now leads to the top of its area, not to the page that opened it before (LIB-21). The library has Installed and Local views, the one picked kept per PC (LIB-22); Local offers Scan a folder for games…, which adds the folder to every scan and scans the PC at once (LIB-23), so `G:\Black Myth Wukong` gets its Play; a game found only by its saves offers Locate the game… on its page, from its program (LIB-24). Every installed game is watched now, so the game playing now is Home's hero whether it syncs or not, with Playing on its tile, row, page and the rail (PLAY-12); only games that sync pause the agent (BG-08). Properties has Art: your own cover, banner and logo, checked like Steam's, kept on this PC (ART-06). The save manager shows the space the backups take on their drive, with its free space (MGR-03). A problem found on the way and fixed: a fresh data folder took Wallpaper Engine for a game being played until Steam said it's software, which would have held every sync back. Checked in the real window on a fresh scratch data folder: a folder of stand-in games scanned (2 found, the rest of the PC scanned with it in about 12 s); a stand-in's program run from its folder showed on Home as Playing now within seconds, and its 1-minute session counted on the calendar; Ghost of Tsushima, found only by its saves, located from a program and given Play; a banner of your own chosen through Windows' picker and shown on its page; Back from the rail to the covers; the Installed view kept across a restart. 377 tests pass.
 
+- 30 Sep: **first run** (ONB-01 to ONB-06), drawn first (design system version 21: the scan under way, a folder chosen for the cloud, changing the daily time, Skip for now, Home's Connect the cloud and its dialog). Until GameSync is set up, the window is first run, with no rail. Its four steps:
+  - **Scan this PC** reads Steam, Epic and EA and the game folders added there. It shows each store's games as soon as they're read, then each game's saves being looked for, and only reads.
+  - **Choose games** shows the groups, each ticked or unticked whole, with each game's save place and how it was found, and names the anti-cheat games.
+  - **Connect the cloud** offers Google Drive (with GameSync's client) or a folder, or Skip for now.
+  - **Backups and startup** has start at sign-in and the daily backup, both on.
+
+  Start using GameSync confirms the ticked games as the command line would, sets the two switches (only for the usual data folder, so a test copy never replaces the real startup entries), and turns the window into Home.
+
+  Skip for now keeps every version on this PC, as offline but calmly: statuses say "No cloud is connected yet", nothing needs you, and nothing is retried. Home's top bar then offers Connect the cloud, which connects Google Drive or a folder at once and uploads what waited.
+
+  While the person chooses, Steam's store is asked about the games found, so Home has their art and knows Steam's software (Wallpaper Engine) by the time setup is done. Software already known is left out of Choose games.
+
+  Checked in the real window on a fresh scratch data folder, on the owner's PC with its real stores (read only): the scan took 2 to 7 seconds for 55 games; the stand-in game's folder was added, every real game unticked, the cloud skipped and both switches turned off. Home then came up with Connect the cloud, the dialog connected a scratch folder, and Sync now uploaded the stand-in's two versions (its files kept at its first sync, then its first backup). The Run key and tasks were unchanged. 6 new tests; 383 pass.
+
 ## How to try the app
 
 ```powershell
@@ -85,7 +99,7 @@ It uses `%LOCALAPPDATA%\GameSync` like the command line, so on the owner's PC it
 1. The foundation: `GameSync.UI` with the theme engine and its tests, tokens as resources, the icon set, and the styled components. **Done.**
 2. The app shell: the tray icon and its states, the main window with the side rail, one instance and the pipe, the agent inside, the theme applied live. **Done 28 Sep.**
 3. Read models for the library, a game, the plan, a conflict and the save manager.
-4. The screens, in order of use: first run, the launcher home and library (**working since 28 Sep**; the library like Steam's since 29 Sep, with Installed and Local views and the game playing now on Home since that night), game detail (**working since 29 Sep**, about the game since the owner's review), the save manager (**a game's saves working since 29 Sep**) with Plan, Versions and Log, the conflict screen (**working since 29 Sep**), settings, and the share and import windows.
+4. The screens, in order of use: first run (**working since 30 Sep**, with Skip for now), the launcher home and library (**working since 28 Sep**; the library like Steam's since 29 Sep, with Installed and Local views and the game playing now on Home since that night), game detail (**working since 29 Sep**, about the game since the owner's review), the save manager (**a game's saves working since 29 Sep**) with Plan, Versions and Log, the conflict screen (**working since 29 Sep**), settings, and the share and import windows.
 5. Cover art and the activity calendar.
 6. The command line handing off to the app.
 7. Accessibility (keyboard, focus, screen-reader names, text size, animations off) and speed with 500 games.

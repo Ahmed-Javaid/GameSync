@@ -12,13 +12,20 @@ namespace GameSync.Host;
 /// </summary>
 public sealed record AppConfig
 {
-    /// <summary>"drive" for Google Drive, or a full folder path standing in for it, such as another drive or a NAS.</summary>
+    /// <summary>The cloud before one is connected: first run's Skip for now keeps every version on this PC (ONB-01).</summary>
+    public const string NoCloud = "none";
+
+    /// <summary>"drive" for Google Drive, a full folder path standing in for it, such as another drive or a NAS, or "none".</summary>
     public required string Remote { get; init; }
 
     public IReadOnlyList<GameDefinition> Games { get; init; } = [];
 
     [JsonIgnore]
     public bool UsesDrive => Remote.Equals("drive", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>No cloud is connected yet: every version stays on this PC and waits to go up.</summary>
+    [JsonIgnore]
+    public bool HasNoCloud => Remote.Equals(NoCloud, StringComparison.OrdinalIgnoreCase);
 
     public static string PathIn(string dataDir) => Path.Combine(dataDir, "games.json");
 

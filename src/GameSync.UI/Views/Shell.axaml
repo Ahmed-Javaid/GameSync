@@ -7,7 +7,7 @@
              x:DataType="vm:ShellViewModel">
   <Panel>
     <DockPanel>
-      <c:GsSideRail DockPanel.Dock="Left" Items="{Binding Rail}" Current="{Binding Current}" NavigateCommand="{Binding NavigateCommand}" />
+      <c:GsSideRail DockPanel.Dock="Left" Items="{Binding Rail}" Current="{Binding Current}" NavigateCommand="{Binding NavigateCommand}" IsVisible="{Binding ShowsRail}" />
       <Panel>
         <!-- The title bar's strip: dragging it moves the window. The rail runs to the top; the page starts a little under
              the strip, whose lower part is the page's own clear margin, so that drags too. -->

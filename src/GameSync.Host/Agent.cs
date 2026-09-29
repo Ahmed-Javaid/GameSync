@@ -408,11 +408,14 @@ internal sealed class Agent(string dataDir, IAgentOutput output) : IDisposable
         });
     }
 
-    /// <summary>BG-04: games whose upload or download waits (offline, Drive full) try again after 1 minute, then 2, 4, up to an hour.</summary>
+    /// <summary>
+    /// BG-04: games whose upload or download waits (offline, Drive full) try again after 1 minute, then 2, 4, up to an
+    /// hour. With no cloud connected yet (first run's Skip for now) there's nothing to try until one is.
+    /// </summary>
     private async Task RetryAsync(DateTime nowUtc, CancellationToken ct)
     {
         using var engine = Engine.Open(dataDir);
-        var waiting = engine.Games.Where(g => engine.State.GetState(g.Id).Status is GameStatus.UploadPending or GameStatus.NewerInCloud)
+        var waiting = engine.Config.HasNoCloud ? [] : engine.Games.Where(g => engine.State.GetState(g.Id).Status is GameStatus.UploadPending or GameStatus.NewerInCloud)
             .Select(g => g.Id).ToList();
         if (waiting.Count == 0)
         {

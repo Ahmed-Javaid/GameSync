@@ -324,8 +324,10 @@ public static partial class Cli
     /// game's saves, and the saves of games not installed. Nothing on the PC or in the library is changed; the findings
     /// join the library with <see cref="Library.Reconcile"/>. A note about the save list goes to the console.
     /// </summary>
+    /// <param name="looked">Each game's saves looked for: how many so far, of how many; from the scan's threads.</param>
+    /// <param name="sources">Where this PC's stores keep their records, from the game folders; Windows' own by default (tests give their own).</param>
     internal static async Task<ScanFindings> DiscoverAsync(ThisPc here, bool refreshList, CancellationToken ct, Action<Detection>? detected = null,
-        Action<string>? note = null)
+        Action<string>? note = null, Action<int, int>? looked = null, Func<IReadOnlyList<string>, StoreSources>? sources = null)
     {
         var (list, listNote) = await new SaveListStore(here.DataDir).GetAsync(refreshList, LudusaviManifest, ct);
         if (listNote is not null)
@@ -334,12 +336,21 @@ public static partial class Cli
         }
 
         var gameFolders = GameFolders(here.State);
-        var detection = Detector.Detect(StoreLocations.ForThisPc(gameFolders));
+        var detection = Detector.Detect((sources ?? StoreLocations.ForThisPc)(gameFolders));
         detected?.Invoke(detection);
         var discoverer = new Discoverer(list, here.Folders, SaveFolders(here.State), here.Guard, here.Registry);
-        var found = detection.Games.AsParallel().AsOrdered().WithDegreeOfParallelism(4).WithCancellation(ct).Select(discoverer.Discover).ToList();
+        var done = 0;
+        var found = detection.Games.AsParallel().AsOrdered().WithDegreeOfParallelism(4).WithCancellation(ct).Select(game =>
+        {
+            var result = discoverer.Discover(game);
+            looked?.Invoke(Interlocked.Increment(ref done), detection.Games.Count);
+            return result;
+        }).ToList();
         return new ScanFindings(found, discoverer.FindUninstalled(found), gameFolders.Count);
     }
+
+    /// <summary>The game folders every scan looks in (LIB-05), as the person added them.</summary>
+    internal static IReadOnlyList<string> GameFoldersOf(StateStore state) => GameFolders(state);
 
     /// <summary>LIB-05: a folder joins the ones every scan looks in for games in their own folders; false when it already is one.</summary>
     internal static bool AddGameFolder(StateStore state, string folder)

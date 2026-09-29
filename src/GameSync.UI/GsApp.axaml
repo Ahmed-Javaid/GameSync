@@ -36,6 +36,12 @@
     <DataTemplate DataType="vm:ConsoleViewModel">
       <v:ConsolePage />
     </DataTemplate>
+    <DataTemplate DataType="vm:FirstRunViewModel">
+      <v:FirstRunPage />
+    </DataTemplate>
+    <DataTemplate DataType="vm:ConnectCloudViewModel">
+      <v:ConnectCloudDialog />
+    </DataTemplate>
     <DataTemplate DataType="vm:PlaceholderViewModel">
       <v:PlaceholderPage />
     </DataTemplate>

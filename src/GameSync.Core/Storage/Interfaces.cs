@@ -92,6 +92,9 @@ public enum CloudErrorKind
     Flagged,
 
     Other,
+
+    /// <summary>First run skipped the cloud: every version is kept on this PC until one is connected (ONB-01).</summary>
+    NotConnected,
 }
 
 /// <summary>A typed cloud failure, so each game can say what went wrong (CLOUD-04).</summary>

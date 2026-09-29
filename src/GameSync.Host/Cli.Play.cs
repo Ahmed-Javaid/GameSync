@@ -54,10 +54,7 @@ public static partial class Cli
                 return 0;
 
             case "daily" when Arg(rest, 1, "time, like 20:00, or off") == "off":
-                Schedule.Remove(Schedule.DailyTask);
-                Schedule.Remove(Schedule.CatchUpTask);
-                state.SetSetting(DailyTimeKey, "");
-                Console.WriteLine("The daily backup is off. Games still sync after you play, while the background app runs.");
+                Console.WriteLine(SetDaily(dataDir, state, null, BackgroundProgram));
                 return 0;
 
             case "daily":
@@ -66,25 +63,15 @@ public static partial class Cli
                     throw new UsageException("Give the time as 20:00, or off.");
                 }
 
-                var program = BackgroundProgram();
-                Schedule.Register(Schedule.DailyTask, Schedule.TaskXml("GameSync: backs up and syncs every game once a day.",
-                    Schedule.DailyTrigger(daily, DateTime.Now), program, Schedule.Arguments("daily", dataDir), unlimited: false));
-                Schedule.Register(Schedule.CatchUpTask, Schedule.TaskXml("GameSync: runs the daily backup after sign-in when the PC was off at its time.",
-                    Schedule.SignInTrigger(Schedule.CatchUpDelay), program, Schedule.Arguments("daily --if-missed", dataDir), unlimited: false));
-                state.SetSetting(DailyTimeKey, daily.ToString("HH:mm", CultureInfo.InvariantCulture));
-                Console.WriteLine($"The daily backup runs at {daily:HH:mm}; when the PC is off then, about 10 minutes after the next sign-in.");
+                Console.WriteLine(SetDaily(dataDir, state, daily, BackgroundProgram));
                 return 0;
 
             case "background" when Arg(rest, 1, "on or off") == "on":
-                SignInStart.ForThisUser().TurnOn(Schedule.SignInCommand(BackgroundProgram(), dataDir));
-                Schedule.Remove(Schedule.BackgroundTask);
-                Console.WriteLine("GameSync starts in the tray when you sign in; Task Manager's Startup apps lists it as GameSync. Start it now with: GameSync.Tray.exe");
+                Console.WriteLine(SetBackground(dataDir, true, BackgroundProgram));
                 return 0;
 
             case "background" when rest[1] == "off":
-                SignInStart.ForThisUser().TurnOff();
-                Schedule.Remove(Schedule.BackgroundTask);
-                Console.WriteLine("GameSync no longer starts when you sign in.");
+                Console.WriteLine(SetBackground(dataDir, false, BackgroundProgram));
                 return 0;
 
             default:
@@ -96,6 +83,48 @@ public static partial class Cli
         File.Exists(Schedule.BackgroundProgram)
             ? Schedule.BackgroundProgram
             : throw new UsageException($"GameSync.Tray.exe isn't next to gamesync.exe in {AppContext.BaseDirectory}.");
+
+    /// <summary>
+    /// BG-02, SET-02: the daily backup at <paramref name="at"/>, as Task Scheduler tasks the person owns (with the
+    /// catch-up after sign-in when the PC was off then), or off when null. Returns what to tell the person.
+    /// </summary>
+    /// <param name="program">GameSync.Tray.exe, which the tasks run.</param>
+    internal static string SetDaily(string dataDir, StateStore state, TimeOnly? at, Func<string> program)
+    {
+        if (at is not { } daily)
+        {
+            Schedule.Remove(Schedule.DailyTask);
+            Schedule.Remove(Schedule.CatchUpTask);
+            state.SetSetting(DailyTimeKey, "");
+            return "The daily backup is off. Games still sync after you play, while the background app runs.";
+        }
+
+        var path = program();
+        Schedule.Register(Schedule.DailyTask, Schedule.TaskXml("GameSync: backs up and syncs every game once a day.",
+            Schedule.DailyTrigger(daily, DateTime.Now), path, Schedule.Arguments("daily", dataDir), unlimited: false));
+        Schedule.Register(Schedule.CatchUpTask, Schedule.TaskXml("GameSync: runs the daily backup after sign-in when the PC was off at its time.",
+            Schedule.SignInTrigger(Schedule.CatchUpDelay), path, Schedule.Arguments("daily --if-missed", dataDir), unlimited: false));
+        state.SetSetting(DailyTimeKey, daily.ToString("HH:mm", CultureInfo.InvariantCulture));
+        return $"The daily backup runs at {daily:HH:mm}; when the PC is off then, about 10 minutes after the next sign-in.";
+    }
+
+    /// <summary>BG-01: GameSync starts in the tray at sign-in, from the person's own Run key, or doesn't. Returns what to tell the person.</summary>
+    internal static string SetBackground(string dataDir, bool on, Func<string> program)
+    {
+        if (on)
+        {
+            SignInStart.ForThisUser().TurnOn(Schedule.SignInCommand(program(), dataDir));
+        }
+        else
+        {
+            SignInStart.ForThisUser().TurnOff();
+        }
+
+        Schedule.Remove(Schedule.BackgroundTask);
+        return on
+            ? "GameSync starts in the tray when you sign in; Task Manager's Startup apps lists it as GameSync. Start it now with: GameSync.Tray.exe"
+            : "GameSync no longer starts when you sign in.";
+    }
 
     /// <summary>The agent in this terminal (design.md → Background work); the background app runs the same with no window.</summary>
     private static async Task<int> RunAgentAsync(string dataDir)

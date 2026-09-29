@@ -31,9 +31,9 @@
   ],
   "lastChange": {
     "by": "Vulsight",
-    "at": "2026-09-29T17:10:20Z",
+    "at": "2026-09-29T19:50:21Z",
     "via": "Claude Code",
-    "note": "Version 20: the library's Installed and Local views, with Scan a folder for games and Locate the game for one not installed; the game playing now as Home's hero, however it started; Properties -> Art to choose a game's own cover, banner and logo; and the save manager's Backups on this PC, the backup folder's real size with the drive's free space."
+    "note": "Version 21: first run's missing states (the scan under way, a folder chosen as the cloud, Change time's field), Skip for now keeping every version on the PC until Home's new Connect the cloud button, and the Connect cloud dialog it opens."
   },
   "layout": "files",
   "libraries": [

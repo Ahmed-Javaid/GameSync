@@ -75,6 +75,8 @@ public sealed record TrayStatus(TrayMood Mood, string Tooltip)
             (_, { NeedYou: > 1 }, _, _) => (TrayMood.NeedsYou, $"{Number(counts.NeedYou)} games need you"),
             (CloudErrorKind.Offline, _, _, _) => (TrayMood.Offline, "offline, saves wait on this PC"),
             (_, _, { } game, _) => (TrayMood.Playing, $"playing {game}"),
+            // Skip for now in first run: saves are kept on this PC, as asked; nothing is wrong and nothing is being tried.
+            (CloudErrorKind.NotConnected, _, _, false) => (TrayMood.Synced, "every version is kept on this PC; no cloud is connected yet"),
             (_, _, _, true) => (TrayMood.Working, "syncing"),
             (_, { Waiting: > 0 }, _, _) => (TrayMood.Working, "trying the upload again soon"),
             (_, { Syncing: 0 }, _, _) => (TrayMood.Synced, "no games sync yet"),

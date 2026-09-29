@@ -1,0 +1,36 @@
+<!-- @dsCard group="Launcher" height=680 subtitle="Connecting the cloud after first run skipped it: Google Drive or a folder, from Home's Connect the cloud" -->
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>preview</title>
+<style>html,body{margin:0;background:var(--bg-100);} .cc{width:620px}</style>
+</head>
+<body class="gs-root">
+<div id="root"></div>
+<script>
+var G = window.GameSync, h = React.createElement;
+// #signed: signed in to Google Drive; #folder: a folder chosen; otherwise nothing connected yet.
+var STATE = location.hash.slice(1);
+function Dialog(){
+  var signed = STATE === 'signed', folder = STATE === 'folder' ? 'D:\\GameSync' : null, connected = signed || !!folder;
+  return h('div',{className:'gs-dialog cc',role:'dialog','aria-modal':'true','aria-labelledby':'gs-cloud-title'},
+    h('div',{className:'gs-dialog-head'},
+      h('div',{className:'gs-card-head'},
+        h('div',null,h('h2',{id:'gs-cloud-title',className:'gs-dialog-title'},'Connect the cloud'),
+          h('p',{className:'gs-dialog-sub'},'Every version is on this PC for now. Once a cloud is connected, what waited goes up in the background.')),
+        h(G.IconButton,{icon:'x',label:'Close Connect the cloud'}))),
+    h('div',{className:'gs-dialog-body gs-dialog-roomy'},
+      h(G.Card,{title:'Google Drive'},
+        signed ? h(G.SettingsRow,{title:'Signed in as you@gmail.com',description:'The GameSync folder is ready. The first upload, about 1.1 GB, carries on in the background.'},h(G.StatusBadge,{status:'synced',label:'Connected'}))
+          : h(G.SettingsRow,{title:'Sign in with Google',description:'Opens your browser. GameSync asks only for its own folder in your Drive.'},h(G.Button,{variant:folder?'secondary':'primary',icon:'cloud'},'Sign in with Google'))),
+      h(G.Card,{title:'Or a folder'},
+        folder ? h(G.SettingsRow,{title:'Saves go to '+folder,description:'Every PC points at this folder; GameSync keeps its files in a GameSync folder inside it.'},h(G.StatusBadge,{status:'synced',label:'Ready'}))
+          : h(G.SettingsRow,{title:'Use a folder instead',description:'A NAS, a USB drive or another disk. Every PC points at the same folder.'},h(G.Button,{variant:'secondary',icon:'folder'},'Choose a folder')))),
+    h('div',{className:'gs-dialog-foot'},
+      h('div',{className:'gs-note'},h(G.Icon,{name:'monitor',size:16}),'Your other PC joins by connecting the same account or folder.'),
+      h('div',{className:'gs-dialog-actions'},h('span'),
+        h(G.Button,{variant:connected?'primary':'ghost',icon:connected?'check':null},connected?'Done':'Not now'))));
+}
+ReactDOM.createRoot(document.getElementById('root')).render(h('div',{className:'gs-scrim',style:{minHeight:660}},h(Dialog)));
+</script>
+</body>
+</html>

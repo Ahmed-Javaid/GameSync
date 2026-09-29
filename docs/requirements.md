@@ -1,10 +1,10 @@
 # GameSync requirements
 
-> Snapshot of the live [GameSync requirements](https://claude.ai/code/artifact/44d3a52e-5ad7-4d90-9eba-2818c484f613) doc, 29 Sep 2026. Record Pass, Fail or Blocked in the live doc; when rows change there, copy them here. Tests and issues refer to requirements by ID.
+> Snapshot of the live [GameSync requirements](https://claude.ai/code/artifact/44d3a52e-5ad7-4d90-9eba-2818c484f613) doc, 30 Sep 2026. Record Pass, Fail or Blocked in the live doc; when rows change there, copy them here. Tests and issues refer to requirements by ID.
 
 ## How to use this doc
 
-There are 219 requirements in ten areas, each with an ID, a priority and a test: run the test and set Result as you go. Anything you expected that has no row here is a gap, so add it to the last section.
+There are 220 requirements in ten areas, each with an ID, a priority and a test: run the test and set Result as you go. Anything you expected that has no row here is a gap, so add it to the last section.
 
 - **ID**: area plus number, for example `FOLD-04`. IDs are never reused, so test notes and GitHub issues can point at them.
 - **Priority**: **Must** means v1 doesn't ship without it. **Should** means v1 unless it slips. **Later** means designed for now, built after v1.
@@ -238,11 +238,12 @@ First run takes four steps; after that the tray app works quietly and speaks up 
 
 | ID | Requirement | Priority | How to test | Result |
 | --- | --- | --- | --- | --- |
-| ONB-01 | First run has four steps: scan this PC, choose games, connect cloud, daily backup time. | Must | A fresh install walks through all four and ends on the launcher. |  |
-| ONB-02 | Found games are grouped: Sync, Back up only, Probably online-only (unticked), Saves found but game not installed, and No saves found yet (watched on first play). | Must | The owner's PC shows each group with the games from the onboarding mockup. |  |
-| ONB-03 | Each game shows its save path and how it was found (save list, engine rule, name search). | Must | Wukong shows "engine rule". |  |
+| ONB-01 | First run has four steps, with no rail until it's done: scan this PC (it only reads; game folders can be added there), choose games, connect the cloud, then backups and startup. Nothing syncs until Start using GameSync, which ends on Home (reworded 30 Sep 2026). | Must | A fresh install walks through all four and ends on Home. Quit before the end and start again: first run again, and nothing synced. |  |
+| ONB-02 | Found games are grouped: Sync, Synced by their store (GameSync keeps a backup of every version), Probably online-only (unticked), Saves found but game not installed, and No saves found yet (watched on first play). A group ticks or unticks whole and shows its first four games until Show more (reworded 30 Sep 2026). | Must | The owner's PC shows each group with the games from the onboarding mockup. |  |
+| ONB-03 | Each game shows its save path and how it was found (save list, engine rule, name search). | Must | Black Myth: Wukong shows its folder inside the game's folder and how it was found; a game found by the name search says "name search". |  |
 | ONB-04 | The Ludusavi import brings custom games, the ignore list, and each game's latest backup into its history as a named save kept aside, never current by itself. From the command line only (`gamesync import-ludusavi`); first run doesn't offer it (28 Sep: almost nobody migrates that way). | Should | The Ludusavi backups of synced games show as "Ludusavi backup (date)" in each game's saves; the 32 ignored games stay ignored. |  |
 | ONB-05 | Anti-cheat games are explained up front: no learn mode, and they launch through their own launcher. | Must | The note names the flagged games. |  |
+| ONB-06 | *New.* The cloud can wait: Skip for now keeps every version on this PC, calmly (nothing needs you, nothing is retried), and Home's top bar offers Connect the cloud, which connects Google Drive or a folder at once; what waited goes up then, the first-sync rule included (30 Sep 2026). | Must | Skip the cloud and back up a game: Home reads No cloud yet and nothing needs you. Connect the cloud with a folder: its versions appear there. |  |
 | SET-01 | *New.* Settings has sections for Appearance, Storage and folders, Backup and sync, Cloud, Devices, Notifications and Safety. | Must | Every section opens, by mouse and by keyboard. |  |
 | SET-02 | You set the daily backup time; a missed run catches up about 10 minutes after the next sign-in. | Must | Set 20:00 with the PC off at 20:00: the backup runs about 10 minutes after sign-in. |  |
 | SET-03 | Settings shows the last daily run: time, games checked, uploads. | Must | The line matches the log. |  |

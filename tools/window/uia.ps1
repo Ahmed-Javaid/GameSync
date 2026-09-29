@@ -1,8 +1,9 @@
-param([int]$ProcessId, [string]$Title = "", [string]$Name, [ValidateSet('invoke', 'select', 'list', 'value', 'windows')][string]$Action = 'invoke', [string]$Value = "")
+param([int]$ProcessId, [string]$Title = "", [string]$Name, [ValidateSet('invoke', 'select', 'toggle', 'list', 'value', 'windows')][string]$Action = 'invoke', [string]$Value = "")
 
 # Drives GameSync's own windows through UI Automation, the way a screen reader would: picks a window of the process by
 # part of its title (-Title GameSync; a dialog Windows opens for it, such as its folder picker, is one of them), then
-# invokes an element by its name, selects one (a pill tab), or types into it (value). list prints the named elements;
+# invokes an element by its name, selects one (a pill tab), ticks or unticks one (toggle, a check box), or types into
+# it (value). list prints the named elements;
 # windows, the windows.
 #   powershell -File tools\window\uia.ps1 -ProcessId 1234 -Title GameSync -Name "Save manager" -Action invoke
 Add-Type -AssemblyName UIAutomationClient
@@ -34,6 +35,7 @@ foreach ($e in $target.FindAll([System.Windows.Automation.TreeScope]::Descendant
     $want = switch ($Action) {
         'value' { [System.Windows.Automation.ValuePattern]::Pattern }
         'select' { [System.Windows.Automation.SelectionItemPattern]::Pattern }
+        'toggle' { [System.Windows.Automation.TogglePattern]::Pattern }
         default { [System.Windows.Automation.InvokePattern]::Pattern }
     }
     $object = $null
@@ -43,6 +45,7 @@ if (-not $element) { "no element named '$Name' that can $Action"; return }
 switch ($Action) {
     'invoke' { $element.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke() }
     'select' { $element.GetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern).Select() }
+    'toggle' { $element.GetCurrentPattern([System.Windows.Automation.TogglePattern]::Pattern).Toggle() }
     'value' { $element.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern).SetValue($Value) }
 }
 "$Action '$Name' in '$($target.Current.Name)': done"

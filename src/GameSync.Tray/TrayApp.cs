@@ -43,6 +43,7 @@ internal sealed class TrayApp
     private Pages? _pages;
     private LibraryViewModel? _library;
     private SaveManagerViewModel? _saves;
+    private FirstRunViewModel? _firstRun;
     private string _page = "home";
     private readonly Backdrops _backdrops;
     private Look _look = new();
@@ -181,8 +182,8 @@ internal sealed class TrayApp
 
     private object? MakePage(string id) => id switch
     {
-        "home" when !_setUp => new PlaceholderViewModel("Welcome to GameSync", "logo",
-            "GameSync isn't set up on this PC yet. First run, which does it in four steps, is on its way; until then, set it up from the command line with gamesync init."),
+        // Until GameSync is set up, the window is first run, whatever page it was left on (ONB-01).
+        _ when !_setUp => _firstRun ??= new FirstRunViewModel(SetupActions),
         "home" => _pages?.Home,
         "library" => Library,
         "log" => _console,
@@ -245,6 +246,7 @@ internal sealed class TrayApp
             }
         }),
         LoadSpace = ct => Task.Run(() => SaveOverview.Space(_dataDir), ct),
+        ConnectCloud = ConnectCloud,
         OpenGame = OpenGame,
         LoadGame = (game, ct) => Task.Run(() => GameDetails.ReadAsync(_dataDir, game, ct, SteamIdOf(game)), ct),
         OpenFolder = OpenFolder,
@@ -322,6 +324,144 @@ internal sealed class TrayApp
         SaveAs = (game, name) => Job(ct => AppActions.SaveAsAsync(_dataDir, game, name, _output, ct)),
         Restore = (game, version, name) => Job(ct => AppActions.RestoreAsync(_dataDir, game, version, name, _output, ct)),
     };
+
+    /// <summary>What first run asks of the app (ONB-01): the scan, what it found, a game folder, the cloud, and finishing.</summary>
+    private SetupActions SetupActions => new(
+        Scan: (progress, ct) => Task.Run(async () =>
+        {
+            var scan = await FirstRun.ScanAsync(_dataDir, progress, ct);
+            TryCopyArt();
+            AskSteamMeanwhile();
+            return scan;
+        }, ct),
+        Groups: ct => Task.Run(() => FirstRun.Groups(_dataDir), ct),
+        AddGameFolder: (folder, ct) => Task.Run(() => FirstRun.AddGameFolder(_dataDir, folder), ct),
+        Cloud: CloudActions,
+        Finish: FinishSetupAsync);
+
+    /// <summary>The cloud's two ways, in first run and in Connect the cloud: Google Drive (with GameSync's client) or a folder.</summary>
+    private CloudActions CloudActions => new(
+        CanSignIn: FirstRun.GoogleClientFile(_dataDir) is not null,
+        SignIn: ct => Task.Run(() => FirstRun.SignInAsync(_dataDir, OpenSignIn, ct), ct),
+        Folder: picked => FirstRun.CloudFolder(_dataDir, picked))
+    {
+        SignedIn = SignedIn(),
+    };
+
+    private bool SignedIn()
+    {
+        try
+        {
+            return FirstRun.SignedIn(_dataDir);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or FormatException or System.Text.Json.JsonException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>First run's covers, from what the Steam client already has here; no network, and no covers is no problem.</summary>
+    private void TryCopyArt()
+    {
+        try
+        {
+            LauncherData.CopyArtFromSteam(_dataDir);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            _output.Say($"! Covers from Steam didn't come this time: {e.Message}");
+        }
+    }
+
+    /// <summary>
+    /// While the person chooses games after first run's scan: Steam's store is asked about the games found, the same
+    /// once-per-game question the art refresh asks after setup (ART-09), so Home has their art, and knows which are
+    /// software (Wallpaper Engine) rather than games, as soon as setup is done.
+    /// </summary>
+    private void AskSteamMeanwhile()
+    {
+        // One at a time: a second scan (a game folder added) leaves it to the art refresh after setup.
+        if (!_askingSteam.IsCompleted)
+        {
+            return;
+        }
+
+        _askingSteam = Task.Run(async () =>
+        {
+            try
+            {
+                await LauncherData.FetchArtAsync(_dataDir, _stop.Token);
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            catch (Exception e)
+            {
+                _output.Say($"! Art from Steam didn't come this time: {e.Message}");
+            }
+        });
+    }
+
+    private Task _askingSteam = Task.CompletedTask;
+
+    /// <summary>
+    /// Start using GameSync: the choices are saved (the cloud, the games, start at sign-in and the daily backup), then the
+    /// window turns into the launcher, the agent starts, and the first backup and art run in the background.
+    /// </summary>
+    private async Task<SetupResult> FinishSetupAsync(SetupChoice choice, CancellationToken ct)
+    {
+        var result = await Task.Run(() => FirstRun.FinishAsync(_dataDir, choice, new FirstRun.WindowsSchedule(_dataDir), ct), ct);
+        foreach (var note in result.Notes)
+        {
+            _output.Say(note);
+        }
+
+        _output.Say($"GameSync is set up: {result.Syncing} {(result.Syncing == 1 ? "game syncs" : "games sync")} and {result.BackedUp} {(result.BackedUp == 1 ? "is" : "are")} backed up.");
+        await Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            _setUp = true;
+            _firstRun = null;
+            _agent.Kick();
+            _page = "home";
+            _shell?.Open("home");
+            Refresh();
+        });
+        // After what first run asked Steam meanwhile, which has usually finished by now.
+        _ = Task.Run(async () =>
+        {
+            await _askingSteam;
+            await RefreshArtAsync(now: true);
+        });
+        return result;
+    }
+
+    /// <summary>Connect the cloud, from Home after first run skipped it: the choice is connected at once, and the waiting versions go up.</summary>
+    private void ConnectCloud() => ShowDialog(new ConnectCloudViewModel(CloudActions with { SignedIn = false }, async (remote, ct) =>
+    {
+        await Task.Run(() => FirstRun.ConnectAsync(_dataDir, remote, ct), ct);
+        _output.Say(remote == CloudSetupViewModel.Drive ? "Google Drive is connected; what waited on this PC goes up now." : $"The cloud is {remote}; what waited on this PC goes up now.");
+        _agent.SyncNow();
+        Dispatcher.UIThread.Post(RefreshSoon);
+    }, () =>
+    {
+        if (_shell is not null)
+        {
+            _shell.Dialog = null;
+        }
+    }));
+
+    /// <summary>Google's sign-in page, in the person's browser (CLOUD-02).</summary>
+    private void OpenSignIn(Uri url)
+    {
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(url.AbsoluteUri) { UseShellExecute = true })?.Dispose();
+        }
+        catch (System.ComponentModel.Win32Exception e)
+        {
+            _output.Say($"! The browser didn't open for the sign-in: {e.Message}");
+        }
+    }
 
     /// <summary>A job a page asked for, off the UI thread; the pages show what it changed once it's done.</summary>
     private void Job(Func<CancellationToken, Task> job) => _ = Task.Run(async () =>
@@ -843,6 +983,16 @@ internal sealed class TrayApp
             try
             {
                 var (thisPc, others, where) = LauncherData.Devices(dataDir);
+                if (where is null)
+                {
+                    // First run skipped the cloud: the top bar offers Connect the cloud.
+                    return new HomeStatus("No cloud yet", "Every version is kept on this PC until you connect a cloud; then it goes up in the background.",
+                        thisPc.ToUpperInvariant(), others.Select(o => $"{o.Name.ToUpperInvariant()} · last seen {Launcher.WhenText(o.LastSeenUtc, nowLocal)}").ToList())
+                    {
+                        NoCloud = true,
+                    };
+                }
+
                 var line = cloud switch
                 {
                     CloudErrorKind.Offline => "Offline: new saves wait on this PC and go up once you're back online.",

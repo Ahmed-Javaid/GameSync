@@ -38,6 +38,9 @@ public sealed record LauncherActions(Action<GameId> Play, Action SyncNow, Action
     /// <summary>The space the backups take on this PC's drive, and the drive's free space, off the UI thread (MGR-03).</summary>
     public Func<CancellationToken, Task<BackupSpace?>>? LoadSpace { get; init; }
 
+    /// <summary>Connect the cloud, after first run skipped it: its dialog over the page.</summary>
+    public Action? ConnectCloud { get; init; }
+
     /// <summary>Opens a game's page in the library, as a click on its cover anywhere does (LIB-18).</summary>
     public Action<GameId>? OpenGame { get; init; }
 
@@ -186,6 +189,11 @@ public sealed record HomeStatus(string Cloud, string CloudLine, string ThisPc, I
     public bool HasOtherPcs => OtherPcs.Count > 0;
 
     public bool NoOtherPcs => OtherPcs.Count == 0;
+
+    /// <summary>First run skipped the cloud: the top bar offers Connect the cloud in place of the cloud button.</summary>
+    public bool NoCloud { get; init; }
+
+    public bool HasCloud => !NoCloud;
 }
 
 /// <summary>
@@ -249,7 +257,17 @@ public sealed partial class HomeViewModel : ObservableObject, IPageSurface
                 Actions?.OpenProperties?.Invoke(game, "general");
             }
         });
+        ConnectCloudCommand = new RelayCommand(() => Actions?.ConnectCloud?.Invoke());
     }
+
+    /// <summary>The top bar's Connect the cloud, while no cloud is connected.</summary>
+    public ICommand ConnectCloudCommand { get; }
+
+    /// <summary>No cloud is connected yet: the top bar offers Connect the cloud.</summary>
+    public bool NoCloud => Status?.NoCloud == true;
+
+    /// <summary>The cloud button: where the saves go, once a cloud is connected.</summary>
+    public bool ShowsCloud => HasStatus && !NoCloud;
 
     /// <summary>A Needs you row's button: Resolve opens the game's conflict; Review and the others its saves in the save manager.</summary>
     public ICommand OpenGameSavesCommand { get; }

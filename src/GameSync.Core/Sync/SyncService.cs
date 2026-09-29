@@ -836,6 +836,7 @@ public sealed partial class SyncService
             ConflictPending = state.Status == GameStatus.Conflict,
             ConflictReason = state.Status == GameStatus.Conflict ? DecisionEngine.WaitingReason(state.Detail) : null,
             CloudReachable = view.Problem is null,
+            NoCloud = view.Problem?.Kind == CloudErrorKind.NotConnected,
             ClockSkew = view.ClockSkew,
             ClockTolerance = _options.ClockTolerance,
         });

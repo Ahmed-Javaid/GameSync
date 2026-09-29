@@ -34,22 +34,28 @@ function Group(p){
    h(G.Button,{size:'sm',variant:'ghost',iconAfter:'chevronDown',style:{alignSelf:'flex-start',marginLeft:18}},'Show 18 more')):null);
 }
 function Page(p){return h('div',{style:{display:'flex',flexDirection:'column',gap:16,flex:1,minWidth:0,minHeight:0}},h('header',null,h('h1',{className:'page-title',style:{margin:0}},p.title),h('p',{className:'gs-muted',style:{margin:'4px 0 0',maxWidth:720}},p.sub)),p.children);}
-function Foot(p){return h('div',{className:'gs-row',style:{marginTop:'auto',justifyContent:'flex-end',gap:12}},p.back?h(G.Button,{variant:'ghost',onClick:p.back},'Back'):null,h(G.Button,{variant:p.quiet?'secondary':'primary',iconAfter:p.done?null:'chevronRight',icon:p.done?'check':null,onClick:p.next},p.label));}
+function Foot(p){return h('div',{className:'gs-row',style:{marginTop:'auto',justifyContent:'flex-end',gap:12}},p.back?h(G.Button,{variant:'ghost',onClick:p.back},'Back'):null,h(G.Button,{variant:p.quiet?'secondary':'primary',iconAfter:p.done?null:'chevronRight',icon:p.done?'check':null,disabled:p.disabled,title:p.title,onClick:p.next},p.label));}
 
+// A step by its id (#scan, #choose, #cloud, #daily), or a state: #scanning (the scan under way), #cloud-signed,
+// #cloud-folder (a folder chosen instead of Drive), #daily-time (Change time open).
+var HASH=location.hash.slice(1);
+var START={scanning:'scan','cloud-signed':'cloud','cloud-folder':'cloud','daily-time':'daily'}[HASH]||(STEPS.some(function(s){return s.id===HASH})?HASH:'choose');
 function App(){
- var st=React.useState(function(){var a=location.hash.slice(1);return STEPS.some(function(s){return s.id===a})?a:'choose';}), step=st[0], go=st[1], idx=STEPS.findIndex(function(s){return s.id===step});
- var online=React.useState(false), signed=React.useState(false), startup=React.useState(true), daily=React.useState(true);
+ var st=React.useState(START), step=st[0], go=st[1], idx=STEPS.findIndex(function(s){return s.id===step});
+ var online=React.useState(false), signed=React.useState(HASH==='cloud-signed'), folder=React.useState(HASH==='cloud-folder'?'D:\\GameSync':null), startup=React.useState(true), daily=React.useState(true), timeOpen=React.useState(HASH==='daily-time');
+ var scanning=HASH==='scanning', connected=signed[0]||!!folder[0];
  var views={
   scan:function(){return h(Page,{title:'Scan this PC',sub:'GameSync reads what Steam, Epic and EA know, and looks through the game folders you add. It only reads; nothing is copied yet.'},
-    h(G.ProgressBar,{value:100,label:'Scan finished in 2 seconds: 46 games, saves found for 43',right:'100%'}),
+    scanning?h(G.ProgressBar,{value:40,label:'Looking for each game\u2019s saves: 18 of 46',right:'40%'})
+      :h(G.ProgressBar,{value:100,label:'Scan finished in 12 seconds: 46 games, saves found for 43',right:'100%'}),
     h('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16}},
      h(G.Card,{title:'Stores'},
       h(G.SettingsRow,{title:'Steam',description:'E:\\Steam and G:\\SteamLibrary'},h('span',{className:'gs-mono'},'18 games')),
       h(G.SettingsRow,{title:'Epic Games',description:'C:\\Program Files\\Epic Games'},h('span',{className:'gs-mono'},'1 game')),
       h(G.SettingsRow,{title:'EA app',description:'Nothing installed right now'},h('span',{className:'gs-mono gs-faint'},'0'))),
      h(G.Card,{title:'Your game folders',subtitle:'For games outside Steam, Epic and EA.'},
-      h(G.FolderList,{items:[{path:'E:\\Games',meta:'16 games'},{path:'G:\\',meta:'3 games'}],addLabel:'Add a game folder'}))),
-    h(Foot,{next:function(){go('choose')},label:'Choose games'}));},
+      h(G.FolderList,{items:[{path:'E:\\Games',meta:scanning?'looking\u2026':'16 games'},{path:'G:\\',meta:scanning?'looking\u2026':'3 games'}],addLabel:'Add a game folder'}))),
+    h(Foot,{next:function(){go('choose')},label:'Choose games',disabled:scanning,title:scanning?'Once the scan has finished':null}));},
   choose:function(){return h(Page,{title:'Choose what to sync',sub:'46 games found. Ticked games are backed up now and synced from then on; you can change this any time.'},
      h(Group,{title:'Sync',count:22,why:'saves found, no store cloud',on:true,rows:SYNC}),
      h(Group,{title:'Synced by their store',count:9,why:'Steam or Epic syncs these between PCs; GameSync keeps a backup of every version',on:true}),
@@ -67,16 +73,21 @@ function App(){
   cloud:function(){return h(Page,{title:'Connect the cloud',sub:'Your saves go to your own Google Drive, in one folder GameSync makes. It can see that folder and nothing else in your Drive.'},
     h(G.Card,{title:'Google Drive'},
      signed[0]?h(G.SettingsRow,{title:'Signed in',description:'The GameSync folder is ready. The first upload is about 1.1 GB and carries on in the background.'},h(G.StatusBadge,{status:'synced',label:'Connected'}))
-      :h(G.SettingsRow,{title:'Sign in with Google',description:'Opens your browser. GameSync asks only for its own folder, and you can sign out any time in Settings.'},h(G.Button,{variant:'primary',icon:'cloud',onClick:function(){signed[1](true)}},'Sign in with Google')),
+      :h(G.SettingsRow,{title:'Sign in with Google',description:'Opens your browser. GameSync asks only for its own folder, and you can sign out any time in Settings.'},h(G.Button,{variant:folder[0]?'secondary':'primary',icon:'cloud',onClick:function(){signed[1](true)}},'Sign in with Google')),
      signed[0]?h(G.ProgressBar,{value:7,label:'Drive storage, shared with Gmail and Photos',right:'1.0 of 15 GB'}):null),
     h(G.Card,{title:'Or a folder'},
-     h(G.SettingsRow,{title:'Use a folder instead',description:'A NAS, a USB drive or another disk. Every PC points at the same folder.'},h(G.Button,{variant:'secondary',icon:'folder'},'Choose a folder'))),
+     folder[0]?h(G.SettingsRow,{title:'Saves go to '+folder[0],description:'Every PC points at this folder; GameSync keeps its files in a GameSync folder inside it.'},h(G.StatusBadge,{status:'synced',label:'Ready'}),h(G.Button,{size:'sm',variant:'ghost',onClick:function(){folder[1](null)}},'Change\u2026'))
+      :h(G.SettingsRow,{title:'Use a folder instead',description:'A NAS, a USB drive or another disk. Every PC points at the same folder.'},h(G.Button,{variant:'secondary',icon:'folder',onClick:function(){folder[1]('D:\\GameSync')}},'Choose a folder'))),
     h('div',{className:'gs-note'},h(G.Icon,{name:'monitor',size:16}),'Setting up the laptop later? Install GameSync there and sign in with the same Google account; it finds this PC\u2019s saves.'),
-    h(Foot,{back:function(){go('choose')},next:function(){go('daily')},label:signed[0]?'Continue':'Skip for now',quiet:!signed[0]}));},
+    connected?null:h('div',{className:'gs-note'},h(G.Icon,{name:'info',size:16}),'Skip for now keeps every version on this PC. Connect the cloud, on Home\u2019s top bar, connects one whenever you like, and what waited goes up then.'),
+    h(Foot,{back:function(){go('choose')},next:function(){go('daily')},label:connected?'Continue':'Skip for now',quiet:!connected}));},
   daily:function(){return h(Page,{title:'Backups and startup',sub:'Games sync when you quit them. These two keep that going without you.'},
     h(G.Card,null,
      h(G.SettingsRow,{title:'Start GameSync when you sign in',description:'It notices games however you start them, syncs each one after you play, and brings the other PC\u2019s saves down.'},h(G.Switch,{label:'Start GameSync when you sign in',checked:startup[0],onChange:startup[1]})),
-     h(G.SettingsRow,{title:'Back up every day at 20:00',description:'Pick a time your PC is usually on. If it\u2019s off then, the backup runs about 10 minutes after you next sign in.'},h(G.Button,{size:'sm',variant:'secondary',icon:'clock',disabled:!daily[0]},'Change time'),h(G.Switch,{label:'Back up every day',checked:daily[0],onChange:daily[1]}))),
+     h(G.SettingsRow,{title:'Back up every day at 20:00',description:'Pick a time your PC is usually on. If it\u2019s off then, the backup runs about 10 minutes after you next sign in.'},
+      timeOpen[0]?h('span',{className:'gs-row',style:{flexWrap:'nowrap',gap:8}},h('input',{className:'gs-input',style:{width:84,textAlign:'center'},defaultValue:'20:00','aria-label':'Daily backup time, 24-hour'}),h(G.Button,{size:'sm',variant:'primary',onClick:function(){timeOpen[1](false)}},'Save'))
+       :h(G.Button,{size:'sm',variant:'secondary',icon:'clock',disabled:!daily[0],onClick:function(){timeOpen[1](true)}},'Change time'),
+      h(G.Switch,{label:'Back up every day',checked:daily[0],onChange:daily[1]}))),
     h('div',{className:'gs-note'},h(G.Icon,{name:'shield',size:16}),'Both run as you, without admin rights, so Windows won\u2019t ask for permission. You can change them in Settings.'),
     h(G.Card,{title:'Ready',subtitle:'22 games sync and 14 are backed up. Your saves stay in their folders; GameSync keeps copies.'},
      h('div',{className:'gs-note'},h(G.Icon,{name:'upload',size:16}),'The first backup, about 1.1 GB, runs in the background once you start. You can play meanwhile.')),

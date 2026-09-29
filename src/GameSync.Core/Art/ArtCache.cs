@@ -162,6 +162,9 @@ public sealed class ArtCache : IDisposable
     public bool IsSoftware(long appId) =>
         Record(appId) is { } record && (record.StoreType == SteamAssets.Software || (record.StoreType == SteamAssets.Demo && record.ParentType == SteamAssets.Software));
 
+    /// <summary>Only the art the Steam client already has on this PC, with no network: first run's covers, straight after its scan.</summary>
+    public int CopyFromSteamClient(IEnumerable<long> appIds) => appIds.Distinct().Sum(CopyFromSteamClient);
+
     /// <summary>
     /// Brings each app's art up to date: first from the Steam client's cache, then, for the apps that are due, from
     /// Steam's store. Offline or refused, what's cached stays and the rest waits for the next try.

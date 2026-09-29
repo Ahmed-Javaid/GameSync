@@ -1,6 +1,6 @@
 # GameSync design system
 
-> Snapshot of the [online design system](https://claude.ai/code/artifact/6a117b31-dc9a-4cd7-be46-037c91f1f074), 29 Sep 2026, version 20. Designs are edited there; copy changed files here afterwards, as with `design/mockups/`. Open `viewer.html` in a browser to see every component and screen offline, in all eight themes.
+> Snapshot of the [online design system](https://claude.ai/code/artifact/6a117b31-dc9a-4cd7-be46-037c91f1f074), 30 Sep 2026, version 21. Designs are edited there; copy changed files here afterwards, as with `design/mockups/`. Open `viewer.html` in a browser to see every component and screen offline, in all eight themes.
 >
 > For building: `tokens.json` holds every colour, type style, spacing and radius, per theme; `Theming.md` says how themes are generated; each `components/<Name>/README.md` is that component's spec. `components/bundle.js` and `bundle.css` are a React reference implementation for the previews, not app code; the app itself is Avalonia.
 

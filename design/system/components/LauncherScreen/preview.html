@@ -30,7 +30,8 @@ var IMPORT_ITEMS = [
 
 
 // #playing: a game runs now (started from GameSync, a store or anywhere, its saves syncing or not): it's the hero.
-var PLAYING = location.hash === '#playing';
+// #nocloud: first run skipped the cloud, so the top bar offers Connect the cloud (see Connect cloud dialog).
+var PLAYING = location.hash === '#playing', NOCLOUD = location.hash === '#nocloud';
 function rail(cur){return h(G.SideRail,{current:cur,items:[
   {id:'search',icon:'search',label:'Search'},
   {id:'home',icon:'home',label:'Home',sep:true},
@@ -47,7 +48,10 @@ function App(){
   h('main',{style:{flex:1,minWidth:0,padding:'20px 24px',display:'flex',flexDirection:'column',gap:16}},
    topbar('Welcome back','Here\u2019s where you left off',
      h(G.PillTabs,{label:'Library view',value:'recent',items:[{id:'all',label:'My games'},{id:'recent',label:'Recently played'},{id:'fav',label:'Favourites'},{id:'attn',label:'Needs you',count:2}]}),
-     [h(G.IconButton,{key:1,icon:'sync',label:'Sync now'}),h(G.IconButton,{key:2,icon:'cloud',label:'Google Drive connected'}),h(G.IconButton,{key:3,icon:'monitor',label:'This PC: DESKTOP'})]),
+     [h(G.IconButton,{key:1,icon:'sync',label:'Sync now'}),
+      NOCLOUD?h(G.Button,{key:2,size:'sm',variant:'secondary',icon:'cloud',title:'Every version is kept on this PC until a cloud is connected'},'Connect the cloud')
+       :h(G.IconButton,{key:2,icon:'cloud',label:'Google Drive connected'}),
+      h(G.IconButton,{key:3,icon:'monitor',label:'This PC: DESKTOP'})]),
    PLAYING
      ? h(G.HeroBanner,{art:ART,eyebrow:'Playing now \u00b7 since 20:41 \u00b7 In its own folder',chip:'31 hrs played',title:'Ghost of Tsushima',status:'playing',statusLabel:'Playing now',
          blurb:'GameSync saw it start, so its play counts. Its saves aren\u2019t synced yet: sync them from its page when you\u2019re done.',noPlay:true,style:{minHeight:340}})

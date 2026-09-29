@@ -105,6 +105,9 @@ public sealed record SyncInputs
     /// <summary>False when the cloud couldn't be reached, so <see cref="Versions"/> may be out of date (PC-05).</summary>
     public bool CloudReachable { get; init; } = true;
 
+    /// <summary>No cloud is connected yet (first run's Skip for now): it works as offline, and says so in its own words.</summary>
+    public bool NoCloud { get; init; }
+
     /// <summary>This PC's clock minus the cloud's, when the cloud has a clock (SYNC-08).</summary>
     public TimeSpan? ClockSkew { get; init; }
 
@@ -137,6 +140,7 @@ public static class DecisionEngine
     /// </summary>
     private static SyncDecision WhileOffline(SyncInputs input, SyncDecision online)
     {
+        var (offline, back) = input.NoCloud ? ("No cloud is connected yet", "once you connect one") : ("Offline", "when you're back online");
         switch (online.Action)
         {
             // A first sync here can't know whether the cloud already has this game's saves, so the first-sync rule waits.
@@ -145,22 +149,22 @@ public static class DecisionEngine
                 {
                     Action = SyncAction.WaitForCloud,
                     KeepLocalFirst = new KeepLocal(VersionOrigin.KeptAtFirstSync, $"{input.Device.Name}'s files before its first sync"),
-                    Reason = "Offline, and this is the game's first sync on this PC: its files are kept here, and what happens next is decided when you're back online.",
+                    Reason = $"{offline}, and this is the game's first sync on this PC: its files are kept here, and what happens next is decided {back}.",
                 };
             case SyncAction.Upload when online.Pins.Count == 0 && online.Supersedes.Count == 0:
-                return online with { Reason = $"{online.Reason} Offline: kept on this PC, and it uploads when you're back online." };
+                return online with { Reason = $"{online.Reason} {offline}: kept on this PC, and it uploads {back}." };
             case SyncAction.Download when online.KeepLocalFirst is null:
                 return new SyncDecision
                 {
                     Action = SyncAction.WaitForCloud,
-                    Reason = $"Offline: {online.Reason} It downloads when you're back online.",
+                    Reason = $"{offline}: {online.Reason} It downloads {back}.",
                 };
             case SyncAction.Upload or SyncAction.Download:
                 return new SyncDecision
                 {
                     Action = SyncAction.WaitForCloud,
                     KeepLocalFirst = online.KeepLocalFirst ?? new KeepLocal(VersionOrigin.KeptInConflict, $"{input.Device.Name}'s save while offline"),
-                    Reason = "Offline, and the cloud has a different save too: this PC's is kept, and which one continues is decided when you're back online.",
+                    Reason = $"{offline}, and the cloud has a different save too: this PC's is kept, and which one continues is decided {back}.",
                 };
             default:
                 return online;

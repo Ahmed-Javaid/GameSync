@@ -6,6 +6,11 @@ using GameSync.UI.Theming;
 
 namespace GameSync.UI.ViewModels;
 
+/// <summary>A page that takes the whole window, with no side rail: first run, until GameSync is set up.</summary>
+public interface IWholeWindowPage
+{
+}
+
 /// <summary>
 /// The window's frame: the side rail and the page it opens. Home and the game library are the launcher; the save
 /// manager and the console hold the save data; settings hold folders and everything else.
@@ -21,7 +26,11 @@ public sealed partial class ShellViewModel : ObservableObject
     private string _current;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowsRail))]
     private object? _page;
+
+    /// <summary>The side rail, on every page but first run's (design system → OnboardingScreen).</summary>
+    public bool ShowsRail => Page is not IWholeWindowPage;
 
     [ObservableProperty]
     private IReadOnlyList<RailItem> _rail = DefaultRail(null, null);

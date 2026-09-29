@@ -92,7 +92,7 @@
               </DataTemplate>
             </ItemsControl.ItemTemplate>
           </ItemsControl>
-          <TextBlock Name="PART_Empty" Text="{TemplateBinding Empty}" FontSize="13" Foreground="{DynamicResource ink-faint}" Margin="0,6" IsVisible="False" />
+          <TextBlock Name="PART_Empty" Text="{TemplateBinding Empty}" FontSize="13" Foreground="{DynamicResource ink-faint}" Margin="0,6" TextWrapping="Wrap" IsVisible="False" />
           <c:GsButton Classes="ghost sm" Icon="plus" Content="{TemplateBinding AddLabel}" Command="{TemplateBinding AddCommand}"
                       IsVisible="{Binding $parent[c:GsFolderList].AddCommand, Converter={x:Static ObjectConverters.IsNotNull}}" />
         </StackPanel>

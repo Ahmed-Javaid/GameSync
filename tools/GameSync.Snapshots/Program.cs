@@ -5,9 +5,12 @@
 // one --game names or the hero game), saves and game-saves (the save manager, and that game's saves in it), conflict and
 // conflict-settled (a made-up conflict of that game, waiting and settled), add-place and import-kept (those dialogs over
 // its saves, made up), and
-// properties-general, -art, -launch, -files, -saves and -sync (its Properties) from that data folder's games and art; and the
+// properties-general, -art, -launch, -files, -saves and -sync (its Properties) from that data folder's games and art;
+// first run over that data folder's library, as if it weren't set up (its stores' folders made up): setup-scan (the scan
+// under way), setup, setup-choose, setup-cloud, setup-cloud-folder, setup-daily and setup-daily-time; home-nocloud and
+// connect-cloud (Home after Skip for now, and its Connect the cloud dialog); and the
 // Glossy window (LOOK-17) over the last-played game's art: glossy-home, glossy-library, glossy-game, glossy-saves,
-// glossy-game-saves, glossy-conflict, glossy-properties, glossy-console, glossy-settings.
+// glossy-game-saves, glossy-conflict, glossy-properties, glossy-console, glossy-settings, glossy-setup, glossy-setup-choose.
 // Themes: every page in Arcade dark, Arcade light and Sakura dark; Glossy goes Solid in light mode, as the app does.
 // "icons" writes gamesync.ico (copy it to src/GameSync.Tray/Assets) and a sheet of the tray icon in every state.
 
@@ -98,6 +101,10 @@ if (dataDir is not null)
         ScanFolder = (folder, _) => Task.FromResult(new FolderScan(folder, [], 0)),
         Locate = (_, _) => { },
     };
+
+    // First run's and Connect the cloud's two ways, answering without signing in or writing: a folder picked becomes
+    // GameSync's folder in it.
+    var setupCloud = new CloudActions(true, _ => Task.FromResult<string?>(null), picked => Path.Combine(picked, "GameSync"));
 
     // Read off the UI thread, as the app does: waiting on it here would hold the thread its awaits come back to.
     T Off<T>(Func<Task<T>> read) => Task.Run(read).GetAwaiter().GetResult();
@@ -218,7 +225,71 @@ if (dataDir is not null)
         ["game-saves"] = () => Saves(open: true),
         ["conflict"] = () => Conflict(settled: false),
         ["conflict-settled"] = () => Conflict(settled: true),
+        ["home-nocloud"] = () => HomeViewModel.From(home, games, now, actions,
+            new HomeStatus("No cloud yet", GameSync.Core.Storage.NoCloud.Message, Environment.MachineName, []) { NoCloud = true }),
+        ["setup-scan"] = () => Setup("scanning"),
+        ["setup"] = () => Setup("scan"),
+        ["setup-choose"] = () => Setup("choose"),
+        ["setup-cloud"] = () => Setup("cloud"),
+        ["setup-cloud-folder"] = () => Setup("cloud-folder"),
+        ["setup-daily"] = () => Setup("daily"),
+        ["setup-daily-time"] = () => Setup("daily-time"),
     };
+
+    // First run (ONB-01 to ONB-05) over this data folder's library, as if GameSync weren't set up yet: the scan while it
+    // runs, then each step; the cloud with a folder chosen, and the daily time being changed. The stores' folders are
+    // made up; the actions only answer, so nothing is written.
+    FirstRunViewModel Setup(string state)
+    {
+        var groups = FirstRun.Groups(dataDir);
+        int Installed(GameSync.Core.Discovery.StoreKind store) => games.Count(g => g.Installed && !g.IsSoftware && g.Store == store);
+        string Where(GameSync.Core.Discovery.StoreKind store, string where) => Installed(store) == 0 ? "Nothing installed right now" : where;
+        var stores = new[]
+        {
+            new StoreSummary("Steam", Installed(GameSync.Core.Discovery.StoreKind.Steam), Where(GameSync.Core.Discovery.StoreKind.Steam, @"E:\Steam and G:\SteamLibrary")),
+            new StoreSummary("Epic Games", Installed(GameSync.Core.Discovery.StoreKind.Epic), Where(GameSync.Core.Discovery.StoreKind.Epic, @"C:\Program Files\Epic Games")),
+            new StoreSummary("EA app", Installed(GameSync.Core.Discovery.StoreKind.Ea), Where(GameSync.Core.Discovery.StoreKind.Ea, @"E:\EA Games")),
+        };
+        var scan = new SetupScan(stores, [new GameFolderSummary(@"G:\", Installed(GameSync.Core.Discovery.StoreKind.Loose), false)],
+            games.Count(g => !g.IsSoftware), groups.Where(g => g.Kind != SetupGroupKind.NoSaves).Sum(g => g.Games.Count), TimeSpan.FromSeconds(41));
+
+        // While it scans, the stores have been read and each game's saves are being looked for; it never finishes here.
+        Task<SetupScan> Scan(IProgress<ScanProgress> progress, CancellationToken ct)
+        {
+            if (state != "scanning")
+            {
+                return Task.FromResult(scan);
+            }
+
+            progress.Report(new ScanProgress("Getting the list of where games keep their saves", 0, 0) { Folders = [@"G:\"] });
+            progress.Report(new ScanProgress("Looking for each game's saves", 18, 46) { Stores = stores });
+            return new TaskCompletionSource<SetupScan>().Task;
+        }
+
+        var setup = new FirstRunViewModel(new SetupActions(
+            Scan,
+            _ => Task.FromResult(groups),
+            (_, _) => Task.FromResult<string?>(null),
+            setupCloud,
+            (_, _) => Task.FromResult(new SetupResult(0, 0, []))));
+        setup.Start();
+        var steps = state switch { "choose" => 1, "cloud" or "cloud-folder" => 2, "daily" or "daily-time" => 3, _ => 0 };
+        for (var i = 0; i < steps; i++)
+        {
+            setup.NextCommand.Execute(null);
+        }
+
+        if (state == "cloud-folder")
+        {
+            setup.Cloud.ChooseFolder(@"D:\");
+        }
+        else if (state == "daily-time")
+        {
+            setup.EditTimeCommand.Execute(null);
+        }
+
+        return setup;
+    }
 
     // Home with a game running (PLAY-12): the game --game names, or the hero game, playing for the last 35 minutes.
     HomeViewModel Playing()
@@ -265,7 +336,14 @@ if (dataDir is not null)
         DataContext = new ShellViewModel(Makers(), current)
         {
             Rail = rail,
-            Dialog = dialog switch { null => null, "add-place" => AddPlace(), "import-kept" => ImportKept(), _ => Properties(dialog) },
+            Dialog = dialog switch
+            {
+                null => null,
+                "add-place" => AddPlace(),
+                "import-kept" => ImportKept(),
+                "connect-cloud" => new ConnectCloudViewModel(setupCloud, (_, _) => Task.CompletedTask, () => { }),
+                _ => Properties(dialog),
+            },
         },
     };
     pages["home"] = (() => Shell("home"), size.Width, size.Height);
@@ -288,6 +366,12 @@ if (dataDir is not null)
 
     pages["add-place"] = (() => Shell("game-saves", "add-place"), size.Width, size.Height);
     pages["import-kept"] = (() => Shell("game-saves", "import-kept"), size.Width, size.Height);
+    pages["home-nocloud"] = (() => Shell("home-nocloud"), size.Width, size.Height);
+    pages["connect-cloud"] = (() => Shell("home-nocloud", "connect-cloud"), size.Width, size.Height);
+    foreach (var step in new[] { "setup-scan", "setup", "setup-choose", "setup-cloud", "setup-cloud-folder", "setup-daily", "setup-daily-time" })
+    {
+        pages[step] = (() => Shell(step), size.Width, size.Height);
+    }
 
     // The app's window as it opens, Glossy or Solid by the theme, with the art the app would use.
     var art = home.Hero?.HeroPath ?? home.Hero?.CoverPath;
@@ -299,7 +383,7 @@ if (dataDir is not null)
         "22:31:57  Hades: synced after play (3 files, 1.2 MB).",
         "22:32:02  ! Sekiro: Shadows Die Twice: changed on two PCs. A conflict waits for you.",
     ], now);
-    foreach (var current in new[] { "home", "library", "game", "saves", "game-saves", "conflict", "log", "settings", "properties" })
+    foreach (var current in new[] { "home", "library", "game", "saves", "game-saves", "conflict", "log", "settings", "properties", "setup", "setup-choose" })
     {
         glossy[current == "log" ? "glossy-console" : "glossy-" + current] = choice =>
         {
