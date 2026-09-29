@@ -5,8 +5,8 @@
              x:Class="GameSync.UI.Views.SaveManagerPage"
              x:DataType="vm:SaveManagerViewModel">
   <!-- The save manager (design system → SaveManagerScreen): every game's saves in one console-style table, a strip of
-       numbers and the live log; a game's row opens its saves (GameSavesScreen), where the save work is. Sharing,
-       importing, Plan and Versions come with their screens. -->
+       numbers and the live log; a game's row opens its saves (GameSavesScreen), where the save work is. Plan (PlanScreen)
+       shows what the next sync would do. Sharing, importing, Versions and Log come with their screens. -->
   <UserControl.Resources>
     <!-- A row of the table: the whole row opens the game's saves; bg-200 under the pointer, as the console's rows -->
     <ControlTheme x:Key="SaveRowButton" TargetType="Button">
@@ -35,16 +35,27 @@
   </UserControl.Resources>
 
   <Panel Margin="24,20">
-    <!-- Every game's saves -->
-    <DockPanel IsVisible="{Binding ShowsTable}">
-      <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" MinHeight="40" Margin="0,0,0,16">
+    <DockPanel IsVisible="{Binding !HasPage}">
+      <!-- The top bar: the view's tabs, and its buttons: Sync now, or on Plan, Check again and Run -->
+      <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto,*" ColumnSpacing="16" MinHeight="40" Margin="0,0,0,16">
         <StackPanel VerticalAlignment="Center">
           <TextBlock Text="{Binding Title}" FontSize="15" LineHeight="20" FontWeight="SemiBold" />
           <TextBlock Classes="caption faint" Text="{Binding Subtitle}" TextTrimming="CharacterEllipsis" />
         </StackPanel>
-        <c:GsButton Grid.Column="1" Classes="primary" Icon="sync" Content="Sync now" Command="{Binding SyncNowCommand}"
-                    ToolTip.Tip="Every game syncs in a moment; a game you're playing, once you quit" />
+        <c:GsPillTabs Grid.Column="1" ItemsSource="{Binding Tabs}" SelectedId="{Binding Tab, Mode=TwoWay}" AutomationProperties.Name="Save manager view" />
+        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" VerticalAlignment="Center">
+          <c:GsButton Classes="primary" Icon="sync" Content="Sync now" Command="{Binding SyncNowCommand}" IsVisible="{Binding ShowsTable}"
+                      ToolTip.Tip="Every game syncs in a moment; a game you're playing, once you quit" />
+          <c:GsButton Icon="sync" Content="Check again" Command="{Binding Plan.CheckCommand}" IsVisible="{Binding ShowsPlan}" IsEnabled="{Binding !Plan.Busy}"
+                      ToolTip.Tip="Makes the plan again from how things are now" />
+          <c:GsButton Classes="primary" Icon="chevronsRight" Content="{Binding Plan.RunLabel}" Command="{Binding Plan.RunCommand}" IsVisible="{Binding ShowsPlan}"
+                      IsEnabled="{Binding Plan.CanRun}" ToolTip.Tip="Does exactly what the plan shows, for the ticked games" />
+        </StackPanel>
       </Grid>
+
+      <Panel>
+      <!-- Every game's saves -->
+      <DockPanel IsVisible="{Binding ShowsTable}">
 
       <ItemsControl DockPanel.Dock="Top" ItemsSource="{Binding Stats}" Margin="4,4,4,16">
         <ItemsControl.ItemsPanel>
@@ -117,9 +128,127 @@
           </ScrollViewer>
         </DockPanel>
       </c:GsConsole>
+      </DockPanel>
+
+      <!-- Plan (SYNC-14): what the next sync would do for each game and why; nothing changes until Run -->
+      <Panel IsVisible="{Binding ShowsPlan}">
+      <DockPanel DataContext="{Binding Plan}" x:DataType="vm:SyncPlanViewModel">
+        <ItemsControl DockPanel.Dock="Top" ItemsSource="{Binding Stats}" Margin="4,4,4,16">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate>
+              <WrapPanel ItemSpacing="48" LineSpacing="12" />
+            </ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:SaveStat">
+              <StackPanel Spacing="2" AutomationProperties.Name="{Binding}">
+                <TextBlock Classes="th" Margin="0" Padding="0" Text="{Binding Label, Converter={x:Static c:UpperConverter.Instance}}" />
+                <TextBlock Classes="mono-stat" Text="{Binding Value}" />
+              </StackPanel>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <StackPanel DockPanel.Dock="Bottom" Spacing="8" Margin="0,12,0,0">
+          <c:GsNote Icon="check" Text="{Binding Result}" IsVisible="{Binding HasResult}" />
+          <c:GsNote Icon="alert" Foreground="{DynamicResource danger}" Text="{Binding Error}" IsVisible="{Binding HasError}" />
+          <Grid ColumnDefinitions="Auto,*" ColumnSpacing="16">
+            <c:GsButton Classes="ghost sm" Icon="{Binding InSyncIcon}" Content="{Binding InSyncLabel}" Command="{Binding ShowInSyncCommand}" IsVisible="{Binding HasInSync}"
+                        VerticalAlignment="Center" />
+            <TextBlock Grid.Column="1" Classes="caption faint" Text="{Binding CheckedText}" TextWrapping="Wrap" TextAlignment="Right" VerticalAlignment="Center" />
+          </Grid>
+          <TextBlock Classes="caption muted" Text="{Binding InSyncText}" TextWrapping="Wrap" IsVisible="{Binding ShowsInSync}" Margin="12,0" />
+        </StackPanel>
+
+        <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+          <StackPanel Spacing="16">
+            <c:GsNote Icon="search" Text="Working out what the next sync would do for each game…" IsVisible="{Binding IsChecking}" />
+            <c:GsNote Icon="check" Text="Nothing to run: every game is in sync, or waits for the reason below." IsVisible="{Binding NoChanges}" />
+            <!-- The changes, each ticked; unticking one skips that game this time only -->
+            <c:GsConsole Command="plan" IsVisible="{Binding HasChanges}">
+              <c:GsConsole.Toolbar>
+                <TextBlock Text="{Binding ChangesToolbar}" />
+              </c:GsConsole.Toolbar>
+              <DockPanel Grid.IsSharedSizeScope="True">
+                <Border DockPanel.Dock="Top" BorderBrush="{DynamicResource line-100}" BorderThickness="0,0,0,1">
+                  <Grid>
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="40" />
+                      <ColumnDefinition Width="2*" MinWidth="160" />
+                      <ColumnDefinition Width="Auto" SharedSizeGroup="Action" />
+                      <ColumnDefinition Width="4*" />
+                      <ColumnDefinition Width="Auto" SharedSizeGroup="Size" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="1" Classes="th" Text="GAME" />
+                    <TextBlock Grid.Column="2" Classes="th" Text="ACTION" />
+                    <TextBlock Grid.Column="3" Classes="th" Text="WHY" />
+                    <TextBlock Grid.Column="4" Classes="th num" Text="SIZE" />
+                  </Grid>
+                </Border>
+                <ItemsControl ItemsSource="{Binding Changes}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="vm:PlanChangeRow">
+                        <Border BorderBrush="{DynamicResource line-100}" BorderThickness="0,0,0,1" MinHeight="{DynamicResource row-height}" AutomationProperties.Name="{Binding}">
+                          <Grid VerticalAlignment="Center">
+                            <Grid.ColumnDefinitions>
+                              <ColumnDefinition Width="40" />
+                              <ColumnDefinition Width="2*" MinWidth="160" />
+                              <ColumnDefinition Width="Auto" SharedSizeGroup="Action" />
+                              <ColumnDefinition Width="4*" />
+                              <ColumnDefinition Width="Auto" SharedSizeGroup="Size" />
+                            </Grid.ColumnDefinitions>
+                            <CheckBox IsChecked="{Binding IsChecked}" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                      AutomationProperties.Name="{Binding Title, StringFormat='Run {0}'}" />
+                            <TextBlock Grid.Column="1" Classes="td" Text="{Binding Title}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Title}" />
+                            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" Margin="12,0">
+                              <c:GsIcon Icon="{Binding ActionIcon}" Size="14" Foreground="{DynamicResource ink-muted}" VerticalAlignment="Center" />
+                              <TextBlock Classes="td" Padding="0" Text="{Binding ActionLabel}" VerticalAlignment="Center" />
+                            </StackPanel>
+                            <TextBlock Grid.Column="3" Classes="td" Text="{Binding Why}" TextWrapping="Wrap" Foreground="{DynamicResource ink-muted}" />
+                            <TextBlock Grid.Column="4" Classes="td num" Text="{Binding Size}" />
+                          </Grid>
+                        </Border>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+              </DockPanel>
+            </c:GsConsole>
+
+          <!-- The games that won't run, and why, each with its status's button -->
+          <c:GsConsole Command="plan --not-running" IsVisible="{Binding HasWaits}">
+            <c:GsConsole.Toolbar>
+              <TextBlock Text="{Binding WaitsToolbar}" />
+            </c:GsConsole.Toolbar>
+              <ItemsControl ItemsSource="{Binding Waits}" Grid.IsSharedSizeScope="True">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:PlanWaitRow">
+                    <Border BorderBrush="{DynamicResource line-100}" BorderThickness="0,0,0,1" MinHeight="{DynamicResource row-height}" AutomationProperties.Name="{Binding}">
+                      <Grid VerticalAlignment="Center">
+                        <Grid.ColumnDefinitions>
+                          <ColumnDefinition Width="2*" MinWidth="160" />
+                          <ColumnDefinition Width="Auto" SharedSizeGroup="WaitStatus" />
+                          <ColumnDefinition Width="4*" />
+                          <ColumnDefinition Width="Auto" SharedSizeGroup="WaitAction" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Classes="td" Text="{Binding Title}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Title}" />
+                        <c:GsStatusBadge Grid.Column="1" Plain="True" Status="{Binding Status}" Margin="12,0" FontFamily="{DynamicResource font-mono}" />
+                        <TextBlock Grid.Column="2" Classes="td" Text="{Binding Why}" TextWrapping="Wrap" Foreground="{DynamicResource ink-muted}" />
+                        <c:GsButton Grid.Column="3" Classes="sm" Content="{Binding Action}" IsVisible="{Binding HasAction}" Margin="12,4"
+                                    Command="{Binding $parent[UserControl].((vm:SaveManagerViewModel)DataContext).Plan.WaitCommand}" CommandParameter="{Binding}" />
+                      </Grid>
+                    </Border>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+          </c:GsConsole>
+          </StackPanel>
+        </ScrollViewer>
+      </DockPanel>
+      </Panel>
+      </Panel>
     </DockPanel>
 
-    <!-- A game's saves -->
-    <ContentControl Content="{Binding Page}" IsVisible="{Binding !ShowsTable}" />
+    <!-- A game's saves, or its conflict -->
+    <ContentControl Content="{Binding Page}" IsVisible="{Binding HasPage}" />
   </Panel>
 </UserControl>

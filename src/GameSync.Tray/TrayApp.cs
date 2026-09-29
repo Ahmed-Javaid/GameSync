@@ -246,6 +246,20 @@ internal sealed class TrayApp
             }
         }),
         OpenAddGame = () => ShowDialog(new AddOwnViewModel(OwnActionsFor(setup: false))),
+        CheckPlan = ct => Task.Run(() => SyncPlans.CheckAsync(_dataDir, _output, ct), ct),
+        RunPlan = async (chosen, ct) =>
+        {
+            try
+            {
+                var run = await Task.Run(() => SyncPlans.RunAsync(_dataDir, chosen, _output, ct), ct);
+                _output.Say($"Plan: {run.Sentence}");
+                return run;
+            }
+            finally
+            {
+                Dispatcher.UIThread.Post(RefreshSoon);
+            }
+        },
         LoadSpace = ct => Task.Run(() => SaveOverview.Space(_dataDir), ct),
         ConnectCloud = ConnectCloud,
         OpenGame = OpenGame,

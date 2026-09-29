@@ -330,6 +330,11 @@ Two uploads from the same parent show up as two newest versions (a fork), which 
 
 **Plan preview**: the same decisions, computed without acting. The Sync button, the daily run and the Plan screen show one line per game: the action and the reason.
 
+In the app it's the save manager's Plan tab (SYNC-14; built 30 Sep 2026 from the design system's PlanScreen), made the first time the tab opens and again on Check again:
+- Each change shows with what it does (Upload, Download, Back up for a game its store's cloud syncs, Hold for review), why in the engine's own sentence, and how much would move. Every change starts ticked; unticking one skips that game this time only.
+- The games that won't run say why, with their status's button: Resolve opens the conflict, the others the game's saves. The games already in sync fold away.
+- Time passes between Check again and Run, so Run plans the ticked games again first. Each runs only if its plan is exactly as shown (the same inputs, the same action). One that changed since (a new save, another PC's upload) doesn't run, and the result names it, so the person checks again. Nothing runs that the person didn't see.
+
 ## Storage backends
 
 The sync engine needs only a file store and a per-game version log, so Google Drive, S3-style buckets and a future server are interchangeable.

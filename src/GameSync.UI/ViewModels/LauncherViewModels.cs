@@ -38,6 +38,12 @@ public sealed record LauncherActions(Action<GameId> Play, Action SyncNow, Action
     /// <summary>Add game: Add a game or folder over the library, for one of the person's own (LIB-13).</summary>
     public Action? OpenAddGame { get; init; }
 
+    /// <summary>SYNC-14: what the next sync would do for every game, and why, off the UI thread (the save manager's Plan).</summary>
+    public Func<CancellationToken, Task<SyncPlanView>>? CheckPlan { get; init; }
+
+    /// <summary>Runs the plan's ticked changes, exactly as they were planned.</summary>
+    public Func<IReadOnlyList<PlannedChange>, CancellationToken, Task<PlanRun>>? RunPlan { get; init; }
+
     /// <summary>The space the backups take on this PC's drive, and the drive's free space, off the UI thread (MGR-03).</summary>
     public Func<CancellationToken, Task<BackupSpace?>>? LoadSpace { get; init; }
 

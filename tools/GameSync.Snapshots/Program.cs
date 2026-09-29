@@ -3,7 +3,8 @@
 // Pages: gallery, gallery2, gallery3, and with --data, home, home-playing (the hero game running), library, library-installed,
 // library-local, library-search and library-game (a game's page, the
 // one --game names or the hero game), saves and game-saves (the save manager, and that game's saves in it), conflict and
-// conflict-settled (a made-up conflict of that game, waiting and settled), add-place and import-kept (those dialogs over
+// conflict-settled (a made-up conflict of that game, waiting and settled), plan (the save manager's Plan tab, made up),
+// add-place and import-kept (those dialogs over
 // its saves, made up), and
 // properties-general, -art, -launch, -files, -saves and -sync (its Properties) from that data folder's games and art;
 // first run over that data folder's library, as if it weren't set up (its stores' folders made up): setup-scan (the scan
@@ -146,6 +147,29 @@ if (dataDir is not null)
         return saves;
     }
 
+    // The save manager's Plan tab (SYNC-14) as the design draws it: three changes, three games that won't run and six in
+    // sync. Made up, like the conflict.
+    SaveManagerViewModel PlanTab()
+    {
+        var saves = Saves();
+        GameId Id(string id) => GameId.Parse(id);
+        saves.Plan.Show(new SyncPlanView(
+            [
+                new PlannedChange(Id("ready-or-not"), "Ready or Not", PlanStep.Upload, "Changed here on 22 Sep. The upload waited because this PC was offline.", 14_155_776, "a"),
+                new PlannedChange(Id("slay-the-spire-2"), "Slay the Spire 2", PlanStep.Download, "LAPTOP uploaded a newer save on 26 Sep and this PC's is unchanged. This PC's copy goes into history first.", 913_408, "b"),
+                new PlannedChange(Id("cyberpunk-2077"), "Cyberpunk 2077", PlanStep.BackUp, "Steam Cloud syncs this game, so GameSync only adds this save to its history.", 16_777_216, "c"),
+            ],
+            [
+                new PlannedWait(Id("sekiro"), Id("sekiro"), "Sekiro: Shadows Die Twice", GameSync.Core.State.GameStatus.Conflict, "Changed on DESKTOP and LAPTOP since the last sync. Nothing moves until you choose.", "Resolve"),
+                new PlannedWait(Id("ghost"), Id("ghost"), "Ghost of Tsushima", GameSync.Core.State.GameStatus.Playing, "Being played now. It syncs a few seconds after it closes.", null),
+                new PlannedWait(Id("rounds"), Id("rounds"), "ROUNDS", GameSync.Core.State.GameStatus.NoSaves, "No save folder found yet. Add a place where it keeps its saves.", "Add a place"),
+            ],
+            ["Terraria", "Hades", "Hollow Knight", "Core Keeper", "Valheim", "Risk of Rain 2"],
+            now.ToUniversalTime()));
+        saves.Tab = "plan";
+        return saves;
+    }
+
     // A game's conflict as the design draws it (SYNC-10): this PC's newer, longer play against LAPTOP's, with Compare
     // files open; or the same conflict settled by newest wins, with Swap (SYNC-04). Made up, in the game --game names.
     SaveManagerViewModel Conflict(bool settled)
@@ -227,6 +251,7 @@ if (dataDir is not null)
         ["game-saves"] = () => Saves(open: true),
         ["conflict"] = () => Conflict(settled: false),
         ["conflict-settled"] = () => Conflict(settled: true),
+        ["plan"] = PlanTab,
         ["home-nocloud"] = () => HomeViewModel.From(home, games, now, actions,
             new HomeStatus("No cloud yet", GameSync.Core.Storage.NoCloud.Message, Environment.MachineName, []) { NoCloud = true }),
         ["setup-scan"] = () => Setup("scanning"),
@@ -396,6 +421,7 @@ if (dataDir is not null)
     pages["game-saves"] = (() => Shell("game-saves"), size.Width, size.Height);
     pages["conflict"] = (() => Shell("conflict"), size.Width, size.Height);
     pages["conflict-settled"] = (() => Shell("conflict-settled"), size.Width, size.Height);
+    pages["plan"] = (() => Shell("plan"), size.Width, size.Height);
     foreach (var section in new[] { "general", "art", "launch", "files", "saves", "sync" })
     {
         pages["properties-" + section] = (() => Shell("game", section), size.Width, size.Height);
@@ -423,7 +449,7 @@ if (dataDir is not null)
         "22:31:57  Hades: synced after play (3 files, 1.2 MB).",
         "22:32:02  ! Sekiro: Shadows Die Twice: changed on two PCs. A conflict waits for you.",
     ], now);
-    foreach (var current in new[] { "home", "library", "game", "saves", "game-saves", "conflict", "log", "settings", "properties", "setup", "setup-choose" })
+    foreach (var current in new[] { "home", "library", "game", "saves", "game-saves", "conflict", "log", "settings", "properties", "setup", "setup-choose", "plan" })
     {
         glossy[current == "log" ? "glossy-console" : "glossy-" + current] = choice =>
         {

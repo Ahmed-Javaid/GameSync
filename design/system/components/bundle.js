@@ -657,7 +657,7 @@
   /* ---------- ConsoleLog ---------- */
   function ConsoleLog(props) {
     var lines = props.lines || [];
-    return h("div", { className: cx("gs-log", props.grow && "gs-log-grow"), role: "log", "aria-label": props.label || "Activity log", style: props.height ? { maxHeight: props.height } : null },
+    return h("div", { className: cx("gs-log", props.grow && "gs-log-grow", props.dated && "gs-log-dated"), role: "log", "aria-label": props.label || "Activity log", style: props.height ? { maxHeight: props.height } : null },
       lines.map(function (l, i) {
         return h("div", { key: i, className: "gs-log-line gs-log-" + (l.level || "info") },
           h("time", null, l.time), h("span", { className: "gs-log-lvl" }, (l.tag || l.level || "info").toUpperCase()), h("span", { className: "gs-log-msg" }, l.msg));

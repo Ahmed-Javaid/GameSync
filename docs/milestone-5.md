@@ -90,6 +90,13 @@ The screens are designed: the Launcher, Save manager and Settings since 27 Sep, 
 
   Checked with 8 new tests (391 pass), the agent's with its clock moved 6 minutes on, and in snapshots. The real window waits: the owner was playing when the test copy opened, so it was stopped at once.
 
+- 30 Sep, night: **the save manager's Plan tab** (SYNC-14), as the design system's PlanScreen draws it.
+  - The save manager has tabs now, Saves and Plan. Plan works out what the next sync would do for every game the first time it's opened, and again on Check again: each change, what it does and why in one sentence, and how much would move, ticked; the games that won't run, with their status's button; and the games already in sync, folded away.
+  - Run does exactly what was shown for the ticked games: each is planned again first, and one that changed since doesn't run and is named, so nothing runs that wasn't seen.
+  - Checked with 2 new tests (393 pass), one running real plans on a scratch cloud, and in snapshots.
+
+  Then **the Versions and Log tabs**, drawn for the owner to look at before they're built (design system version 23): every version of every game, newest first, by game and PC; and the whole log, searchable, with Only what needs you and Copy the log.
+
 ## How to try the app
 
 ```powershell
@@ -106,7 +113,7 @@ It uses `%LOCALAPPDATA%\GameSync` like the command line, so on the owner's PC it
 1. The foundation: `GameSync.UI` with the theme engine and its tests, tokens as resources, the icon set, and the styled components. **Done.**
 2. The app shell: the tray icon and its states, the main window with the side rail, one instance and the pipe, the agent inside, the theme applied live. **Done 28 Sep.**
 3. Read models for the library, a game, the plan, a conflict and the save manager.
-4. The screens, in order of use: first run (**working since 30 Sep**, with Skip for now, and Add a game or folder), the launcher home and library (**working since 28 Sep**; the library like Steam's since 29 Sep, with Installed and Local views and the game playing now on Home since that night), game detail (**working since 29 Sep**, about the game since the owner's review), the save manager (**a game's saves working since 29 Sep**) with Plan, Versions and Log, the conflict screen (**working since 29 Sep**), settings, and the share and import windows.
+4. The screens, in order of use: first run (**working since 30 Sep**, with Skip for now, and Add a game or folder), the launcher home and library (**working since 28 Sep**; the library like Steam's since 29 Sep, with Installed and Local views and the game playing now on Home since that night), game detail (**working since 29 Sep**, about the game since the owner's review), the save manager (**a game's saves working since 29 Sep**, **Plan since 30 Sep**) with Versions and Log (drawn 30 Sep), the conflict screen (**working since 29 Sep**), settings, and the share and import windows.
 5. Cover art and the activity calendar.
 6. The command line handing off to the app.
 7. Accessibility (keyboard, focus, screen-reader names, text size, animations off) and speed with 500 games.

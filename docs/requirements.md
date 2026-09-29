@@ -4,7 +4,7 @@
 
 ## How to use this doc
 
-There are 220 requirements in ten areas, each with an ID, a priority and a test: run the test and set Result as you go. Anything you expected that has no row here is a gap, so add it to the last section.
+There are 222 requirements in ten areas, each with an ID, a priority and a test: run the test and set Result as you go. Anything you expected that has no row here is a gap, so add it to the last section.
 
 - **ID**: area plus number, for example `FOLD-04`. IDs are never reused, so test notes and GitHub issues can point at them.
 - **Priority**: **Must** means v1 doesn't ship without it. **Should** means v1 unless it slips. **Later** means designed for now, built after v1.
@@ -152,7 +152,7 @@ Each game syncs on its own with a three-way compare; the newest save wins by def
 | SYNC-11 | Until you decide, the game neither uploads nor downloads, and each PC keeps playing its own copy. | Must | Play on both PCs while undecided: nothing is overwritten. |  |
 | SYNC-12 | Missing is not deleted: a vanished folder, unplugged drive or uninstalled game never becomes an empty version. | Must | Unplug G: during a sync: the game shows "Drive G: not connected". |  |
 | SYNC-13 | Deleting some files in a session syncs; losing every file never does. | Must | Rotating autosaves sync; an emptied save folder does not. |  |
-| SYNC-14 | Plan shows what the next sync would do for each game and why, without acting, and Sync now then does exactly that. | Must | Compare Plan with the log after Sync now. |  |
+| SYNC-14 | Plan (a tab of the save manager, and `gamesync plan`) shows what the next sync would do for each game and why, without acting; Run then does exactly that for the games left ticked, and a game whose plan changed since doesn't run and says so (reworded 30 Sep 2026). | Must | Compare Plan with the log after Run. Change a save after Check again, then Run: that game doesn't run, and the result names it. |  |
 | PC-01 | Each PC is a named device (a random ID plus the name you pick), listed in the cloud with its app version and last-seen time. | Must | Settings, Devices lists DESKTOP and LAPTOP with last seen. |  |
 | PC-02 | You can rename a device. | Must | Rename LAPTOP: DESKTOP shows the new name after its next sync. |  |
 | PC-03 | Account IDs (`<steamUser>`, `<epicUser>`) resolve per PC, and games that embed the ID warn when they differ. | Must | Sign into another Steam account on LAPTOP: Sekiro warns. |  |
@@ -192,6 +192,8 @@ The save manager is the dense, console-style view of every game's saves, and sha
 | MGR-05 | *New.* The table sorts and filters by status, name, size and last backup. | Should | Filter to Needs you: only those games remain. |  |
 | MGR-06 | *New.* Each row's status has its action one click away (Resolve, Review, Retry, Add path). | Should | Every status in the table offers its button from the Statuses table in `design.md`. |  |
 | MGR-07 | *New.* A game's saves in the save manager, moved there from its page (the owner, 29 Sep 2026): Back and the breadcrumb; its status and what happened, with Keep the new save and Restore the previous save for a held one; named saves with Restore; where its saves are, with Open the folder and Choose files…; every version from every PC with Restore (asking first) and Export; its log. It opens from the game's row in the table, Open in Saves on its page, its status's own action and Home's Needs you buttons. Since 29 Sep 2026: Resolve opens the conflict screen (SYNC-10), Retry syncs a game whose files were in use, Add a place… (FOLD-01), a named save's ⋯ renames it or takes its name away (BAK-18), Import kept saves… (BAK-19), and the last conflict's line while its winner is current, with See both and Swap (SYNC-04). | Must | On Home, press Review on a held game: its saves open; Keep the new save makes it Synced. |  |
+| MGR-08 | *New.* The save manager's Versions tab: every version of every game, newest first, from every PC, filtered by game and by PC, with Named and kept only; a row opens its game's saves with that version picked, where Restore is (drawn 30 Sep 2026, design system version 23). | Should | Pick LAPTOP: only its versions remain. Click one: its game's saves open on that version. |  |
+| MGR-09 | *New.* The save manager's Log tab: everything GameSync did, per game, newest first and kept for good, with a search, a game filter and Only what needs you; Copy the log puts the lines shown on the clipboard, never sign-in tokens or save files (drawn 30 Sep 2026, design system version 23). | Should | Search "in use": only those lines remain. Copy the log and paste it: the same lines, and no token. |  |
 | SHARE-01 | *New.* Share selected opens the share window with those games ticked; ticking a game takes its latest version. | Must | Tick 2 rows and press Share: both are ticked, with 1 version each. |  |
 | SHARE-02 | *New.* In the share window you can open a game and pick exact versions, older and pinned ones included. | Must | Add Sekiro's "before update" version: the counts and the size update. |  |
 | SHARE-03 | *New.* The footer shows games, versions, the zip name and total size as the selection changes. | Must | The size shown is within 5% of the finished zip. |  |

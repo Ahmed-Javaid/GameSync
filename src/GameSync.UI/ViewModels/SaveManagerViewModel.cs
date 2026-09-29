@@ -50,19 +50,35 @@ public sealed partial class SaveManagerViewModel : ObservableObject, IPageSurfac
 
     /// <summary>The game whose saves are open; null shows every game's.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowsTable), nameof(Page), nameof(BackdropArt))]
+    [NotifyPropertyChangedFor(nameof(ShowsTable), nameof(ShowsPlan), nameof(HasPage), nameof(Page), nameof(BackdropArt))]
     private GameSavesViewModel? _game;
 
     /// <summary>A game's conflict, open over its saves or on its own (SYNC-10).</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowsTable), nameof(Page), nameof(BackdropArt))]
+    [NotifyPropertyChangedFor(nameof(ShowsTable), nameof(ShowsPlan), nameof(HasPage), nameof(Page), nameof(BackdropArt))]
     private ConflictViewModel? _conflict;
+
+    /// <summary>The view: <c>saves</c>, every game's saves, or <c>plan</c>, what the next sync would do (SYNC-14).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowsTable), nameof(ShowsPlan))]
+    private string _tab = "saves";
 
     /// <param name="log">The agent's log, which the page shows as it happens.</param>
     public SaveManagerViewModel(LauncherActions? actions = null, ObservableCollection<LogLine>? log = null)
     {
         _actions = actions;
         Log = log ?? [];
+        Plan = new SyncPlanViewModel(actions, (id, conflict) =>
+        {
+            if (conflict)
+            {
+                OpenConflict(id);
+            }
+            else
+            {
+                Open(id);
+            }
+        });
         OpenCommand = new RelayCommand<GameId>(id => Open(id));
         SyncNowCommand = new RelayCommand(() => _actions?.SyncNow(), () => _actions is not null);
         BackCommand = new RelayCommand(Back);
@@ -90,7 +106,25 @@ public sealed partial class SaveManagerViewModel : ObservableObject, IPageSurfac
 
     public string Title => "Save manager";
 
-    public bool ShowsTable => Game is null && Conflict is null;
+    public bool ShowsTable => Game is null && Conflict is null && Tab != "plan";
+
+    public bool ShowsPlan => Game is null && Conflict is null && Tab == "plan";
+
+    public bool HasPage => Game is not null || Conflict is not null;
+
+    /// <summary>The save manager's views, as the design system's PillTabs: Saves and Plan (Versions and Log come with their designs).</summary>
+    public IReadOnlyList<Controls.NavItem> Tabs { get; } = [new("saves", "Saves", "saves"), new("plan", "Plan", "chevronsRight")];
+
+    /// <summary>The Plan tab: made the first time it's shown, and again on Check again.</summary>
+    public SyncPlanViewModel Plan { get; }
+
+    partial void OnTabChanged(string value)
+    {
+        if (value == "plan")
+        {
+            Plan.CheckIfFirst();
+        }
+    }
 
     /// <summary>What shows instead of the table: a game's conflict, or its saves.</summary>
     public object? Page => (object?)Conflict ?? Game;

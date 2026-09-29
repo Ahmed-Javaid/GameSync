@@ -1,0 +1,65 @@
+<!-- @dsCard group="Screens" height=800 width=1280 page=true subtitle="Log: everything GameSync did, per game, newest first; search it or show only what needs you" -->
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>preview</title>
+<style>html,body{margin:0;background:var(--bg-100);}</style>
+</head>
+<body class="gs-root">
+<div id="root"></div>
+<script>
+var G = window.GameSync, h = React.createElement;
+
+var ART = "";
+
+function rail(cur){return h(G.SideRail,{current:cur,items:[
+  {id:'search',icon:'search',label:'Search'},
+  {id:'home',icon:'home',label:'Home',sep:true},
+  {id:'library',icon:'library',label:'Game library'},
+  {id:'saves',icon:'saves',label:'Save manager',sep:true,dot:'warn',dotLabel:'2 games need you'},
+  {id:'log',icon:'terminal',label:'Console'},
+  {id:'settings',icon:'settings',label:'Settings',bottom:true}]})}
+function topbar(title,sub,tabs,right){return h('header',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',gap:16}},h('div',null,h('div',{style:{font:'600 15px/20px var(--font-sans)'}},title),h('div',{className:'gs-faint',style:{fontSize:12}},sub)),tabs,h('div',{className:'gs-row',style:{flexWrap:'nowrap'}},right));}
+var TABS=[{id:'saves',label:'Saves',icon:'saves'},{id:'plan',label:'Plan',icon:'chevronsRight'},{id:'versions',label:'Versions',icon:'clock'},{id:'log',label:'Log',icon:'terminal'}];
+
+var LINES=[
+  {time:'Today 21:06:13',level:'ok',tag:'upload',game:'Sekiro: Shadows Die Twice',msg:'Sekiro: Shadows Die Twice  v14  2.1 MB, after 3 h 10 min of play'},
+  {time:'Today 21:04:40',level:'warn',tag:'conflict',game:'Sekiro: Shadows Die Twice',msg:'Sekiro: Shadows Die Twice changed on DESKTOP and LAPTOP. Newest kept, LAPTOP’s copy kept too; Swap brings it back.'},
+  {time:'Today 20:00:11',level:'warn',tag:'held',game:'Black Myth: Wukong',msg:'Black Myth: Wukong changed while the game wasn’t running. Held for review.'},
+  {time:'Today 20:00:09',level:'ok',tag:'backup',game:'Terraria',msg:'Terraria  v52  326 MB  (3 files changed)'},
+  {time:'Today 20:00:02',level:'info',tag:'daily',game:'',msg:'Daily backup started · 12 games'},
+  {time:'Today 19:31:02',level:'ok',tag:'download',game:'Slay the Spire 2',msg:'Slay the Spire 2  v23 from LAPTOP  892 KB. This PC’s copy went into history first.'},
+  {time:'Today 18:40:55',level:'error',tag:'in use',game:'Dark Souls III',msg:'Dark Souls III: DS30000.sl2 is open in another program, so it wasn’t read. It’s tried again after the next session.'},
+  {time:'Yesterday 23:31:40',level:'ok',tag:'named',game:'Black Myth: Wukong',msg:'Black Myth: Wukong saved as “Before Erlang Shen” on every PC'},
+  {time:'Yesterday 22:47:03',level:'info',tag:'session',game:'Black Myth: Wukong',msg:'Black Myth: Wukong: played 2 h 04 min'},
+  {time:'27 Sep 12:00:31',level:'ok',tag:'restore',game:'Dark Souls III',msg:'Dark Souls III restored to 25 Sep 21:40; the files it replaced were kept first'}];
+var GAMES=[{id:'all',label:'All games'}].concat(LINES.map(function(l){return l.game}).filter(function(g,i,a){return g&&a.indexOf(g)===i}).sort().map(function(g){return {id:g,label:g}}));
+var SHOW=[{id:'all',label:'Everything'},{id:'needs',label:'Only what needs you'},{id:'moves',label:'Uploads, downloads and restores'}];
+var MOVES=['upload','download','backup','restore','named'];
+
+// #needs: only what needs you; #search: the search typed.
+var STATE=location.hash.slice(1);
+function App(){
+ var q=React.useState(STATE==='search'?'dark souls':''), game=React.useState('all'), show=React.useState(STATE==='needs'?'needs':'all');
+ var words=q[0].toLowerCase();
+ var lines=LINES.filter(function(l){return (game[0]==='all'||l.game===game[0])
+   &&(show[0]==='all'||(show[0]==='needs'?l.level==='warn'||l.level==='error':MOVES.indexOf(l.tag)>=0))
+   &&(!words||l.msg.toLowerCase().indexOf(words)>=0)});
+ return h(G.ThemeScope,{strength:'glass',art:ART,style:{width:1280,height:800,display:'flex'}},
+  rail('saves'),
+  h('main',{style:{flex:1,minWidth:0,padding:'20px 24px',display:'flex',flexDirection:'column',gap:16}},
+   topbar('Save manager','Everything GameSync did, per game, newest first',
+     h(G.PillTabs,{label:'Save manager view',value:'log',items:TABS}),
+     [h(G.Button,{key:'c',variant:'secondary',icon:'copy'},'Copy the log')]),
+   h('div',{className:'gs-row',style:{flexWrap:'nowrap',gap:12}},
+     h(G.SearchField,{placeholder:'Search the log',value:q[0],onChange:q[1],style:{width:320}}),
+     h(G.Select,{label:'Game',value:game[0],options:GAMES,onChange:game[1]}),
+     h(G.Select,{label:'Show',value:show[0],options:SHOW,onChange:show[1]}),
+     h('span',{className:'gs-faint',style:{marginLeft:'auto',fontSize:12}},lines.length+' of 1,284 lines')),
+   lines.length?h(G.ConsoleLog,{lines:lines.map(function(l){return {time:l.time,level:l.level,tag:l.tag,msg:l.msg}}),grow:true,dated:true,label:'GameSync’s log'})
+     :h('div',{className:'gs-note'},h(G.Icon,{name:'search',size:16}),'Nothing in the log matches. Try fewer words, or Everything.'),
+   h('span',{className:'gs-faint',style:{fontSize:12}},'Every line is kept. Copy the log puts the lines shown on the clipboard, for a bug report: never sign-in tokens or save files.')));
+}
+ReactDOM.createRoot(document.getElementById('root')).render(h(App));
+</script>
+</body>
+</html>

@@ -104,6 +104,8 @@ export function ConsoleTable<R extends { id: string; name?: string }>(props: {
 export function ConsoleLog(props: {
   lines: { time: string; level?: "ok" | "info" | "warn" | "error"; tag?: string; msg: string }[];
   live?: boolean; grow?: boolean; height?: number | string; label?: string;
+  /** A day and a time in each line's time ("27 Sep 12:00:31"): the time column widens for them. */
+  dated?: boolean;
 }): JSX.Element;
 
 export interface ShareVersion { id: string; label: string; when: string; pc?: string; size: number; pinned?: boolean }

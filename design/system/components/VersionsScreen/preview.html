@@ -1,0 +1,68 @@
+<!-- @dsCard group="Screens" height=800 width=1280 page=true subtitle="Versions: every version of every game, newest first, from every PC; filter by game or PC" -->
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>preview</title>
+<style>html,body{margin:0;background:var(--bg-100);}</style>
+</head>
+<body class="gs-root">
+<div id="root"></div>
+<script>
+var G = window.GameSync, h = React.createElement;
+
+var ART = "";
+
+function rail(cur){return h(G.SideRail,{current:cur,items:[
+  {id:'search',icon:'search',label:'Search'},
+  {id:'home',icon:'home',label:'Home',sep:true},
+  {id:'library',icon:'library',label:'Game library'},
+  {id:'saves',icon:'saves',label:'Save manager',sep:true,dot:'warn',dotLabel:'2 games need you'},
+  {id:'log',icon:'terminal',label:'Console'},
+  {id:'settings',icon:'settings',label:'Settings',bottom:true}]})}
+function topbar(title,sub,tabs,right){return h('header',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',gap:16}},h('div',null,h('div',{style:{font:'600 15px/20px var(--font-sans)'}},title),h('div',{className:'gs-faint',style:{fontSize:12}},sub)),tabs,h('div',{className:'gs-row',style:{flexWrap:'nowrap'}},right));}
+function Stat(p){return h('div',{style:{display:'flex',flexDirection:'column',gap:2}},h('span',{className:'gs-faint',style:{font:'500 11px/14px var(--font-mono)',letterSpacing:'.08em',textTransform:'uppercase'}},p.k),h('span',{style:{font:'500 28px/32px var(--font-mono)'}},p.v))}
+var TABS=[{id:'saves',label:'Saves',icon:'saves'},{id:'plan',label:'Plan',icon:'chevronsRight'},{id:'versions',label:'Versions',icon:'clock'},{id:'log',label:'Log',icon:'terminal'}];
+
+// Why each version was made, as its note says; kept ones (named, pinned) carry the pin.
+var KIND={play:'play',kept:'pin',held:'pause',daily:'clock',first:'upload',quiet:'folder'};
+var ROWS=[
+  {id:'1',saved:'Today 21:06',game:'Sekiro: Shadows Die Twice',pc:'DESKTOP',what:'After play · 3 h 10 min',kind:'play',files:2,size:2202009},
+  {id:'2',saved:'Today 21:04',game:'Sekiro: Shadows Die Twice',pc:'LAPTOP',what:'Lost the conflict, kept: Swap brings it back',kind:'kept',files:2,size:2199552},
+  {id:'3',saved:'Today 20:00',game:'Terraria',pc:'DESKTOP',what:'Daily backup',kind:'daily',files:3,size:341835776},
+  {id:'4',saved:'Today 19:30',game:'Slay the Spire 2',pc:'LAPTOP',what:'After play · 47 min',kind:'play',files:1,size:913408},
+  {id:'5',saved:'Yesterday 23:31',game:'Black Myth: Wukong',pc:'DESKTOP',what:'Named: Before Erlang Shen',kind:'kept',files:3,size:522240},
+  {id:'6',saved:'Yesterday 22:47',game:'Black Myth: Wukong',pc:'DESKTOP',what:'Changed outside play, held for review',kind:'held',files:3,size:519168},
+  {id:'7',saved:'Yesterday 21:10',game:'Minecraft server world',pc:'DESKTOP',what:'After 5 quiet minutes',kind:'quiet',files:142,size:40265318},
+  {id:'8',saved:'27 Sep 18:05',game:'Hollow Knight',pc:'LAPTOP',what:'Kept before the update to 1.5.78',kind:'kept',files:6,size:1153434},
+  {id:'9',saved:'27 Sep 12:00',game:'Dark Souls III',pc:'DESKTOP',what:'Kept before a restore',kind:'kept',files:1,size:6815744},
+  {id:'10',saved:'25 Sep 20:00',game:'Cuphead',pc:'LAPTOP',what:'First backup',kind:'first',files:4,size:48128}];
+var GAMES=[{id:'all',label:'All games'}].concat(ROWS.map(function(r){return r.game}).filter(function(g,i,a){return a.indexOf(g)===i}).sort().map(function(g){return {id:g,label:g}}));
+
+// #kept: only named and pinned versions; #empty: a filter nothing matches.
+var STATE=location.hash.slice(1);
+function App(){
+ var game=React.useState(STATE==='empty'?'Hades':'all'), pc=React.useState('all'), kept=React.useState(STATE==='kept');
+ var rows=ROWS.filter(function(r){return (game[0]==='all'||r.game===game[0])&&(pc[0]==='all'||r.pc===pc[0])&&(!kept[0]||r.kind==='kept')});
+ return h(G.ThemeScope,{strength:'glass',art:ART,style:{width:1280,height:800,display:'flex'}},
+  rail('saves'),
+  h('main',{style:{flex:1,minWidth:0,padding:'20px 24px',display:'flex',flexDirection:'column',gap:16}},
+   topbar('Save manager','DESKTOP · 214 versions of 12 games, from DESKTOP and LAPTOP',
+     h(G.PillTabs,{label:'Save manager view',value:'versions',items:TABS}),
+     [h(G.Select,{key:'g',label:'Game',value:game[0],options:STATE==='empty'?GAMES.concat([{id:'Hades',label:'Hades'}]):GAMES,onChange:game[1]}),
+      h(G.Select,{key:'p',label:'PC',value:pc[0],options:[{id:'all',label:'Every PC'},{id:'DESKTOP',label:'DESKTOP'},{id:'LAPTOP',label:'LAPTOP'}],onChange:pc[1]})]),
+   h('div',{style:{display:'flex',gap:48,padding:'4px 4px 0'}},h(Stat,{k:'Versions',v:'214'}),h(Stat,{k:'Named',v:'5'}),h(Stat,{k:'Kept',v:'12'}),h(Stat,{k:'This week',v:'31'}),h(Stat,{k:'Oldest',v:'14 Sep'})),
+   h(G.ConsoleTable,{command:'versions --all',toolbar:h(G.Checkbox,{label:'Named and kept only',showLabel:true,checked:kept[0],onChange:kept[1]}),
+     onRowClick:function(){},rows:rows,empty:'No version of Hades yet: it hasn’t synced since it was added.',columns:[
+     {key:'saved',label:'Saved'},
+     {key:'game',label:'Game'},
+     {key:'pc',label:'PC'},
+     {key:'what',label:'Why it was kept',render:function(r){return h('span',{className:'gs-row',style:{gap:6,flexWrap:'nowrap'}},h(G.Icon,{name:KIND[r.kind],size:14}),r.what);}},
+     {key:'files',label:'Files',align:'right'},
+     {key:'size',label:'Size',align:'right',render:function(r){return G.formatBytes(r.size)}}]}),
+   h('div',{className:'gs-row',style:{justifyContent:'space-between',marginTop:'auto'}},
+     h(G.Button,{size:'sm',variant:'ghost',icon:'chevronDown'},'Show 204 older'),
+     h('span',{className:'gs-faint',style:{fontSize:12}},'A row opens its game’s saves, where Restore is. Every version is kept: all of them in the cloud, and the last 10 of each game on this PC.'))));
+}
+ReactDOM.createRoot(document.getElementById('root')).render(h(App));
+</script>
+</body>
+</html>
