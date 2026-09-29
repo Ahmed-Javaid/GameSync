@@ -99,6 +99,9 @@ public sealed record SyncInputs
     /// <summary>A conflict is already waiting for the user; it stays until they decide (SYNC-11).</summary>
     public bool ConflictPending { get; init; }
 
+    /// <summary>Why the waiting conflict asked when it arose, so it keeps saying so until the user decides (SYNC-10).</summary>
+    public string? ConflictReason { get; init; }
+
     /// <summary>False when the cloud couldn't be reached, so <see cref="Versions"/> may be out of date (PC-05).</summary>
     public bool CloudReachable { get; init; } = true;
 
@@ -226,7 +229,7 @@ public static class DecisionEngine
 
         if (input.ConflictPending)
         {
-            return NeedsYou("A conflict is waiting for you to choose which save continues.");
+            return NeedsYou(input.ConflictReason ?? "A conflict is waiting for you to choose which save continues.");
         }
 
         if (localChanged && !cloudChanged)
@@ -454,7 +457,25 @@ public static class DecisionEngine
         Reason = reason,
     };
 
-    private static SyncDecision NeedsYou(string reason) => new() { Action = SyncAction.NeedsYou, Reason = $"Conflict, needs you: {reason}" };
+    /// <summary>
+    /// The reason a waiting conflict gave, from the game's recorded status: without the words in front, or the note
+    /// about an upload waiting that a sync can add after it. Null when the status isn't a waiting conflict's.
+    /// </summary>
+    public static string? WaitingReason(string? detail)
+    {
+        if (detail is null || !detail.StartsWith(NeedsYouPrefix, StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        var reason = detail[NeedsYouPrefix.Length..];
+        var added = reason.IndexOf(" Kept on this PC; the upload waits:", StringComparison.Ordinal);
+        return added > 0 ? reason[..added] : reason;
+    }
+
+    private const string NeedsYouPrefix = "Conflict, needs you: ";
+
+    private static SyncDecision NeedsYou(string reason) => new() { Action = SyncAction.NeedsYou, Reason = NeedsYouPrefix + reason };
 
     private static SyncDecision SavesMissing() => new()
     {

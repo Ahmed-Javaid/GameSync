@@ -54,8 +54,9 @@ public static class ArtImages
 
             return decoded;
         }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException or InvalidOperationException or NotSupportedException)
+        catch (Exception e) when (e is not OutOfMemoryException)
         {
+            // Art is untrusted (ART-08): whatever a picture that won't decode throws, it's treated as missing.
             return null;
         }
     }

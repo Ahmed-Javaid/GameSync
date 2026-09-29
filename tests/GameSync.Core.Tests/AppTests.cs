@@ -296,7 +296,7 @@ public class AppTests
         var library = LibraryViewModel.From(games, DateTime.Now, "all", actions, LibrarySort.Name);
         var changed = new List<string?>();
         library.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
-        Assert.Equal(["all", "attn", "software", "hidden"], library.Tabs.Select(t => t.Id));
+        Assert.Equal(["all", "installed", "local", "attn", "software", "hidden"], library.Tabs.Select(t => t.Id));
         Assert.Equal(["celeste", "hades"], library.OtherTiles.Select(t => t.Title));
         library.SelectedTab = "attn";
         Assert.Equal(["celeste"], library.OtherTiles.Select(t => t.Title));

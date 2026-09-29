@@ -124,6 +124,9 @@ public sealed record GameDetail
 
     /// <summary>The game itself: its store page's basics, and how it's installed and started here.</summary>
     public GameAbout About { get; init; } = new();
+
+    /// <summary>A conflict waiting for the person, or the last one GameSync settled while its winner is current (SYNC-04, SYNC-10).</summary>
+    public ConflictDetail? Conflict { get; init; }
 }
 
 /// <summary>Reads a game's page from a data folder.</summary>
@@ -147,13 +150,16 @@ public static class GameDetails
         var history = new LocalHistory(Cli.HistoryFolder(engine.State, dataDir));
         var thinned = await history.Log.ListThinnedAsync(game, ct);
         var versions = (await history.Log.ListAsync(game, ct)).Where(v => !thinned.Contains(v.Id)).ToList();
-        var pins = (await history.Log.ListPinsAsync(game, ct)).GroupBy(p => p.Version).ToDictionary(g => g.Key, g => g.OrderByDescending(p => p.CreatedUtc).First());
+        var allPins = await history.Log.ListPinsAsync(game, ct);
+        var pins = allPins.GroupBy(p => p.Version).ToDictionary(g => g.Key, g => g.OrderByDescending(p => p.CreatedUtc).First());
         var pending = history.PendingVersions(game).ToHashSet();
         var pcs = history.LoadDevices().ToDictionary(d => d.Id, d => d.Name);
         var events = engine.State.GetEvents(game, LogLines);
         var detail = Describe(game, entry, definition, versions, pins, pending, pcs, events, engine.Here.Resolver);
         var folder = engine.InstallDirs.GetValueOrDefault(game) ?? (entry?.Installed == true ? entry.InstallDir : null);
-        return detail with { About = About(dataDir, game, entry, engine.State, folder, steamAppId) };
+        var conflict = definition is null ? null
+            : ConflictDetails.Describe(definition, versions, allPins, engine.State.GetState(game), engine.State.GetSessions(game), engine.Device, pcs);
+        return detail with { About = About(dataDir, game, entry, engine.State, folder, steamAppId), Conflict = conflict };
     }
 
     /// <summary>The game itself (LIB-19, ART-09, PLAY-11): what its Steam store page said when GameSync asked for its art, and how it starts here.</summary>
@@ -181,7 +187,8 @@ public static class GameDetails
             SteamAppId = steamAppId,
             Store = entry?.Store,
             StoreId = entry?.StoreId,
-            Engine = entry?.Engine,
+            // A folder that gives no clue says "unknown", which isn't worth showing.
+            Engine = entry?.Engine is { Length: > 0 } engine && engine != "unknown" ? engine : null,
             Build = entry?.Build,
             AntiCheat = entry?.HasAntiCheat == true ? entry.AntiCheat ?? "an anti-cheat" : null,
             InstallBytes = entry is { Store: StoreKind.Steam, StoreId: { Length: > 0 } id } && folder is not null ? SteamSize(folder, id) : null,

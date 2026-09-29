@@ -98,15 +98,30 @@
     <!-- The covers, or the game picked -->
     <Panel Grid.Column="1">
       <DockPanel IsVisible="{Binding ShowsCovers}">
-        <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto,*" Margin="0,0,0,16">
+        <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="16" Margin="0,0,0,16">
           <StackPanel VerticalAlignment="Center">
             <TextBlock Text="{Binding Title}" FontSize="15" LineHeight="20" FontWeight="SemiBold" />
             <TextBlock Classes="caption faint" Text="{Binding Subtitle}" TextTrimming="CharacterEllipsis" />
           </StackPanel>
-          <c:GsPillTabs Grid.Column="1" ItemsSource="{Binding Tabs}" SelectedId="{Binding SelectedTab, Mode=TwoWay}" AutomationProperties.Name="Library view" />
+          <c:GsPillTabs Grid.Column="1" ItemsSource="{Binding Tabs}" SelectedId="{Binding SelectedTab, Mode=TwoWay}" AutomationProperties.Name="Library view"
+                        HorizontalAlignment="Center" />
           <!-- Add game comes with its dialog (LIB-13); until then it isn't shown, as nothing on screen does nothing -->
           <c:GsButton Grid.Column="2" Icon="plus" Content="Add game" HorizontalAlignment="Right" IsVisible="False" />
         </Grid>
+        <!-- Local: what the view holds, and Scan a folder for games… (LIB-22, LIB-23) -->
+        <c:GsCard DockPanel.Dock="Top" Padding="16,12" Margin="0,0,0,16" IsVisible="{Binding IsLocalView}" AutomationProperties.Name="Games in their own folders">
+          <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="14">
+            <c:GsIcon Icon="folder" Size="18" Foreground="{DynamicResource ink-muted}" VerticalAlignment="Center" />
+            <StackPanel Grid.Column="1" Spacing="6" VerticalAlignment="Center">
+              <TextBlock Classes="muted" FontSize="13" LineHeight="19" TextWrapping="Wrap"
+                         Text="Games in their own folders, started without a store's launcher. GameSync finds them in the folders you give it, such as G:\ or E:\Games." />
+              <TextBlock Classes="caption" Text="{Binding ScanNote}" TextWrapping="Wrap" IsVisible="{Binding HasScanNote}" />
+            </StackPanel>
+            <c:GsButton Grid.Column="2" Classes="sm" Icon="search" Content="{Binding ScanLabel}" Click="ScanFolder" VerticalAlignment="Center"
+                        IsEnabled="{Binding !IsScanning}" IsVisible="{Binding CanScan}"
+                        ToolTip.Tip="Pick a folder of games; GameSync looks in it now and at every scan" />
+          </Grid>
+        </c:GsCard>
         <!-- The covers' hover ring reaches 4px past each cover: the scroller gives it room on every side, so the first
              row's and column's rings aren't cut off, and the covers stay where they were -->
         <ScrollViewer Name="CoverScroller" HorizontalScrollBarVisibility="Disabled" Margin="-6,-6,-6,0">

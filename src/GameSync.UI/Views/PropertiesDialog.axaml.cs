@@ -72,6 +72,26 @@ public partial class PropertiesDialog : UserControl
         }
     }
 
+    /// <summary>Choose an image…: the game's own cover, banner or logo, picked in Windows' own file picker (ART-06).</summary>
+    private async void ChooseArt(object? sender, RoutedEventArgs e)
+    {
+        if ((sender as Control)?.DataContext is not ArtSlot slot || TopLevel.GetTopLevel(this)?.StorageProvider is not { } storage)
+        {
+            return;
+        }
+
+        var files = await storage.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = $"An image for {slot.GameTitle}'s {slot.Title.ToLowerInvariant()}",
+            AllowMultiple = false,
+            FileTypeFilter = [new FilePickerFileType("Pictures") { Patterns = ["*.jpg", "*.jpeg", "*.png", "*.webp"] }],
+        });
+        if (files.Count > 0 && files[0].TryGetLocalPath() is { } path)
+        {
+            slot.Choose(path);
+        }
+    }
+
     /// <summary>Change…: the program a game in its own folder starts from, picked in Windows' own file picker.</summary>
     private async void PickProgram(object? sender, RoutedEventArgs e)
     {

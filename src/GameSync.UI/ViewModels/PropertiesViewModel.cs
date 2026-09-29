@@ -1,8 +1,10 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Windows.Input;
+using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using GameSync.Core.Art;
 using GameSync.Core.Discovery;
 using GameSync.Core.Games;
 using GameSync.Core.Model;
@@ -170,9 +172,136 @@ public sealed record Choice(string Id, string Label)
 }
 
 /// <summary>
-/// A game's Properties, like Steam's (design system → GamePropertiesDialog; LIB-20, FIND-12): General, Launch, Installed
-/// files, Saves (which files are backed up) and Sync. Changes wait for Save changes; Cancel, Esc and the close button
-/// drop them, asking first when there are some.
+/// One of a game's pictures in its Properties' Art (design system → GamePropertiesDialog, ART-06): Steam's, the person's
+/// own image, or none, with Choose an image… and Use Steam's. A picked image is checked at once, like Steam's art, and
+/// kept only when the person saves.
+/// </summary>
+public sealed partial class ArtSlot : ObservableObject
+{
+    private readonly Action _changed;
+
+    /// <summary>What the person did: an image file picked, "" to take their own away, or null for as it was.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsOwn), nameof(From), nameof(ChooseLabel), nameof(ChooseName), nameof(Shown))]
+    private string? _picked;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasError))]
+    private string? _error;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasThumb), nameof(NoThumb))]
+    private IImage? _thumb;
+
+    public ArtSlot(Action changed, GameArt art, string gameTitle)
+    {
+        _changed = changed;
+        (Kind, Steam, Own, GameTitle) = (art.Kind, art.Steam, art.Own, gameTitle);
+        UndoCommand = new RelayCommand(() => Picked = Own is null ? null : "");
+        LoadThumb();
+    }
+
+    public ArtKind Kind { get; }
+
+    public string? Steam { get; }
+
+    /// <summary>The person's own image, as it was when the dialog opened.</summary>
+    public string? Own { get; }
+
+    public string GameTitle { get; }
+
+    public string Title => Kind switch
+    {
+        ArtKind.Cover => "Cover",
+        ArtKind.Hero => "Banner",
+        _ => "Logo",
+    };
+
+    public string Description => Kind switch
+    {
+        ArtKind.Cover => "The tile in the library and on Home: tall, like Steam's 600 × 900.",
+        ArtKind.Hero => "The wide picture at the top of its page, and on Home when it's the last played: like 1920 × 620.",
+        _ => "Shown over the banner in place of its name: a PNG with a see-through background.",
+    };
+
+    /// <summary>Its own image shows: one picked now, or the one it had.</summary>
+    public bool IsOwn => Picked is { Length: > 0 } || (Picked is null && Own is not null);
+
+    /// <summary>The picture the slot shows now.</summary>
+    public string? Shown => Picked is { Length: > 0 } picked ? picked : IsOwn ? Own : Steam;
+
+    public string From => IsOwn ? "Your image" : Steam is not null ? "Steam's" : Kind == ArtKind.Logo ? "None: its name shows" : "None: a title cover shows";
+
+    public string ChooseLabel => IsOwn ? "Choose another…" : "Choose an image…";
+
+    /// <summary>What a screen reader says for the button (A11Y-03): "Choose an image for the banner".</summary>
+    public string ChooseName => $"{(IsOwn ? "Choose another image" : "Choose an image")} for the {Title.ToLowerInvariant()}";
+
+    public string UndoLabel => Steam is not null ? "Use Steam's" : "Remove";
+
+    /// <summary>What a screen reader says for it: "Use Steam's banner", "Remove your logo".</summary>
+    public string UndoName => Steam is not null ? $"Use Steam's {Title.ToLowerInvariant()}" : $"Remove your {Title.ToLowerInvariant()}";
+
+    public bool HasError => Error is not null;
+
+    public bool HasThumb => Thumb is not null;
+
+    public bool NoThumb => Thumb is null;
+
+    /// <summary>What the empty picture says: its name for a logo, the game's initial for the others.</summary>
+    public string Placeholder => Kind == ArtKind.Logo ? "Its name" : GsGameTile.InitialOf(GameTitle);
+
+    public double ThumbWidth => Kind switch
+    {
+        ArtKind.Cover => 48,
+        ArtKind.Hero => 124,
+        _ => 96,
+    };
+
+    public double ThumbHeight => Kind == ArtKind.Cover ? 72 : 40;
+
+    /// <summary>Use Steam's, or Remove when Steam has none: the person's own image goes once they save.</summary>
+    public ICommand UndoCommand { get; }
+
+    /// <summary>What changed, as the host saves it; null when nothing did.</summary>
+    public ArtChoice? Change => Picked switch
+    {
+        null => null,
+        "" => Own is null ? null : new ArtChoice(Kind, null),
+        var file => new ArtChoice(Kind, file),
+    };
+
+    /// <summary>An image picked in Windows' picker: checked now, like Steam's art (ART-08), and shown; kept when the person saves.</summary>
+    public void Choose(string file)
+    {
+        try
+        {
+            GameSettings.Picture(file, Kind);
+            Error = null;
+            Picked = file;
+        }
+        catch (Exception e) when (e is UsageException or IOException or UnauthorizedAccessException)
+        {
+            Error = e.Message;
+        }
+    }
+
+    partial void OnPickedChanged(string? value)
+    {
+        LoadThumb();
+        OnPropertyChanged(nameof(Change));
+        _changed();
+    }
+
+    private void LoadThumb() => Thumb = ArtImages.Load(Shown, (int)ThumbWidth * 2);
+
+    public override string ToString() => $"{Title}: {From}";
+}
+
+/// <summary>
+/// A game's Properties, like Steam's (design system → GamePropertiesDialog; LIB-20, FIND-12, ART-06): General, Art (its
+/// own cover, banner and logo), Launch, Installed files, Saves (which files are backed up) and Sync. Changes wait for
+/// Save changes; Cancel, Esc and the close button drop them, asking first when there are some.
 /// </summary>
 public sealed partial class PropertiesViewModel : ObservableObject
 {
@@ -236,6 +365,10 @@ public sealed partial class PropertiesViewModel : ObservableObject
     [ObservableProperty]
     private IReadOnlyList<FileRow> _rows = [];
 
+    /// <summary>Its cover, banner and logo (ART-06).</summary>
+    [ObservableProperty]
+    private IReadOnlyList<ArtSlot> _art = [];
+
     [ObservableProperty]
     private string _countText = "";
 
@@ -294,6 +427,7 @@ public sealed partial class PropertiesViewModel : ObservableObject
     public IReadOnlyList<NavItem> Sections { get; } =
     [
         new("general", "General", "info"),
+        new("art", "Art", "palette"),
         new("launch", "Launch", "play"),
         new("files", "Installed files", "drive"),
         new("saves", "Saves", "saves"),
@@ -312,6 +446,8 @@ public sealed partial class PropertiesViewModel : ObservableObject
     public bool HasChanges => Changes > 0;
 
     public bool IsGeneral => Section == "general";
+
+    public bool IsArt => Section == "art";
 
     public bool IsLaunch => Section == "launch";
 
@@ -452,6 +588,7 @@ public sealed partial class PropertiesViewModel : ObservableObject
             _ => "newest",
         };
         BuildRows(properties);
+        Art = properties.Art.Select(a => new ArtSlot(Recount, a, properties.Title)).ToList();
         IsLoaded = true;
         Changes = 0;
         foreach (var name in new[] { nameof(AntiCheatNote), nameof(HasAntiCheat), nameof(ThroughStore), nameof(OwnProgram), nameof(IsSteam), nameof(RouteTitle),
@@ -491,6 +628,7 @@ public sealed partial class PropertiesViewModel : ObservableObject
             Screenshots = p.Syncs && (Screenshots == "on") != p.Screenshots ? Screenshots == "on" : null,
             SkipDefaults = p.Syncs && SkipDefaults != p.SkipDefaults ? SkipDefaults : null,
             Files = p.Syncs ? FileChoices() : [],
+            Art = Art.Select(a => a.Change).OfType<ArtChoice>().ToList(),
         };
     }
 
@@ -540,7 +678,7 @@ public sealed partial class PropertiesViewModel : ObservableObject
 
     partial void OnSectionChanged(string value)
     {
-        foreach (var name in new[] { nameof(IsGeneral), nameof(IsLaunch), nameof(IsFiles), nameof(IsSaves), nameof(IsSync) })
+        foreach (var name in new[] { nameof(IsGeneral), nameof(IsArt), nameof(IsLaunch), nameof(IsFiles), nameof(IsSaves), nameof(IsSync) })
         {
             OnPropertyChanged(name);
         }
@@ -652,7 +790,7 @@ public sealed partial class PropertiesViewModel : ObservableObject
 
         var change = Change();
         Changes = new object?[] { change.Title, change.Favourite, change.Hidden, change.LaunchOptions, change.Program, change.Mode, change.Conflict, change.SettingsFiles,
-            change.Screenshots, change.SkipDefaults }.Count(v => v is not null) + change.Files.Count;
+            change.Screenshots, change.SkipDefaults }.Count(v => v is not null) + change.Files.Count + change.Art.Count;
         if (Changes == 0)
         {
             ConfirmingDiscard = false;

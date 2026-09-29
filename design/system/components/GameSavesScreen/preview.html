@@ -24,8 +24,8 @@ html,body{margin:0;background:var(--bg-100);} .pv{padding:24px;}
 <div id="root"></div>
 <script>
 var G = window.GameSync, h = React.createElement;
-// The game whose saves are open when the preview starts; null shows every game's.
-var INITIAL = 'wukong';
+// The game whose saves are open when the preview starts (#terraria and the rest pick another); null shows every game's.
+var INITIAL = location.hash.slice(1) || 'wukong';
 
 var ART = "data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%201200%20500%27%20preserveAspectRatio%3D%27xMidYMid%20slice%27%3E%3Crect%20width%3D%271200%27%20height%3D%27500%27%20fill%3D%27%231b2a33%27/%3E%3Ccircle%20cx%3D%27860%27%20cy%3D%27150%27%20r%3D%2770%27%20fill%3D%27%237fe6f2%27%20opacity%3D%27.35%27/%3E%3Cpath%20d%3D%27M0%20330%20L180%20200%20L330%20300%20L520%20150%20L700%20290%20L880%20190%20L1200%20320%20V500%20H0Z%27%20fill%3D%27%23223640%27/%3E%3Cpath%20d%3D%27M0%20400%20L220%20290%20L420%20380%20L640%20270%20L860%20370%20L1040%20300%20L1200%20360%20V500%20H0Z%27%20fill%3D%27%23182730%27/%3E%3Cpath%20d%3D%27M0%20460%20L300%20390%20L600%20450%20L900%20380%20L1200%20440%20V500%20H0Z%27%20fill%3D%27%2310191f%27/%3E%3C/svg%3E";
 var COVERS = ["data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%20200%20300%27%3E%3Crect%20width%3D%27200%27%20height%3D%27300%27%20fill%3D%27%232b2220%27/%3E%3Ccircle%20cx%3D%27140%27%20cy%3D%2790%27%20r%3D%2738%27%20fill%3D%27%23e0b36a%27%20opacity%3D%27.5%27/%3E%3Cpath%20d%3D%27M0%20220%20L70%20160%20L130%20210%20L200%20150%20V300%20H0Z%27%20fill%3D%27%23e0b36a%27%20opacity%3D%27.35%27/%3E%3C/svg%3E", "data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%20200%20300%27%3E%3Crect%20width%3D%27200%27%20height%3D%27300%27%20fill%3D%27%231d2a24%27/%3E%3Ccircle%20cx%3D%27140%27%20cy%3D%2790%27%20r%3D%2738%27%20fill%3D%27%237fd1a6%27%20opacity%3D%27.5%27/%3E%3Cpath%20d%3D%27M0%20220%20L70%20160%20L130%20210%20L200%20150%20V300%20H0Z%27%20fill%3D%27%237fd1a6%27%20opacity%3D%27.35%27/%3E%3C/svg%3E", "data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%20200%20300%27%3E%3Crect%20width%3D%27200%27%20height%3D%27300%27%20fill%3D%27%23221f33%27/%3E%3Ccircle%20cx%3D%27140%27%20cy%3D%2790%27%20r%3D%2738%27%20fill%3D%27%23b9a3ff%27%20opacity%3D%27.5%27/%3E%3Cpath%20d%3D%27M0%20220%20L70%20160%20L130%20210%20L200%20150%20V300%20H0Z%27%20fill%3D%27%23b9a3ff%27%20opacity%3D%27.35%27/%3E%3C/svg%3E", "data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%20200%20300%27%3E%3Crect%20width%3D%27200%27%20height%3D%27300%27%20fill%3D%27%231d2630%27/%3E%3Ccircle%20cx%3D%27140%27%20cy%3D%2790%27%20r%3D%2738%27%20fill%3D%27%237fe6f2%27%20opacity%3D%27.5%27/%3E%3Cpath%20d%3D%27M0%20220%20L70%20160%20L130%20210%20L200%20150%20V300%20H0Z%27%20fill%3D%27%237fe6f2%27%20opacity%3D%27.35%27/%3E%3C/svg%3E", "data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%20200%20300%27%3E%3Crect%20width%3D%27200%27%20height%3D%27300%27%20fill%3D%27%232c2519%27/%3E%3Ccircle%20cx%3D%27140%27%20cy%3D%2790%27%20r%3D%2738%27%20fill%3D%27%23f2b544%27%20opacity%3D%27.5%27/%3E%3Cpath%20d%3D%27M0%20220%20L70%20160%20L130%20210%20L200%20150%20V300%20H0Z%27%20fill%3D%27%23f2b544%27%20opacity%3D%27.35%27/%3E%3C/svg%3E", "data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%20200%20300%27%3E%3Crect%20width%3D%27200%27%20height%3D%27300%27%20fill%3D%27%2322262b%27/%3E%3Ccircle%20cx%3D%27140%27%20cy%3D%2790%27%20r%3D%2738%27%20fill%3D%27%23a4abb3%27%20opacity%3D%27.5%27/%3E%3Cpath%20d%3D%27M0%20220%20L70%20160%20L130%20210%20L200%20150%20V300%20H0Z%27%20fill%3D%27%23a4abb3%27%20opacity%3D%27.35%27/%3E%3C/svg%3E", "data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%20200%20300%27%3E%3Crect%20width%3D%27200%27%20height%3D%27300%27%20fill%3D%27%232a1f24%27/%3E%3Ccircle%20cx%3D%27140%27%20cy%3D%2790%27%20r%3D%2738%27%20fill%3D%27%23ff8a7d%27%20opacity%3D%27.5%27/%3E%3Cpath%20d%3D%27M0%20220%20L70%20160%20L130%20210%20L200%20150%20V300%20H0Z%27%20fill%3D%27%23ff8a7d%27%20opacity%3D%27.35%27/%3E%3C/svg%3E"];
@@ -61,6 +61,8 @@ function Stat(p){return h('div',{style:{display:'flex',flexDirection:'column',ga
 /* ---------- One game's saves: what the game's page used to hold ---------- */
 var NAMED = {wukong:[{name:'Before Erlang Shen',when:'23 Sep 21:02',pc:'DESKTOP'},{name:'Chapter 5 start',when:'20 Sep 18:10',pc:'LAPTOP'},{name:'Ludusavi backup (14 Sep)',when:'14 Sep 12:00',pc:'DESKTOP'}],
   sekiro:[{name:'Before update 1.06',when:'12 Sep 20:31',pc:'DESKTOP'}]};
+// A conflict newest wins settled, while its winner is the current save: one line under the status, with See both and Swap.
+var SETTLED = {terraria:{kept:'DESKTOP',pinned:'LAPTOP'}};
 var PLACES = {wukong:[{portable:'<installDir>/b1/Saved/SaveGames',here:'G:\\Black Myth Wukong\\b1\\Saved\\SaveGames',files:'3 files \u00b7 0.5 MB \u00b7 newest 23 Sep 21:09'}],
   sekiro:[{portable:'<roaming>/Sekiro/*',here:'C:\\Users\\You\\AppData\\Roaming\\Sekiro\\76561198041',files:'2 files \u00b7 2.1 MB \u00b7 newest today 21:04'}]};
 var VERSIONS=[
@@ -101,13 +103,19 @@ function GameSaves(p){
       h(G.StatusBadge,{status:g.status,label:g.status==='backup-only'?'Synced by Steam':undefined}),
       h('p',null,(SENTENCE[g.status]||SENTENCE.synced)(g)),
       g.status==='held' ? h('div',{className:'gs-row',style:{flexWrap:'nowrap'}},h(G.Button,{variant:'secondary',icon:'reset'},'Restore the previous save'),h(G.Button,{variant:'primary',icon:'check'},'Keep the new save'))
-      : g.status==='conflict' ? h(G.Button,{variant:'primary',icon:'alert'},'Resolve') : null),
+      : g.status==='conflict' ? h(G.Button,{variant:'primary',icon:'alert'},'Resolve')
+      : g.status==='in-use' ? h(G.Button,{variant:'primary',icon:'sync'},'Retry') : null),
+    SETTLED[g.id] ? h('section',{className:'gs-card sm-status','aria-label':'Last conflict'},
+      h(G.Icon,{name:'sync',size:16}),
+      h('p',null,'Newest kept: '+SETTLED[g.id].kept+'’s save is current, '+SETTLED[g.id].pinned+'’s is pinned in history.'),
+      h('div',{className:'gs-row',style:{flexWrap:'nowrap'}},h(G.Button,{size:'sm',variant:'ghost'},'See both'),h(G.Button,{size:'sm',variant:'secondary',icon:'sync','aria-haspopup':'dialog'},'Swap to '+SETTLED[g.id].pinned+'’s'))) : null,
     h('div',{className:'sm-grid'},
-      h(G.Card,{title:'Named saves',subtitle:'On every PC, and back in one step.',action:h(G.Button,{size:'sm',variant:'secondary',icon:'plus'},'Save as\u2026')},
+      h(G.Card,{title:'Named saves',subtitle:'On every PC, and back in one step.',action:h(G.Button,{size:'sm',variant:'ghost',icon:'download','aria-haspopup':'dialog'},'Import kept saves\u2026')},
         named.length ? named.map(function(n){return h('div',{key:n.name,style:{display:'flex',alignItems:'center',gap:12}},
           h(G.Icon,{name:'pin',size:16}),
           h('div',{style:{flex:1,minWidth:0}},h('div',{style:{fontWeight:600,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}},n.name),h('div',{className:'gs-faint gs-mono',style:{fontSize:12,lineHeight:'16px'}},n.when+' \u00b7 '+n.pc)),
-          h(G.Button,{size:'sm',variant:'ghost',icon:'reset'},'Restore'))})
+          h(G.Button,{size:'sm',variant:'ghost',icon:'reset'},'Restore'),
+          h(G.IconButton,{size:'sm',icon:'more',label:'More for '+n.name,'aria-haspopup':'dialog'}))})
         : h('div',{className:'gs-note'},h(G.Icon,{name:'info',size:16}),'None yet. Save as\u2026 keeps this save under a name, on every PC, before a boss or a big choice.')),
       h(G.Card,{title:'Where the saves are',subtitle:'Found by the save list, confirmed 27 Sep.',action:h(G.Button,{size:'sm',variant:'ghost',icon:'settings'},'Choose files\u2026')},
         places.map(function(pl){return h('div',{key:pl.here,className:'gs-well-line',style:{alignItems:'flex-start',fontFamily:'var(--font-sans)'}},
@@ -115,7 +123,7 @@ function GameSaves(p){
             h('div',{className:'gs-mono',style:{fontSize:13,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'},title:pl.here},pl.here),
             h('div',{className:'gs-faint',style:{fontSize:12,lineHeight:'16px'}},pl.files)),
           h(G.IconButton,{size:'sm',icon:'folder',label:'Open the save folder'}))}),
-        h('div',{className:'gs-row'},h(G.Button,{size:'sm',variant:'secondary',icon:'plus'},'Add a place')))),
+        h('div',{className:'gs-row'},h(G.Button,{size:'sm',variant:'secondary',icon:'plus','aria-haspopup':'dialog'},'Add a place\u2026')))),
     h('div',{className:'sm-hist'},h(G.ConsoleTable,{command:'history '+g.id,
       toolbar:h('span',null,g.versions+' versions \u00b7 '+G.formatBytes(g.size)+' of history'),
       rows:VERSIONS,columns:[{key:'saved',label:'Saved'},{key:'pc',label:'PC'},{key:'note',label:'Note',render:Note},{key:'size',label:'Size',align:'right',render:function(r){return G.formatBytes(r.size)}},{key:'act',label:'',align:'right',render:Actions}]})),

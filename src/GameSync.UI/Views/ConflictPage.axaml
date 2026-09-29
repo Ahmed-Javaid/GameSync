@@ -1,0 +1,160 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="using:GameSync.UI.Controls"
+             xmlns:vm="using:GameSync.UI.ViewModels"
+             xmlns:v="using:GameSync.UI.Views"
+             xmlns:s="using:GameSync.Core.State"
+             x:Class="GameSync.UI.Views.ConflictPage"
+             x:DataType="vm:ConflictViewModel">
+  <!-- A game's conflict in the save manager (design system → ConflictScreen, SYNC-10): Back and the breadcrumb; what
+       happened; the suggested side with why and why GameSync asked; each side's card with Keep; Compare files; Decide
+       later. Settled, the same screen says which save is current and offers Swap (SYNC-04). -->
+  <DockPanel>
+    <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*" MinHeight="40" Margin="0,0,0,16">
+      <StackPanel Orientation="Horizontal" Spacing="12">
+        <c:GsButton Classes="sm" Icon="arrowLeft" Content="Back" ToolTip.Tip="Back (Esc)" Command="{Binding BackCommand}" />
+        <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+          <Button Theme="{StaticResource CrumbButton}" Content="Save manager" Command="{Binding OpenTableCommand}" />
+          <c:GsIcon Icon="chevronRight" Size="14" Foreground="{DynamicResource ink-muted}" VerticalAlignment="Center" />
+          <Button Theme="{StaticResource CrumbButton}" Content="{Binding Title}" Command="{Binding OpenSavesCommand}" />
+          <c:GsIcon Icon="chevronRight" Size="14" Foreground="{DynamicResource ink-muted}" VerticalAlignment="Center" />
+          <TextBlock Text="Conflict" FontSize="13" FontWeight="Medium" VerticalAlignment="Center" />
+        </StackPanel>
+      </StackPanel>
+    </Grid>
+
+    <!-- Compare files, Decide later, and what waiting means -->
+    <Grid DockPanel.Dock="Bottom" ColumnDefinitions="Auto,Auto,*" ColumnSpacing="16" Margin="0,16,0,0" IsVisible="{Binding HasDetail}">
+      <c:GsButton Icon="chevronDown" Content="Compare files" Command="{Binding CompareCommand}" IsVisible="{Binding HasFiles}"
+                  ToolTip.Tip="The files that differ, side by side" />
+      <c:GsButton Grid.Column="1" Classes="ghost" Icon="clock" Content="Decide later" Command="{Binding BackCommand}" IsVisible="{Binding ShowsWaiting}" />
+      <TextBlock Grid.Column="2" Classes="caption muted" Text="{Binding WaitNote}" VerticalAlignment="Center" TextWrapping="Wrap" IsVisible="{Binding ShowsWaiting}" />
+    </Grid>
+
+    <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+      <StackPanel Spacing="16" Margin="0,0,0,8">
+        <StackPanel Spacing="8">
+          <c:GsStatusBadge Status="{x:Static s:GameStatus.Conflict}" Label="{Binding StatusLabel}" HorizontalAlignment="Left"
+                           IsVisible="{Binding !ShowsNothing}" />
+          <TextBlock Text="{Binding Headline}" FontSize="24" LineHeight="30" FontWeight="SemiBold" TextWrapping="Wrap" />
+          <TextBlock Classes="muted" Text="{Binding Sentence}" FontSize="14" LineHeight="21" TextWrapping="Wrap" MaxWidth="780" HorizontalAlignment="Left" />
+        </StackPanel>
+
+        <c:GsNote Icon="sync" Text="{Binding Busy}" IsVisible="{Binding !NotBusy}" />
+
+        <!-- Waiting: the suggestion, why, and why GameSync asked. Settled: Swap. -->
+        <Border Background="{DynamicResource bg-200}" BorderBrush="{DynamicResource edge-card}" BorderThickness="1" BackgroundSizing="OuterBorderEdge"
+                BoxShadow="{DynamicResource lift-card}" CornerRadius="{DynamicResource radius-lg}" Padding="20,14"
+                IsVisible="{Binding !ShowsNothing}">
+          <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+            <c:GsIcon Icon="info" Size="16" Foreground="{DynamicResource ink-muted}" VerticalAlignment="Center" />
+            <TextBlock Grid.Column="1" FontSize="13" LineHeight="19" TextWrapping="Wrap" VerticalAlignment="Center">
+              <Run Text="{Binding Suggestion}" FontWeight="SemiBold" /><Run Text=" " /><Run Text="{Binding SuggestionWhy}" />
+            </TextBlock>
+            <c:GsButton Grid.Column="2" Classes="ghost sm" Icon="settings" Content="Change for this game" Command="{Binding ChangeForGameCommand}"
+                        IsVisible="{Binding ShowsWaiting}" ToolTip.Tip="Who wins when both PCs changed this game: its Properties, on Sync" />
+            <c:GsButton Grid.Column="2" Classes="primary" Icon="sync" Content="{Binding SwapLabel}" IsVisible="{Binding ShowsSettled}"
+                        IsEnabled="{Binding NotBusy}">
+              <c:GsButton.Flyout>
+                <Flyout Placement="BottomEdgeAlignedRight">
+                  <StackPanel Width="300" Spacing="12" Margin="8">
+                    <TextBlock Text="{Binding SwapLabel, StringFormat='{}{0} save?'}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                    <TextBlock Classes="caption muted" TextWrapping="Wrap" Text="Your files now are kept as a version first, so you can swap back." />
+                    <c:GsButton Classes="primary sm" Icon="sync" Content="Swap" HorizontalAlignment="Right" Click="CloseFlyout" Command="{Binding SwapCommand}" />
+                  </StackPanel>
+                </Flyout>
+              </c:GsButton.Flyout>
+            </c:GsButton>
+          </Grid>
+        </Border>
+
+        <!-- Each side: where it is, the PC, its facts, and Keep -->
+        <ItemsControl ItemsSource="{Binding Sides}" ClipToBounds="False">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate>
+              <UniformGrid Rows="1" ColumnSpacing="16" />
+            </ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:ConflictSideItem">
+              <c:GsCard VerticalAlignment="Stretch" AutomationProperties.Name="{Binding}">
+                <DockPanel>
+                  <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,16">
+                    <StackPanel Spacing="2">
+                      <TextBlock Classes="overline" Text="{Binding Where}" />
+                      <TextBlock Classes="mono" Text="{Binding Pc}" FontSize="20" LineHeight="26" FontWeight="Bold" TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+                    <c:GsTag Grid.Column="1" Text="Newest" Background="{DynamicResource secondary-soft}" Foreground="{DynamicResource ink}"
+                             IsVisible="{Binding Newest}" VerticalAlignment="Top" />
+                  </Grid>
+                  <Panel DockPanel.Dock="Bottom" HorizontalAlignment="Left" Margin="0,20,0,0" IsVisible="{Binding CanKeep}"
+                         IsEnabled="{Binding $parent[v:ConflictPage].((vm:ConflictViewModel)DataContext).NotBusy}">
+                    <c:GsButton Classes.primary="{Binding Suggested}" Icon="check" Content="{Binding KeepLabel}" Command="{Binding Keep}"
+                                IsVisible="{Binding KeepsAtOnce}" />
+                    <c:GsButton Classes.primary="{Binding Suggested}" Icon="check" Content="{Binding KeepLabel}" IsVisible="{Binding AsksFirst}">
+                      <c:GsButton.Flyout>
+                        <Flyout Placement="BottomEdgeAlignedLeft">
+                          <StackPanel Width="300" Spacing="12" Margin="8">
+                            <TextBlock Text="{Binding ConfirmTitle}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                            <TextBlock Classes="caption muted" TextWrapping="Wrap"
+                                       Text="Its files replace this PC's. This PC's save is kept in history first, and Swap brings it back." />
+                            <c:GsButton Classes="primary sm" Icon="check" Content="{Binding KeepLabel}" HorizontalAlignment="Right" Click="CloseFlyout"
+                                        Command="{Binding Keep}" />
+                          </StackPanel>
+                        </Flyout>
+                      </c:GsButton.Flyout>
+                    </c:GsButton>
+                  </Panel>
+                  <c:GsFacts ItemsSource="{Binding Facts}" />
+                </DockPanel>
+              </c:GsCard>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <!-- Compare files: the files that differ, each side's copy, and what changed -->
+        <c:GsConsole Command="{Binding CompareCommandLine}" IsVisible="{Binding Comparing}">
+          <c:GsConsole.Toolbar>
+            <TextBlock Text="{Binding FilesSummary}" VerticalAlignment="Center" />
+          </c:GsConsole.Toolbar>
+          <StackPanel Grid.IsSharedSizeScope="True">
+            <Border BorderBrush="{DynamicResource line-100}" BorderThickness="0,0,0,1">
+              <Grid>
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="*" />
+                  <ColumnDefinition Width="Auto" SharedSizeGroup="Here" />
+                  <ColumnDefinition Width="Auto" SharedSizeGroup="There" />
+                  <ColumnDefinition Width="Auto" SharedSizeGroup="What" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Classes="th" Text="FILE" />
+                <TextBlock Grid.Column="1" Classes="th num" Text="{Binding HereHeading}" />
+                <TextBlock Grid.Column="2" Classes="th num" Text="{Binding ThereHeading}" />
+                <TextBlock Grid.Column="3" Classes="th" Text="WHAT CHANGED" />
+              </Grid>
+            </Border>
+            <ItemsControl ItemsSource="{Binding Files}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:ConflictFileItem">
+                  <Border BorderBrush="{DynamicResource line-100}" BorderThickness="0,0,0,1" MinHeight="34" AutomationProperties.Name="{Binding}">
+                    <Grid>
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" SharedSizeGroup="Here" />
+                        <ColumnDefinition Width="Auto" SharedSizeGroup="There" />
+                        <ColumnDefinition Width="Auto" SharedSizeGroup="What" />
+                      </Grid.ColumnDefinitions>
+                      <TextBlock Classes="td" Text="{Binding Name}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Name}" />
+                      <TextBlock Grid.Column="1" Classes="td num" Text="{Binding Here}" />
+                      <TextBlock Grid.Column="2" Classes="td num" Text="{Binding There}" />
+                      <TextBlock Grid.Column="3" Classes="td" Text="{Binding What}" />
+                    </Grid>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+        </c:GsConsole>
+      </StackPanel>
+    </ScrollViewer>
+  </DockPanel>
+</UserControl>

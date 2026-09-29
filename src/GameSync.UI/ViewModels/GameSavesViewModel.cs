@@ -5,6 +5,7 @@ using CommunityToolkit.Mvvm.Input;
 using GameSync.Core.Discovery;
 using GameSync.Core.Model;
 using GameSync.Core.State;
+using GameSync.Core.Sync;
 using GameSync.Host;
 using GameSync.UI.Controls;
 using GameSync.UI.Theming;
@@ -30,9 +31,21 @@ public sealed record PlaceItem(string Portable, string? Folder, string? Tag, str
     public override string ToString() => string.Join(", ", new[] { Folder ?? Portable, Tag, Evidence }.OfType<string>());
 }
 
-/// <summary>A named save: its name, when and on which PC it was saved.</summary>
-public sealed record NamedSaveItem(string Name, VersionId Version, string When, string Pc)
+/// <summary>A named save: its name, when and on which PC it was saved, and the new name typed to rename it.</summary>
+public sealed partial class NamedSaveItem(string name, VersionId version, string when, string pc) : ObservableObject
 {
+    public string Name { get; } = name;
+
+    public VersionId Version { get; } = version;
+
+    public string When { get; } = when;
+
+    public string Pc { get; } = pc;
+
+    /// <summary>Rename's box: it starts as the name.</summary>
+    [ObservableProperty]
+    private string _newName = name;
+
     public string Meta => $"{When} · {Pc}";
 
     public override string ToString() => $"{Name}, saved {When} on {Pc}";
@@ -68,8 +81,14 @@ public sealed partial class GameSavesViewModel : ObservableObject, IPageSurface
     private string _title = "";
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsHeld), nameof(IsConflict), nameof(NeedsYou), nameof(IsPlaying), nameof(BackUpTip))]
+    [NotifyPropertyChangedFor(nameof(IsHeld), nameof(IsConflict), nameof(IsFilesInUse), nameof(IsSavesMissing), nameof(NeedsYou), nameof(IsPlaying), nameof(BackUpTip),
+        nameof(ShowsSettled))]
     private GameStatus? _status;
+
+    /// <summary>The last conflict GameSync settled, while its winner is still the current save: which PC's was kept, and Swap (SYNC-04).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowsSettled), nameof(SwapLabel))]
+    private ConflictDetail? _settled;
 
     [ObservableProperty]
     private string? _statusLabel;
@@ -156,6 +175,26 @@ public sealed partial class GameSavesViewModel : ObservableObject, IPageSurface
             }
         }, () => _actions?.Restore is not null);
         ChooseFilesCommand = new RelayCommand(() => _actions?.OpenProperties?.Invoke(Id, "saves"), () => _actions?.OpenProperties is not null);
+        RenameSaveCommand = new RelayCommand<NamedSaveItem>(named =>
+        {
+            var name = named?.NewName.Trim() ?? "";
+            if (named is not null && name.Length > 0 && name != named.Name)
+            {
+                _actions?.RenameSave?.Invoke(Id, named.Name, name);
+            }
+        }, _ => _actions?.RenameSave is not null);
+        ForgetSaveCommand = new RelayCommand<NamedSaveItem>(named =>
+        {
+            if (named is not null)
+            {
+                _actions?.ForgetSave?.Invoke(Id, named.Name);
+            }
+        }, _ => _actions?.ForgetSave is not null);
+        ResolveCommand = new RelayCommand(() => _actions?.OpenConflict?.Invoke(Id), () => _actions?.OpenConflict is not null);
+        RetryCommand = new RelayCommand(() => _actions?.Retry?.Invoke(Id), () => _actions?.Retry is not null);
+        SwapCommand = new RelayCommand(() => _actions?.Swap?.Invoke(Id), () => _actions?.Swap is not null);
+        OpenAddPlaceCommand = new RelayCommand(() => _actions?.OpenAddPlace?.Invoke(Id), () => _actions?.OpenAddPlace is not null);
+        OpenImportKeptCommand = new RelayCommand(() => _actions?.OpenImportKept?.Invoke(Id), () => _actions?.OpenImportKept is not null);
         Update(game);
     }
 
@@ -192,9 +231,44 @@ public sealed partial class GameSavesViewModel : ObservableObject, IPageSurface
     /// <summary>The game's Properties, on Saves: which files are backed up (FIND-12).</summary>
     public ICommand ChooseFilesCommand { get; }
 
+    /// <summary>A named save's Rename, with the name typed in its box (BAK-18).</summary>
+    public ICommand RenameSaveCommand { get; }
+
+    /// <summary>A named save's Remove the name: the save stays in the history, unnamed (BAK-18).</summary>
+    public ICommand ForgetSaveCommand { get; }
+
+    /// <summary>A conflict: both saves side by side, to choose one (SYNC-10). A settled one's See both opens it too.</summary>
+    public ICommand ResolveCommand { get; }
+
+    /// <summary>Files in use: sync the game again, once the program holding them let go (SYNC-02).</summary>
+    public ICommand RetryCommand { get; }
+
+    /// <summary>A settled conflict: switch to the save that lost (SYNC-04). It restores, so the page asks first.</summary>
+    public ICommand SwapCommand { get; }
+
+    /// <summary>Add a place: a folder or file where it keeps saves GameSync didn't find (FOLD-01).</summary>
+    public ICommand OpenAddPlaceCommand { get; }
+
+    /// <summary>Import kept saves: copies of its saves kept by hand, as named saves (BAK-19).</summary>
+    public ICommand OpenImportKeptCommand { get; }
+
+    /// <summary>A conflict GameSync settled by itself or you did, and nothing else needs you: which save is current, with Swap.</summary>
+    public bool ShowsSettled => Settled is not null && !NeedsYou && !IsPlaying;
+
+    public string SettledText => Settled is not { } s ? ""
+        : s.ByHand ? $"You kept {s.KeptPc}'s save; {s.PinnedPc}'s is pinned in history."
+        : $"Newest kept: {s.KeptPc}'s save is current, {s.PinnedPc}'s is pinned in history.";
+
+    public string SwapLabel => Settled is { PinnedPc: { } pc } ? $"Swap to {pc}'s" : "Swap";
+
     public bool IsHeld => Status == GameStatus.HeldForReview;
 
     public bool IsConflict => Status == GameStatus.Conflict;
+
+    public bool IsFilesInUse => Status == GameStatus.FilesInUse;
+
+    /// <summary>Its saves weren't found where its places say: Add a place sets one by hand.</summary>
+    public bool IsSavesMissing => Status is GameStatus.SavesMissing or GameStatus.NoSaves;
 
     public bool NeedsYou => SyncCounts.NeedsYou(Status);
 
@@ -281,6 +355,8 @@ public sealed partial class GameSavesViewModel : ObservableObject, IPageSurface
         _current = detail.Versions.FirstOrDefault(v => v.IsCurrent)?.Id;
         HistorySummary = detail.Versions.Count == 0 ? "no versions yet"
             : $"{(detail.Versions.Count == 1 ? "1 version" : $"{detail.Versions.Count.ToString(CultureInfo.InvariantCulture)} versions")} · {Cli.FormatSize(detail.HistoryBytes)}";
+        Settled = detail.Conflict is { Waiting: false } settled ? settled : null;
+        OnPropertyChanged(nameof(SettledText));
         LogLines = detail.Log.Select(l => new LogLine(When(l.AtUtc, nowLocal), l.Level switch
         {
             "error" => LogLevel.Error,
@@ -305,7 +381,8 @@ public sealed partial class GameSavesViewModel : ObservableObject, IPageSurface
         { Syncs: false } => "GameSync found its saves on this PC. Nothing is backed up until you sync them.",
         { Status: GameStatus.HeldForReview } =>
             "Its save changed while the game wasn't running, so GameSync held it for you to look at. Keep the new save, or restore the previous one; either way the other stays in the history.",
-        { Status: GameStatus.Conflict } => $"{game.StatusDetail ?? "It changed on two PCs."} To take the other PC's save instead, restore the version marked Kept from a conflict.",
+        { Status: GameStatus.Conflict } =>
+            $"{DecisionEngine.WaitingReason(game.StatusDetail) ?? "It changed on two PCs since they last agreed."} Both copies are safe; Resolve shows them side by side.",
         { NeedsYou: true, StatusDetail: { Length: > 0 } detail } => detail,
         { Status: GameStatus.Playing } => "Running now. Its save syncs a few seconds after you quit.",
         { Status: GameStatus.BackupOnly } => $"{StoreNames.SyncingStore(game.Store)} syncs its saves between your PCs; GameSync keeps a backup of every version.",

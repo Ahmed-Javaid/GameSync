@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.Json;
+using GameSync.Core.Model;
 
 namespace GameSync.Core.Art;
 
@@ -35,6 +36,7 @@ public sealed class ArtCache : IDisposable
     public ArtCache(string dataDir, HttpMessageHandler? handler = null, Func<DateTime>? utcNow = null, string? steamRoot = null)
     {
         Folder = Path.Combine(dataDir, "art", "steam");
+        OwnFolder = Path.Combine(dataDir, "art", "own");
         _utcNow = utcNow ?? (() => DateTime.UtcNow);
         _steamCache = steamRoot is null ? null : Path.Combine(steamRoot, "appcache", "librarycache");
         // No redirects: an image comes from Steam's image server or not at all.
@@ -47,6 +49,9 @@ public sealed class ArtCache : IDisposable
 
     public string Folder { get; }
 
+    /// <summary>The person's own images (ART-06), a folder per game: on this PC only, never synced or put in a shared zip.</summary>
+    public string OwnFolder { get; }
+
     public void Dispose() => _http.Dispose();
 
     /// <summary>The cached image of this kind for the app, if there is one.</summary>
@@ -54,6 +59,64 @@ public sealed class ArtCache : IDisposable
     {
         var folder = AppFolder(appId);
         return Extensions.Select(e => Path.Combine(folder, Name(kind) + e)).FirstOrDefault(File.Exists);
+    }
+
+    /// <summary>The person's own image of this kind for the game, when they chose one in its Properties (ART-06).</summary>
+    public string? FindOwn(GameId game, ArtKind kind)
+    {
+        var folder = Path.Combine(OwnFolder, game.Value);
+        try
+        {
+            return Directory.Exists(folder)
+                ? Directory.EnumerateFiles(folder, Name(kind) + ".*")
+                    .Where(f => Extensions.Contains(Path.GetExtension(f), StringComparer.OrdinalIgnoreCase))
+                    .MaxBy(File.GetLastWriteTimeUtc)
+                : null;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Keeps the person's own image of this kind for the game (ART-06), checked by its content like Steam's art (ART-08):
+    /// JPEG, PNG or WebP, up to 8 MB. Each image gets a name of its own, so a new one never shows as the one before.
+    /// </summary>
+    /// <returns>Why it can't be kept; null once it is.</returns>
+    public string? SetOwn(GameId game, ArtKind kind, byte[] content)
+    {
+        if (ArtCheck.ExtensionOf(content) is not { } extension)
+        {
+            return content.Length > ArtCheck.MaxBytes ? "It's over 8 MB; pick a smaller picture." : "It isn't a JPEG, PNG or WebP picture.";
+        }
+
+        var folder = Directory.CreateDirectory(Path.Combine(OwnFolder, game.Value)).FullName;
+        var hash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(content))[..8].ToLowerInvariant();
+        var target = Path.Combine(folder, $"{Name(kind)}.{hash}{extension}");
+        var temporary = target + ".part";
+        File.WriteAllBytes(temporary, content);
+        File.Move(temporary, target, overwrite: true);
+        File.SetLastWriteTimeUtc(target, _utcNow());
+        foreach (var old in Directory.EnumerateFiles(folder, Name(kind) + ".*").Where(f => !string.Equals(f, target, StringComparison.OrdinalIgnoreCase)))
+        {
+            File.Delete(old);
+        }
+
+        return null;
+    }
+
+    /// <summary>Takes the person's own image of this kind away, so Steam's shows again, or the title cover.</summary>
+    public void RemoveOwn(GameId game, ArtKind kind)
+    {
+        var folder = Path.Combine(OwnFolder, game.Value);
+        if (Directory.Exists(folder))
+        {
+            foreach (var file in Directory.EnumerateFiles(folder, Name(kind) + ".*").ToList())
+            {
+                File.Delete(file);
+            }
+        }
     }
 
     /// <summary>What the app's Steam store page says about it, once Steam's store has been asked (ART-09).</summary>

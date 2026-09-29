@@ -121,12 +121,31 @@ internal sealed class Engine : IDisposable
         return (Service, recover ? await Service.RecoverAsync(ct) : []);
     }
 
-    /// <summary>Each game's programs, for spotting it running; games with no install folder here can't be spotted.</summary>
-    public IReadOnlyList<Core.Sessions.GamePrograms> Programs() =>
-        Games.Where(g => InstallDirs.ContainsKey(g.Id) && Directory.Exists(InstallDirs[g.Id]))
-            .Select(g => Core.Sessions.GamePrograms.For(g.Id, InstallDirs[g.Id]))
-            .Where(p => p.Names.Count > 0)
-            .ToList();
+    /// <summary>
+    /// PLAY-05, PLAY-12: the games to watch for play, with their install folders: every game that syncs, and every other
+    /// game installed here that isn't ignored, so Home can say what's playing and its play counts; not Steam's software
+    /// (Wallpaper Engine), which can run all day. A game with no install folder here can't be spotted.
+    /// </summary>
+    /// <param name="isSoftware">Whether Steam lists an app ID as software, as far as it's been asked.</param>
+    public IReadOnlyList<(GameId Id, string Title, string InstallDir, bool Syncs)> Watched(Func<long, bool>? isSoftware = null)
+    {
+        var watched = new List<(GameId Id, string Title, string InstallDir, bool Syncs)>();
+        foreach (var game in Games.Where(g => InstallDirs.ContainsKey(g.Id)))
+        {
+            watched.Add((game.Id, game.Title, InstallDirs[game.Id], true));
+        }
+
+        foreach (var entry in Library.All().Where(e => e is { State: LibraryState.Found, MergedInto: null, Installed: true } && InstallDirs.ContainsKey(e.Id)))
+        {
+            var software = entry.Store == StoreKind.Steam && long.TryParse(entry.StoreId, out var app) && isSoftware?.Invoke(app) == true;
+            if (!software && watched.All(w => w.Id != entry.Id))
+            {
+                watched.Add((entry.Id, entry.DisplayTitle, InstallDirs[entry.Id], false));
+            }
+        }
+
+        return watched.Where(w => Directory.Exists(w.InstallDir)).ToList();
+    }
 
     public void Dispose()
     {

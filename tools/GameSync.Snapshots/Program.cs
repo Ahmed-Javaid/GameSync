@@ -1,10 +1,13 @@
 // Renders pages of GameSync's UI to PNG files, in the themes asked for, with Avalonia's headless platform and Skia:
 //   dotnet run --project tools/GameSync.Snapshots -- <output folder> [--data <data folder>] [--game <id>] [--size 1920x1128] [--hover x,y] [page ...]
-// Pages: gallery, gallery2, gallery3, and with --data, home, library, library-search and library-game (a game's page, the
-// one --game names or the hero game), saves and game-saves (the save manager, and that game's saves in it), and
-// properties-general, -launch, -files, -saves and -sync (its Properties) from that data folder's games and art; and the
+// Pages: gallery, gallery2, gallery3, and with --data, home, home-playing (the hero game running), library, library-installed,
+// library-local, library-search and library-game (a game's page, the
+// one --game names or the hero game), saves and game-saves (the save manager, and that game's saves in it), conflict and
+// conflict-settled (a made-up conflict of that game, waiting and settled), add-place and import-kept (those dialogs over
+// its saves, made up), and
+// properties-general, -art, -launch, -files, -saves and -sync (its Properties) from that data folder's games and art; and the
 // Glossy window (LOOK-17) over the last-played game's art: glossy-home, glossy-library, glossy-game, glossy-saves,
-// glossy-game-saves, glossy-properties, glossy-console, glossy-settings.
+// glossy-game-saves, glossy-conflict, glossy-properties, glossy-console, glossy-settings.
 // Themes: every page in Arcade dark, Arcade light and Sakura dark; Glossy goes Solid in light mode, as the app does.
 // "icons" writes gamesync.ico (copy it to src/GameSync.Tray/Assets) and a sheet of the tray icon in every state.
 
@@ -12,6 +15,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Threading;
+using GameSync.Core.Model;
 using GameSync.Host;
 using GameSync.Snapshots;
 using GameSync.UI;
@@ -23,7 +27,7 @@ var list = args.ToList();
 var dataDir = TakeOption(list, "--data");
 // The game whose page library-game and glossy-game show; the hero game by default.
 var gameId = TakeOption(list, "--game");
-// A window size for the app's pages instead of the design's 1280 × 800, such as a maximized window's.
+// A window size for the app's pages instead of the design's 1280 Ã— 800, such as a maximized window's.
 var size = TakeOption(list, "--size")?.Split('x') is [var w, var h] ? (Width: int.Parse(w), Height: int.Parse(h)) : (Width: 1280, Height: 800);
 // The mouse pointer resting at x,y (window coordinates), to see hover states.
 var hover = TakeOption(list, "--hover")?.Split(',') is [var hx, var hy] ? new Point(double.Parse(hx), double.Parse(hy)) : (Point?)null;
@@ -60,7 +64,7 @@ if (dataDir is not null)
 {
     var now = DateTime.Now;
     var (games, home) = LauncherData.Read(dataDir, now);
-    var rail = ShellViewModel.DefaultRail(games.FirstOrDefault(g => g.Status == GameSync.Core.State.GameStatus.Playing)?.Title, games.Count(g => g.NeedsYou));
+    var rail = ShellViewModel.DefaultRail(games.FirstOrDefault(g => g.IsRunning)?.Title, games.Count(g => g.NeedsYou));
     // The library as it opens, on its Hidden view, with a search typed, and with a game's page open beside the list: the
     // one --game names, or the hero game, its places, saves and history read from the data folder as the app reads them.
     var shown = gameId is not null ? games.FirstOrDefault(g => g.Id.Value == gameId) : home.Hero ?? games.FirstOrDefault();
@@ -79,8 +83,20 @@ if (dataDir is not null)
         OpenProperties = (_, _) => { },
         OpenLink = _ => { },
         Approve = _ => { },
+        OpenConflict = _ => { },
+        Resolve = (_, _, _) => { },
+        Swap = _ => { },
+        Retry = _ => { },
+        RenameSave = (_, _, _) => { },
+        ForgetSave = (_, _) => { },
+        OpenAddPlace = _ => { },
+        AddPlace = (_, _, _) => { },
+        OpenImportKept = _ => { },
         SaveProperties = (_, _) => { },
         CloseDialog = () => { },
+        SetView = _ => { },
+        ScanFolder = (folder, _) => Task.FromResult(new FolderScan(folder, [], 0)),
+        Locate = (_, _) => { },
     };
 
     // Read off the UI thread, as the app does: waiting on it here would hold the thread its awaits come back to.
@@ -108,6 +124,7 @@ if (dataDir is not null)
         var saves = new SaveManagerViewModel(actions);
         saves.Update(games);
         saves.Show(Off(() => SaveOverview.ReadAsync(dataDir, CancellationToken.None)), now);
+        saves.ShowSpace(SaveOverview.Space(dataDir), now);
         if (open && shown is not null)
         {
             saves.Open(shown.Id);
@@ -115,6 +132,56 @@ if (dataDir is not null)
             {
                 saves.Game?.Show(detail, now);
             }
+        }
+
+        return saves;
+    }
+
+    // A game's conflict as the design draws it (SYNC-10): this PC's newer, longer play against LAPTOP's, with Compare
+    // files open; or the same conflict settled by newest wins, with Swap (SYNC-04). Made up, in the game --game names.
+    SaveManagerViewModel Conflict(bool settled)
+    {
+        var saves = Saves();
+        if (shown is null)
+        {
+            return saves;
+        }
+
+        DateTime At(int hour, int minute) => now.Date.AddHours(hour).AddMinutes(minute).ToUniversalTime();
+        FileEntry File(string name, int hour, int minute) => new($"saves/{name}", 11_953_766, At(hour, minute), BlobId.Parse(new string('a', 64)));
+        var desktop = new ConflictSide
+        {
+            Pc = "DESKTOP", IsThisPc = true, Version = VersionId.Parse("2026-09-29T20-04-00Z_DESKTOP_d1"), SavedUtc = At(21, 4),
+            Session = new SessionInfo(At(19, 12), At(21, 4)), Sessions = 2, Played = TimeSpan.FromMinutes(190), Bytes = 11_953_766, Files = 2,
+            Changed = ["S0000.sl2", "S0000.sl2.bak"], Newest = true, Suggested = true,
+        };
+        var laptop = new ConflictSide
+        {
+            Pc = "LAPTOP", Version = VersionId.Parse("2026-09-29T18-30-00Z_LAPTOP_l1"), SavedUtc = At(19, 30),
+            Session = new SessionInfo(At(18, 43), At(19, 30)), Sessions = 1, Played = TimeSpan.FromMinutes(47), Bytes = 11_953_766, Files = 2,
+            Changed = ["S0000.sl2", "S0000.sl2.bak"],
+        };
+        var detail = new ConflictDetail
+        {
+            Id = shown.Id,
+            Title = shown.Title,
+            Waiting = !settled,
+            Sides = [desktop, laptop],
+            Reason = "Changed on DESKTOP and on LAPTOP; this game is set to always ask.",
+            LastSyncUtc = At(12, 0),
+            Files =
+            [
+                new ConflictFile("saves/S0000.sl2", File("S0000.sl2", 21, 4), File("S0000.sl2", 19, 30), "Changed on both PCs"),
+                new ConflictFile("saves/S0000.sl2.bak", File("S0000.sl2.bak", 20, 58), File("S0000.sl2.bak", 19, 29), "Changed on both PCs"),
+            ],
+            KeptPc = settled ? "DESKTOP" : null,
+            PinnedPc = settled ? "LAPTOP" : null,
+        };
+        saves.OpenConflict(shown.Id);
+        saves.Conflict?.Show(detail, now);
+        if (saves.Conflict is { } conflict)
+        {
+            conflict.Comparing = !settled;
         }
 
         return saves;
@@ -140,30 +207,87 @@ if (dataDir is not null)
     Dictionary<string, Func<object?>> Makers() => new()
     {
         ["home"] = () => HomeViewModel.From(home, games, now),
+        ["playing"] = Playing,
         ["library"] = () => Library(),
+        ["installed"] = () => Library("installed"),
+        ["local"] = () => Library("local"),
         ["hidden"] = () => Library("hidden"),
         ["searched"] = () => Library(search: "re"),
         ["game"] = () => Library(open: true),
         ["saves"] = () => Saves(),
         ["game-saves"] = () => Saves(open: true),
+        ["conflict"] = () => Conflict(settled: false),
+        ["conflict-settled"] = () => Conflict(settled: true),
     };
+
+    // Home with a game running (PLAY-12): the game --game names, or the hero game, playing for the last 35 minutes.
+    HomeViewModel Playing()
+    {
+        var running = games.Select(g => g.Id == shown?.Id ? g with { RunningSinceUtc = now.AddMinutes(-35).ToUniversalTime() } : g).ToList();
+        using var state = new GameSync.Core.State.StateStore(dataDir);
+        return HomeViewModel.From(Launcher.Home(running, state, now), running, now);
+    }
+
+    // Add a place over a game's saves, with a folder picked (made up, in the game --game names): as the design draws it.
+    AddPlaceViewModel AddPlace()
+    {
+        var add = new AddPlaceViewModel(shown?.Id ?? GameId.Parse("game"), shown?.Title ?? "Game", actions);
+        add.Place = new NewPlaceLook
+        {
+            Path = @"C:\Users\You\AppData\LocalLow\Team Cherry\Hollow Knight",
+            Folder = @"C:\Users\You\AppData\LocalLow\Team Cherry\Hollow Knight",
+            Portable = "<localLow>/Team Cherry/Hollow Knight",
+            Files = 6,
+            Bytes = 1_153_434,
+            NewestUtc = now.Date.AddHours(21).AddMinutes(4).ToUniversalTime(),
+        };
+        return add;
+    }
+
+    // Import kept saves with a folder read (made up): each copy by name, one the same as another.
+    ImportKeptViewModel ImportKept()
+    {
+        var import = new ImportKeptViewModel(shown?.Id ?? GameId.Parse("game"), shown?.Title ?? "Game", actions) { Folder = @"D:\Saves\Bloodborne\CUSA00207" };
+        DateTime At(int day, int hour, int minute) => new DateTime(now.Year, 9, day, hour, minute, 0, DateTimeKind.Local).ToUniversalTime();
+        import.Show(new GameSync.Core.Sync.ImportReport(
+        [
+            new("Before Father Gascoigne", "", 3, 1_153_434, At(4, 20, 12), null),
+            new("Before Vicar Amelia", "", 3, 1_160_192, At(9, 22, 40), null),
+            new("Before Rom", "", 3, 1_171_456, At(12, 21, 5), null),
+            new("After Rom", "", 3, 1_171_456, At(12, 21, 5), "Before Rom"),
+            new("Before Orphan of Kos", "", 3, 1_189_888, At(20, 23, 18), null),
+        ], ["SPRJ0005 is the live save, so it's left as it is."], 0), now);
+        return import;
+    }
 
     Control Shell(string current, string? dialog = null) => new Shell
     {
-        DataContext = new ShellViewModel(Makers(), current) { Rail = rail, Dialog = dialog is null ? null : Properties(dialog) },
+        DataContext = new ShellViewModel(Makers(), current)
+        {
+            Rail = rail,
+            Dialog = dialog switch { null => null, "add-place" => AddPlace(), "import-kept" => ImportKept(), _ => Properties(dialog) },
+        },
     };
     pages["home"] = (() => Shell("home"), size.Width, size.Height);
+    pages["home-playing"] = (() => Shell("playing"), size.Width, size.Height);
     pages["library"] = (() => Shell("library"), size.Width, size.Height);
     pages["library-full"] = (() => Shell("library"), 1280, 2400);
     pages["library-hidden"] = (() => Shell("hidden"), 1280, 800);
+    pages["library-installed"] = (() => Shell("installed"), size.Width, size.Height);
+    pages["library-local"] = (() => Shell("local"), size.Width, size.Height);
     pages["library-search"] = (() => Shell("searched"), size.Width, size.Height);
     pages["library-game"] = (() => Shell("game"), size.Width, size.Height);
     pages["saves"] = (() => Shell("saves"), size.Width, size.Height);
     pages["game-saves"] = (() => Shell("game-saves"), size.Width, size.Height);
-    foreach (var section in new[] { "general", "launch", "files", "saves", "sync" })
+    pages["conflict"] = (() => Shell("conflict"), size.Width, size.Height);
+    pages["conflict-settled"] = (() => Shell("conflict-settled"), size.Width, size.Height);
+    foreach (var section in new[] { "general", "art", "launch", "files", "saves", "sync" })
     {
         pages["properties-" + section] = (() => Shell("game", section), size.Width, size.Height);
     }
+
+    pages["add-place"] = (() => Shell("game-saves", "add-place"), size.Width, size.Height);
+    pages["import-kept"] = (() => Shell("game-saves", "import-kept"), size.Width, size.Height);
 
     // The app's window as it opens, Glossy or Solid by the theme, with the art the app would use.
     var art = home.Hero?.HeroPath ?? home.Hero?.CoverPath;
@@ -175,7 +299,7 @@ if (dataDir is not null)
         "22:31:57  Hades: synced after play (3 files, 1.2 MB).",
         "22:32:02  ! Sekiro: Shadows Die Twice: changed on two PCs. A conflict waits for you.",
     ], now);
-    foreach (var current in new[] { "home", "library", "game", "saves", "game-saves", "log", "settings", "properties" })
+    foreach (var current in new[] { "home", "library", "game", "saves", "game-saves", "conflict", "log", "settings", "properties" })
     {
         glossy[current == "log" ? "glossy-console" : "glossy-" + current] = choice =>
         {

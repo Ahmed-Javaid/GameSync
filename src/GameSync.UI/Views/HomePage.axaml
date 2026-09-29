@@ -52,7 +52,7 @@
     <Panel>
     <c:GsHeroBanner MinHeight="0" Art="{Binding HeroArt}" Logo="{Binding HeroLogo}" Title="{Binding HeroTitle}"
                     Eyebrow="{Binding HeroEyebrow}" Chip="{Binding HeroChip}" Status="{Binding HeroStatus}" StatusLabel="{Binding HeroStatusLabel}"
-                    Blurb="{Binding HeroBlurb}" PlayLabel="{Binding HeroPlayLabel}" PlayCommand="{Binding PlayCommand}" IsVisible="{Binding HasHero}"
+                    Blurb="{Binding HeroBlurb}" PlayLabel="{Binding HeroPlayLabel}" PlayCommand="{Binding PlayCommand}" ShowsPlay="{Binding HeroShowsPlay}" IsVisible="{Binding HasHero}"
                     SavesCommand="{Binding OpenHeroSavesCommand}" SettingsCommand="{Binding OpenHeroPropertiesCommand}" />
     <c:GsCard Title="No games yet" Subtitle="GameSync hasn't looked for games on this PC." IsVisible="{Binding NoGames}">
       <c:GsNote Icon="search" MaxWidth="640" HorizontalAlignment="Left" VerticalAlignment="Top"

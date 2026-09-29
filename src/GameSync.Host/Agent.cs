@@ -48,7 +48,8 @@ public interface IAgentOutput
 /// The agent (design.md → Background work). It notices games being played, however they were started (PLAY-05), and
 /// around each session marks the game as playing for the other PCs (PLAY-07), records the session, syncs the game once
 /// it has closed, and checks its saves didn't move (FIND-07). Between sessions it retries what waits to upload (BG-04)
-/// and keeps the save before a game update runs (BAK-06). While any game plays, it only watches (BG-08).
+/// and keeps the save before a game update runs (BAK-06). While a game that syncs plays, it only watches (BG-08). Every
+/// other game installed here is watched too, so Home shows what's playing and its play counts (PLAY-12).
 /// </summary>
 internal sealed class Agent(string dataDir, IAgentOutput output) : IDisposable
 {
@@ -59,13 +60,17 @@ internal sealed class Agent(string dataDir, IAgentOutput output) : IDisposable
     private static readonly TimeSpan FirstRetry = TimeSpan.FromMinutes(1);
     private static readonly TimeSpan LongestRetry = TimeSpan.FromHours(1);
 
+    private static readonly TimeSpan ProgramsEvery = TimeSpan.FromHours(1);
+
     private readonly StateStore _state = new(dataDir);
     private readonly SessionTracker _tracker = new();
     private readonly ProcessWatcher _watcher = new();
     private readonly Dictionary<GameId, SaveActivity> _activity = [];
     private readonly Dictionary<GameId, SessionInfo> _ended = [];
+    private readonly Dictionary<GameId, (string Folder, GamePrograms Programs, DateTime At)> _known = [];
     private IReadOnlyList<GamePrograms> _programs = [];
     private Dictionary<GameId, (string Title, IReadOnlyList<string> Folders)> _games = [];
+    private Dictionary<GameId, string> _titles = [];
     private IReadOnlyList<GameProcess> _running = [];
     private DateTime _gamesAt = DateTime.MinValue;
     private DateTime _buildsAt = DateTime.MinValue;
@@ -73,6 +78,7 @@ internal sealed class Agent(string dataDir, IAgentOutput output) : IDisposable
     private DateTime _retryAt = DateTime.MinValue;
     private TimeSpan _retryWait = FirstRetry;
     private int _syncSoon;
+    private int _watchSoon;
 
     public const string DailyRequestKey = "daily.requested";
 
@@ -83,6 +89,9 @@ internal sealed class Agent(string dataDir, IAgentOutput output) : IDisposable
 
     /// <summary>Sync now, from the window or the tray: every game syncs at the next round with nothing playing (BG-08). Any thread.</summary>
     public void SyncSoon() => Interlocked.Exchange(ref _syncSoon, 1);
+
+    /// <summary>The games are read again at the next round, so a game just located or found is watched at once (PLAY-12). Any thread.</summary>
+    public void WatchSoon() => Interlocked.Exchange(ref _watchSoon, 1);
 
     public void Dispose()
     {
@@ -142,7 +151,8 @@ internal sealed class Agent(string dataDir, IAgentOutput output) : IDisposable
     /// <summary>One round: find the games' processes, move sessions on, and between sessions do what waits.</summary>
     public async Task TickAsync(DateTime nowUtc, CancellationToken ct)
     {
-        if (nowUtc - _gamesAt >= GamesEvery)
+        var asked = Interlocked.Exchange(ref _watchSoon, 0) == 1;
+        if (asked || nowUtc - _gamesAt >= GamesEvery)
         {
             RefreshGames(nowUtc);
         }
@@ -172,8 +182,10 @@ internal sealed class Agent(string dataDir, IAgentOutput output) : IDisposable
             }
         }
 
-        // BG-08: no disk work while anything plays.
-        if (_tracker.Playing.Count > 0)
+        // BG-08: no disk work while a game that syncs plays. A game that doesn't sync is only watched for Home (PLAY-12),
+        // as it was before GameSync watched it at all: a program taken for a game, such as software running all day
+        // before Steam has said it's software, never holds every sync back.
+        if (_tracker.Playing.Keys.Any(Syncs))
         {
             return;
         }
@@ -226,18 +238,55 @@ internal sealed class Agent(string dataDir, IAgentOutput output) : IDisposable
         }
     }
 
-    /// <summary>Which games sync, their programs and their save folders, read again now and then so new ones are watched.</summary>
+    /// <summary>
+    /// Which games sync and their save folders, and the programs of every game installed here (PLAY-12), read again now
+    /// and then so new ones are watched. A game's programs are looked for again within the hour, or when it moves.
+    /// </summary>
     private void RefreshGames(DateTime nowUtc)
     {
         using var engine = Engine.Open(dataDir);
-        _programs = engine.Programs();
+        using var art = new Core.Art.ArtCache(dataDir);
+        var watched = engine.Watched(art.IsSoftware);
+        var programs = new List<GamePrograms>();
+        foreach (var (id, _, folder, _) in watched)
+        {
+            if (!_known.TryGetValue(id, out var known) || !string.Equals(known.Folder, folder, StringComparison.OrdinalIgnoreCase) || nowUtc - known.At >= ProgramsEvery)
+            {
+                known = (folder, GamePrograms.For(id, folder), nowUtc);
+                _known[id] = known;
+            }
+
+            if (known.Programs.Names.Count > 0)
+            {
+                programs.Add(known.Programs);
+            }
+        }
+
+        foreach (var gone in _known.Keys.Where(k => watched.All(w => w.Id != k)).ToList())
+        {
+            _known.Remove(gone);
+        }
+
+        _programs = programs;
+
+        // A game still playing that's no longer watched (Steam has just said it's software) keeps its name for the session's end.
+        var titles = watched.ToDictionary(w => w.Id, w => w.Title);
+        foreach (var playing in _tracker.Playing.Keys.Where(g => !titles.ContainsKey(g) && _titles.ContainsKey(g)))
+        {
+            titles[playing] = _titles[playing];
+        }
+
+        _titles = titles;
         _games = engine.Games.ToDictionary(
             g => g.Id,
             g => (g.Title, (IReadOnlyList<string>)g.Roots.Values.Where(f => !RootResolver.IsUnresolved(f) && Directory.Exists(f)).ToList()));
         _gamesAt = nowUtc;
     }
 
-    private string Title(GameId game) => _games.TryGetValue(game, out var known) ? known.Title : game.Value;
+    private string Title(GameId game) => _games.TryGetValue(game, out var known) ? known.Title : _titles.GetValueOrDefault(game, game.Value);
+
+    /// <summary>The game's saves sync, so its session marks it as playing for the other PCs and it syncs when it closes.</summary>
+    private bool Syncs(GameId game) => _games.ContainsKey(game);
 
     /// <summary>
     /// A session the agent had open when it stopped without closing it (a crash, a power cut): it's recorded from its
@@ -258,14 +307,23 @@ internal sealed class Agent(string dataDir, IAgentOutput output) : IDisposable
         }
     }
 
+    /// <summary>
+    /// A session starts: it's kept open in this PC's state, so Home shows the game as playing (PLAY-12). A game whose saves
+    /// sync is also marked as playing, here and for the other PCs (PLAY-07); one that doesn't sync only has its play counted.
+    /// </summary>
     private async Task StartedAsync(SessionStarted started, CancellationToken ct)
     {
         var game = started.Game;
         _state.SetSetting(RunningGames.OpenSessionKey(game), started.StartUtc.ToString("O", CultureInfo.InvariantCulture));
-        _state.SetStatus(game, GameStatus.Playing, $"Playing since {started.StartUtc.ToLocalTime():HH:mm}.");
         _activity[game] = new SaveActivity(_games.TryGetValue(game, out var known) ? known.Folders : []);
         output.Say($"{Title(game)}: playing since {started.StartUtc.ToLocalTime():HH:mm:ss}.");
         output.Played(game, Title(game), playing: true);
+        if (!Syncs(game))
+        {
+            return;
+        }
+
+        _state.SetStatus(game, GameStatus.Playing, $"Playing since {started.StartUtc.ToLocalTime():HH:mm}.");
         try
         {
             await Markers.SetAsync(dataDir, game, started.StartUtc, ct);
@@ -286,7 +344,10 @@ internal sealed class Agent(string dataDir, IAgentOutput output) : IDisposable
 
         _state.AddSession(ended.Game, ended.Session);
         _state.SetSetting(RunningGames.OpenSessionKey(ended.Game), "");
-        _ended[ended.Game] = ended.Session;
+        if (Syncs(ended.Game))
+        {
+            _ended[ended.Game] = ended.Session;
+        }
         var minutes = Math.Max(1, (int)Math.Round((ended.Session.EndUtc - ended.Session.StartUtc).TotalMinutes));
         output.Say($"{Title(ended.Game)}: session over after {minutes} min{(ended.ByHand ? ", ended by hand" : "")}.");
         output.Played(ended.Game, Title(ended.Game), playing: false);

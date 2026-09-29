@@ -1,0 +1,90 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="using:GameSync.UI.Controls"
+             xmlns:vm="using:GameSync.UI.ViewModels"
+             x:Class="GameSync.UI.Views.AddPlaceDialog"
+             x:DataType="vm:AddPlaceViewModel"
+             Width="640">
+  <!-- Add a place (design system → AddPlaceDialog, FOLD-01): a folder or one save file picked in Windows' own picker, how
+       every PC reads it and what's there, what it holds, and Add this place. Program files in it are never taken. -->
+  <Border Background="{DynamicResource surface-dialog}" BorderBrush="{DynamicResource edge-dialog}" BorderThickness="1" BackgroundSizing="OuterBorderEdge"
+          CornerRadius="16" BoxShadow="{DynamicResource shadow-dialog}" ClipToBounds="True">
+    <DockPanel>
+      <Border DockPanel.Dock="Top" Padding="24,20,24,8">
+        <Grid ColumnDefinitions="*,Auto">
+          <StackPanel>
+            <TextBlock Classes="card-title" Text="Add a place" />
+            <TextBlock Classes="muted" Text="{Binding Subtitle}" TextTrimming="CharacterEllipsis" />
+          </StackPanel>
+          <c:GsIconButton Grid.Column="1" Classes="sm" Icon="x" Label="Close Add a place" Command="{Binding CancelCommand}" VerticalAlignment="Center" />
+        </Grid>
+      </Border>
+
+      <Border DockPanel.Dock="Bottom" BorderBrush="{DynamicResource line-100}" BorderThickness="0,1,0,0" Padding="24,14">
+        <StackPanel Spacing="12">
+          <c:GsNote Icon="info" Text="It's backed up at the next sync. Your other PCs are asked before they take a new place, and nothing in it is ever deleted." />
+          <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+            <c:GsButton Classes="ghost" Content="Cancel" Command="{Binding CancelCommand}" />
+            <c:GsButton Classes="primary" Icon="plus" Content="Add this place" Command="{Binding AddCommand}" IsEnabled="{Binding CanAdd}" />
+          </StackPanel>
+        </StackPanel>
+      </Border>
+
+      <StackPanel Margin="24,12,24,20" Spacing="16">
+        <!-- Nothing picked yet: a folder, the usual case, or one save file -->
+        <StackPanel Spacing="16" IsVisible="{Binding NoPlace}">
+          <TextBlock Classes="muted" TextWrapping="Wrap" Text="{Binding Intro}" />
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <c:GsButton Icon="folder" Content="Choose a folder…" Click="PickFolder" />
+            <c:GsButton Classes="ghost" Icon="file" Content="Choose a file…" Click="PickFile" />
+          </StackPanel>
+        </StackPanel>
+
+        <!-- Picked: this PC's full path and what's there, Change… and Open in Explorer -->
+        <Border Background="{DynamicResource surface-well}" BorderBrush="{DynamicResource edge-well}" BorderThickness="1" BackgroundSizing="OuterBorderEdge"
+                CornerRadius="{DynamicResource radius-md}" Padding="12,10,8,10" IsVisible="{Binding HasPlace}">
+          <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="12">
+            <Border Width="40" Height="40" CornerRadius="{DynamicResource radius-md}" Background="{DynamicResource bg-300}">
+              <c:GsIcon Icon="{Binding PlaceIcon}" Size="18" Foreground="{DynamicResource ink-muted}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Border>
+            <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+              <TextBlock Classes="mono" Text="{Binding Place.Path, FallbackValue=''}" TextTrimming="LeadingCharacterEllipsis" ToolTip.Tip="{Binding Place.Path, FallbackValue=''}" />
+              <TextBlock Classes="caption muted" Text="{Binding Meta}" IsVisible="{Binding !IsRefused}" />
+            </StackPanel>
+            <c:GsButton Grid.Column="2" Classes="sm" Content="Change…" Click="PickAgain" VerticalAlignment="Center" />
+            <c:GsIconButton Grid.Column="3" Classes="sm" Icon="folder" Label="Open in Explorer" Command="{Binding OpenCommand}" VerticalAlignment="Center" />
+          </Grid>
+        </Border>
+
+        <c:GsNote Icon="search" Text="Looking at what's there…" IsVisible="{Binding Looking}" />
+        <c:GsNote Icon="block" Foreground="{DynamicResource danger}" Text="{Binding Refused}" IsVisible="{Binding IsRefused}" />
+        <c:GsNote Icon="alert" Foreground="{DynamicResource danger}" Text="{Binding Error}" IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
+        <!-- How every PC reads it, and what it holds -->
+        <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto" ColumnSpacing="16" RowSpacing="12" IsVisible="{Binding CanAdd}">
+          <TextBlock Classes="overline faint" Text="EVERY PC READS IT AS" VerticalAlignment="Center" />
+          <TextBlock Grid.Column="1" Classes="mono-fact" Text="{Binding Portable}" TextTrimming="LeadingCharacterEllipsis" ToolTip.Tip="{Binding Portable}"
+                     VerticalAlignment="Center" />
+          <TextBlock Grid.Row="1" Classes="overline faint" Text="WHAT IT HOLDS" VerticalAlignment="Center" />
+          <c:GsButton Grid.Row="1" Grid.Column="1" Classes="sm" IconAfter="chevronDown" Content="{Binding CategoryLabel}" HorizontalAlignment="Left"
+                      AutomationProperties.Name="{Binding CategoryLabel, StringFormat='What it holds: {0}'}">
+            <c:GsButton.Flyout>
+              <MenuFlyout Placement="BottomEdgeAlignedLeft">
+                <MenuItem Header="Game saves: synced between PCs" ToggleType="CheckBox" Command="{Binding SelectCommand}" CommandParameter="save"
+                          IsChecked="{Binding Category, Mode=OneWay, Converter={x:Static c:EqualsConverter.Instance}, ConverterParameter=save}" />
+                <MenuItem Header="Settings: each PC keeps its own" ToggleType="CheckBox" Command="{Binding SelectCommand}" CommandParameter="config"
+                          IsChecked="{Binding Category, Mode=OneWay, Converter={x:Static c:EqualsConverter.Instance}, ConverterParameter=config}" />
+                <MenuItem Header="Screenshots: backed up on this PC" ToggleType="CheckBox" Command="{Binding SelectCommand}" CommandParameter="screenshots"
+                          IsChecked="{Binding Category, Mode=OneWay, Converter={x:Static c:EqualsConverter.Instance}, ConverterParameter=screenshots}" />
+              </MenuFlyout>
+            </c:GsButton.Flyout>
+          </c:GsButton>
+        </Grid>
+
+        <c:GsNote Icon="info" Text="{Binding PortableNote}" IsVisible="{Binding PortableNote, Converter={x:Static ObjectConverters.IsNotNull}}" />
+        <c:GsNote Icon="shield" Text="{Binding ProgramsNote}" IsVisible="{Binding ProgramsNote, Converter={x:Static ObjectConverters.IsNotNull}}" />
+        <c:GsNote Icon="alert" Foreground="{DynamicResource warn}" Text="{Binding Warning}" IsVisible="{Binding Warning, Converter={x:Static ObjectConverters.IsNotNull}}" />
+      </StackPanel>
+    </DockPanel>
+  </Border>
+</UserControl>

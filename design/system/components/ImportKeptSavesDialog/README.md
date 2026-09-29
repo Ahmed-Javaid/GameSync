@@ -1,0 +1,8 @@
+Dialog that brings in save folders kept by hand as named saves (BAK-19): copies of a game's save, each in a folder named after the moment ("Before Orphan of Kos"), beside the live save or anywhere else.
+
+Provide `game`, `folder` once picked, `items` (`{id, name, saved, files, bytes, same?, kept?}`), `skipped` (why a folder in it isn't a kept copy), `roots` and `root` when the game has more than one save folder, `stage` (`pick`, `review`, `done`), `onPick` (opens Windows' folder picker), `onRoot`, `onOpen`, `onImport` and `onClose`.
+
+- **Pick**: what a kept copy looks like, and Choose the folder….
+- **Review**: the `FolderField` with the folder and how many kept copies it holds (Change…); **They're copies of** (a `Select`) when the game keeps saves in more than one place; then each copy by name with when it was saved, its files and size, newest last. A copy identical to another here, or to a named save, says Same as that one and isn't named again; one identical to a version already in the history says Already kept, and that version takes its name, stored once. `skipped` lines, in `warn`, say what was left alone: the live save itself, a folder with no save in it.
+- The foot counts the named saves the import makes (and the copies not kept twice) and the space the new files take, and says the folders are never changed and each copy is kept aside, never current by itself. Import N named saves is the one primary.
+- **Done**: how many were imported, where they are (Named saves, on every PC), and that Restore brings one back, keeping the files there now first. Opens from Import kept saves… on a game's Named saves card.

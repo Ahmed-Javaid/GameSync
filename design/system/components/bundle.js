@@ -783,6 +783,7 @@
   /* ---------- GamePropertiesDialog: one game's settings, like Steam's Properties ---------- */
   var PROP_SECTIONS = [
     { id: "general", label: "General", icon: "info" },
+    { id: "art", label: "Art", icon: "palette" },
     { id: "launch", label: "Launch", icon: "play" },
     { id: "files", label: "Installed files", icon: "drive" },
     { id: "saves", label: "Saves", icon: "saves" },
@@ -796,7 +797,8 @@
     var initial = {
       name: g.name || "", favourite: !!g.favourite, shown: !g.hidden, args: launch.args || "",
       files: g.files || [], settings: g.settings || "this-pc", screenshots: g.screenshots || "off", skip: g.skip !== false,
-      mode: g.mode || "sync", conflict: g.conflict || "newest"
+      mode: g.mode || "sync", conflict: g.conflict || "newest",
+      art: { cover: g.art && g.art.mine && g.art.mine.cover ? "mine" : null, hero: g.art && g.art.mine && g.art.mine.hero ? "mine" : null, logo: g.art && g.art.mine && g.art.mine.logo ? "mine" : null }
     };
     var secS = useState(props.section || "general"), sec = secS[0];
     var stS = useState(initial), st = stS[0];
@@ -819,6 +821,29 @@
             h(Button, { size: "sm", variant: "ghost", icon: copiedS[0] === "id" ? "check" : "copy", onClick: function () { copy("id"); } }, copiedS[0] === "id" ? "Copied" : "Copy"), { key: "id" }),
           g.antiCheat ? h("div", { key: "ac", className: "gs-note" }, h(Icon, { name: "shield", size: 16 }),
             "Ships " + g.antiCheat + ": it starts only through " + (store || "its launcher") + ", learn mode stays off, and its saves are never shared.") : null];
+      },
+      art: function () {
+        var art = g.art || {}, mine = art.mine || {};
+        function pick(kind, value) { var n = Object.assign({}, st.art); n[kind] = value; set("art", n); }
+        function slot(kind, title, description) {
+          var own = st.art[kind] === "mine", src = own ? mine[kind] : art[kind];
+          return h(SettingsRow, { key: kind, title: title, description: description },
+            h("div", { className: "gs-art-slot" },
+              h("span", { className: cx("gs-art-thumb", "is-" + kind, !src && "gs-cover-empty"), style: src ? { backgroundImage: "url(" + src + ")" } : null, "aria-hidden": "true" },
+                src ? null : kind === "logo" ? "Its name" : initialOf(g.name)),
+              h("div", { className: "gs-art-text" },
+                h("div", { className: "gs-art-from" }, own ? "Your image" : src ? "Steam\u2019s" : kind === "logo" ? "None: its name shows" : "None: a title cover shows"),
+                h("div", { className: "gs-row" },
+                  h(Button, { size: "sm", variant: "secondary", icon: "file", onClick: function () { pick(kind, "mine"); } }, own ? "Choose another\u2026" : "Choose an image\u2026"),
+                  own ? h(Button, { size: "sm", variant: "ghost", onClick: function () { pick(kind, null); } }, art[kind] ? "Use Steam\u2019s" : "Remove") : null))));
+        }
+        return [
+          h("h3", { key: "t", className: "gs-props-title" }, "Art"),
+          slot("cover", "Cover", "The tile in the library and on Home: tall, like Steam\u2019s 600 \u00d7 900."),
+          slot("hero", "Banner", "The wide picture at the top of its page, and on Home when it\u2019s the last played: like 1920 \u00d7 620."),
+          slot("logo", "Logo", "Shown over the banner in place of its name: a PNG with a see-through background."),
+          h("div", { key: "n", className: "gs-note" }, h(Icon, { name: "info", size: 16 }),
+            "Your own images stay on this PC: they\u2019re never synced or shared. JPEG, PNG or WebP, up to 8 MB, each checked like Steam\u2019s art.")];
       },
       launch: function () {
         var line = "\"C:\\Program Files\\GameSync\\GameSync.Tray.exe\" launch " + g.id + " -- %command%";
@@ -1060,6 +1085,104 @@
       h("div", { className: "gs-dialog-foot" }, foot));
   }
 
+  /* ---------- AddPlaceDialog: a place a game keeps saves, set by hand (FOLD-01) ---------- */
+  // place: { kind: "folder" | "file", path, portable, portableNote, files, bytes, newest, programs, state: "ok" | "warn" | "refused", message }
+  function AddPlaceDialog(props) {
+    var place = props.place || null;
+    var cat = useState(props.category || "save"), category = cat[0];
+    var refused = !!place && place.state === "refused";
+    var CATS = [
+      { id: "save", label: "Game saves: synced between PCs" },
+      { id: "config", label: "Settings: each PC keeps its own" },
+      { id: "screenshots", label: "Screenshots: backed up on this PC" }];
+    function pick(kind) { if (props.onPick) props.onPick(kind); }
+    var body = !place
+      ? h("div", { className: "gs-place" },
+          h("p", { className: "gs-muted", style: { margin: 0 } }, "Pick the folder where " + props.game + " keeps its saves, or one save file. You see what's there before anything is added."),
+          h("div", { className: "gs-row" },
+            h(Button, { variant: "secondary", icon: "folder", onClick: function () { pick("folder"); } }, "Choose a folder…"),
+            h(Button, { variant: "ghost", icon: "file", onClick: function () { pick("file"); } }, "Choose a file…")))
+      : h("div", { className: "gs-place" },
+          h(FolderField, { path: place.path, icon: place.kind === "file" ? "file" : "folder", state: refused ? "refused" : "ok", message: refused ? place.message : null,
+            meta: refused ? null : place.kind === "file" ? fmt(place.bytes || 0) + " · saved " + place.newest : place.files + (place.files === 1 ? " file · " : " files · ") + fmt(place.bytes || 0) + " · newest " + place.newest,
+            changeLabel: "Change…", onChange: function () { pick(place.kind); }, onOpen: props.onOpen }),
+          refused ? null : h(Facts, { items: [
+            { label: "Every PC reads it as", value: place.portable, mono: true, title: place.portableNote || place.portable },
+            { label: "What it holds", value: h(Select, { value: category, options: CATS, label: "What it holds", onChange: cat[1] }) }] }),
+          !refused && place.portableNote ? h("div", { className: "gs-note" }, h(Icon, { name: "info", size: 16 }), place.portableNote) : null,
+          !refused && place.programs ? h("div", { className: "gs-note" }, h(Icon, { name: "shield", size: 16 }),
+            (place.programs === 1 ? "1 program file is" : place.programs + " program files are") + " there too, and never taken: only save data moves.") : null,
+          !refused && place.state === "warn" ? h("div", { className: "gs-import-note gs-import-warn" }, h(Icon, { name: "alert", size: 14, strokeWidth: 2 }), place.message) : null);
+    return h("div", { className: "gs-dialog", role: "dialog", "aria-modal": "true", "aria-labelledby": "gs-place-title" },
+      h("div", { className: "gs-dialog-head" },
+        h("div", { className: "gs-card-head" },
+          h("div", null, h("h2", { id: "gs-place-title", className: "gs-dialog-title" }, "Add a place"),
+            h("p", { className: "gs-dialog-sub" }, "Where " + props.game + " keeps saves GameSync didn't find")),
+          h(IconButton, { icon: "x", label: "Close Add a place", onClick: props.onClose }))),
+      h("div", { className: "gs-dialog-body gs-dialog-roomy" }, body),
+      h("div", { className: "gs-dialog-foot" },
+        h("div", { className: "gs-note" }, h(Icon, { name: "info", size: 16 }), "It's backed up at the next sync. Your other PCs are asked before they take a new place, and nothing in it is ever deleted."),
+        h("div", { className: "gs-dialog-actions" },
+          h(Button, { variant: "ghost", onClick: props.onClose }, "Cancel"),
+          h(Button, { variant: "primary", icon: "plus", disabled: !place || refused, onClick: function () { if (props.onAdd) props.onAdd({ path: place.path, category: category }); } }, "Add this place"))));
+  }
+
+  /* ---------- ImportKeptSavesDialog: save folders kept by hand, as named saves (BAK-19) ---------- */
+  // items: { id, name, saved, files, bytes, same, kept }; skipped: strings
+  function ImportKeptSavesDialog(props) {
+    var items = props.items || [];
+    var st = useState(props.stage || (props.folder ? "review" : "pick")), stage = st[0];
+    // A copy the same as another here (or as a named save) isn't named again; one already in the history only gets its name.
+    var named = items.filter(function (it) { return !it.same; });
+    var fresh = named.filter(function (it) { return !it.kept; });
+    var bytes = fresh.reduce(function (n, it) { return n + (it.bytes || 0); }, 0);
+    function pick() { if (props.onPick) props.onPick(); }
+    var body;
+    if (stage === "pick") {
+      body = h("div", { className: "gs-place" },
+        h("p", { className: "gs-muted", style: { margin: 0 } }, "Pick the folder that holds the copies you kept of " + props.game + "'s saves: each copy in a folder named after the moment, beside the live save or anywhere else."),
+        h("div", { className: "gs-row" }, h(Button, { variant: "secondary", icon: "folder", onClick: pick }, "Choose the folder…")));
+    } else {
+      body = h("div", { className: "gs-place" },
+        h(FolderField, { path: props.folder, meta: items.length + (items.length === 1 ? " kept copy found" : " kept copies found"), changeLabel: "Change…", onChange: pick, onOpen: props.onOpen }),
+        props.roots && props.roots.length > 1 ? h(Facts, { items: [{ label: "They're copies of", value: h(Select, { value: props.root || props.roots[0].id, options: props.roots, label: "They're copies of", onChange: props.onRoot }) }] }) : null,
+        h("div", { className: "gs-kept-list", role: "list" }, items.map(function (it) {
+          return h("div", { key: it.id, className: "gs-kept-row", role: "listitem" },
+            h(Icon, { name: "pin", size: 16 }),
+            h("div", { style: { minWidth: 0 } },
+              h("div", { className: "gs-kept-name" }, it.name),
+              h("div", { className: "gs-kept-meta" }, it.saved + " · " + it.files + (it.files === 1 ? " file" : " files"))),
+            it.same ? h("span", { className: "gs-tag", title: "Its files are the same as " + it.same + "'s, so it isn't named again" }, "Same as " + it.same)
+              : it.kept ? h("span", { className: "gs-tag", title: "Its files are already in the history; that version takes this name" }, "Already kept")
+              : h("span", { className: "gs-kept-size" }, fmt(it.bytes || 0)));
+        })),
+        (props.skipped || []).map(function (s, i) { return h("div", { key: "s" + i, className: "gs-import-note gs-import-warn" }, h(Icon, { name: "alert", size: 14, strokeWidth: 2 }), s); }));
+    }
+    var foot = stage === "done" ? [
+      h("div", { key: "d", className: "gs-done" }, h(Icon, { name: "check", size: 20, className: "gs-done-icon" }),
+        h("div", null, h("div", null, "Imported " + named.length + (named.length === 1 ? " named save." : " named saves.")),
+          h("div", { className: "gs-muted", style: { fontSize: 12 } }, "They're under Named saves, on every PC. Restore brings one back, keeping your files now first."))),
+      h("div", { key: "a", className: "gs-dialog-actions" }, h("span"), h(Button, { variant: "primary", onClick: props.onClose }, "Done"))
+    ] : [
+      stage === "review" ? h("div", { key: "s", className: "gs-share-summary" },
+        h("span", null, h("b", null, named.length + (named.length === 1 ? " named save" : " named saves")), named.length < items.length ? " · " + (items.length - named.length) + " the same as another, not kept twice" : ""),
+        h("span", null, fmt(bytes))) : null,
+      h("div", { key: "n", className: "gs-note" }, h(Icon, { name: "shield", size: 16 }), "Your folders are never changed. Each copy becomes a named save on every PC, kept aside: never current by itself."),
+      h("div", { key: "a", className: "gs-dialog-actions" },
+        h(Button, { variant: "ghost", onClick: props.onClose }, "Cancel"),
+        h(Button, { variant: "primary", icon: "download", disabled: stage !== "review" || !named.length, onClick: function () { st[1]("done"); if (props.onImport) props.onImport(); } },
+          "Import " + (named.length || "") + (named.length === 1 ? " named save" : " named saves")))
+    ];
+    return h("div", { className: "gs-dialog", role: "dialog", "aria-modal": "true", "aria-labelledby": "gs-kept-title" },
+      h("div", { className: "gs-dialog-head" },
+        h("div", { className: "gs-card-head" },
+          h("div", null, h("h2", { id: "gs-kept-title", className: "gs-dialog-title" }, "Import kept saves"),
+            h("p", { className: "gs-dialog-sub" }, props.game + ": copies you kept by hand, as named saves")),
+          h(IconButton, { icon: "x", label: "Close Import kept saves", onClick: props.onClose }))),
+      h("div", { className: "gs-dialog-body gs-dialog-roomy" }, body),
+      h("div", { className: "gs-dialog-foot" }, foot));
+  }
+
   /* ---------- Settings: nav, rows, folders ---------- */
   function SettingsNav(props) {
     return h("nav", { className: "gs-setnav", "aria-label": props.label || "Settings sections" },
@@ -1211,6 +1334,7 @@
     SettingsNav: SettingsNav, SettingsRow: SettingsRow, FolderField: FolderField, FolderList: FolderList,
     ThemeScope: ThemeScope, Backdrop: Backdrop, ThemePicker: ThemePicker, ColorSwatchPicker: ColorSwatchPicker,
     PlayBar: PlayBar, Facts: Facts, Select: Select, FileTree: FileTree, GamePropertiesDialog: GamePropertiesDialog,
+    AddPlaceDialog: AddPlaceDialog, ImportKeptSavesDialog: ImportKeptSavesDialog,
     fileTree: { toggle: treeToggle, count: treeCount },
     surface: { get: getSurface, set: setSurface, use: useSurface },
     formatBytes: fmt, theme: Theme

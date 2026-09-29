@@ -57,6 +57,7 @@
             <StackPanel Spacing="2" AutomationProperties.Name="{Binding}">
               <TextBlock Classes="th" Margin="0" Padding="0" Text="{Binding Label, Converter={x:Static c:UpperConverter.Instance}}" />
               <TextBlock Classes="mono-stat" Text="{Binding Value}" />
+              <TextBlock Classes="caption faint" Text="{Binding Sub}" IsVisible="{Binding HasSub}" />
             </StackPanel>
           </DataTemplate>
         </ItemsControl.ItemTemplate>
@@ -119,6 +120,6 @@
     </DockPanel>
 
     <!-- A game's saves -->
-    <ContentControl Content="{Binding Game}" IsVisible="{Binding !ShowsTable}" />
+    <ContentControl Content="{Binding Page}" IsVisible="{Binding !ShowsTable}" />
   </Panel>
 </UserControl>

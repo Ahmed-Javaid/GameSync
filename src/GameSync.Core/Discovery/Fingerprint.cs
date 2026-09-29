@@ -230,4 +230,32 @@ public static partial class LooseScanner
 
         return games;
     }
+
+    /// <summary>Folders engines keep a game's programs in, below the game's own folder.</summary>
+    [GeneratedRegex(@"^(binaries|bin|bin32|bin64|bin_x64|win32|win64|wingdk|x86|x64|x86_64|amd64|retail|shipping)$", RegexOptions.IgnoreCase)]
+    private static partial Regex ProgramFolder();
+
+    /// <summary>
+    /// LIB-24: the game's own folder, from its program picked in Locate the game…: the program's folder, above the folders
+    /// engines keep programs in (<c>bin\x64</c>, <c>Binaries\Win64</c>), and above an Unreal game's project folder, which
+    /// sits beside its <c>Engine</c> folder: <c>G:\Black Myth Wukong\b1\Binaries\Win64\b1-Win64-Shipping.exe</c> is in
+    /// <c>G:\Black Myth Wukong</c>. It never climbs to a drive's top.
+    /// </summary>
+    public static string GameFolderOf(string program)
+    {
+        var folder = Path.GetDirectoryName(Path.GetFullPath(program))!;
+        static bool BelowTop(string path) => Path.GetDirectoryName(path) is { } parent && Path.GetDirectoryName(parent) is not null;
+        while (BelowTop(folder) && ProgramFolder().IsMatch(Path.GetFileName(folder)))
+        {
+            folder = Path.GetDirectoryName(folder)!;
+        }
+
+        if (BelowTop(folder) && Path.GetDirectoryName(folder) is { } above && Directory.Exists(Path.Combine(above, "Engine")) &&
+            !string.Equals(Path.GetFileName(folder), "Engine", StringComparison.OrdinalIgnoreCase))
+        {
+            folder = above;
+        }
+
+        return folder;
+    }
 }

@@ -1,3 +1,4 @@
+using GameSync.Core.Art;
 using GameSync.Core.Discovery;
 using GameSync.Core.Games;
 using GameSync.Core.Model;
@@ -5,6 +6,12 @@ using GameSync.Core.Safety;
 using GameSync.Core.Scanning;
 
 namespace GameSync.Host;
+
+/// <summary>One of a game's pictures in its Properties (ART-06): Steam's, and the person's own when they chose one.</summary>
+public sealed record GameArt(ArtKind Kind, string? Steam, string? Own);
+
+/// <summary>A picture chosen in a game's Properties (ART-06): the image file to use, or null to take the person's own away.</summary>
+public sealed record ArtChoice(ArtKind Kind, string? File);
 
 /// <summary>A file in one of a game's save places, as its Properties list it: ticked files are backed up and synced (FIND-12).</summary>
 /// <param name="Path">Its path inside the place, with forward slashes.</param>
@@ -56,6 +63,9 @@ public sealed record GameProperties
     public bool HasSettingsFiles { get; init; }
 
     public IReadOnlyList<SavePlaceFiles> Places { get; init; } = [];
+
+    /// <summary>Its cover, banner and logo: Steam's, and the person's own (ART-06).</summary>
+    public IReadOnlyList<GameArt> Art { get; init; } = [];
 }
 
 /// <summary>A file, or a whole place (an empty path), ticked or unticked in a game's Properties.</summary>
@@ -88,7 +98,19 @@ public sealed record GamePropertiesChange
 
     /// <summary>Stop syncing it on this PC: its versions stay in the cloud and here, and it can sync again later.</summary>
     public bool StopSyncing { get; init; }
+
+    /// <summary>A folder or one file picked in Add a place (FOLD-01), which becomes a place of the game's saves.</summary>
+    public string? AddPlace { get; init; }
+
+    /// <summary>What the added place holds: game saves, settings files or screenshots.</summary>
+    public SaveCategory AddPlaceCategory { get; init; } = SaveCategory.Save;
+
+    /// <summary>Its own cover, banner or logo in place of Steam's, or taken away again (ART-06); kept on this PC only.</summary>
+    public IReadOnlyList<ArtChoice> Art { get; init; } = [];
 }
+
+/// <summary>A place added by hand (FOLD-01): its folder as every PC reads it, what it takes there, and what it holds.</summary>
+public sealed record NewPlace(string Root, string Include, SaveCategory Category);
 
 /// <summary>
 /// A game's Properties (LIB-20, FIND-12): read from this PC, and changed as the person saves them. File choices change
@@ -116,6 +138,7 @@ public static class GameSettings
         }
 
         using var engine = Engine.Open(dataDir);
+        using var art = new ArtCache(dataDir);
         var entry = engine.Library.All().FirstOrDefault(e => e.Id == game && e.MergedInto is null);
         var resolved = engine.Games.FirstOrDefault(g => g.Id == game);
         var portable = entry?.Confirmed ?? engine.Config.Games.FirstOrDefault(g => g.Id == game);
@@ -123,6 +146,7 @@ public static class GameSettings
         var configRules = (portable?.Rules ?? []).Where(r => r.Category == SaveCategory.Config).ToList();
         return new GameProperties
         {
+            Art = ArtKinds.Select(kind => new GameArt(kind, steamAppId is { } app ? art.Find(app, kind) : null, art.FindOwn(game, kind))).ToList(),
             Id = game,
             Title = resolved?.Title ?? entry?.DisplayTitle ?? game.Value,
             Favourite = engine.State.GetSetting(Launcher.FavouriteKey(game)) == "1",
@@ -158,6 +182,9 @@ public static class GameSettings
 
         var title = entry?.DisplayTitle ?? configGame!.Title;
         var said = new List<string>();
+
+        // ART-06: pictures are read and checked before anything changes, so a bad one changes nothing.
+        var images = change.Art.Select(choice => (choice.Kind, Content: choice.File is { } file ? Picture(file, choice.Kind) : null)).ToList();
         if (change.Favourite is { } favourite)
         {
             engine.State.SetSetting(Launcher.FavouriteKey(game), favourite ? "1" : "");
@@ -190,13 +217,35 @@ public static class GameSettings
 
         var portable = entry?.Confirmed ?? configGame;
         var rulesChange = change.Mode is not null || change.Conflict is not null || change.SettingsFiles is not null || change.Screenshots is not null ||
-            change.SkipDefaults is not null || change.Files.Count > 0;
+            change.SkipDefaults is not null || change.Files.Count > 0 || change.AddPlace is not null;
         if (rulesChange && portable is null)
         {
-            throw new UsageException($"{title} isn't syncing yet: sync its saves first, then choose its files.");
+            throw new UsageException(change.AddPlace is not null
+                ? $"{title} isn't syncing yet: sync its saves first, then add a place."
+                : $"{title} isn't syncing yet: sync its saves first, then choose its files.");
         }
 
-        var updated = portable is null ? null : Changed(portable, change);
+        // FOLD-01: the place is looked at again as it's added, with the same checks the dialog showed.
+        NewPlace? place = null;
+        if (change.AddPlace is { } picked)
+        {
+            var look = SavePlaces.Look(engine, game, picked);
+            if (look.Refused is { } refused)
+            {
+                throw new UsageException(refused);
+            }
+
+            place = new NewPlace(look.Portable, look.IsFile ? Path.GetFileName(look.Path) : "**", change.AddPlaceCategory);
+            said.Add($"a new place, {look.Portable}");
+        }
+
+        var updated = portable is null ? null : Changed(portable, change, place);
+
+        // A game whose rules don't pass the engine's own checks never gets saved: games.json has to open next time.
+        if (updated is not null && GameValidator.Problems(engine.Here.Resolver.Resolve(updated), engine.Here.Guard).FirstOrDefault() is { } problem)
+        {
+            throw new UsageException(problem);
+        }
         if (updated is not null && change.Files.Count > 0)
         {
             said.Add(Files(change.Files));
@@ -238,14 +287,97 @@ public static class GameSettings
             said.Add("not syncing any more; its versions stay in the cloud and on this PC");
         }
 
+        if (images.Count > 0)
+        {
+            using var art = new ArtCache(dataDir);
+            foreach (var (kind, content) in images)
+            {
+                if (content is null)
+                {
+                    art.RemoveOwn(game, kind);
+                    said.Add($"your own {ArtName(kind)} taken away");
+                }
+                else if (art.SetOwn(game, kind, content) is { } why)
+                {
+                    throw new UsageException($"That {ArtName(kind)} can't be used: {why}");
+                }
+                else
+                {
+                    said.Add($"your own {ArtName(kind)}");
+                }
+            }
+        }
+
         return said.Count == 0 ? $"{title}: nothing changed." : $"{newTitle ?? title}: {string.Join(", ", said)}.";
     }
 
-    /// <summary>The game's rules with the person's changes: file choices become excludes, or rules of their own for a file taken back in.</summary>
-    public static GameDefinition Changed(GameDefinition game, GamePropertiesChange change)
+    /// <summary>A game's pictures in the order its Properties list them: cover, banner, logo.</summary>
+    public static readonly IReadOnlyList<ArtKind> ArtKinds = [ArtKind.Cover, ArtKind.Hero, ArtKind.Logo];
+
+    /// <summary>What a picture is called on screen: the hero is the banner.</summary>
+    public static string ArtName(ArtKind kind) => kind switch
+    {
+        ArtKind.Cover => "cover",
+        ArtKind.Hero => "banner",
+        _ => "logo",
+    };
+
+    /// <summary>
+    /// ART-06: an image picked for a game, read and checked like Steam's art (ART-08) before it's kept: JPEG, PNG or WebP
+    /// by its content, up to 8 MB.
+    /// </summary>
+    public static byte[] Picture(string file, ArtKind kind)
+    {
+        var info = new FileInfo(file);
+        if (!info.Exists)
+        {
+            throw new UsageException($"{file} isn't there any more, so the {ArtName(kind)} stays as it was.");
+        }
+
+        if (info.Length > ArtCheck.MaxBytes)
+        {
+            throw new UsageException($"That {ArtName(kind)} is over 8 MB; pick a smaller picture.");
+        }
+
+        var content = File.ReadAllBytes(file);
+        return ArtCheck.ExtensionOf(content) is not null ? content
+            : throw new UsageException($"That {ArtName(kind)} isn't a JPEG, PNG or WebP picture, so it can't be used.");
+    }
+
+    /// <summary>
+    /// The game's rules with the person's changes: file choices become excludes, or rules of their own for a file taken
+    /// back in; a place added by hand becomes a root of its own, keyed as every PC keys it, with a rule taking it.
+    /// </summary>
+    public static GameDefinition Changed(GameDefinition game, GamePropertiesChange change, NewPlace? place = null)
     {
         var rules = game.Rules.ToList();
         var registry = game.Registry.ToList();
+        var roots = new Dictionary<string, string>(game.Roots, StringComparer.Ordinal);
+        var portableRoots = game.PortableRoots is null ? null : new Dictionary<string, string>(game.PortableRoots, StringComparer.Ordinal);
+        if (place is not null)
+        {
+            static string Plain(string folder) => folder.Replace('\\', '/').TrimEnd('/');
+            var key = (portableRoots ?? roots).FirstOrDefault(r => string.Equals(Plain(r.Value), Plain(place.Root), StringComparison.OrdinalIgnoreCase)).Key;
+            if (key is null)
+            {
+                var first = Core.Discovery.Discoverer.RootKey(place.Root);
+                key = first;
+                for (var n = 2; roots.ContainsKey(key) || key == GameDefinition.RegistryRoot; n++)
+                {
+                    key = $"{first[..Math.Min(first.Length, 36)].TrimEnd('-')}-{n}";
+                }
+
+                roots[key] = place.Root;
+                portableRoots?.Add(key, place.Root);
+            }
+
+            if (!rules.Any(r => r.Root == key && string.Equals(r.Include, place.Include, StringComparison.OrdinalIgnoreCase) && r.Category == place.Category))
+            {
+                // One file picked by itself is taken whatever it's called; a folder skips logs and caches as the others do.
+                rules.Add(new SaveRule { Root = key, Include = place.Include, Category = place.Category, UseDefaultExcludes = place.Include == "**" });
+            }
+        }
+
         foreach (var choice in change.Files)
         {
             if (choice.Root.StartsWith("registry:", StringComparison.Ordinal))
@@ -320,6 +452,8 @@ public static class GameSettings
 
         return game with
         {
+            Roots = roots,
+            PortableRoots = portableRoots,
             Rules = rules,
             Registry = registry,
             Mode = change.Mode ?? game.Mode,

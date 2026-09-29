@@ -60,6 +60,9 @@ public sealed class AppAgent(string dataDir, IAgentOutput output)
     /// <summary>Sync now: every game syncs at the agent's next round with nothing playing.</summary>
     public void SyncNow() => _agent?.SyncSoon();
 
+    /// <summary>The library changed (a game located, a folder scanned, a game that syncs now): the agent watches the games anew at its next round.</summary>
+    public void WatchNow() => _agent?.WatchSoon();
+
     /// <summary>GameSync was just set up here: the agent starts now rather than within the minute.</summary>
     public void Kick() => _kick.Release();
 }

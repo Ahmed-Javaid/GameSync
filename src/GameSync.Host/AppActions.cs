@@ -85,6 +85,60 @@ public static class AppActions
         WithServiceAsync(dataDir, output, ct, async service => [await service.ApproveAsync(game, ct)]);
 
     /// <summary>
+    /// SYNC-10, SYNC-11: settles a waiting conflict the person's way, as <c>gamesync resolve</c> does: this PC's save, or
+    /// the cloud's (<paramref name="cloudVersion"/>, when more than one PC's is current). The other stays pinned in history.
+    /// </summary>
+    public static Task ResolveAsync(string dataDir, GameId game, bool keepThisPc, VersionId? cloudVersion, IAgentOutput output, CancellationToken ct) =>
+        WithServiceAsync(dataDir, output, ct, async service => [await service.ResolveAsync(game, keepThisPc, cloudVersion, ct)]);
+
+    /// <summary>BAK-18: gives a named save another name, on every PC, as <c>gamesync rename-save</c> does.</summary>
+    public static Task RenameSaveAsync(string dataDir, GameId game, string name, string newName, IAgentOutput output, CancellationToken ct) =>
+        WithServiceAsync(dataDir, output, ct, async service =>
+        {
+            await service.RenameSaveAsync(game, name, newName, ct);
+            output.Say($"Renamed the named save '{name}' to '{newName}'.");
+            return [];
+        });
+
+    /// <summary>BAK-18: takes a save's name away, as <c>gamesync forget-save</c> does; the save stays in the history.</summary>
+    public static Task ForgetSaveAsync(string dataDir, GameId game, string name, IAgentOutput output, CancellationToken ct) =>
+        WithServiceAsync(dataDir, output, ct, async service =>
+        {
+            await service.ForgetSaveAsync(game, name, ct);
+            output.Say($"The name '{name}' is gone; the save stays in the history.");
+            return [];
+        });
+
+    /// <summary>
+    /// BAK-19: save folders kept by hand, as <c>gamesync import-saves</c> brings them in: without <paramref name="apply"/>,
+    /// what they'd become; with it, they become named saves. The folders themselves are never changed. What goes wrong
+    /// is thrown, for the dialog to say.
+    /// </summary>
+    /// <param name="root">The game's place they're copies of, when it has more than one.</param>
+    public static async Task<ImportReport> KeptSavesAsync(string dataDir, GameId game, string folder, string? root, bool apply, IAgentOutput output, CancellationToken ct)
+    {
+        using var engineLock = await EngineLock.AcquireAsync(dataDir, () => output.Say("Waiting for the sync in the background to finish first."), ct);
+        using var engine = Engine.Open(dataDir);
+        var running = new RunningGames(engine);
+        var (service, _) = await engine.OpenServiceAsync(new SyncOptions { IsRunning = running.IsRunning }, ct, recover: false);
+        var report = await service.ImportSavesAsync(game, folder, apply, root, ct);
+        if (apply)
+        {
+            output.Say($"Imported {report.Added} kept {(report.Added == 1 ? "save" : "saves")} from {folder} as named saves; the folders weren't changed.");
+        }
+
+        return report;
+    }
+
+    /// <summary>SYNC-04: switches to the save that lost the game's last conflict, as <c>gamesync swap</c> does.</summary>
+    public static Task SwapAsync(string dataDir, GameId game, IAgentOutput output, CancellationToken ct) =>
+        WithServiceAsync(dataDir, output, ct, async service => [await service.SwapAsync(game, ct)]);
+
+    /// <summary>Syncs one game again, for a game whose files were in use or whose folder was missing (SYNC-02).</summary>
+    public static Task RetryAsync(string dataDir, GameId game, IAgentOutput output, CancellationToken ct) =>
+        WithServiceAsync(dataDir, output, ct, service => service.SyncAsync([game], ct));
+
+    /// <summary>
     /// A job on one game, the way a command runs it: it waits while the agent finishes a sync (BG-09), opens the sync
     /// service, does the job, and says how it went as the agent does.
     /// </summary>

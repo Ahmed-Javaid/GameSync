@@ -1,1 +1,3 @@
 Showcase of the console-style save manager: stats strip, selectable save table and live log. Tick rows and press Share selected, press Share all, or press the download icon to import a friend's zip. A game's name in the table opens its saves (see Game saves).
+
+- The stats strip: the games that sync; **Backups on this PC**, the space the backup folder really takes on its drive (files stored once and packed, as they are on disk), with the drive and its free space under it; every version kept; the last backup; and how many games need you. The table's Size is each game's history as its versions list it.

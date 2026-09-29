@@ -17,10 +17,12 @@ public sealed record SaveRow(GameId Id, string Title, GameStatus? Status, string
     public override string ToString() => string.Join(", ", new[] { Title, StatusLabel ?? GsStatusBadge.Describe(Status).Word, Versions == "" ? null : $"{Versions} versions", LastBackup == "" ? null : $"last backup {LastBackup}" }.OfType<string>());
 }
 
-/// <summary>A number in the save manager's strip: GAMES 12.</summary>
-public sealed record SaveStat(string Label, string Value)
+/// <summary>A number in the save manager's strip: GAMES 12; with a line under it when it needs one ("E: · 312 GB free").</summary>
+public sealed record SaveStat(string Label, string Value, string? Sub = null)
 {
-    public override string ToString() => $"{Label}: {Value}";
+    public bool HasSub => Sub is not null;
+
+    public override string ToString() => Sub is null ? $"{Label}: {Value}" : $"{Label}: {Value}, {Sub}";
 }
 
 /// <summary>
@@ -28,11 +30,13 @@ public sealed record SaveStat(string Label, string Value)
 /// table, a strip of numbers and the live log; a game's name opens its saves, where the save work is (MGR-07). It lives
 /// as long as the window, so the game open in it stays when the games refresh.
 /// </summary>
-public sealed partial class SaveManagerViewModel : ObservableObject, IPageSurface
+public sealed partial class SaveManagerViewModel : ObservableObject, IPageSurface, IRailPage
 {
     private readonly LauncherActions? _actions;
     private IReadOnlyList<LauncherGame> _games = [];
     private IReadOnlyDictionary<GameId, GameSaveSummary> _summaries = new Dictionary<GameId, GameSaveSummary>();
+    private BackupSpace? _space;
+    private bool _spaceRead;
     private int _loads;
 
     [ObservableProperty]
@@ -46,8 +50,13 @@ public sealed partial class SaveManagerViewModel : ObservableObject, IPageSurfac
 
     /// <summary>The game whose saves are open; null shows every game's.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowsTable), nameof(Strength), nameof(BackdropArt))]
+    [NotifyPropertyChangedFor(nameof(ShowsTable), nameof(Page), nameof(BackdropArt))]
     private GameSavesViewModel? _game;
+
+    /// <summary>A game's conflict, open over its saves or on its own (SYNC-10).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowsTable), nameof(Page), nameof(BackdropArt))]
+    private ConflictViewModel? _conflict;
 
     /// <param name="log">The agent's log, which the page shows as it happens.</param>
     public SaveManagerViewModel(LauncherActions? actions = null, ObservableCollection<LogLine>? log = null)
@@ -57,18 +66,39 @@ public sealed partial class SaveManagerViewModel : ObservableObject, IPageSurfac
         OpenCommand = new RelayCommand<GameId>(id => Open(id));
         SyncNowCommand = new RelayCommand(() => _actions?.SyncNow(), () => _actions is not null);
         BackCommand = new RelayCommand(Back);
+        ConflictBackCommand = new RelayCommand(ConflictBack);
+        TableCommand = new RelayCommand(() =>
+        {
+            ReturnTo = null;
+            _conflictReturnTo = null;
+            Conflict = null;
+            Game = null;
+        });
+        ConflictSavesCommand = new RelayCommand(() =>
+        {
+            if (Conflict is { } conflict)
+            {
+                Conflict = null;
+                Open(conflict.Id);
+            }
+        });
     }
+
+    private string? _conflictReturnTo;
 
     public ObservableCollection<LogLine> Log { get; }
 
     public string Title => "Save manager";
 
-    public bool ShowsTable => Game is null;
+    public bool ShowsTable => Game is null && Conflict is null;
 
-    /// <summary>Full glass (LOOK-17); a game's saves show that game's own art.</summary>
+    /// <summary>What shows instead of the table: a game's conflict, or its saves.</summary>
+    public object? Page => (object?)Conflict ?? Game;
+
+    /// <summary>Full glass (LOOK-17); a game's saves and its conflict show that game's own art.</summary>
     public GlassStrength Strength => GlassStrength.Glass;
 
-    public string? BackdropArt => Game?.BackdropArt;
+    public string? BackdropArt => Conflict?.BackdropArt ?? Game?.BackdropArt;
 
     /// <summary>A game's name in the table: its saves.</summary>
     public ICommand OpenCommand { get; }
@@ -78,6 +108,15 @@ public sealed partial class SaveManagerViewModel : ObservableObject, IPageSurfac
     /// <summary>Back from a game's saves: to where the person came from (its page in the library), or to every game's saves.</summary>
     public ICommand BackCommand { get; }
 
+    /// <summary>Back from a conflict, and Decide later: to the game's saves when it was opened there, or where the person came from.</summary>
+    public ICommand ConflictBackCommand { get; }
+
+    /// <summary>The breadcrumb's first step: every game's saves.</summary>
+    public ICommand TableCommand { get; }
+
+    /// <summary>The breadcrumb's game, from its conflict: its saves.</summary>
+    public ICommand ConflictSavesCommand { get; }
+
     /// <summary>The page Back returns to from a game's saves, when they were opened from another page (a game's page).</summary>
     public string? ReturnTo { get; private set; }
 
@@ -85,6 +124,7 @@ public sealed partial class SaveManagerViewModel : ObservableObject, IPageSurfac
     public void Open(GameId id, string? returnTo = null)
     {
         ReturnTo = returnTo;
+        Conflict = null;
         if (_games.FirstOrDefault(g => g.Id == id) is not { } game)
         {
             Game = null;
@@ -99,10 +139,68 @@ public sealed partial class SaveManagerViewModel : ObservableObject, IPageSurfac
         Game.Reload();
     }
 
+    /// <summary>
+    /// Opens a game's conflict (SYNC-10). Opened from its saves, Back returns there; from another page
+    /// (<paramref name="returnTo"/>: Home, the library), Back returns to that page.
+    /// </summary>
+    public void OpenConflict(GameId id, string? returnTo = null)
+    {
+        if (_games.FirstOrDefault(g => g.Id == id) is not { } game)
+        {
+            return;
+        }
+
+        _conflictReturnTo = returnTo;
+        if (Game?.Id != id)
+        {
+            // Not over its own saves: Back goes back where it came from, or to every game's saves.
+            Game = null;
+            ReturnTo = null;
+        }
+
+        if (Conflict?.Id != id)
+        {
+            Conflict = new ConflictViewModel(game, _actions, ConflictBackCommand, ConflictSavesCommand, TableCommand);
+        }
+
+        Conflict.Reload();
+    }
+
+    /// <summary>The rail's Save manager: a game's saves or conflict still open keeps showing, and Back leads to every game's saves.</summary>
+    public void ReachedFromRail()
+    {
+        ReturnTo = null;
+        _conflictReturnTo = null;
+    }
+
+    private void ConflictBack()
+    {
+        var returnTo = _conflictReturnTo;
+        _conflictReturnTo = null;
+        Conflict = null;
+        if (Game is null && returnTo is not null)
+        {
+            _actions?.Show(returnTo, null);
+        }
+    }
+
     /// <summary>The games as they are now; the table is read again, off the UI thread, and the open game's saves too.</summary>
     public void Update(IReadOnlyList<LauncherGame> games)
     {
         _games = games;
+        if (Conflict is { } conflict)
+        {
+            if (games.FirstOrDefault(g => g.Id == conflict.Id) is { } game)
+            {
+                conflict.Update(game);
+                conflict.Reload();
+            }
+            else
+            {
+                Conflict = null;
+            }
+        }
+
         if (Game is { } open)
         {
             if (games.FirstOrDefault(g => g.Id == open.Id) is { } game)
@@ -127,6 +225,13 @@ public sealed partial class SaveManagerViewModel : ObservableObject, IPageSurfac
         Rebuild(nowLocal);
     }
 
+    /// <summary>The space the backups take on this PC's drive, once it's been counted (MGR-03).</summary>
+    public void ShowSpace(BackupSpace? space, DateTime nowLocal)
+    {
+        (_space, _spaceRead) = (space, true);
+        Rebuild(nowLocal);
+    }
+
     private async void LoadSummaries()
     {
         if (_actions?.LoadSaves is not { } load)
@@ -142,6 +247,11 @@ public sealed partial class SaveManagerViewModel : ObservableObject, IPageSurfac
             {
                 Show(summaries, DateTime.Now);
             }
+
+            if (_actions.LoadSpace is { } space && await space(CancellationToken.None) is var counted && ticket == _loads)
+            {
+                ShowSpace(counted, DateTime.Now);
+            }
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidOperationException or UsageException)
         {
@@ -156,6 +266,7 @@ public sealed partial class SaveManagerViewModel : ObservableObject, IPageSurfac
     {
         var returnTo = ReturnTo;
         ReturnTo = null;
+        Conflict = null;
         Game = null;
         if (returnTo is not null)
         {
@@ -187,7 +298,9 @@ public sealed partial class SaveManagerViewModel : ObservableObject, IPageSurfac
         Stats =
         [
             new SaveStat("Games", syncing.ToString(CultureInfo.InvariantCulture)),
-            new SaveStat("History", Cli.FormatSize(_summaries.Values.Sum(s => s.HistoryBytes))),
+            // MGR-03: the backup folder as it is on its drive, not the versions' own sizes added up.
+            new SaveStat("Backups on this PC", _space is { } space ? Cli.FormatSize(space.Bytes) : _spaceRead ? "None yet" : "…",
+                _space is { } on ? on.FreeBytes is { } free ? $"{on.Drive} · {Cli.FormatSize(free)} free" : on.Drive : null),
             new SaveStat("Versions", _summaries.Values.Sum(s => s.Versions).ToString(CultureInfo.InvariantCulture)),
             new SaveStat("Last backup", latest is { } at ? Launcher.WhenText(at, nowLocal) ?? "None yet" : "None yet"),
             new SaveStat("Needs you", shown.Count(g => g.NeedsYou).ToString(CultureInfo.InvariantCulture)),

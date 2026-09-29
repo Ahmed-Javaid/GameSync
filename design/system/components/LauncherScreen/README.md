@@ -1,1 +1,5 @@
 Showcase of the launcher home: rail, top bar, hero, and the Needs you, Jump back in and Activity cards. Built only from the components above; switch the theme to see it in every preset.
+
+- **The hero** is the game playing now, however it was started (Play in GameSync, a store, a shortcut) and whether its saves sync or not: its status reads Playing now, the eyebrow says since when, and there's no Play while it runs (`#playing`). With nothing running, it's the last-played game, with Continue playing.
+- The rail's Game library shows the `play` dot while a game runs, saying which ("Ghost of Tsushima is running"), and the running game's tile carries Playing wherever it shows.
+- GameSync notices a game running by its programs, in the folder it's installed in, with the least access Windows gives (as Task Manager does); nothing touches the game itself. Its play is recorded, so play time and the activity calendar count it.

@@ -83,15 +83,25 @@ public sealed partial class ShellViewModel : ObservableObject
         Page = _makePage(Current);
     }
 
-    /// <summary>Opens a page as its rail button does, as when a page's own button leads to another.</summary>
-    public void Open(string id) => Navigate(id);
+    /// <summary>Opens a page for another page's button (a cover on Home opening the library): the page keeps where Back returns to.</summary>
+    public void Open(string id) => Show(id);
 
+    /// <summary>
+    /// The rail's buttons. A page reached from the rail forgets where an earlier visit came from, so Back from a game's
+    /// page still open in the library leads to the covers, not to Home that opened it before (LIB-21).
+    /// </summary>
     [RelayCommand]
     private void Navigate(string id)
     {
+        Show(id);
+        (Page as IRailPage)?.ReachedFromRail();
+    }
+
+    private void Show(string id)
+    {
         if (id == SearchId)
         {
-            Navigate("library");
+            Show("library");
             (Page as ISearchablePage)?.FocusSearch();
             return;
         }

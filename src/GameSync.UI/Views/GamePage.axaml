@@ -32,11 +32,16 @@
 
         <c:GsPlayBar Stats="{Binding Stats}" AutomationProperties.Name="{Binding Title}">
           <c:GsPlayBar.Primary>
-            <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding PrimaryLabel, Converter={x:Static ObjectConverters.IsNotNull}}">
-              <c:GsButton Classes.primary="{Binding PrimaryIsMain}" Icon="{Binding PrimaryIcon}" Content="{Binding PrimaryLabel}" Command="{Binding PrimaryCommand}"
-                          IsEnabled="{Binding PrimaryEnabled}" ToolTip.Tip="{Binding PrimaryTip}" />
-              <c:GsIconButton Icon="play" Label="Play" Command="{Binding PlayCommand}" IsVisible="{Binding ShowsPlayBeside}" />
-            </StackPanel>
+            <Panel>
+              <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding PrimaryLabel, Converter={x:Static ObjectConverters.IsNotNull}}">
+                <c:GsButton Classes.primary="{Binding PrimaryIsMain}" Icon="{Binding PrimaryIcon}" Content="{Binding PrimaryLabel}" Command="{Binding PrimaryCommand}"
+                            IsEnabled="{Binding PrimaryEnabled}" ToolTip.Tip="{Binding PrimaryTip}" />
+                <c:GsIconButton Icon="play" Label="Play" Command="{Binding PlayCommand}" IsVisible="{Binding ShowsPlayBeside}" />
+              </StackPanel>
+              <!-- A game no store installs, not here: its program, picked in Windows' picker, marks it installed (LIB-24) -->
+              <c:GsButton Icon="search" Content="Locate the game…" Click="Locate" IsVisible="{Binding CanLocate}"
+                          ToolTip.Tip="Pick its program, and Play starts it from there" />
+            </Panel>
           </c:GsPlayBar.Primary>
           <c:GsPlayBar.Actions>
             <StackPanel Orientation="Horizontal" Spacing="8">
@@ -51,6 +56,9 @@
                     </MenuItem>
                     <MenuItem Header="Open the save folder" Command="{Binding OpenSaveFolderCommand}" IsVisible="{Binding HasSaveFolder}">
                       <MenuItem.Icon><c:GsIcon Icon="saves" Size="16" /></MenuItem.Icon>
+                    </MenuItem>
+                    <MenuItem Header="Change the art…" Command="{Binding OpenPropertiesCommand}" CommandParameter="art">
+                      <MenuItem.Icon><c:GsIcon Icon="palette" Size="16" /></MenuItem.Icon>
                     </MenuItem>
                     <Separator />
                     <MenuItem Header="Properties" Command="{Binding OpenPropertiesCommand}" CommandParameter="general">
@@ -102,7 +110,7 @@
                 </Grid>
               </Border>
               <!-- When it needs you: the status's own action; else Back up now and Save as…; not syncing yet: Sync these saves and Choose files… -->
-              <c:GsButton Classes="sm" Icon="{Binding NeedIcon}" Content="{Binding NeedAction}" Command="{Binding OpenSavesCommand}" HorizontalAlignment="Left"
+              <c:GsButton Classes="sm" Icon="{Binding NeedIcon}" Content="{Binding NeedAction}" Command="{Binding NeedCommand}" HorizontalAlignment="Left"
                           IsVisible="{Binding SavesNeedYou}" />
               <WrapPanel ItemSpacing="8" LineSpacing="8" IsVisible="{Binding SavesSyncing}">
                 <c:GsButton Classes="sm" Icon="upload" Content="Back up now" Command="{Binding BackUpNowCommand}" IsEnabled="{Binding !IsPlaying}"
@@ -114,7 +122,7 @@
                         <TextBlock Text="Keep this save under a name" FontWeight="SemiBold" />
                         <TextBlock Classes="caption muted" TextWrapping="Wrap"
                                    Text="It's kept on every PC and never thinned, and comes back in one step: before a boss, or a big choice." />
-                        <TextBox Text="{Binding SaveName}" PlaceholderText="Before Lady Maria" MaxLength="100">
+                        <TextBox Text="{Binding SaveName}" PlaceholderText="Before Lady Maria" AutomationProperties.Name="Name for this save" MaxLength="100">
                           <TextBox.KeyBindings>
                             <KeyBinding Gesture="Enter" Command="{Binding SaveAsCommand}" />
                           </TextBox.KeyBindings>

@@ -39,6 +39,12 @@ public sealed record LibraryEntry
 
     public string? InstallDir { get; init; }
 
+    /// <summary>
+    /// The folder the person located the game in (Locate the game…, LIB-24), for a game no scan finds there: rescans keep
+    /// it installed in that folder while the folder is on this PC.
+    /// </summary>
+    public string? InstallDirByHand { get; init; }
+
     public string? Build { get; init; }
 
     public string? Engine { get; init; }
@@ -236,7 +242,7 @@ public static class Library
             entries[entry.Id] = entry with
             {
                 Title = left.Listed.Title,
-                Installed = false,
+                Installed = Located(entry),
                 SaveListTitle = left.Listed.Title,
                 StoreCloud = left.StoreCloud,
                 ProbablyOnlineOnly = left.ProbablyOnlineOnly,
@@ -248,17 +254,39 @@ public static class Library
         }
 
         // What this scan didn't find at all is Not installed, and nothing was found for it; confirmed rules stay (LIB-08).
+        // A game the person located stays installed in its folder while the folder is here (LIB-24).
         foreach (var entry in entries.Values.ToList())
         {
             if (!seen.Contains(entry.Id) && !leftSeen.Contains(entry.Id) && entry.MergedInto is null &&
                 (entry.Installed || entry.Proposals.Count > 0 || entry.RegistryProposals.Count > 0))
             {
-                entries[entry.Id] = entry with { Installed = false, Proposals = [], RegistryProposals = [] };
+                entries[entry.Id] = entry with { Installed = Located(entry), Proposals = [], RegistryProposals = [] };
             }
         }
 
         return entries.Values.OrderBy(e => e.Id.Value, StringComparer.Ordinal).ToList();
     }
+
+    /// <summary>
+    /// LIB-24: Locate the game…, for a game found by its saves or one that moved: it's installed in <paramref name="folder"/>
+    /// on this PC, a game in its own folder that starts from its program there, and rescans keep it so while the folder
+    /// is here. What the folder shows (its engine, an anti-cheat) is taken as a scan would.
+    /// </summary>
+    public static LibraryEntry Locate(LibraryEntry entry, string folder, Fingerprint? print, DateTime nowUtc) => entry with
+    {
+        Installed = true,
+        Store = StoreKind.Loose,
+        StoreId = null,
+        InstallDir = folder,
+        InstallDirByHand = folder,
+        Build = null,
+        Engine = print?.Engine ?? entry.Engine,
+        AntiCheat = print is null ? entry.AntiCheat : print.AntiCheat,
+        LastSeenUtc = nowUtc,
+    };
+
+    /// <summary>The person located it in a folder that's on this PC now: an unplugged drive only makes it Not installed for now.</summary>
+    private static bool Located(LibraryEntry entry) => entry.InstallDirByHand is { Length: > 0 } folder && Directory.Exists(folder);
 
     /// <summary>
     /// FIND-06: pins the proposals as the game's save rules; a game its store's cloud syncs is backup only. Confirming
@@ -398,6 +426,7 @@ public static class Library
         return GameId.Parse(id);
     }
 
+    // A game a scan finds is where the scan found it: a folder it was located in by hand no longer counts.
     private static LibraryEntry Updated(LibraryEntry entry, DiscoveredGame game, DateTime nowUtc) => entry with
     {
         Title = game.Title,
@@ -405,6 +434,7 @@ public static class Library
         Store = game.Installed.Store,
         StoreId = game.Installed.StoreId,
         InstallDir = game.Installed.InstallDir,
+        InstallDirByHand = null,
         Build = game.Installed.Build,
         Engine = game.Print.Engine,
         AntiCheat = game.Print.AntiCheat,

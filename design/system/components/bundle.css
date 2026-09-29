@@ -383,3 +383,23 @@ button.gs-ftree-twisty:hover { color: var(--ink); background: var(--bg-400); }
 .gs-backdrop { position: absolute; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; border-radius: inherit; }
 .gs-backdrop-art { position: absolute; inset: -140px; background-size: cover; background-position: center; filter: blur(64px) saturate(1.3); }
 .gs-backdrop-scrim { position: absolute; inset: 0; }
+
+/* Add a place and Import kept saves: a roomier dialog body, and the kept copies' rows */
+.gs-dialog-roomy { padding-top: var(--space-2); padding-bottom: var(--space-4); gap: var(--space-4); }
+.gs-place { display: flex; flex-direction: column; gap: var(--space-4); }
+.gs-kept-list { display: flex; flex-direction: column; gap: 2px; }
+.gs-kept-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--space-3); padding: 8px var(--space-3); border-radius: var(--radius-md); color: var(--ink); }
+.gs-kept-row:hover { background: var(--bg-300); }
+.gs-kept-row > .gs-icon { color: var(--ink-muted); }
+.gs-kept-name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gs-kept-meta { font: 400 12px/16px var(--font-mono); color: var(--ink-muted); }
+.gs-kept-size { font: 400 12px/16px var(--font-mono); color: var(--ink-muted); text-align: right; min-width: 72px; }
+
+/* Properties, Art: each picture's thumbnail in its own shape, where it comes from, and its buttons */
+.gs-art-slot { display: flex; align-items: center; gap: var(--space-4); }
+.gs-art-thumb { flex-shrink: 0; border-radius: var(--radius-md); background-size: cover; background-position: center; border: 1px solid var(--edge-well); }
+.gs-art-thumb.is-cover { width: 48px; height: 72px; }
+.gs-art-thumb.is-hero { width: 124px; height: 40px; }
+.gs-art-thumb.is-logo { width: 96px; height: 40px; background-size: contain; background-repeat: no-repeat; background-color: var(--bg-300); font-size: 11px; }
+.gs-art-text { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.gs-art-from { font: 400 12px/16px var(--font-sans); color: var(--ink-muted); }

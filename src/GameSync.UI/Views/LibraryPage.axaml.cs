@@ -2,6 +2,8 @@ using System.ComponentModel;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Interactivity;
+using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using GameSync.UI.Controls;
@@ -21,7 +23,7 @@ public partial class LibraryPage : UserControl
     {
         InitializeComponent();
         AddHandler(KeyDownEvent, OnKey, handledEventsToo: false);
-        AddHandler(PointerPressedEvent, OnPointer, Avalonia.Interactivity.RoutingStrategies.Tunnel);
+        AddHandler(PointerPressedEvent, OnPointer, RoutingStrategies.Tunnel);
     }
 
     protected override void OnDataContextChanged(EventArgs e)
@@ -92,6 +94,25 @@ public partial class LibraryPage : UserControl
         else if (e.Key == Key.Down && e.Source == SearchBox)
         {
             e.Handled = MoveInList(null, 1);
+        }
+    }
+
+    /// <summary>Scan a folder for games…: the folder, picked in Windows' own folder picker (LIB-23).</summary>
+    private async void ScanFolder(object? sender, RoutedEventArgs e)
+    {
+        if (_model is null || TopLevel.GetTopLevel(this)?.StorageProvider is not { } storage)
+        {
+            return;
+        }
+
+        var folders = await storage.OpenFolderPickerAsync(new FolderPickerOpenOptions
+        {
+            Title = "A folder your games are in, such as G:\\ or E:\\Games",
+            AllowMultiple = false,
+        });
+        if (folders.Count > 0 && folders[0].TryGetLocalPath() is { } path)
+        {
+            _model.ScanFolder(path);
         }
     }
 

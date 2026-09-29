@@ -295,34 +295,64 @@ public static partial class Cli
     private static async Task<int> ScanAsync(List<string> rest, SyncService service, ThisPc here, CancellationToken ct)
     {
         var clock = Stopwatch.StartNew();
-        var (list, note) = await new SaveListStore(here.DataDir).GetAsync(rest.Contains("--refresh-list"), LudusaviManifest, ct);
-        if (note is not null)
+        var scan = await DiscoverAsync(here, rest.Contains("--refresh-list"), ct, detection =>
         {
-            Console.WriteLine($"! {note}");
-        }
-
-        var gameFolders = GameFolders(here.State);
-        var detection = Detector.Detect(StoreLocations.ForThisPc(gameFolders));
-        var byStore = string.Join(", ", detection.Games.GroupBy(g => g.Store).OrderBy(g => g.Key).Select(g => $"{g.Count()} {StoreName(g.Key)}"));
-        Console.WriteLine($"Found {detection.Games.Count} installed games ({(byStore.Length == 0 ? "none" : byStore)}). Looking for their saves...");
-
-        var discoverer = new Discoverer(list, here.Folders, SaveFolders(here.State), here.Guard, here.Registry);
-        var found = detection.Games.AsParallel().AsOrdered().WithDegreeOfParallelism(4).Select(discoverer.Discover).ToList();
-        var leftovers = discoverer.FindUninstalled(found);
+            var byStore = string.Join(", ", detection.Games.GroupBy(g => g.Store).OrderBy(g => g.Key).Select(g => $"{g.Count()} {StoreName(g.Key)}"));
+            Console.WriteLine($"Found {detection.Games.Count} installed games ({(byStore.Length == 0 ? "none" : byStore)}). Looking for their saves...");
+        });
         var others = await service.OtherGamesAsync(ct);
-        var entries = Library.Reconcile(here.Library.All(), found, DateTime.UtcNow, others.ToDictionary(o => o.Id, o => o.Title), leftovers);
+        var entries = Library.Reconcile(here.Library.All(), scan.Found, DateTime.UtcNow, others.ToDictionary(o => o.Id, o => o.Title), scan.Leftovers);
         here.Library.SaveAll(entries);
 
         Console.WriteLine();
         PrintLibrary(entries, others, showIgnored: false);
         Console.WriteLine();
         Console.WriteLine($"Scanned in {clock.Elapsed.TotalSeconds:0} s; nothing was changed on your PC.");
-        if (gameFolders.Count == 0)
+        if (scan.GameFolders == 0)
         {
             Console.WriteLine("Games outside Steam, Epic and EA are found in the game folders you add: gamesync add-folder E:\\Games");
         }
 
         return 0;
+    }
+
+    /// <summary>What a scan found, before it joins the library: the installed games with their saves, and the saves of games not installed.</summary>
+    internal sealed record ScanFindings(IReadOnlyList<DiscoveredGame> Found, IReadOnlyList<LeftoverGame> Leftovers, int GameFolders);
+
+    /// <summary>
+    /// A scan of this PC (LIB-01 to LIB-05, FIND-01 to FIND-05): the stores' games and those in the game folders, each
+    /// game's saves, and the saves of games not installed. Nothing on the PC or in the library is changed; the findings
+    /// join the library with <see cref="Library.Reconcile"/>. A note about the save list goes to the console.
+    /// </summary>
+    internal static async Task<ScanFindings> DiscoverAsync(ThisPc here, bool refreshList, CancellationToken ct, Action<Detection>? detected = null,
+        Action<string>? note = null)
+    {
+        var (list, listNote) = await new SaveListStore(here.DataDir).GetAsync(refreshList, LudusaviManifest, ct);
+        if (listNote is not null)
+        {
+            (note ?? (n => Console.WriteLine($"! {n}")))(listNote);
+        }
+
+        var gameFolders = GameFolders(here.State);
+        var detection = Detector.Detect(StoreLocations.ForThisPc(gameFolders));
+        detected?.Invoke(detection);
+        var discoverer = new Discoverer(list, here.Folders, SaveFolders(here.State), here.Guard, here.Registry);
+        var found = detection.Games.AsParallel().AsOrdered().WithDegreeOfParallelism(4).WithCancellation(ct).Select(discoverer.Discover).ToList();
+        return new ScanFindings(found, discoverer.FindUninstalled(found), gameFolders.Count);
+    }
+
+    /// <summary>LIB-05: a folder joins the ones every scan looks in for games in their own folders; false when it already is one.</summary>
+    internal static bool AddGameFolder(StateStore state, string folder)
+    {
+        var folders = GameFolders(state);
+        if (folders.Contains(folder, StringComparer.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        folders.Add(folder);
+        state.SetSetting(GameFoldersKey, JsonSerializer.Serialize(folders));
+        return true;
     }
 
     /// <summary>The library by what's next for each game, like the onboarding groups in design.md.</summary>

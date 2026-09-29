@@ -100,6 +100,44 @@
             <c:GsNote Icon="shield" Text="{Binding AntiCheatNote}" IsVisible="{Binding HasAntiCheat}" Margin="0,8,0,0" />
           </StackPanel>
 
+          <!-- Art: its own cover, banner and logo in place of Steam's (ART-06) -->
+          <StackPanel Spacing="4" IsVisible="{Binding IsArt}">
+            <TextBlock Text="Art" FontSize="16" LineHeight="22" FontWeight="Medium" Margin="0,0,0,8" />
+            <ItemsControl ItemsSource="{Binding Art}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:ArtSlot">
+                  <c:GsSettingsRow Title="{Binding Title}" Description="{Binding Description}">
+                    <StackPanel Spacing="6">
+                      <StackPanel Orientation="Horizontal" Spacing="16">
+                        <Border Width="{Binding ThumbWidth}" Height="{Binding ThumbHeight}" CornerRadius="{DynamicResource radius-md}" ClipToBounds="True"
+                                Background="{DynamicResource bg-300}" VerticalAlignment="Center">
+                          <Panel>
+                            <Image Source="{Binding Thumb}" Stretch="UniformToFill" IsVisible="{Binding HasThumb}" />
+                            <TextBlock Text="{Binding Placeholder}" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource ink-muted}"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding NoThumb}" />
+                          </Panel>
+                        </Border>
+                        <StackPanel Spacing="6" VerticalAlignment="Center">
+                          <TextBlock Classes="caption muted" Text="{Binding From}" />
+                          <StackPanel Orientation="Horizontal" Spacing="8">
+                            <c:GsButton Classes="sm" Icon="file" Content="{Binding ChooseLabel}" Click="ChooseArt"
+                                        AutomationProperties.Name="{Binding ChooseName}" />
+                            <c:GsButton Classes="ghost sm" Content="{Binding UndoLabel}" Command="{Binding UndoCommand}" IsVisible="{Binding IsOwn}"
+                                        AutomationProperties.Name="{Binding UndoName}" />
+                          </StackPanel>
+                        </StackPanel>
+                      </StackPanel>
+                      <TextBlock Classes="caption" Foreground="{DynamicResource warn}" Text="{Binding Error}" TextWrapping="Wrap" MaxWidth="340"
+                                 IsVisible="{Binding HasError}" />
+                    </StackPanel>
+                  </c:GsSettingsRow>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <c:GsNote Icon="info" Margin="0,8,0,0"
+                      Text="Your own images stay on this PC: they're never synced or shared. JPEG, PNG or WebP, up to 8 MB, each checked like Steam's art." />
+          </StackPanel>
+
           <!-- Launch -->
           <StackPanel Spacing="4" IsVisible="{Binding IsLaunch}">
             <TextBlock Text="Launch" FontSize="16" LineHeight="22" FontWeight="Medium" Margin="0,0,0,8" />

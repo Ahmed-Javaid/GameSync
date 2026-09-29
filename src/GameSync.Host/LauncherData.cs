@@ -12,9 +12,35 @@ public static class LauncherData
         using var engine = Engine.Open(dataDir);
         using var art = new ArtCache(dataDir);
         var games = Launcher.Games(engine.Library.All(), engine.Config.Games.Select(g => (g.Id, g.Title)), engine.State,
-            new SaveListStore(dataDir).Load(), SteamPlay(), art);
+            new SaveListStore(dataDir).Load(), SteamPlay(), art, Running(engine));
         return (games, Launcher.Home(games, engine.State, nowLocal));
     }
+
+    /// <summary>
+    /// PLAY-12: the games being played now, from the sessions the agent keeps open, with when each started. Only while
+    /// the agent runs: one it left open when it stopped says nothing, and it closes it when it starts again.
+    /// </summary>
+    private static Dictionary<GameSync.Core.Model.GameId, DateTime> Running(Engine engine)
+    {
+        var running = new Dictionary<GameSync.Core.Model.GameId, DateTime>();
+        if (!EngineLock.AgentRunning(engine.DataDir))
+        {
+            return running;
+        }
+
+        foreach (var (key, value) in engine.State.GetSettings(OpenPrefix))
+        {
+            if (GameSync.Core.Model.GameId.TryParse(key[OpenPrefix.Length..], out var game) &&
+                DateTime.TryParse(value, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.RoundtripKind, out var since))
+            {
+                running[game] = since.ToUniversalTime();
+            }
+        }
+
+        return running;
+    }
+
+    private const string OpenPrefix = "session.open.";
 
     /// <summary>
     /// ART-01, ART-07: every game's cover, hero and logo, for games with a Steam app ID: from the Steam client's own cache
@@ -62,6 +88,19 @@ public static class LauncherData
     {
         using var state = new GameSync.Core.State.StateStore(dataDir);
         state.SetSetting(Launcher.SortKey, sort.ToString());
+    }
+
+    /// <summary>LIB-22: the library's view on this PC (<c>all</c>, <c>installed</c>, <c>local</c>…); All games until the person picks another.</summary>
+    public static string ReadView(string dataDir)
+    {
+        using var state = new GameSync.Core.State.StateStore(dataDir);
+        return state.GetSetting(Launcher.ViewKey) is { Length: > 0 } view ? view : "all";
+    }
+
+    public static void SetView(string dataDir, string view)
+    {
+        using var state = new GameSync.Core.State.StateStore(dataDir);
+        state.SetSetting(Launcher.ViewKey, view);
     }
 
     /// <summary>

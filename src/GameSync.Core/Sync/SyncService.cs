@@ -834,6 +834,7 @@ public sealed partial class SyncService
             Sessions = _state.GetSessions(stream.Game.Id),
             TreatChangesAsInSession = treatAsInSession,
             ConflictPending = state.Status == GameStatus.Conflict,
+            ConflictReason = state.Status == GameStatus.Conflict ? DecisionEngine.WaitingReason(state.Detail) : null,
             CloudReachable = view.Problem is null,
             ClockSkew = view.ClockSkew,
             ClockTolerance = _options.ClockTolerance,

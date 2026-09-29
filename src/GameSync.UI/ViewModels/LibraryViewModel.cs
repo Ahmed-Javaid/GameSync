@@ -34,13 +34,24 @@ public interface ISearchablePage
 }
 
 /// <summary>
+/// A page the rail can open while one of its inner pages is open (a game's page in the library, a game's saves in the
+/// save manager). Reached from the rail, it forgets where an earlier visit came from, so Back leads to the top of its own
+/// area rather than to the page that opened it before (LIB-21).
+/// </summary>
+public interface IRailPage
+{
+    void ReachedFromRail();
+}
+
+/// <summary>
 /// The game library, laid out like Steam's (LIB-14 to LIB-18): every game by name in a list on the left, with the
 /// search, the sort and favourites first, and the covers, or the page of the game picked, on the right (design system →
-/// LibraryScreen). Its pill tabs choose the view, all games, those that need you, Steam's software or games hidden from
-/// the launcher, and the view, the search and the sort apply to both sides. It lives as long as the window, so what
-/// the person typed, the order they chose and the game they opened stay when the games refresh.
+/// LibraryScreen). Its pill tabs choose the view: all games, those installed on this PC, those in their own folders
+/// (Local, with Scan a folder for games…), those that need you, Steam's software or games hidden from the launcher; the
+/// view, the search and the sort apply to both sides. It lives as long as the window, so what the person typed, the
+/// order they chose and the game they opened stay when the games refresh; the view and the order are kept per PC.
 /// </summary>
-public sealed partial class LibraryViewModel : ObservableObject, IPageSurface, ISearchablePage
+public sealed partial class LibraryViewModel : ObservableObject, IRailPage, IPageSurface, ISearchablePage
 {
     /// <summary>The orders on offer, as the sort menu names them (LIB-16).</summary>
     public static readonly IReadOnlyList<(LibrarySort Sort, string Label)> Sorts =
@@ -54,10 +65,15 @@ public sealed partial class LibraryViewModel : ObservableObject, IPageSurface, I
     private static readonly IReadOnlyDictionary<string, string> ViewNames = new Dictionary<string, string>
     {
         ["all"] = "Games",
+        ["installed"] = "Installed",
+        ["local"] = "Local",
         ["attn"] = "Needs you",
         ["software"] = "Software",
         ["hidden"] = "Hidden",
     };
+
+    /// <summary>The views kept per PC (LIB-22): what's on this PC. Needs you, Software and Hidden are visits, not a way to browse.</summary>
+    public static readonly IReadOnlySet<string> KeptViews = new HashSet<string> { "all", "installed", "local" };
 
     private readonly HashSet<string> _closed = [];
     private readonly Func<LauncherGame, TileItem, GameViewModel>? _makePage;
@@ -113,14 +129,27 @@ public sealed partial class LibraryViewModel : ObservableObject, IPageSurface, I
     [ObservableProperty]
     private int _searchFocusRequests;
 
+    /// <summary>A folder is being scanned for games (LIB-23).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ScanLabel))]
+    private string? _scanning;
+
+    /// <summary>What the last Scan a folder for games… found, or why it couldn't.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasScanNote))]
+    private string? _scanNote;
+
     /// <param name="actions">What the page asks of the app; null where it only shows, as in the snapshot tool.</param>
     /// <param name="sort">The order kept on this PC (LIB-16).</param>
     /// <param name="makePage">A game's page, opened beside the list; by default one made from what the library knows of it.</param>
-    public LibraryViewModel(LauncherActions? actions = null, LibrarySort sort = LibrarySort.RecentlyPlayed, Func<LauncherGame, TileItem, GameViewModel>? makePage = null)
+    /// <param name="view">The view kept on this PC (LIB-22).</param>
+    public LibraryViewModel(LauncherActions? actions = null, LibrarySort sort = LibrarySort.RecentlyPlayed, Func<LauncherGame, TileItem, GameViewModel>? makePage = null,
+        string view = "all")
     {
         Actions = actions;
         _sort = sort;
         _makePage = makePage;
+        _selectedTab = KeptViews.Contains(view) ? view : "all";
         OpenCommand = new RelayCommand<GameId>(game =>
         {
             ReturnTo = null;
@@ -171,6 +200,17 @@ public sealed partial class LibraryViewModel : ObservableObject, IPageSurface, I
     public bool HasFavouriteTiles => FavouriteTiles.Count > 0;
 
     public bool HasNothing => Nothing is not null;
+
+    /// <summary>The Local view, which says what it holds and offers Scan a folder for games… (LIB-22, LIB-23).</summary>
+    public bool IsLocalView => SelectedTab == "local";
+
+    public bool IsScanning => Scanning is not null;
+
+    public string ScanLabel => Scanning is null ? "Scan a folder for games…" : "Looking for games…";
+
+    public bool HasScanNote => ScanNote is not null;
+
+    public bool CanScan => Actions?.ScanFolder is not null;
 
     public string SortLabel => Sorts.First(s => s.Sort == Sort).Label;
 
@@ -242,6 +282,8 @@ public sealed partial class LibraryViewModel : ObservableObject, IPageSurface, I
         var tabs = new List<NavItem>
         {
             new("all", "All games"),
+            new("installed", "Installed"),
+            new("local", "Local"),
             new("attn", "Needs you", Count: needsYou > 0 ? needsYou.ToString(CultureInfo.InvariantCulture) : null),
         };
         if (games.Any(g => g.IsSoftware && !g.IsHidden))
@@ -285,7 +327,72 @@ public sealed partial class LibraryViewModel : ObservableObject, IPageSurface, I
 
     public void FocusSearch() => SearchFocusRequests++;
 
-    partial void OnSelectedTabChanged(string value) => Rebuild();
+    /// <summary>The rail's Game library: a game's page still open keeps showing, and Back from it leads to the covers.</summary>
+    public void ReachedFromRail() => ReturnTo = null;
+
+    /// <summary>A view another page opened (Home's My games and Needs you): shown, not kept as the library's own.</summary>
+    public void ShowView(string view)
+    {
+        _visiting = true;
+        try
+        {
+            SelectedTab = view;
+        }
+        finally
+        {
+            _visiting = false;
+        }
+    }
+
+    private bool _visiting;
+
+    /// <summary>
+    /// LIB-23: Scan a folder for games…, with the folder picked in Windows' picker: the note says it's looking, then what
+    /// it found, or why it couldn't; the games found join the view as the library refreshes.
+    /// </summary>
+    public async void ScanFolder(string folder)
+    {
+        if (Actions?.ScanFolder is not { } scan || Scanning is not null)
+        {
+            return;
+        }
+
+        Scanning = folder;
+        ScanNote = $"Looking for games in {folder}, and scanning the rest of this PC with it. It takes a minute or so.";
+        try
+        {
+            ScanNote = (await scan(folder, CancellationToken.None)).Sentence;
+        }
+        catch (OperationCanceledException)
+        {
+            ScanNote = null;
+        }
+        catch (Exception e) when (e is UsageException or InvalidOperationException)
+        {
+            ScanNote = e.Message;
+        }
+        catch (Exception e)
+        {
+            ScanNote = $"The scan stopped before it finished: {e.Message}";
+        }
+        finally
+        {
+            Scanning = null;
+        }
+    }
+
+    partial void OnSelectedTabChanged(string value)
+    {
+        if (!_visiting && KeptViews.Contains(value))
+        {
+            Actions?.SetView?.Invoke(value);
+        }
+
+        OnPropertyChanged(nameof(IsLocalView));
+        Rebuild();
+    }
+
+    partial void OnScanningChanged(string? value) => OnPropertyChanged(nameof(IsScanning));
 
     partial void OnSearchChanged(string value) => Rebuild();
 
@@ -327,6 +434,8 @@ public sealed partial class LibraryViewModel : ObservableObject, IPageSurface, I
     {
         var inView = _games.Where(g => SelectedTab switch
         {
+            "installed" => g.Shown && g.Installed,
+            "local" => g.Shown && g.IsLocal,
             "attn" => g.Shown && g.NeedsYou,
             "software" => g.IsSoftware && !g.IsHidden,
             "hidden" => g.IsHidden,
@@ -363,6 +472,8 @@ public sealed partial class LibraryViewModel : ObservableObject, IPageSurface, I
             : searching ? $"No game here matches “{Search.Trim()}”."
             : SelectedTab switch
             {
+                "installed" => "No games are installed on this PC yet, as far as GameSync has looked.",
+                "local" => "No games in their own folders yet.",
                 "attn" => "Nothing needs you. Every game that syncs is fine.",
                 "hidden" => "No games are hidden. Right-click a game to hide it from the launcher on this PC.",
                 _ => "No games yet. First run looks for them on this PC; until it's built, run gamesync scan.",

@@ -231,10 +231,35 @@ export interface PropertiesGame {
   store?: string; storeId?: string; installDir?: string; size?: string; build?: string; engine?: string; foundBy?: string; antiCheat?: string;
   launch?: { url?: string; program?: string; steamOptions?: string; args?: string };
   files?: FileTreeItem[]; settings?: "sync" | "this-pc" | "off"; screenshots?: "this-pc" | "off"; skip?: boolean;
+  /** Steam's pictures (cover, hero, logo) and the person's own (`mine`), which win; either may be missing. */
+  art?: { cover?: string; hero?: string; logo?: string; mine?: { cover?: string; hero?: string; logo?: string } };
   mode?: "sync" | "backup"; conflict?: "newest" | "ask" | "this-pc";
 }
-/** One game's Properties, like Steam's: General (name, favourite, shown, its ID), Launch (how it starts, launch options), Installed files, Saves (which files are backed up, in a FileTree, with settings files, screenshots and the usual skips) and Sync (between PCs or backup only, and who wins when both changed it). Changes wait for Save changes; Cancel drops them. */
-export function GamePropertiesDialog(props: { game: PropertiesGame; section?: "general" | "launch" | "files" | "saves" | "sync"; onSave?: (values: object) => void; onClose?: () => void }): JSX.Element;
+/** One game's Properties, like Steam's: General (name, favourite, shown, its ID), Art (its cover, banner and logo: Steam's or your own), Launch (how it starts, launch options), Installed files, Saves (which files are backed up, in a FileTree, with settings files, screenshots and the usual skips) and Sync (between PCs or backup only, and who wins when both changed it). Changes wait for Save changes; Cancel drops them. */
+export function GamePropertiesDialog(props: { game: PropertiesGame; section?: "general" | "art" | "launch" | "files" | "saves" | "sync"; onSave?: (values: object) => void; onClose?: () => void }): JSX.Element;
+
+export interface NewPlace {
+  kind: "folder" | "file"; path: string;
+  /** How every PC reads it: "<localLow>/Team Cherry/Hollow Knight"; a full path when it's under no folder every PC has. */
+  portable: string; portableNote?: string;
+  files?: number; bytes?: number; newest?: string;
+  /** Program files in it, never taken (R1). */
+  programs?: number;
+  /** warn: it can be added, with `message` (another game saves there too); refused: it can't, with `message` saying why and what to pick. */
+  state?: "ok" | "warn" | "refused"; message?: string;
+}
+/** A place a game keeps saves, set by hand (FOLD-01): pick a folder or one file, see how every PC reads it and what's there, pick what it holds, Add this place. Program files in it are never taken. */
+export function AddPlaceDialog(props: { game: string; place?: NewPlace | null; category?: "save" | "config" | "screenshots"; onPick?: (kind: "folder" | "file") => void; onOpen?: () => void; onAdd?: (choice: { path: string; category: string }) => void; onClose?: () => void }): JSX.Element;
+
+export interface KeptSave {
+  id: string; name: string; saved: string; files: number; bytes?: number;
+  /** The name of an identical copy here, or a named save: it isn't named again. */
+  same?: string;
+  /** Its files are already in the history: that version takes this name, and nothing is stored again. */
+  kept?: boolean;
+}
+/** Save folders kept by hand (BAK-19), as named saves: pick the folder holding them, see each copy by name, Import. The folders are never changed; each copy is a named save on every PC, never current by itself. */
+export function ImportKeptSavesDialog(props: { game: string; folder?: string; items?: KeptSave[]; skipped?: string[]; roots?: { id: string; label: string }[]; root?: string; stage?: "pick" | "review" | "done"; onPick?: () => void; onRoot?: (id: string) => void; onOpen?: () => void; onImport?: () => void; onClose?: () => void }): JSX.Element;
 
 /** 1536 → "2 KB", 2202009 → "2.1 MB". */
 export function formatBytes(bytes: number): string;

@@ -1,3 +1,4 @@
+using CommunityToolkit.Mvvm.Input;
 using System.Security.Cryptography;
 using System.Text;
 using GameSync.Core.Discovery;
@@ -158,6 +159,40 @@ public class GamePageTests
         library.BackCommand.Execute(null);
         Assert.True(library.ShowsCovers);
         Assert.Equal(UI.Theming.GlassStrength.Home, library.Strength);
+    }
+
+    [Fact]
+    public void BAK_18_a_named_saves_menu_renames_it_and_takes_its_name_away_keeping_the_save()
+    {
+        var renamed = new List<(GameId Game, string Name, string NewName)>();
+        var forgotten = new List<(GameId Game, string Name)>();
+        var actions = new LauncherActions(_ => { }, () => { }, (_, _) => { }, (_, _) => { })
+        {
+            RenameSave = (game, name, newName) => renamed.Add((game, name, newName)),
+            ForgetSave = (game, name) => forgotten.Add((game, name)),
+        };
+        var game = new LauncherGame { Id = Game, Title = "Hollow Knight", Syncs = true, Status = GameStatus.Synced };
+        var saves = new GameSavesViewModel(game, actions, new RelayCommand(() => { }));
+        var v1 = V("v1", null, Desktop, 0, F("user1.dat", "one"));
+        saves.Show(new GameDetail
+        {
+            Id = Game,
+            Syncs = true,
+            NamedSaves = [new GameNamedSave("Before the Radiance", v1.Id, T0, "DESKTOP", Uploaded: true)],
+        }, T0.ToLocalTime());
+        var named = Assert.Single(saves.NamedSaves);
+        Assert.Equal("Before the Radiance", named.NewName);
+
+        // An unchanged or empty name does nothing; a new one is sent with the old, trimmed.
+        saves.RenameSaveCommand.Execute(named);
+        named.NewName = "   ";
+        saves.RenameSaveCommand.Execute(named);
+        named.NewName = "  Before the Radiance, again ";
+        saves.RenameSaveCommand.Execute(named);
+        Assert.Equal([(Game, "Before the Radiance", "Before the Radiance, again")], renamed);
+
+        saves.ForgetSaveCommand.Execute(named);
+        Assert.Equal([(Game, "Before the Radiance")], forgotten);
     }
 
     private static IEnumerable<string> Names(LibraryViewModel library) =>

@@ -13,9 +13,56 @@ namespace GameSync.Host;
 /// <param name="Folder">The first place it keeps saves, on this PC; null when this PC can't place it.</param>
 public sealed record GameSaveSummary(GameId Id, string? Folder, int Versions, long HistoryBytes, DateTime? LastBackupUtc, string? LastBackupPc);
 
+/// <summary>
+/// MGR-03: the space the backups take on this PC: the backup folder's files as they are on disk (each file stored once,
+/// whatever the versions share), the drive it's on, and that drive's free space.
+/// </summary>
+public sealed record BackupSpace(long Bytes, string Drive, long? FreeBytes);
+
 /// <summary>Reads every game's saves at a glance from a data folder: the backup folder's copy of the records, so it's quick and works offline.</summary>
 public static class SaveOverview
 {
+    /// <summary>MGR-03: how much the backup folder takes on its drive, and what's free there; null when the folder isn't there.</summary>
+    public static BackupSpace? Space(string dataDir)
+    {
+        string folder;
+        using (var state = new Core.State.StateStore(dataDir))
+        {
+            folder = Cli.HistoryFolder(state, dataDir);
+        }
+
+        if (!Directory.Exists(folder))
+        {
+            return null;
+        }
+
+        long bytes = 0;
+        foreach (var file in new DirectoryInfo(folder).EnumerateFiles("*", new EnumerationOptions { RecurseSubdirectories = true, IgnoreInaccessible = true, AttributesToSkip = FileAttributes.ReparsePoint }))
+        {
+            try
+            {
+                bytes += file.Length;
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+            {
+                // A file going away while it's counted doesn't count.
+            }
+        }
+
+        var root = Path.GetPathRoot(Path.GetFullPath(folder)) ?? folder;
+        long? free = null;
+        try
+        {
+            free = new DriveInfo(root).AvailableFreeSpace;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            // A network folder may not say.
+        }
+
+        return new BackupSpace(bytes, root.TrimEnd('\\'), free);
+    }
+
     public static async Task<IReadOnlyList<GameSaveSummary>> ReadAsync(string dataDir, CancellationToken ct)
     {
         using var engine = Engine.Open(dataDir);

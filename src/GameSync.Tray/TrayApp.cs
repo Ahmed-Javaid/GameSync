@@ -133,7 +133,7 @@ internal sealed class TrayApp
         _agentRun = Task.Run(() => _agent.RunAsync(_stop.Token));
         _ = Task.Run(() => AppPipe.ServeAsync(_dataDir, Answer, e => _output.Say($"! A second start can't reach this app: {e.Message}"), _stop.Token));
         _ = Task.Run(ReadTodaysLogAsync);
-        _ = Task.Run(RefreshArtAsync);
+        _ = Task.Run(() => RefreshArtAsync());
         RefreshSoon();
         if (showWindow)
         {
@@ -216,6 +216,35 @@ internal sealed class TrayApp
     {
         SetFavourite = SetFavourite,
         SetSort = sort => Task.Run(() => LauncherData.SetSort(_dataDir, sort)),
+        SetView = view => Task.Run(() => LauncherData.SetView(_dataDir, view)),
+        ScanFolder = async (folder, ct) =>
+        {
+            try
+            {
+                var scan = await Task.Run(() => LocalGames.ScanFolderAsync(_dataDir, folder, _output, _stop.Token), ct);
+                _output.Say(scan.Sentence);
+                _agent.WatchNow();
+                _ = Task.Run(() => RefreshArtAsync(now: true));
+                return scan;
+            }
+            finally
+            {
+                Dispatcher.UIThread.Post(RefreshSoon);
+            }
+        },
+        Locate = (game, program) => Job(async ct =>
+        {
+            try
+            {
+                _output.Say(await LocalGames.LocateAsync(_dataDir, game, program, _output, ct));
+                _agent.WatchNow();
+            }
+            catch (Exception e) when (e is UsageException or IOException or UnauthorizedAccessException or InvalidOperationException)
+            {
+                _output.NeedsYou(TitleOf(game), e.Message);
+            }
+        }),
+        LoadSpace = ct => Task.Run(() => SaveOverview.Space(_dataDir), ct),
         OpenGame = OpenGame,
         LoadGame = (game, ct) => Task.Run(() => GameDetails.ReadAsync(_dataDir, game, ct, SteamIdOf(game)), ct),
         OpenFolder = OpenFolder,
@@ -243,10 +272,49 @@ internal sealed class TrayApp
             }
         }),
         Approve = game => Job(ct => AppActions.ApproveAsync(_dataDir, game, _output, ct)),
+        OpenConflict = OpenConflict,
+        LoadConflict = (game, ct) => Task.Run(() => ConflictDetails.ReadAsync(_dataDir, game, ct), ct),
+        Resolve = (game, keepThisPc, cloudVersion) => Job(ct => AppActions.ResolveAsync(_dataDir, game, keepThisPc, cloudVersion, _output, ct)),
+        Swap = game => Job(ct => AppActions.SwapAsync(_dataDir, game, _output, ct)),
+        Retry = game => Job(ct => AppActions.RetryAsync(_dataDir, game, _output, ct)),
+        RenameSave = (game, name, newName) => Job(ct => AppActions.RenameSaveAsync(_dataDir, game, name, newName, _output, ct)),
+        ForgetSave = (game, name) => Job(ct => AppActions.ForgetSaveAsync(_dataDir, game, name, _output, ct)),
+        OpenAddPlace = game => ShowDialog(new AddPlaceViewModel(game, TitleOf(game), Actions)),
+        LookPlace = (game, path, ct) => Task.Run(() => SavePlaces.Look(_dataDir, game, path), ct),
+        AddPlace = (game, path, category) => Job(async ct =>
+        {
+            try
+            {
+                _output.Say(await GameSettings.ApplyAsync(_dataDir, game, new GamePropertiesChange { AddPlace = path, AddPlaceCategory = category },
+                    () => _output.Say("Waiting for the sync in the background to finish first."), ct));
+            }
+            catch (Exception e) when (e is UsageException or IOException or UnauthorizedAccessException or InvalidOperationException)
+            {
+                _output.NeedsYou("GameSync", e.Message);
+            }
+        }),
+        OpenImportKept = game =>
+        {
+            var import = new ImportKeptViewModel(game, TitleOf(game), Actions);
+            ShowDialog(import);
+            import.Load();
+        },
+        SaveRoots = (game, ct) => Task.Run(() => SavePlaces.Roots(_dataDir, game), ct),
+        KeptSaves = async (game, folder, root, apply, ct) =>
+        {
+            var report = await Task.Run(() => AppActions.KeptSavesAsync(_dataDir, game, folder, root, apply, _output, ct), ct);
+            if (apply)
+            {
+                Dispatcher.UIThread.Post(RefreshSoon);
+            }
+
+            return report;
+        },
         SyncGame = game => Job(async ct =>
         {
             if (await AppActions.SyncGameAsync(_dataDir, game, _output, ct))
             {
+                _agent.WatchNow();
                 _agent.SyncNow();
             }
         }),
@@ -298,7 +366,7 @@ internal sealed class TrayApp
 
     private LibraryViewModel NewLibrary()
     {
-        var library = new LibraryViewModel(Actions, ReadSort());
+        var library = new LibraryViewModel(Actions, ReadSort(), view: ReadView());
         if (_pages is { } pages)
         {
             library.Update(pages.Games, pages.Tiles);
@@ -316,6 +384,19 @@ internal sealed class TrayApp
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidOperationException)
         {
             return LibrarySort.RecentlyPlayed;
+        }
+    }
+
+    /// <summary>The library's view kept on this PC (LIB-22): All games until the person picks another.</summary>
+    private string ReadView()
+    {
+        try
+        {
+            return LauncherData.ReadView(_dataDir);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            return "all";
         }
     }
 
@@ -346,19 +427,35 @@ internal sealed class TrayApp
         _shell?.Open("saves");
     }
 
+    /// <summary>
+    /// A game's conflict in the save manager, from Resolve anywhere (SYNC-10). Opened over the game's saves, Back returns
+    /// to them; from Home or a game's page, to that page.
+    /// </summary>
+    private void OpenConflict(GameId game)
+    {
+        var from = _shell?.Current;
+        Saves.OpenConflict(game, from is null or "saves" ? null : from);
+        _shell?.Open("saves");
+    }
+
     /// <summary>A game's Properties over the page (LIB-20, FIND-12), read after it opens.</summary>
     private void OpenProperties(GameId game, string? section)
     {
-        if (_shell is null)
-        {
-            return;
-        }
-
-        var title = _pages?.Games.FirstOrDefault(g => g.Id == game)?.Title ?? game.Value;
-        var properties = new PropertiesViewModel(game, title, Actions, section);
-        _shell.Dialog = properties;
+        var properties = new PropertiesViewModel(game, TitleOf(game), Actions, section);
+        ShowDialog(properties);
         properties.Load();
     }
+
+    /// <summary>A dialog over the page: Properties, Add a place, Import kept saves.</summary>
+    private void ShowDialog(object dialog)
+    {
+        if (_shell is not null)
+        {
+            _shell.Dialog = dialog;
+        }
+    }
+
+    private string TitleOf(GameId game) => _pages?.Games.FirstOrDefault(g => g.Id == game)?.Title ?? game.Value;
 
     /// <summary>A link GameSync made (a game's Steam store page, or Steam's own install and library links), in the app Windows keeps for it.</summary>
     private void OpenLink(string link)
@@ -400,7 +497,7 @@ internal sealed class TrayApp
     {
         if (page == "library" && tab is not null)
         {
-            Library.SelectedTab = tab;
+            Library.ShowView(tab);
             Library.Selected = null;
         }
 
@@ -627,12 +724,20 @@ internal sealed class TrayApp
         }
     }
 
-    /// <summary>ART-07: a while after the start, art for new games, and art that's due a check, from Steam.</summary>
-    private async Task RefreshArtAsync()
+    /// <summary>
+    /// ART-07: a while after the start (or at once, after a scan found games), art for new games, and art that's due a
+    /// check, from Steam. What Steam says a game is comes with it, so the agent then watches the games anew: software
+    /// such as Wallpaper Engine isn't taken for a game being played (PLAY-12).
+    /// </summary>
+    private async Task RefreshArtAsync(bool now = false)
     {
         try
         {
-            await Task.Delay(ArtAfterStart, _stop.Token);
+            if (!now)
+            {
+                await Task.Delay(ArtAfterStart, _stop.Token);
+            }
+
             if (!File.Exists(AppConfig.PathIn(_dataDir)))
             {
                 return;
@@ -643,6 +748,11 @@ internal sealed class TrayApp
             {
                 _output.Say($"Art: {refresh.Copied + refresh.Downloaded} new pictures for the launcher.");
                 Dispatcher.UIThread.Post(RefreshSoon);
+            }
+
+            if (refresh.Asked > 0)
+            {
+                _agent.WatchNow();
             }
 
             Dispatcher.UIThread.Post(() => LetGoSoon());
@@ -723,7 +833,7 @@ internal sealed class TrayApp
                 HomeViewModel.From(home, games, now, actions, Status(dataDir, now, cloud)),
                 games,
                 LibraryViewModel.Tiles(games, now, actions),
-                ShellViewModel.DefaultRail(games.FirstOrDefault(g => g.Status == GameStatus.Playing)?.Title, games.Count(g => g.NeedsYou)),
+                ShellViewModel.DefaultRail(games.Where(g => g.IsRunning && g.Shown).MaxBy(g => g.RunningSinceUtc ?? DateTime.MinValue)?.Title, games.Count(g => g.NeedsYou)),
                 home.Hero?.HeroPath ?? home.Hero?.CoverPath);
         }
 

@@ -21,8 +21,17 @@
     <DataTemplate DataType="vm:GameSavesViewModel">
       <v:GameSavesPage />
     </DataTemplate>
+    <DataTemplate DataType="vm:ConflictViewModel">
+      <v:ConflictPage />
+    </DataTemplate>
     <DataTemplate DataType="vm:PropertiesViewModel">
       <v:PropertiesDialog />
+    </DataTemplate>
+    <DataTemplate DataType="vm:AddPlaceViewModel">
+      <v:AddPlaceDialog />
+    </DataTemplate>
+    <DataTemplate DataType="vm:ImportKeptViewModel">
+      <v:ImportKeptDialog />
     </DataTemplate>
     <DataTemplate DataType="vm:ConsoleViewModel">
       <v:ConsolePage />

@@ -1,0 +1,26 @@
+<!-- @dsCard group="Save manager" height=720 subtitle="Save folders kept by hand, as named saves; the folders are never changed" -->
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>preview</title>
+<style>html,body{margin:0;background:var(--bg-100);}</style>
+</head>
+<body class="gs-root">
+<div id="root"></div>
+<script>
+var G = window.GameSync, h = React.createElement;
+// #pick: before the folder is chosen; #done: after Import; otherwise the kept copies found, ready to import.
+var STATE = location.hash.slice(1);
+var ITEMS = [
+  {id:'k1', name:'Before Father Gascoigne', saved:'4 Sep 20:12', files:3, bytes:1153434},
+  {id:'k2', name:'Before Vicar Amelia', saved:'9 Sep 22:40', files:3, bytes:1160192, kept:true},
+  {id:'k3', name:'Before Rom', saved:'12 Sep 21:05', files:3, bytes:1171456},
+  {id:'k4', name:'After Rom', saved:'12 Sep 21:05', files:3, bytes:1171456, same:'Before Rom'},
+  {id:'k5', name:'Before Orphan of Kos', saved:'20 Sep 23:18', files:3, bytes:1189888}];
+var props = STATE === 'pick' ? {game:'Bloodborne', stage:'pick'}
+  : {game:'Bloodborne', folder:'D:\\Saves\\Bloodborne\\CUSA00207', items:ITEMS, stage:STATE === 'done' ? 'done' : 'review',
+     skipped:['SPRJ0005 is the live save, so it\u2019s left as it is.']};
+ReactDOM.createRoot(document.getElementById('root')).render(
+  h('div',{className:'gs-scrim',style:{minHeight:700}},h(G.ImportKeptSavesDialog,props)));
+</script>
+</body>
+</html>

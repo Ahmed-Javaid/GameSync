@@ -1,0 +1,22 @@
+<!-- @dsCard group="Save manager" height=620 subtitle="A place a game keeps saves, set by hand: how every PC reads it, what's there, what it holds" -->
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>preview</title>
+<style>html,body{margin:0;background:var(--bg-100);}</style>
+</head>
+<body class="gs-root">
+<div id="root"></div>
+<script>
+var G = window.GameSync, h = React.createElement;
+// #pick: nothing picked yet; #refused: a folder too wide to add; otherwise a folder picked and ready to add.
+var STATE = location.hash.slice(1);
+var PLACE = STATE === 'pick' ? null
+  : STATE === 'refused' ? {kind:'folder', path:'C:\\Users\\You\\Documents', state:'refused',
+      message:'That\u2019s your whole Documents folder, far more than one game\u2019s saves. Pick the game\u2019s own folder inside it.'}
+  : {kind:'folder', path:'C:\\Users\\You\\AppData\\LocalLow\\Team Cherry\\Hollow Knight', portable:'<localLow>/Team Cherry/Hollow Knight',
+      files:6, bytes:1153434, newest:'today 21:04', programs:0};
+ReactDOM.createRoot(document.getElementById('root')).render(
+  h('div',{className:'gs-scrim',style:{minHeight:600}},h(G.AddPlaceDialog,{game:'Hollow Knight',place:PLACE})));
+</script>
+</body>
+</html>

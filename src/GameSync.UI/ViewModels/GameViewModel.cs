@@ -67,6 +67,13 @@ public sealed partial class GameViewModel : ObservableObject, IPageSurface
     [ObservableProperty]
     private bool _showsPlayBeside;
 
+    /// <summary>
+    /// LIB-24: Locate the game… in place of Play, for a game not installed here that no store installs (found only by its
+    /// saves, or one whose folder moved): its program, picked in Windows' picker, marks it installed.
+    /// </summary>
+    [ObservableProperty]
+    private bool _canLocate;
+
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(FavouriteLabel))]
     private bool _isFavourite;
@@ -145,6 +152,7 @@ public sealed partial class GameViewModel : ObservableObject, IPageSurface
         ToggleHiddenCommand = new RelayCommand(() => _actions?.SetHidden(Id, !IsHidden), () => _actions is not null);
         OpenPropertiesCommand = new RelayCommand<string>(section => _actions?.OpenProperties?.Invoke(Id, section), _ => _actions?.OpenProperties is not null);
         OpenSavesCommand = new RelayCommand(() => _actions?.OpenSaves?.Invoke(Id), () => _actions?.OpenSaves is not null);
+        OpenConflictCommand = new RelayCommand(() => _actions?.OpenConflict?.Invoke(Id), () => _actions?.OpenConflict is not null);
         OpenStorePageCommand = new RelayCommand(() =>
         {
             if (_game.SteamAppId is { } app)
@@ -226,6 +234,15 @@ public sealed partial class GameViewModel : ObservableObject, IPageSurface
     /// <summary>The game's saves in the save manager, where the save work is (MGR-07).</summary>
     public ICommand OpenSavesCommand { get; }
 
+    /// <summary>The game's conflict, both saves side by side (SYNC-10).</summary>
+    public ICommand OpenConflictCommand { get; }
+
+    /// <summary>
+    /// The status's own action when the game needs you: Resolve opens its conflict; the others its saves, where the
+    /// sentence says what happened and the buttons deal with it.
+    /// </summary>
+    public ICommand NeedCommand => _game.Status == GameStatus.Conflict && _actions?.OpenConflict is not null ? OpenConflictCommand : OpenSavesCommand;
+
     public ICommand OpenStorePageCommand { get; }
 
     public ICommand OpenGameFolderCommand { get; }
@@ -243,7 +260,11 @@ public sealed partial class GameViewModel : ObservableObject, IPageSurface
 
     public ICommand ToggleAboutCommand { get; }
 
-    public bool IsPlaying => _game.Status == GameStatus.Playing;
+    /// <summary>It's being played now, however it was started (PLAY-12).</summary>
+    public bool IsPlaying => _game.IsRunning;
+
+    /// <summary>Locate the game…: the program picked in Windows' picker; the app marks the game installed in its folder (LIB-24).</summary>
+    public void Locate(string program) => _actions?.Locate?.Invoke(Id, program);
 
     /// <summary>What the page reads after it opens, and again whenever the games refresh: About, the saves at a glance, this PC.</summary>
     public async void Reload()
@@ -278,7 +299,7 @@ public sealed partial class GameViewModel : ObservableObject, IPageSurface
         var about = detail.About;
         About = about.Description;
         AboutSource = about.Description is null ? null : "From its Steam store page";
-        AboutNote = _game.Store is null && _game.SteamAppId is null ? "Added by hand, so there's no store page to show."
+        AboutNote = _game.ByHand && _game.SteamAppId is null ? "Added by hand, so there's no store page to show."
             : _game.SteamAppId is null ? "No Steam store page matches this game, so there's nothing more to show about it."
             : "Its Steam store page comes with its art, the next time GameSync asks Steam.";
         AboutFacts = Fact.Known(
@@ -337,11 +358,13 @@ public sealed partial class GameViewModel : ObservableObject, IPageSurface
         (NeedAction, NeedIcon) = game.NeedsYou ? ActionFor(game.Status) : (null, "alert");
         Stats = StatsOf(game, DateTime.Now);
 
-        // The one recommended action: Play; the status's own when the game needs you; Install through Steam when it isn't here.
+        // The one recommended action: Play; the status's own when the game needs you; when it isn't here, Install through
+        // Steam for a Steam game, and Locate the game… for one no store installs.
         ShowsPlayBeside = false;
         PrimaryIsMain = true;
         PrimaryEnabled = true;
         PrimaryTip = null;
+        CanLocate = !game.Installed && (game.Store is null or StoreKind.Loose) && !game.ByHand && _actions?.Locate is not null;
         if (!game.Installed)
         {
             PrimaryLabel = game.Store == StoreKind.Steam && game.SteamAppId is not null ? "Install through Steam" : null;
@@ -349,20 +372,21 @@ public sealed partial class GameViewModel : ObservableObject, IPageSurface
             PrimaryIsMain = false;
             PrimaryCommand = new RelayCommand(() => _actions?.OpenLink?.Invoke($"steam://install/{game.SteamAppId?.ToString(CultureInfo.InvariantCulture)}"));
         }
-        else if (game.Syncs && NeedAction is { } need)
-        {
-            PrimaryLabel = need;
-            PrimaryIcon = NeedIcon;
-            PrimaryCommand = OpenSavesCommand;
-            ShowsPlayBeside = true;
-        }
-        else if (game.Status == GameStatus.Playing)
+        else if (game.IsRunning)
         {
             PrimaryLabel = "Playing";
             PrimaryIcon = "play";
             PrimaryEnabled = false;
             PrimaryTip = "It's running now";
             PrimaryCommand = null;
+            ShowsPlayBeside = false;
+        }
+        else if (game.Syncs && NeedAction is { } need)
+        {
+            PrimaryLabel = need;
+            PrimaryIcon = NeedIcon;
+            PrimaryCommand = NeedCommand;
+            ShowsPlayBeside = true;
         }
         else
         {
@@ -373,12 +397,13 @@ public sealed partial class GameViewModel : ObservableObject, IPageSurface
 
         OnPropertyChanged(nameof(BackdropArt));
         OnPropertyChanged(nameof(IsPlaying));
+        OnPropertyChanged(nameof(NeedCommand));
     }
 
     /// <summary>Last played, Play time and Saves, as the play bar shows them; Achievements join once they're read (after v1).</summary>
     public static IReadOnlyList<PlayStat> StatsOf(LauncherGame game, DateTime nowLocal) =>
     [
-        new PlayStat("Last played", game.Status == GameStatus.Playing ? "Playing now" : game.LastPlayedUtc is { } at ? Launcher.WhenText(at, nowLocal) ?? "Never" : "Never"),
+        new PlayStat("Last played", game.IsRunning ? "Playing now" : game.LastPlayedUtc is { } at ? Launcher.WhenText(at, nowLocal) ?? "Never" : "Never"),
         new PlayStat("Play time", game.Playtime <= TimeSpan.Zero ? "None yet"
             : game.Playtime.TotalHours >= 1 ? $"{Math.Round(game.Playtime.TotalHours).ToString(CultureInfo.InvariantCulture)} hours"
             : $"{Math.Max(1, (int)Math.Round(game.Playtime.TotalMinutes))} minutes"),
@@ -401,7 +426,7 @@ public sealed partial class GameViewModel : ObservableObject, IPageSurface
         _ => "Backed up on this PC and in your Google Drive, every version kept.",
     };
 
-    /// <summary>The status's own action and its icon, for a game that needs you; they all lead to the game's saves, where the details are.</summary>
+    /// <summary>The status's own action and its icon, for a game that needs you: Resolve leads to its conflict, the others to its saves.</summary>
     public static (string Label, string Icon) ActionFor(GameStatus? status) => status switch
     {
         GameStatus.Conflict => ("Resolve", "alert"),
@@ -411,13 +436,17 @@ public sealed partial class GameViewModel : ObservableObject, IPageSurface
         _ => ("See why", "alert"),
     };
 
-    /// <summary>"Steam"; "In its own folder · G:\Black Myth Wukong · Unreal Engine"; "Not installed on this PC · Steam"; "Added by hand".</summary>
+    /// <summary>
+    /// "Steam"; "In its own folder · G:\Black Myth Wukong · Unreal Engine"; "Not installed on this PC · Steam"; "Not
+    /// installed on this PC · Found by its saves"; "Added by hand".
+    /// </summary>
     private static string EyebrowOf(LauncherGame game, GameDetail? detail)
     {
         var where = StoreNames.Name(game.Store) ?? game.Store switch
         {
-            StoreKind.Loose => string.Join(" · ", new[] { "In its own folder", detail?.InstallDir, detail?.About.Engine }.OfType<string>()),
-            _ => "Added by hand",
+            StoreKind.Loose when game.Installed => string.Join(" · ", new[] { "In its own folder", detail?.InstallDir, detail?.About.Engine }.OfType<string>()),
+            StoreKind.Loose => "In its own folder",
+            _ => game.ByHand ? "Added by hand" : "Found by its saves",
         };
         return game.Installed ? where : $"Not installed on this PC · {where}";
     }

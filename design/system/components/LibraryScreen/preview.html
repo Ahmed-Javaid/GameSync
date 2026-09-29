@@ -58,6 +58,8 @@ var GAMES = [
   {id:'drg',name:'Deep Rock Galactic',art:C[0],hero:HERO_AMBER,status:null,hours:66,rank:14,last:'9 Apr',added:39,store:'Steam',found:'<base>/FSD/Saved/SaveGames',at:'E:\\Steam\\steamapps\\common\\Deep Rock Galactic\\FSD\\Saved\\SaveGames',files:'5 files \u00b7 1.1 MB \u00b7 newest 9 Apr 21:05'},
   {id:'stardew',name:'Stardew Valley',art:C[1],hero:HERO_CYAN,status:null,hours:57,rank:15,last:'12 Mar',added:38,store:'Steam',found:'<winAppData>/StardewValley/Saves',at:'C:\\Users\\You\\AppData\\Roaming\\StardewValley\\Saves',files:'12 files \u00b7 3.0 MB \u00b7 newest 12 Mar 23:58'},
   {id:'bloodborne',name:'Bloodborne',art:null,hero:null,status:'synced',hours:0,rank:16,last:null,added:2,loose:'E:\\Emulators\\shadPS4'},
+  {id:'ghost',name:'Ghost of Tsushima',art:C[0],hero:HERO_AMBER,status:null,hours:31,rank:4.5,last:'24 Sep',added:4,loose:'G:\\Ghost of Tsushima',found:'<home>/Documents/Ghost of Tsushima DIRECTOR\u2019S CUT',at:'C:\\Users\\You\\Documents\\Ghost of Tsushima DIRECTOR\u2019S CUT',files:'4 files \u00b7 18.2 MB \u00b7 newest 24 Sep 23:40'},
+  {id:'gow',name:'God of War',art:C[5],hero:HERO_AMBER,status:null,installed:false,hours:52,rank:17.5,last:'2 Feb',added:34,found:'<home>/Saved Games/God of War',at:'C:\\Users\\You\\Saved Games\\God of War',files:'6 files \u00b7 4.1 MB \u00b7 newest 2 Feb 22:15'},
   {id:'mcworld',name:'Minecraft server world',art:null,hero:null,status:'synced',hours:0,rank:17,last:null,added:1,byHand:true},
   {id:'cyberpunk',name:'Cyberpunk 2077',art:C[4],hero:HERO_AMBER,status:null,installed:false,hours:120,rank:18,last:'3 Mar',added:37,store:'Steam',found:'<home>/Saved Games/CD Projekt Red/Cyberpunk 2077',at:'C:\\Users\\You\\Saved Games\\CD Projekt Red\\Cyberpunk 2077',files:'61 files \u00b7 412 MB \u00b7 newest 3 Mar 01:20'},
   {id:'witcher',name:'The Witcher 3: Wild Hunt',art:C[5],hero:HERO_AMBER,status:null,installed:false,hours:180,rank:19,last:'14 Jan',added:36,store:'Steam',found:'<home>/Documents/The Witcher 3/gamesaves',at:'C:\\Users\\You\\Documents\\The Witcher 3\\gamesaves',files:'40 files \u00b7 96 MB \u00b7 newest 14 Jan 22:17'},
@@ -193,8 +195,10 @@ function blurbOf(g){
 function GamePage(p){
   var g = p.game, info = INFO[g.id] || {}, s = info.saves || {}, syncs = !!g.status, away = g.installed === false, need = SAVE_ACTION[g.status];
   var aboutOpen = useState(false);
-  var where = g.loose ? 'Loose game in ' + g.loose + (g.engine ? ' \u00b7 ' + g.engine : '') : g.byHand ? 'Added by hand' : (away ? 'Not installed on this PC \u00b7 ' : '') + g.store;
-  var primary = away ? (g.store === 'Steam' ? h(G.Button,{variant:'secondary',icon:'download'},'Install through Steam') : null)
+  var where = g.loose ? 'Loose game in ' + g.loose + (g.engine ? ' \u00b7 ' + g.engine : '') : g.byHand ? 'Added by hand' : away ? 'Not installed on this PC \u00b7 ' + (g.store || 'Found by its saves') : g.store;
+  // Not installed here: a Steam game installs through Steam; any other is located by hand, picking its program.
+  var primary = away ? (g.store === 'Steam' ? h(G.Button,{variant:'secondary',icon:'download'},'Install through Steam')
+      : h(G.Button,{variant:'secondary',icon:'search',title:'Pick its program, and Play starts it from there'},'Locate the game\u2026'))
     : need ? [h(G.Button,{key:'n',variant:'primary',icon:need[1],onClick:p.onSaves},need[0]), h(G.IconButton,{key:'p',icon:'play',label:'Play'})]
     : g.status === 'playing' ? h(G.Button,{variant:'primary',icon:'play',disabled:true,title:'It\u2019s running now'},'Playing')
     : h(G.Button,{variant:'primary',icon:'play'},'Play');
@@ -256,8 +260,13 @@ function Covers(p){
   return h(React.Fragment,null,
     h('header',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',gap:16}},
       h('div',{style:{minWidth:0}},h('div',{style:{font:'600 15px/20px var(--font-sans)'}},'My games'),h('div',{className:'gs-faint',style:{fontSize:12}},GAMES.length+' games \u00b7 '+GAMES.filter(function(g){return g.installed!==false}).length+' installed')),
-      h(G.PillTabs,{label:'Library view',value:p.tab,onChange:p.onTab,items:[{id:'all',label:'All games'},{id:'attn',label:'Needs you',count:GAMES.filter(function(g){return NEEDS[g.status]}).length},{id:'software',label:'Software'},{id:'hidden',label:'Hidden'}]}),
+      h(G.PillTabs,{label:'Library view',value:p.tab,onChange:p.onTab,items:[{id:'all',label:'All games'},{id:'installed',label:'Installed'},{id:'local',label:'Local'},{id:'attn',label:'Needs you',count:GAMES.filter(function(g){return NEEDS[g.status]}).length},{id:'software',label:'Software'},{id:'hidden',label:'Hidden'}]}),
       h(G.Button,{icon:'plus'},'Add game')),
+    // Local: games in their own folders, started without a store's launcher; the folders to look in are the person's.
+    p.tab === 'local' ? h('div',{className:'gs-card',style:{flexDirection:'row',alignItems:'center',gap:16,padding:'14px 20px'}},
+      h(G.Icon,{name:'folder',size:18}),
+      h('p',{className:'gs-muted',style:{margin:0,flex:1,fontSize:13,lineHeight:'19px'}},'Games in their own folders, started without a store\u2019s launcher. GameSync finds them in the folders you give it, such as G:\\ or E:\\Games.'),
+      h(G.Button,{size:'sm',variant:'secondary',icon:'search'},'Scan a folder for games\u2026')) : null,
     p.games.length === 0 ? h('div',{className:'gs-note',style:{fontSize:13}},h(G.Icon,{name:'search',size:16}),'No game here matches \u201c'+p.query+'\u201d.')
     : favs.length ? [h('div',{key:'fh',className:'gs-overline'},'Favourites'),h('div',{key:'ft'},tiles(favs)),rest.length?h('div',{key:'rh',className:'gs-overline'},p.tab==='all'?'All games':'The rest'):null,h('div',{key:'rt'},tiles(rest))]
     : tiles(rest));
@@ -265,9 +274,9 @@ function Covers(p){
 
 function App(){
   var games = useState(GAMES.concat(SOFTWARE, HIDDEN)), all = games[0];
-  // A render can open a game, and its Properties: #core, or #ror2/saves.
-  var hash = (location.hash || '').slice(1).split('/');
-  var sel = useState(hash[0] || INITIAL), tab = useState('all'), sort = useState('recent'), q = useState(''), menu = useState(null), props = useState(hash[1] ? {section:hash[1]} : null);
+  // A render can open a game, and its Properties: #core, or #ror2/saves; or a view of the covers: #view:local.
+  var hash = (location.hash || '').slice(1).split('/'), view = hash[0].indexOf('view:') === 0 ? hash[0].slice(5) : null;
+  var sel = useState(view ? null : hash[0] || INITIAL), tab = useState(view || 'all'), sort = useState('recent'), q = useState(''), menu = useState(null), props = useState(hash[1] ? {section:hash[1]} : null);
   var frame = useRef(null), search = useRef(null);
   function back(){ sel[1](null); }
   useEffect(function(){
@@ -283,16 +292,17 @@ function App(){
   function update(g, change){ games[1](all.map(function(x){return x.id===g.id?Object.assign({},x,change):x})); }
   function at(e){ var r = frame.current.getBoundingClientRect(); return {x:Math.min(e.clientX-r.left,1280-240),y:Math.min(e.clientY-r.top,800-230)}; }
   function openMenu(kind, g, e){ e.stopPropagation(); var p = at(e); menu[1]({kind:kind,game:g,x:p.x,y:p.y}); }
-  var inView = all.filter(function(g){ return tab[0]==='software'?g.software:tab[0]==='hidden'?g.hidden:tab[0]==='attn'?NEEDS[g.status]&&!g.hidden:!g.software&&!g.hidden; });
+  var inView = all.filter(function(g){ return tab[0]==='software'?g.software:tab[0]==='hidden'?g.hidden:tab[0]==='attn'?NEEDS[g.status]&&!g.hidden
+    : tab[0]==='installed'?g.installed!==false&&!g.software&&!g.hidden : tab[0]==='local'?!!g.loose&&g.installed!==false&&!g.hidden : !g.software&&!g.hidden; });
   var shown = sorted(inView.filter(function(g){return matches(g,q[0])}), sort[0]);
   var current = sel[0] ? all.filter(function(g){return g.id===sel[0]})[0] : null;
   var groups = [{id:'fav',label:'Favourites',games:shown.filter(function(g){return g.fav})},
-    {id:'rest',label:{all:'Games',attn:'Needs you',software:'Software',hidden:'Hidden'}[tab[0]],games:shown.filter(function(g){return !g.fav})}];
+    {id:'rest',label:{all:'Games',installed:'Installed',local:'Local',attn:'Needs you',software:'Software',hidden:'Hidden'}[tab[0]],games:shown.filter(function(g){return !g.fav})}];
   var menuEl = null;
   if (menu[0]) {
     var m = menu[0], g = m.game;
     var items = m.kind==='sort' ? [{heading:'Sort by'}].concat(SORTS.map(function(s){return {id:s.id,label:s.label,checked:s.id===sort[0]}}))
-      : m.kind==='more' ? [{id:'hide',label:g.hidden?'Show in the library':'Hide from the library'}].concat(g.installed===false?[]:[{id:'folder',label:'Open the game\u2019s folder',icon:'folder'}],
+      : m.kind==='more' ? [{id:'hide',label:g.hidden?'Show in the library':'Hide from the library'},{id:'art',label:'Change the art\u2026',icon:'palette'}].concat(g.installed===false?[]:[{id:'folder',label:'Open the game\u2019s folder',icon:'folder'}],
           [{id:'saves-folder',label:'Open the save folder',icon:'saves'},{sep:true},{id:'props',label:'Properties',icon:'settings'}])
       : (g.installed===false ? [] : [{id:'play',label:'Play',icon:'play'},{sep:true}]).concat([
          {id:'fav',label:g.fav?'Remove from favourites':'Add to favourites',icon:'star',filled:!!g.fav},
@@ -303,6 +313,7 @@ function App(){
         else if(id==='fav') update(g,{fav:!g.fav});
         else if(id==='hide') update(g,{hidden:!g.hidden});
         else if(id==='props'){ sel[1](g.id); props[1]({section:'general'}); }
+        else if(id==='art'){ sel[1](g.id); props[1]({section:'art'}); }
         menu[1](null);}}));
   }
   return h('div',{ref:frame,style:{position:'relative',width:1280,height:800}},

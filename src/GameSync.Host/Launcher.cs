@@ -51,6 +51,21 @@ public sealed record LauncherGame
     /// <summary>When GameSync first found it on this PC, for Recently added (LIB-16); unknown for games added by hand.</summary>
     public DateTime? AddedUtc { get; init; }
 
+    /// <summary>Added by hand in games.json, rather than found by a scan.</summary>
+    public bool ByHand { get; init; }
+
+    /// <summary>
+    /// PLAY-12: when the session playing it now started, however the game was started and whether its saves sync or
+    /// not; null while it isn't running.
+    /// </summary>
+    public DateTime? RunningSinceUtc { get; init; }
+
+    /// <summary>It's being played now.</summary>
+    public bool IsRunning => RunningSinceUtc is not null || Status == GameStatus.Playing;
+
+    /// <summary>LIB-22: installed on this PC in its own folder, started without a store's launcher: the library's Local view.</summary>
+    public bool IsLocal => Installed && Store == StoreKind.Loose;
+
     /// <summary>What Home and the library's game tabs show: games the person hasn't hidden.</summary>
     public bool Shown => !IsSoftware && !IsHidden;
 
@@ -85,13 +100,15 @@ public sealed record LauncherHome(
 /// </summary>
 public static class Launcher
 {
+    /// <param name="running">PLAY-12: the games being played now, with when each session started.</param>
     public static IReadOnlyList<LauncherGame> Games(
         IEnumerable<LibraryEntry> library,
         IEnumerable<(GameId Id, string Title)> handAdded,
         StateStore state,
         SaveList? saveList,
         IReadOnlyDictionary<long, SteamPlay> steamPlay,
-        ArtCache? art)
+        ArtCache? art,
+        IReadOnlyDictionary<GameId, DateTime>? running = null)
     {
         var marks = new Marks(state.GetSettings(HiddenPrefix), state.GetSettings(FavouritePrefix));
         var games = new List<LauncherGame>();
@@ -101,13 +118,18 @@ public static class Launcher
             games.Add(Describe(entry.Id, entry.DisplayTitle, entry.State == LibraryState.Synced, entry.Installed, entry.Store, steamId, state, steamPlay, art, marks) with
             {
                 AddedUtc = entry.FirstSeenUtc == default ? null : entry.FirstSeenUtc,
+                RunningSinceUtc = running?.GetValueOrDefault(entry.Id) is { } since && since != default ? since : null,
             });
         }
 
         foreach (var (id, title) in handAdded.Where(g => games.All(x => x.Id != g.Id)))
         {
             var steamId = saveList?.ByTitle(title)?.SteamIds.FirstOrDefault() is > 0 and var listed ? listed : (long?)null;
-            games.Add(Describe(id, title, syncs: true, installed: true, store: null, steamId, state, steamPlay, art, marks));
+            games.Add(Describe(id, title, syncs: true, installed: true, store: null, steamId, state, steamPlay, art, marks) with
+            {
+                ByHand = true,
+                RunningSinceUtc = running?.GetValueOrDefault(id) is { } since && since != default ? since : null,
+            });
         }
 
         return games
@@ -117,9 +139,9 @@ public static class Launcher
     }
 
     /// <summary>
-    /// The home screen: the most recently played installed game as the hero, up to three that need you, the next
-    /// <see cref="JumpBackInAtMost"/> played (Home shows as many as fit), and this month's play per day from GameSync's
-    /// sessions (Steam keeps no daily record).
+    /// The home screen: the game playing now as the hero (PLAY-12), or else the most recently played installed game, up
+    /// to three that need you, the next <see cref="JumpBackInAtMost"/> played (Home shows as many as fit), and this month's
+    /// play per day from GameSync's sessions (Steam keeps no daily record).
     /// </summary>
     public const int JumpBackInAtMost = 12;
 
@@ -128,7 +150,8 @@ public static class Launcher
         // The home is about games; software such as Wallpaper Engine stays in the library's Software tab, and hidden games in Hidden.
         var games = all.Where(g => g.Shown).ToList();
         var played = games.Where(g => g.LastPlayedUtc is not null).ToList();
-        var hero = played.FirstOrDefault(g => g.Installed) ?? games.FirstOrDefault(g => g.Installed);
+        var hero = games.Where(g => g.IsRunning).MaxBy(g => g.RunningSinceUtc ?? DateTime.MinValue)
+            ?? played.FirstOrDefault(g => g.Installed) ?? games.FirstOrDefault(g => g.Installed);
         var jump = played.Where(g => g != hero).Take(JumpBackInAtMost).ToList();
         if (jump.Count < JumpBackInAtMost)
         {
@@ -168,6 +191,9 @@ public static class Launcher
 
     /// <summary>The setting that keeps the library's order on this PC (LIB-16).</summary>
     public const string SortKey = "library.sort";
+
+    /// <summary>The setting that keeps the library's view on this PC: all games, installed, local and the rest (LIB-22).</summary>
+    public const string ViewKey = "library.view";
 
     private const string HiddenPrefix = "hidden.";
     private const string FavouritePrefix = "favourite.";
@@ -272,7 +298,7 @@ public static class Launcher
 
     /// <summary>A tile's meta line: "61 h · Today 21:04".</summary>
     public static string? Meta(LauncherGame game, DateTime nowLocal) =>
-        string.Join(" · ", new[] { PlaytimeText(game.Playtime), game.Status == GameStatus.Playing ? "Now" : WhenText(game.LastPlayedUtc, nowLocal) }
+        string.Join(" · ", new[] { PlaytimeText(game.Playtime), game.IsRunning ? "Now" : WhenText(game.LastPlayedUtc, nowLocal) }
             .Where(s => s is not null)) is { Length: > 0 } meta ? meta : null;
 
     internal static long? SteamIdOf(LibraryEntry entry, SaveList? saveList)
@@ -309,9 +335,10 @@ public static class Launcher
             SteamAppId = steamId,
             Playtime = steam is null || steam.Playtime < sessionTime ? sessionTime : steam.Playtime,
             LastPlayedUtc = Latest(lastSession, steam?.LastPlayedUtc),
-            CoverPath = steamId is { } a ? art?.Find(a, ArtKind.Cover) : null,
-            HeroPath = steamId is { } h ? art?.Find(h, ArtKind.Hero) : null,
-            LogoPath = steamId is { } l ? art?.Find(l, ArtKind.Logo) : null,
+            // The person's own image first (ART-06), then Steam's.
+            CoverPath = art?.FindOwn(id, ArtKind.Cover) ?? (steamId is { } a ? art?.Find(a, ArtKind.Cover) : null),
+            HeroPath = art?.FindOwn(id, ArtKind.Hero) ?? (steamId is { } h ? art?.Find(h, ArtKind.Hero) : null),
+            LogoPath = art?.FindOwn(id, ArtKind.Logo) ?? (steamId is { } l ? art?.Find(l, ArtKind.Logo) : null),
             IsSoftware = steamId is { } s && art?.IsSoftware(s) == true,
             IsHidden = marks.Hidden.ContainsKey(HiddenKey(id)),
             IsFavourite = marks.Favourites.ContainsKey(FavouriteKey(id)),

@@ -1,3 +1,4 @@
+using System.Windows.Input;
 using Avalonia.Controls;
 using Avalonia.Input;
 using GameSync.UI.ViewModels;
@@ -9,23 +10,31 @@ public partial class SaveManagerPage : UserControl
     public SaveManagerPage()
     {
         InitializeComponent();
-        // Back from a game's saves: Esc, Alt+Left and the mouse's back button, as the Back button does.
+        // Back from a game's saves or its conflict: Esc, Alt+Left and the mouse's back button, as the Back button does.
         AddHandler(KeyDownEvent, (_, e) =>
         {
-            if (DataContext is SaveManagerViewModel { Game: not null } page && (e.Key == Key.Escape || (e.Key == Key.Left && e.KeyModifiers == KeyModifiers.Alt)) &&
+            if (BackOf(DataContext) is { } back && (e.Key == Key.Escape || (e.Key == Key.Left && e.KeyModifiers == KeyModifiers.Alt)) &&
                 e.Source is not TextBox)
             {
-                page.BackCommand.Execute(null);
+                back.Execute(null);
                 e.Handled = true;
             }
         }, handledEventsToo: false);
         AddHandler(PointerReleasedEvent, (_, e) =>
         {
-            if (e.InitialPressMouseButton == MouseButton.XButton1 && DataContext is SaveManagerViewModel { Game: not null } page)
+            if (e.InitialPressMouseButton == MouseButton.XButton1 && BackOf(DataContext) is { } back)
             {
-                page.BackCommand.Execute(null);
+                back.Execute(null);
                 e.Handled = true;
             }
         }, handledEventsToo: true);
     }
+
+    /// <summary>The Back of the page showing: the conflict's, or the game's saves'; none over every game's saves.</summary>
+    private static ICommand? BackOf(object? context) => context switch
+    {
+        SaveManagerViewModel { Conflict: { } conflict } => conflict.BackCommand,
+        SaveManagerViewModel { Game: not null } page => page.BackCommand,
+        _ => null,
+    };
 }

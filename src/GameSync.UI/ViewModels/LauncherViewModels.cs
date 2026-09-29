@@ -6,6 +6,7 @@ using CommunityToolkit.Mvvm.Input;
 using GameSync.Core.Discovery;
 using GameSync.Core.Model;
 using GameSync.Core.State;
+using GameSync.Core.Sync;
 using GameSync.Host;
 using GameSync.UI.Controls;
 using GameSync.UI.Theming;
@@ -24,6 +25,18 @@ public sealed record LauncherActions(Action<GameId> Play, Action SyncNow, Action
 
     /// <summary>Keeps the library's order on this PC (LIB-16).</summary>
     public Action<LibrarySort>? SetSort { get; init; }
+
+    /// <summary>Keeps the library's view on this PC: all games, installed or local (LIB-22).</summary>
+    public Action<string>? SetView { get; init; }
+
+    /// <summary>Scan a folder for games…: the folder joins the ones every scan looks in, and this PC is scanned now (LIB-23).</summary>
+    public Func<string, CancellationToken, Task<FolderScan>>? ScanFolder { get; init; }
+
+    /// <summary>Locate the game…: the program picked marks a game installed in its folder, and Play starts it (LIB-24).</summary>
+    public Action<GameId, string>? Locate { get; init; }
+
+    /// <summary>The space the backups take on this PC's drive, and the drive's free space, off the UI thread (MGR-03).</summary>
+    public Func<CancellationToken, Task<BackupSpace?>>? LoadSpace { get; init; }
 
     /// <summary>Opens a game's page in the library, as a click on its cover anywhere does (LIB-18).</summary>
     public Action<GameId>? OpenGame { get; init; }
@@ -57,6 +70,45 @@ public sealed record LauncherActions(Action<GameId> Play, Action SyncNow, Action
 
     /// <summary>Keeps a save held for review as the game's current one, as <c>gamesync approve</c> does.</summary>
     public Action<GameId>? Approve { get; init; }
+
+    /// <summary>A game's conflict in the save manager: the one waiting for the person, or the last one settled (SYNC-10).</summary>
+    public Action<GameId>? OpenConflict { get; init; }
+
+    /// <summary>Reads a game's conflict, off the UI thread.</summary>
+    public Func<GameId, CancellationToken, Task<ConflictDetail?>>? LoadConflict { get; init; }
+
+    /// <summary>Settles a waiting conflict: this PC's save (true), or the cloud's version given (SYNC-11).</summary>
+    public Action<GameId, bool, VersionId?>? Resolve { get; init; }
+
+    /// <summary>Switches to the save that lost the game's last conflict (SYNC-04).</summary>
+    public Action<GameId>? Swap { get; init; }
+
+    /// <summary>Syncs one game again, when its files were in use (SYNC-02).</summary>
+    public Action<GameId>? Retry { get; init; }
+
+    /// <summary>Gives a named save another name: the game, the name, the new name (BAK-18).</summary>
+    public Action<GameId, string, string>? RenameSave { get; init; }
+
+    /// <summary>Takes a save's name away; the save stays in the history (BAK-18).</summary>
+    public Action<GameId, string>? ForgetSave { get; init; }
+
+    /// <summary>Add a place, over the page (FOLD-01).</summary>
+    public Action<GameId>? OpenAddPlace { get; init; }
+
+    /// <summary>Looks at a folder or file picked in Add a place, off the UI thread.</summary>
+    public Func<GameId, string, CancellationToken, Task<NewPlaceLook>>? LookPlace { get; init; }
+
+    /// <summary>Adds a place to a game: the folder or file, and what it holds.</summary>
+    public Action<GameId, string, SaveCategory>? AddPlace { get; init; }
+
+    /// <summary>Import kept saves, over the page (BAK-19).</summary>
+    public Action<GameId>? OpenImportKept { get; init; }
+
+    /// <summary>A game's places, for which one kept copies copy.</summary>
+    public Func<GameId, CancellationToken, Task<IReadOnlyList<SaveRoot>>>? SaveRoots { get; init; }
+
+    /// <summary>Reads a folder of kept saves (false) or imports them as named saves (true): the game, the folder, the place they copy.</summary>
+    public Func<GameId, string, string?, bool, CancellationToken, Task<ImportReport>>? KeptSaves { get; init; }
 
     /// <summary>Every game's saves at a glance, for the save manager's table, off the UI thread.</summary>
     public Func<CancellationToken, Task<IReadOnlyList<GameSaveSummary>>>? LoadSaves { get; init; }
@@ -164,7 +216,18 @@ public sealed partial class HomeViewModel : ObservableObject, IPageSurface
         OpenLibraryCommand = new RelayCommand(() => Actions?.Show("library", "all"));
         OpenSavesCommand = new RelayCommand(() => Actions?.Show("saves", null));
         OpenGameCommand = new RelayCommand<GameId>(game => Actions?.OpenGame?.Invoke(game));
-        OpenGameSavesCommand = new RelayCommand<GameId>(game => Actions?.OpenSaves?.Invoke(game));
+        OpenGameSavesCommand = new RelayCommand<GameId>(game =>
+        {
+            // Resolve opens the game's conflict; the other actions its saves, where the details are.
+            if (NeedsYou.FirstOrDefault(n => n.Id == game) is { Status: GameStatus.Conflict } && Actions?.OpenConflict is { } conflict)
+            {
+                conflict(game);
+            }
+            else
+            {
+                Actions?.OpenSaves?.Invoke(game);
+            }
+        });
         OpenHeroCommand = new RelayCommand(() =>
         {
             if (HeroId is { } game)
@@ -188,7 +251,7 @@ public sealed partial class HomeViewModel : ObservableObject, IPageSurface
         });
     }
 
-    /// <summary>A Needs you row's button (Review, Resolve): the game's saves in the save manager, where that's done.</summary>
+    /// <summary>A Needs you row's button: Resolve opens the game's conflict; Review and the others its saves in the save manager.</summary>
     public ICommand OpenGameSavesCommand { get; }
 
     /// <summary>The hero's Manage saves: the hero game's saves in the save manager.</summary>
@@ -238,6 +301,9 @@ public sealed partial class HomeViewModel : ObservableObject, IPageSurface
 
     /// <summary>There are games to choose from, so the Needs you card can offer to choose the ones to sync.</summary>
     public bool CanChoose => NoneSyncing && !NoGames;
+
+    /// <summary>The hero's Play, except while the hero game runs (PLAY-12).</summary>
+    public bool HeroShowsPlay { get; init; } = true;
 
     public IImage? HeroArt { get; init; }
 
@@ -305,13 +371,15 @@ public sealed partial class HomeViewModel : ObservableObject, IPageSurface
             ],
             HeroId = hero?.Id,
             NoGames = games.Count == 0,
+            HeroShowsPlay = hero?.IsRunning != true,
             HeroArt = ArtImages.Load(hero?.HeroPath, 1920),
             HeroLogo = ArtImages.Load(hero?.LogoPath, 760),
             HeroTitle = hero?.Title,
-            HeroEyebrow = hero is null ? null : LastPlayedPhrase(hero, nowLocal),
+            HeroEyebrow = hero is null ? null : HeroPhrase(hero, nowLocal),
             HeroChip = hero is null || hero.Playtime <= TimeSpan.Zero ? null : HoursPlayed(hero.Playtime),
-            HeroStatus = hero?.Syncs == true ? hero.Status ?? GameStatus.Synced : null,
-            HeroStatusLabel = hero is { Syncs: true, Status: null or GameStatus.Synced } ? "Save synced" : StatusLabel(hero),
+            // PLAY-12: the game playing now reads Playing now, whether its saves sync or not.
+            HeroStatus = hero?.IsRunning == true ? GameStatus.Playing : hero?.Syncs == true ? hero.Status ?? GameStatus.Synced : null,
+            HeroStatusLabel = hero?.IsRunning == true ? "Playing now" : hero is { Syncs: true, Status: null or GameStatus.Synced } ? "Save synced" : StatusLabel(hero),
             HeroBlurb = hero is null ? null : Blurb(hero),
             HeroPlayLabel = hero?.LastPlayedUtc is null ? "Play" : "Continue playing",
             NeedsYou = home.NeedsYou.Select(g => new NeedsYouItem(g.Id, g.Title, ArtImages.Load(g.CoverPath, 96), GsGameTile.InitialOf(g.Title), g.Status, ActionFor(g.Status))).ToList(),
@@ -341,7 +409,7 @@ public sealed partial class HomeViewModel : ObservableObject, IPageSurface
 
     /// <param name="smallWidth">Also decode the cover this wide for the library's list; 0 leaves it out.</param>
     public static TileItem Tile(LauncherGame game, DateTime nowLocal, int width = 320, bool withMeta = true, LauncherActions? actions = null, int smallWidth = 0) =>
-        new(game.Id, game.Title, ArtImages.Load(game.CoverPath, width), game.Status, withMeta ? Launcher.Meta(game, nowLocal) : null)
+        new(game.Id, game.Title, ArtImages.Load(game.CoverPath, width), game.IsRunning ? GameStatus.Playing : game.Status, withMeta ? Launcher.Meta(game, nowLocal) : null)
         {
             StatusLabel = StatusLabel(game),
             SmallArt = smallWidth > 0 ? ArtImages.Load(game.CoverPath, smallWidth) : null,
@@ -356,10 +424,25 @@ public sealed partial class HomeViewModel : ObservableObject, IPageSurface
     /// <summary>LIB-10: a game its store's cloud syncs names the store ("Synced by Steam"); other statuses say their own word.</summary>
     public static string? StatusLabel(LauncherGame? game) => game?.Status == GameStatus.BackupOnly ? StoreNames.SyncedBy(game.Store) : null;
 
+    /// <summary>
+    /// The hero's eyebrow: for the game playing now, since when and how it's installed ("Playing now · since 20:41 · In its
+    /// own folder"); otherwise when it was last played.
+    /// </summary>
+    public static string HeroPhrase(LauncherGame game, DateTime nowLocal)
+    {
+        if (!game.IsRunning)
+        {
+            return LastPlayedPhrase(game, nowLocal);
+        }
+
+        var where = StoreNames.Name(game.Store) ?? (game.Store == StoreKind.Loose ? "In its own folder" : null);
+        return string.Join(" · ", new[] { "Playing now", game.RunningSinceUtc is { } since ? $"since {since.ToLocalTime():HH:mm}" : null, where }.OfType<string>());
+    }
+
     /// <summary>"Last played today, 21:04", "Last played yesterday", "Last played on 20 Sep".</summary>
     public static string LastPlayedPhrase(LauncherGame game, DateTime nowLocal)
     {
-        if (game.Status == GameStatus.Playing)
+        if (game.IsRunning)
         {
             return "Playing now";
         }
@@ -380,9 +463,10 @@ public sealed partial class HomeViewModel : ObservableObject, IPageSurface
 
     private static string Blurb(LauncherGame game) => game switch
     {
+        { IsRunning: true, Syncs: false } => "GameSync saw it start, so its play counts. Its saves aren't synced yet: sync them from its page when you're done.",
         { Syncs: false } => "GameSync found its saves. Sync them from its page to back them up and keep them in step.",
         { NeedsYou: true, StatusDetail: { Length: > 0 } detail } => detail,
-        { Status: GameStatus.Playing } => "Its save syncs a few seconds after you quit.",
+        { IsRunning: true } => "Its save syncs a few seconds after you quit.",
         _ => "Its saves are backed up on this PC and in your Google Drive.",
     };
 
