@@ -1,6 +1,8 @@
 using System.Globalization;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.Media;
 using GameSync.UI.Branding;
 using GameSync.UI.Theming;
@@ -14,11 +16,28 @@ namespace GameSync.UI.Views;
 /// </summary>
 public partial class MainWindow : Window
 {
+    /// <summary>How long the next game's light takes to grow over the window (KAN-54).</summary>
+    public static readonly TimeSpan RevealTime = TimeSpan.FromMilliseconds(750);
+
+    private Point? _pressed;
+    private DateTime _pressedAtUtc;
+
     public MainWindow()
     {
         InitializeComponent();
         Icon = new WindowIcon(new MemoryStream(MarkArt.Ico([16, 20, 24, 32, 40, 48, 64], MarkArt.AppIcon)));
         Frame.TitleBarHeight = WindowDecorationMargin.Top;
+
+        // Where the person last clicked: a page they opened grows its colours from there (KAN-54).
+        AddHandler(PointerPressedEvent, (_, e) => (_pressed, _pressedAtUtc) = (e.GetPosition(this), DateTime.UtcNow),
+            RoutingStrategies.Tunnel, handledEventsToo: true);
+
+        // For measuring (KAN-58): Avalonia's frame rate and its render and layout times, drawn over the window.
+        if (Environment.GetEnvironmentVariable("GAMESYNC_RENDER_STATS") == "1")
+        {
+            RendererDiagnostics.DebugOverlays = Avalonia.Rendering.RendererDebugOverlays.Fps |
+                Avalonia.Rendering.RendererDebugOverlays.RenderTimeGraph | Avalonia.Rendering.RendererDebugOverlays.LayoutTimeGraph;
+        }
     }
 
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
@@ -61,7 +80,21 @@ public partial class MainWindow : Window
     public void ShowSurface(GlassSurface? glass, IImage? backdrop)
     {
         ThemeService.Scope(Frame.Resources, glass?.Tokens);
-        Art.Source = glass is null ? null : backdrop;
+        var next = glass is null ? null : backdrop;
+
+        // KAN-54: a new game's colours glow in over the ones before like a light behind frosted glass, unless Windows'
+        // animation effects are off (A11Y-04) or there was nothing before (the backdrop still being made).
+        if (next is not null && Art.Source is { } before && !ReferenceEquals(before, next) && !ReferenceEquals(Art.GlowingTo, next) && AnimationsOn())
+        {
+            var size = Bounds.Size;
+            var centre = _pressed is { } pressed && DateTime.UtcNow - _pressedAtUtc < TimeSpan.FromSeconds(2) ? pressed : new Point(size.Width / 2, size.Height / 2);
+            Art.GlowTo(next, centre, RevealTime);
+        }
+        else if (!ReferenceEquals(Art.GlowingTo, next) || next is null)
+        {
+            Art.Source = next;
+        }
+
         if (glass is null)
         {
             ClearValue(BackgroundProperty);
@@ -71,6 +104,11 @@ public partial class MainWindow : Window
             Background = new SolidColorBrush(Color.Parse(glass.Base));
         }
     }
+
+    private static bool AnimationsOn() => GameSync.UI.Controls.Motion.On;
+
+    /// <summary>For the snapshot tool's benchmark: the glow toward <paramref name="next"/> at <paramref name="t"/> (0 to 1), from the window's middle.</summary>
+    public void GlowFrame(IImage next, double t) => Art.GlowFrame(next, t);
 
     private static int Rgb(string hex) => hex.StartsWith('#') && hex.Length == 7 ? int.Parse(hex[1..], NumberStyles.HexNumber, CultureInfo.InvariantCulture) : 0;
 }

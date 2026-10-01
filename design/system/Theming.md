@@ -24,7 +24,7 @@ The stored themes in this system are showcase combinations: Arcade in Dark, Ligh
 
 ## Swatches (v1)
 
-Primary and secondary can each be swapped for one of eleven swatches: Cyan, Aqua, Sky, Blue, Green, Mint, Lime, Pink, Steel, Grey, White. Each swatch is a light seed; the engine keeps it as is in dark mode (lightening it only if it's too dark) and darkens it in light mode. Show a swatch in the tone it will actually take, as `ColorSwatchPicker` does. Warm swatches are left out on purpose: amber, red and violet already mean a status.
+Primary and secondary can each be swapped for one of eleven swatches: Cyan, Aqua, Sky, Blue, Green, Mint, Lime, Pink, Steel, Grey, White. Each swatch is a light seed; the engine keeps it as is in dark mode (lightening it only if it's too dark) and darkens it in light mode. Show a swatch in the tone it will actually take, as `ColorSwatchPicker` does. Amber and red swatches are left out on purpose: they already mean a status. Green is Playing's too since 1 Oct 2026 (Spotify's green, the owner's choice), so a green primary (Moss, the Green, Mint and Lime swatches) can sit beside it; a status always keeps its icon and word, so they stay told apart.
 
 ## How the engine derives each token
 
@@ -38,7 +38,7 @@ Primary and secondary can each be swapped for one of eleven swatches: Cyan, Aqua
 ## Custom colours (later)
 
 - Any hex code or colour picker value can be the primary or secondary. It goes through the same engine, so a colour that's too dark or too light is adjusted until it passes, and `ColorSwatchPicker` shows the value actually used and its contrast.
-- A custom colour within about 22 degrees of amber, red or violet gets a note that statuses keep their icon and word.
+- A custom colour within about 22 degrees of amber, red or Playing's green gets a note that statuses keep their icon and word.
 - Themes export and import as a small file of these four choices.
 
 ## Surface: Glossy or Solid
@@ -51,10 +51,11 @@ Picked under Appearance → Surface, saved per PC; a fresh install starts in **G
 
 | Strength | Screens | Page ground | Cards | Rail | Scrim from top to bottom |
 | --- | --- | --- | --- | --- | --- |
-| `glass` | game detail, conflict, the save manager and its Plan tab | `bg-000` | white at 5.5% | white at 3% | 44%, 70% at 40%, 84% |
-| `home` | Home and the game library | `bg-000` | the card colour at 60% | `bg-100` at 25% | 48%, 77% at 40%, 86% at 68%, 88% |
+| `glass` | Home, the game library, game detail, conflict, the save manager and its Plan tab | `bg-000` | white at 5.5% | white at 3% | 44%, 70% at 40%, 84% |
+| `home` | none since 1 Oct 2026 (Home and the library, until the owner found their cards grey over the art); kept for a page that wants a step more solid | `bg-000` | the card colour at 60% | `bg-100` at 25% | 48%, 77% at 40%, 86% at 68%, 88% |
 | `glow` | first run, settings | `bg-100` | `bg-200` at 82% | `bg-100` at 50% | 56%, 84% at 36%, 93% at 60%, 95% |
 
+- **A backdrop's colour is capped** (LOOK-22, 1 Oct 2026): above an OKLab chroma of 0.10 the art's colour eases towards 0.15, keeping its lightness and hue, so one vivid colour filling the art (Counter-Strike 2's orange) doesn't flood the app, while muted art keeps its colour. The app does it as it makes the backdrop; these previews show the plain saturate(1.3).
 - **Contrast holds over any art** (LOOK-18). The scrim's stops are the least darkening; the app measures each picture and darkens a row further wherever the art is bright, just enough that every text colour keeps 4.5:1, and controls and borders 3:1, on every surface over every pixel. Dark art keeps the design's gradient exactly. Its test runs every dark theme and strength over white, black, saturated colours, a bright sky, hard stripes and noise. These previews show the design's stops over dark sample art.
 - **When Glossy goes Solid**: in light mode (a light Glossy isn't designed yet), with pure black, when Windows' transparency effects are off, and on a page with no art. The Surface choice stays; the page follows it again when those change.
 - In the previews, `ThemeScope` with `art` and `strength` draws a page in the Surface picked on the Settings screen, which every screen follows; `surface` fixes it for one scope.

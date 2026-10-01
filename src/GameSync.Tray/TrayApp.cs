@@ -43,6 +43,7 @@ internal sealed class TrayApp
     private Pages? _pages;
     private LibraryViewModel? _library;
     private SaveManagerViewModel? _saves;
+    private SettingsViewModel? _settings;
     private FirstRunViewModel? _firstRun;
     private string _page = "home";
     private readonly Backdrops _backdrops;
@@ -170,6 +171,7 @@ internal sealed class TrayApp
                 _pages = null;
                 _library = null;
                 _saves = null;
+                _settings = null;
                 LetGoSoon(force: true);
             };
             (_window, _shell) = (window, shell);
@@ -188,8 +190,7 @@ internal sealed class TrayApp
         "library" => Library,
         "log" => _console,
         "saves" => Saves,
-        "settings" => new PlaceholderViewModel("Settings", "settings",
-            "Appearance, folders, the daily backup, the cloud, your PCs and notifications. They come after the save manager; until then, the command line has them."),
+        "settings" => Settings,
         _ => null,
     };
 
@@ -217,7 +218,7 @@ internal sealed class TrayApp
     {
         SetFavourite = SetFavourite,
         SetSort = sort => Task.Run(() => LauncherData.SetSort(_dataDir, sort)),
-        SetView = view => Task.Run(() => LauncherData.SetView(_dataDir, view)),
+        SetInstalledOnly = installedOnly => Task.Run(() => LauncherData.SetInstalledOnly(_dataDir, installedOnly)),
         ScanFolder = async (folder, ct) =>
         {
             try
@@ -276,6 +277,8 @@ internal sealed class TrayApp
             }
         },
         LoadSaves = ct => Task.Run(() => SaveOverview.ReadAsync(_dataDir, ct), ct),
+        LoadVersions = ct => Task.Run(() => SaveHistory.ReadVersionsAsync(_dataDir, ct), ct),
+        LoadLog = ct => Task.Run(() => SaveHistory.ReadLog(_dataDir), ct),
         LoadProperties = (game, ct) => Task.Run(() => GameSettings.ReadAsync(_dataDir, game, SteamIdOf(game), ct), ct),
         SaveProperties = (game, change) => Job(async ct =>
         {
@@ -310,6 +313,17 @@ internal sealed class TrayApp
                 _output.NeedsYou("GameSync", e.Message);
             }
         }),
+        Keep = async game =>
+        {
+            var kept = await Task.Run(() => AppActions.KeepAsync(_dataDir, game, _output, _stop.Token));
+            if (kept)
+            {
+                _agent.WatchNow();
+                RefreshSoon();
+            }
+
+            return kept;
+        },
         OpenImportKept = game =>
         {
             var import = new ImportKeptViewModel(game, TitleOf(game), Actions);
@@ -337,7 +351,7 @@ internal sealed class TrayApp
         }),
         BackUpNow = game => Job(ct => AppActions.BackUpNowAsync(_dataDir, game, _output, ct)),
         SaveAs = (game, name) => Job(ct => AppActions.SaveAsAsync(_dataDir, game, name, _output, ct)),
-        Restore = (game, version, name) => Job(ct => AppActions.RestoreAsync(_dataDir, game, version, name, _output, ct)),
+        Restore = (game, version, name) => JobAsync(ct => AppActions.RestoreAsync(_dataDir, game, version, name, _output, ct)),
     };
 
     /// <summary>What first run asks of the app (ONB-01): the scan, what it found, a game folder, the cloud, and finishing.</summary>
@@ -395,6 +409,133 @@ internal sealed class TrayApp
     {
         OpenFolder = OpenFolder,
     };
+
+    /// <summary>Settings, for as long as the window is open: the section open and anything half typed stay when the app refreshes (SET-01).</summary>
+    private SettingsViewModel Settings => _settings ??= new SettingsViewModel(SettingsActions, _look);
+
+    /// <summary>What Settings asks of the app (SET-01): each change runs off the UI thread, and what went wrong comes back in its outcome.</summary>
+    private SettingsActions SettingsActions => new()
+    {
+        Read = ct => Task.Run(() => (SettingsView?)SettingsData.Read(_dataDir), ct),
+        Figures = ct => Task.Run(() => SettingsData.FiguresAsync(_dataDir, ct), ct),
+        Cloud = ct => Task.Run(() => SettingsData.CloudAsync(_dataDir, ct), ct),
+        SetLook = SetLook,
+        Windows = () =>
+        {
+            var colors = Application.Current?.PlatformSettings?.GetColorValues();
+            return (colors?.ThemeVariant == PlatformThemeVariant.Light, colors?.AccentColor1 is { } a ? $"#{a.R:x2}{a.G:x2}{a.B:x2}" : null);
+        },
+        MoveBackupFolder = (target, progress) => Change(async ct =>
+        {
+            var said = await SettingsData.MoveBackupFolderAsync(_dataDir, target, progress, () => _output.Say("Waiting for the sync in the background to finish first."), ct);
+            _output.Say(said);
+            return said;
+        }),
+        SetKeepEverything = everything => Change(_ => Task.FromResult(SettingsData.SetKeepEverything(_dataDir, everything))),
+        AddGameFolder = folder => Change(async ct =>
+        {
+            var scan = await LocalGames.ScanFolderAsync(_dataDir, folder, _output, ct);
+            _output.Say(scan.Sentence);
+            _agent.WatchNow();
+            _ = Task.Run(() => RefreshArtAsync(now: true));
+            return scan.Sentence;
+        }),
+        RemoveGameFolder = folder => Change(async ct =>
+        {
+            var said = await LocalGames.RemoveFolderAsync(_dataDir, folder, _output, ct);
+            _output.Say(said);
+            _agent.WatchNow();
+            return said;
+        }),
+        AddSaveFolder = folder => Change(async ct =>
+        {
+            var said = await SettingsData.AddSaveFolderAsync(_dataDir, folder, _output, ct);
+            _output.Say(said);
+            return said;
+        }),
+        RemoveSaveFolder = path => Change(async ct =>
+        {
+            var said = await SettingsData.RemoveSaveFolderAsync(_dataDir, path, _output, ct);
+            _output.Say(said);
+            return said;
+        }),
+        SetStartAtSignIn = on => Change(_ => Task.FromResult(SettingsData.SetStartAtSignIn(_dataDir, on))),
+        SetDaily = at => Change(_ => Task.FromResult(SettingsData.SetDaily(_dataDir, at))),
+        RunDailyNow = () => Change(_ => Task.FromResult(SettingsData.RunDailyNow(_dataDir))),
+        SetDefaults = defaults => Task.Run(() => SettingsData.SetDefaults(_dataDir, defaults)),
+        ApplyDefaults = (files, conflict) => Change(async ct =>
+        {
+            var said = await SettingsData.ApplyDefaultsAsync(_dataDir, files, conflict, () => _output.Say("Waiting for the sync in the background to finish first."), ct);
+            _output.Say(said);
+            return said;
+        }),
+        ConnectCloud = ConnectCloud,
+        SignIn = () => Change(async ct =>
+        {
+            var account = await FirstRun.SignInAsync(_dataDir, OpenSignIn, ct);
+            _agent.SyncNow();
+            return account is null ? "Signed in to Google Drive; syncing carries on." : $"Signed in to Google Drive as {account}; syncing carries on.";
+        }),
+        SignOut = () => Change(async ct =>
+        {
+            var said = await SettingsData.SignOutAsync(_dataDir, ct);
+            _output.Say(said);
+            return said;
+        }),
+        OpenLink = OpenLink,
+        OpenFolder = OpenFolder,
+        RenamePc = name => Change(_ => Task.FromResult(SettingsData.RenamePc(_dataDir, name))),
+        SetNotifications = (hold, dailyNote) => Task.Run(() =>
+        {
+            SettingsData.SetNotifications(_dataDir, hold, dailyNote);
+            if (hold is { } h)
+            {
+                _output.HoldWhileFullscreen = h;
+            }
+        }),
+        Diagnostics = ct => Task.Run(() => SettingsData.DiagnosticsAsync(_dataDir, ct), ct),
+    };
+
+    /// <summary>A change Settings asked for, off the UI thread: what it came to, or why it couldn't be; the pages refresh after.</summary>
+    private async Task<Outcome> Change(Func<CancellationToken, Task<string>> change)
+    {
+        try
+        {
+            return new Outcome(await Task.Run(() => change(_stop.Token)));
+        }
+        catch (OperationCanceledException)
+        {
+            return new Outcome("GameSync is closing, so nothing was changed.", Failed: true);
+        }
+        catch (Exception e) when (e is UsageException or IOException or UnauthorizedAccessException or InvalidOperationException or CloudException
+                                      or System.Net.Http.HttpRequestException or FormatException)
+        {
+            return new Outcome(e.Message, Failed: true);
+        }
+        finally
+        {
+            Dispatcher.UIThread.Post(RefreshSoon);
+        }
+    }
+
+    /// <summary>LOOK-07: the look picked in Settings, applied now and kept on this PC.</summary>
+    private void SetLook(Look look)
+    {
+        _look = look;
+        ApplyTheme();
+        _ = Task.Run(() =>
+        {
+            try
+            {
+                using var state = new StateStore(_dataDir);
+                look.Save(state);
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidOperationException)
+            {
+                _output.Say($"! Your appearance choice couldn't be kept for next time: {e.Message}");
+            }
+        });
+    }
 
     /// <summary>The cloud's two ways, in first run and in Connect the cloud: Google Drive (with GameSync's client) or a folder.</summary>
     private CloudActions CloudActions => new(
@@ -520,6 +661,26 @@ internal sealed class TrayApp
         }
     }
 
+    /// <summary>
+    /// A job a page waits for, off the UI thread: null once it's done, or why it couldn't be (KAN-51); the pages show what
+    /// it changed once it's done.
+    /// </summary>
+    private async Task<string?> JobAsync(Func<CancellationToken, Task<string?>> job)
+    {
+        try
+        {
+            return await Task.Run(() => job(_stop.Token));
+        }
+        catch (OperationCanceledException)
+        {
+            return "GameSync is closing, so nothing was changed.";
+        }
+        finally
+        {
+            Dispatcher.UIThread.Post(RefreshSoon);
+        }
+    }
+
     /// <summary>A job a page asked for, off the UI thread; the pages show what it changed once it's done.</summary>
     private void Job(Func<CancellationToken, Task> job) => _ = Task.Run(async () =>
     {
@@ -563,7 +724,7 @@ internal sealed class TrayApp
 
     private LibraryViewModel NewLibrary()
     {
-        var library = new LibraryViewModel(Actions, ReadSort(), view: ReadView());
+        var library = new LibraryViewModel(Actions, ReadSort(), installedOnly: ReadInstalledOnly());
         if (_pages is { } pages)
         {
             library.Update(pages.Games, pages.Tiles);
@@ -584,16 +745,16 @@ internal sealed class TrayApp
         }
     }
 
-    /// <summary>The library's view kept on this PC (LIB-22): All games until the person picks another.</summary>
-    private string ReadView()
+    /// <summary>The library's Installed only, kept on this PC (KAN-47).</summary>
+    private bool ReadInstalledOnly()
     {
         try
         {
-            return LauncherData.ReadView(_dataDir);
+            return LauncherData.ReadInstalledOnly(_dataDir);
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidOperationException)
         {
-            return "all";
+            return false;
         }
     }
 
@@ -654,10 +815,14 @@ internal sealed class TrayApp
 
     private string TitleOf(GameId game) => _pages?.Games.FirstOrDefault(g => g.Id == game)?.Title ?? game.Value;
 
-    /// <summary>A link GameSync made (a game's Steam store page, or Steam's own install and library links), in the app Windows keeps for it.</summary>
+    /// <summary>
+    /// A link GameSync made (a game's Steam store page, Steam's own install and library links, GameSync's folder in
+    /// Google Drive), in the app Windows keeps for it.
+    /// </summary>
     private void OpenLink(string link)
     {
-        if (!link.StartsWith("https://store.steampowered.com/app/", StringComparison.Ordinal) && !link.StartsWith("steam://", StringComparison.Ordinal))
+        if (!link.StartsWith("https://store.steampowered.com/app/", StringComparison.Ordinal) && !link.StartsWith("steam://", StringComparison.Ordinal) &&
+            !link.StartsWith("https://drive.google.com/", StringComparison.Ordinal))
         {
             return;
         }
@@ -689,13 +854,24 @@ internal sealed class TrayApp
         _output.Say(_playing.Count > 0 ? "Sync now: every game syncs once you stop playing." : "Sync now: every game syncs in a moment.");
     }
 
-    /// <summary>Opens a page, and the library on a view when asked: Home's My games and Needs you tabs are the library's views.</summary>
+    /// <summary>
+    /// Opens a page, on a view when asked: Home's My games opens the library on every game, and its Needs you the save
+    /// manager's Needs you (KAN-46).
+    /// </summary>
     private void Show(string page, string? tab)
     {
         if (page == "library" && tab is not null)
         {
             Library.ShowView(tab);
             Library.Selected = null;
+        }
+        else if (page == "saves" && tab is not null)
+        {
+            Saves.ShowTab(tab);
+        }
+        else if (page == "settings" && tab is not null)
+        {
+            Settings.Show(tab);
         }
 
         _shell?.Open(page);
@@ -716,6 +892,7 @@ internal sealed class TrayApp
         {
             LoadLook();
             ApplyTheme();
+            _settings?.Appearance.Show(_look);
             return "ok";
         }),
         "status" => await Dispatcher.UIThread.InvokeAsync(() =>
@@ -761,6 +938,11 @@ internal sealed class TrayApp
                 _backdropArt = pages.BackdropArt;
                 _library?.Update(pages.Games, pages.Tiles);
                 _saves?.Update(pages.Games);
+                if (_shell.Current == "settings")
+                {
+                    _settings?.Reload();
+                }
+
                 _shell.Rail = pages.Rail;
                 _shell.Reload();
                 ShowSurface();
@@ -858,6 +1040,7 @@ internal sealed class TrayApp
         _transparency = WindowsLook.TransparencyOn();
         _window?.PaintFrame(_tokens, _dark);
         ShowSurface();
+        _settings?.Appearance.Refresh();
     }
 
     /// <summary>LOOK-18: with Windows' transparency effects turned off, Glossy goes Solid, and back when they're on again.</summary>
@@ -981,10 +1164,26 @@ internal sealed class TrayApp
         _ = Task.Run(async () =>
         {
             await Task.Delay(TimeSpan.FromSeconds(2));
+            Collect();
+
+            // A closed window's pictures are let go by the renderer only after a moment: measured 30 Sep, the first
+            // collection left about 300 MB that a later one brought down to about 130 (PERF-01). So once more, later.
+            if (force)
+            {
+                await Task.Delay(TimeSpan.FromSeconds(15));
+                if (_window is null)
+                {
+                    Collect();
+                }
+            }
+        });
+
+        static void Collect()
+        {
             GC.Collect(GC.MaxGeneration, GCCollectionMode.Aggressive, blocking: true, compacting: true);
             GC.WaitForPendingFinalizers();
             GC.Collect(GC.MaxGeneration, GCCollectionMode.Aggressive, blocking: true, compacting: true);
-        });
+        }
     }
 
     /// <summary>Quit from the tray: the window closes, the agent records any open session and stops, and the tray icon goes.</summary>
@@ -1033,7 +1232,13 @@ internal sealed class TrayApp
                 games,
                 LibraryViewModel.Tiles(games, now, actions),
                 ShellViewModel.DefaultRail(games.Where(g => g.IsRunning && g.Shown).MaxBy(g => g.RunningSinceUtc ?? DateTime.MinValue)?.Title, games.Count(g => g.NeedsYou)),
-                home.Hero?.HeroPath ?? home.Hero?.CoverPath);
+                // Glossy's art: the hero game's, or when it has none (a game in its own folder with no art), the most
+                // recently played game's that has some, so the pages don't go Solid (KAN-54).
+                home.Hero?.HeroPath ?? home.Hero?.CoverPath ?? games
+                    .Where(g => g.Shown && (g.HeroPath ?? g.CoverPath) is not null)
+                    .OrderByDescending(g => g.LastPlayedUtc ?? DateTime.MinValue)
+                    .Select(g => g.HeroPath ?? g.CoverPath)
+                    .FirstOrDefault());
         }
 
         /// <summary>Home's top bar: where the saves go and whether it's reachable, this PC, and the other PCs with when each was last seen.</summary>

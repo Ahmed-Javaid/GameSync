@@ -45,11 +45,12 @@ public interface IRailPage
 
 /// <summary>
 /// The game library, laid out like Steam's (LIB-14 to LIB-18): every game by name in a list on the left, with the
-/// search, the sort and favourites first, and the covers, or the page of the game picked, on the right (design system →
-/// LibraryScreen). Its pill tabs choose the view: all games, those installed on this PC, those in their own folders
-/// (Local, with Scan a folder for games…), those that need you, Steam's software or games hidden from the launcher; the
-/// view, the search and the sort apply to both sides. It lives as long as the window, so what the person typed, the
-/// order they chose and the game they opened stay when the games refresh; the view and the order are kept per PC.
+/// search, the sort, Installed only and favourites first, and the covers, or the page of the game picked, on the right
+/// (design system → LibraryScreen). Its pill tabs choose the view: all games, those in their own folders (Local, with
+/// Scan a folder for games…), Steam's software or games hidden from the launcher; the view, the search, the sort and
+/// Installed only apply to both sides. What needs you is the save manager's, not a kind of game (KAN-46). It lives as
+/// long as the window, so what the person typed, the order they chose and the game they opened stay when the games
+/// refresh; the order and Installed only are kept per PC (KAN-47), and the rail always opens every game.
 /// </summary>
 public sealed partial class LibraryViewModel : ObservableObject, IRailPage, IPageSurface, ISearchablePage
 {
@@ -65,15 +66,10 @@ public sealed partial class LibraryViewModel : ObservableObject, IRailPage, IPag
     private static readonly IReadOnlyDictionary<string, string> ViewNames = new Dictionary<string, string>
     {
         ["all"] = "Games",
-        ["installed"] = "Installed",
         ["local"] = "Local",
-        ["attn"] = "Needs you",
         ["software"] = "Software",
         ["hidden"] = "Hidden",
     };
-
-    /// <summary>The views kept per PC (LIB-22): what's on this PC. Needs you, Software and Hidden are visits, not a way to browse.</summary>
-    public static readonly IReadOnlySet<string> KeptViews = new HashSet<string> { "all", "installed", "local" };
 
     private readonly HashSet<string> _closed = [];
     private readonly Func<LauncherGame, TileItem, GameViewModel>? _makePage;
@@ -84,7 +80,12 @@ public sealed partial class LibraryViewModel : ObservableObject, IRailPage, IPag
     private string _selectedTab = "all";
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SearchCount), nameof(ShowsShortcut))]
     private string _search = "";
+
+    /// <summary>KAN-47: only the games installed on this PC, in the list and the covers; kept per PC like the order.</summary>
+    [ObservableProperty]
+    private bool _installedOnly;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(SortLabel), nameof(SortName), nameof(SortsByRecent), nameof(SortsByName), nameof(SortsByHours), nameof(SortsByAdded))]
@@ -115,6 +116,7 @@ public sealed partial class LibraryViewModel : ObservableObject, IRailPage, IPag
     private string _otherHeading = "All games";
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SearchCount))]
     private string _countLabel = "";
 
     [ObservableProperty]
@@ -142,14 +144,14 @@ public sealed partial class LibraryViewModel : ObservableObject, IRailPage, IPag
     /// <param name="actions">What the page asks of the app; null where it only shows, as in the snapshot tool.</param>
     /// <param name="sort">The order kept on this PC (LIB-16).</param>
     /// <param name="makePage">A game's page, opened beside the list; by default one made from what the library knows of it.</param>
-    /// <param name="view">The view kept on this PC (LIB-22).</param>
+    /// <param name="installedOnly">Installed only, as kept on this PC (KAN-47).</param>
     public LibraryViewModel(LauncherActions? actions = null, LibrarySort sort = LibrarySort.RecentlyPlayed, Func<LauncherGame, TileItem, GameViewModel>? makePage = null,
-        string view = "all")
+        bool installedOnly = false)
     {
         Actions = actions;
         _sort = sort;
         _makePage = makePage;
-        _selectedTab = KeptViews.Contains(view) ? view : "all";
+        _installedOnly = installedOnly;
         OpenCommand = new RelayCommand<GameId>(game =>
         {
             ReturnTo = null;
@@ -194,8 +196,11 @@ public sealed partial class LibraryViewModel : ObservableObject, IRailPage, IPag
 
     public bool CanAddGame => Actions?.OpenAddGame is not null;
 
-    /// <summary>Home's strength over the covers; a game's page is full glass over that game's own art, as game detail is (LOOK-17).</summary>
-    public GlassStrength Strength => Page is null ? GlassStrength.Home : GlassStrength.Glass;
+    /// <summary>
+    /// Full glass, with a game's page open or not, so the list beside the covers keeps the art's colour as pages open
+    /// and close (the owner, 1 Oct 2026; LOOK-17); a game's page shows that game's own art.
+    /// </summary>
+    public GlassStrength Strength => GlassStrength.Glass;
 
     public string? BackdropArt => Page?.BackdropArt;
 
@@ -206,6 +211,11 @@ public sealed partial class LibraryViewModel : ObservableObject, IRailPage, IPag
     public bool HasFavouriteTiles => FavouriteTiles.Count > 0;
 
     public bool HasNothing => Nothing is not null;
+
+    /// <summary>While searching, how many games match, in the search field where Ctrl F was ("3 of 61").</summary>
+    public string? SearchCount => string.IsNullOrWhiteSpace(Search) ? null : CountLabel;
+
+    public bool ShowsShortcut => string.IsNullOrEmpty(Search);
 
     /// <summary>The Local view, which says what it holds and offers Scan a folder for games… (LIB-22, LIB-23).</summary>
     public bool IsLocalView => SelectedTab == "local";
@@ -269,11 +279,11 @@ public sealed partial class LibraryViewModel : ObservableObject, IRailPage, IPag
     }
 
     /// <summary>A library from a data folder's games, as the snapshot tool and the tests make it.</summary>
-    /// <param name="tab"><c>all</c> for the games, <c>attn</c> for those that need you, <c>software</c> for Steam's software, <c>hidden</c> for games hidden from the launcher.</param>
+    /// <param name="tab"><c>all</c> for the games, <c>local</c> for those in their own folders, <c>software</c> for Steam's software, <c>hidden</c> for games hidden from the launcher.</param>
     public static LibraryViewModel From(IReadOnlyList<LauncherGame> all, DateTime nowLocal, string tab = "all", LauncherActions? actions = null,
-        LibrarySort sort = LibrarySort.RecentlyPlayed)
+        LibrarySort sort = LibrarySort.RecentlyPlayed, bool installedOnly = false)
     {
-        var library = new LibraryViewModel(actions, sort);
+        var library = new LibraryViewModel(actions, sort, installedOnly: installedOnly);
         library.Update(all, Tiles(all, nowLocal, actions));
         library.SelectedTab = library.Tabs.Any(t => t.Id == tab) ? tab : "all";
         return library;
@@ -284,13 +294,10 @@ public sealed partial class LibraryViewModel : ObservableObject, IRailPage, IPag
     {
         (_games, _tiles) = (games, tiles);
         var shown = games.Where(g => g.Shown).ToList();
-        var needsYou = shown.Count(g => g.NeedsYou);
         var tabs = new List<NavItem>
         {
             new("all", "All games"),
-            new("installed", "Installed"),
             new("local", "Local"),
-            new("attn", "Needs you", Count: needsYou > 0 ? needsYou.ToString(CultureInfo.InvariantCulture) : null),
         };
         if (games.Any(g => g.IsSoftware && !g.IsHidden))
         {
@@ -333,24 +340,20 @@ public sealed partial class LibraryViewModel : ObservableObject, IRailPage, IPag
 
     public void FocusSearch() => SearchFocusRequests++;
 
-    /// <summary>The rail's Game library: a game's page still open keeps showing, and Back from it leads to the covers.</summary>
-    public void ReachedFromRail() => ReturnTo = null;
-
-    /// <summary>A view another page opened (Home's My games and Needs you): shown, not kept as the library's own.</summary>
-    public void ShowView(string view)
+    /// <summary>
+    /// KAN-46: the rail's Game library always opens the library itself: every game, no game's page, no search or view
+    /// left from before. Installed only and the order stay, since they're the person's settings.
+    /// </summary>
+    public void ReachedFromRail()
     {
-        _visiting = true;
-        try
-        {
-            SelectedTab = view;
-        }
-        finally
-        {
-            _visiting = false;
-        }
+        ReturnTo = null;
+        Selected = null;
+        Search = "";
+        SelectedTab = "all";
     }
 
-    private bool _visiting;
+    /// <summary>A view another page opened (Home's My games): every game, or the view asked for when the library has it.</summary>
+    public void ShowView(string view) => SelectedTab = Tabs.Any(t => t.Id == view) ? view : "all";
 
     /// <summary>
     /// LIB-23: Scan a folder for games…, with the folder picked in Windows' picker: the note says it's looking, then what
@@ -389,12 +392,13 @@ public sealed partial class LibraryViewModel : ObservableObject, IRailPage, IPag
 
     partial void OnSelectedTabChanged(string value)
     {
-        if (!_visiting && KeptViews.Contains(value))
-        {
-            Actions?.SetView?.Invoke(value);
-        }
-
         OnPropertyChanged(nameof(IsLocalView));
+        Rebuild();
+    }
+
+    partial void OnInstalledOnlyChanged(bool value)
+    {
+        Actions?.SetInstalledOnly?.Invoke(value);
         Rebuild();
     }
 
@@ -438,15 +442,14 @@ public sealed partial class LibraryViewModel : ObservableObject, IRailPage, IPag
 
     private void Rebuild()
     {
+        // Installed only leaves Hidden alone: it's where a hidden game is found again, installed or not.
         var inView = _games.Where(g => SelectedTab switch
         {
-            "installed" => g.Shown && g.Installed,
             "local" => g.Shown && g.IsLocal,
-            "attn" => g.Shown && g.NeedsYou,
             "software" => g.IsSoftware && !g.IsHidden,
             "hidden" => g.IsHidden,
             _ => g.Shown,
-        }).ToList();
+        } && (!InstalledOnly || g.Installed || SelectedTab == "hidden")).ToList();
         var matching = Launcher.Sort(inView.Where(g => Launcher.Matches(g.Title, Search)), Sort);
         var favourites = matching.Where(g => g.IsFavourite).Select(g => _tiles.GetValueOrDefault(g.Id)).OfType<TileItem>().ToList();
         var others = matching.Where(g => !g.IsFavourite).Select(g => _tiles.GetValueOrDefault(g.Id)).OfType<TileItem>().ToList();
@@ -478,9 +481,8 @@ public sealed partial class LibraryViewModel : ObservableObject, IRailPage, IPag
             : searching ? $"No game here matches “{Search.Trim()}”."
             : SelectedTab switch
             {
-                "installed" => "No games are installed on this PC yet, as far as GameSync has looked.",
+                "all" when InstalledOnly => "No games are installed on this PC yet, as far as GameSync has looked. Untick Installed only to see every game.",
                 "local" => "No games in their own folders yet.",
-                "attn" => "Nothing needs you. Every game that syncs is fine.",
                 "hidden" => "No games are hidden. Right-click a game to hide it from the launcher on this PC.",
                 _ => "No games yet. First run looks for them on this PC; until it's built, run gamesync scan.",
             };

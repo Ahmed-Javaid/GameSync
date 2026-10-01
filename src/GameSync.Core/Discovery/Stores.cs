@@ -23,6 +23,15 @@ public static class StoreNames
         _ => "Synced by its store",
     };
 
+    /// <summary>The words of a store-cloud game's small mark on its cover (KAN-48): "Backed up; Steam syncs it".</summary>
+    public static string BackedUpSyncedBy(StoreKind? store) => store switch
+    {
+        StoreKind.Steam => "Backed up; Steam syncs it",
+        StoreKind.Epic => "Backed up; Epic syncs it",
+        StoreKind.Ea => "Backed up; the EA app syncs it",
+        _ => "Backed up; its store syncs it",
+    };
+
     /// <summary>The store's name as the one that syncs a game: "Steam", "Epic", "The EA app", "Its store".</summary>
     public static string SyncingStore(StoreKind? store) => store switch
     {

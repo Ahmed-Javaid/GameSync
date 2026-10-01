@@ -386,14 +386,7 @@ public sealed partial class ConflictViewModel : ObservableObject, IPageSurface
     }
 
     /// <summary>"1 h 52 min", "47 min", "under a minute".</summary>
-    public static string Duration(TimeSpan span)
-    {
-        var minutes = (int)Math.Round(span.TotalMinutes);
-        return minutes < 1 ? "under a minute"
-            : minutes < 60 ? $"{minutes} min"
-            : minutes % 60 == 0 ? $"{minutes / 60} h"
-            : $"{minutes / 60} h {minutes % 60} min";
-    }
+    public static string Duration(TimeSpan span) => Launcher.DurationText(span);
 
     private static string Copy(FileEntry? file, DateTime nowLocal) =>
         file is null ? "—" : $"{Cli.FormatSize(file.Size)} · {file.ModifiedUtc.ToLocalTime().ToString(file.ModifiedUtc.ToLocalTime().Date == nowLocal.Date ? "HH:mm" : "d MMM HH:mm", CultureInfo.InvariantCulture)}";

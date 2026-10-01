@@ -7,7 +7,8 @@ namespace GameSync.UI.Controls;
 
 /// <summary>
 /// One of the design system's icons (design/system/components/Icon): outlined on a 24px grid, a 1.75 stroke with round
-/// caps and joins, in the text colour around it. Only <c>play</c> is filled, and the <c>star</c> of a favourite.
+/// caps and joins, in the text colour around it. Only <c>play</c> is filled, and the <c>star</c> of a favourite; the stores' marks
+/// (<c>steam</c>, <c>epic</c>, <c>ea</c>) are filled and never outlined.
 /// </summary>
 public sealed class GsIcon : Control
 {
@@ -70,8 +71,10 @@ public sealed class GsIcon : Control
         var scale = Size / 24;
         using (context.PushTransform(Matrix.CreateScale(scale, scale)))
         {
-            var pen = new Pen(brush, StrokeWidth, lineCap: PenLineCap.Round, lineJoin: PenLineJoin.Round);
-            var fill = Icon == "play" || Filled && Icon == "star" ? brush : null;
+            // A store's mark is filled and never outlined (KAN-55); the design system's icons are outlined.
+            var brand = Icons.IsBrand(Icon);
+            var pen = brand ? null : new Pen(brush, StrokeWidth, lineCap: PenLineCap.Round, lineJoin: PenLineJoin.Round);
+            var fill = brand || Icon == "play" || Filled && Icon == "star" ? brush : null;
             foreach (var path in paths)
             {
                 context.DrawGeometry(fill, pen, path);

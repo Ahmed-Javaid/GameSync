@@ -16,7 +16,7 @@ namespace GameSync.UI.ViewModels;
 /// <summary>What the launcher's pages ask of the app. Pages made without it (the snapshot tool) only show.</summary>
 /// <param name="Play">Starts a game, with the check before playing when it syncs (PLAY-02, PLAY-03).</param>
 /// <param name="SyncNow">Every game syncs at the agent's next round with nothing playing.</param>
-/// <param name="Show">Opens a page by its rail id, on a tab when given: <c>("library", "attn")</c>.</param>
+/// <param name="Show">Opens a page by its rail id, on a tab when given: <c>("saves", "needs")</c>.</param>
 /// <param name="SetHidden">Hides a game from the launcher on this PC, or shows it again.</param>
 public sealed record LauncherActions(Action<GameId> Play, Action SyncNow, Action<string, string?> Show, Action<GameId, bool> SetHidden)
 {
@@ -26,8 +26,8 @@ public sealed record LauncherActions(Action<GameId> Play, Action SyncNow, Action
     /// <summary>Keeps the library's order on this PC (LIB-16).</summary>
     public Action<LibrarySort>? SetSort { get; init; }
 
-    /// <summary>Keeps the library's view on this PC: all games, installed or local (LIB-22).</summary>
-    public Action<string>? SetView { get; init; }
+    /// <summary>Keeps the library's Installed only on this PC (KAN-47).</summary>
+    public Action<bool>? SetInstalledOnly { get; init; }
 
     /// <summary>Scan a folder for games…: the folder joins the ones every scan looks in, and this PC is scanned now (LIB-23).</summary>
     public Func<string, CancellationToken, Task<FolderScan>>? ScanFolder { get; init; }
@@ -65,11 +65,17 @@ public sealed record LauncherActions(Action<GameId> Play, Action SyncNow, Action
     /// <summary>Backs a game up now (BAK-16).</summary>
     public Action<GameId>? BackUpNow { get; init; }
 
-    /// <summary>Save as…: keeps the game's save as it is now under a name (BAK-18).</summary>
+    /// <summary>Save as…: keeps the game's save as it is now under a name (BAK-18); a game not syncing yet is kept first (KAN-63).</summary>
     public Action<GameId, string>? SaveAs { get; init; }
 
-    /// <summary>Brings a version back, a named save's (with its name) or any other; this PC's files are kept first.</summary>
-    public Action<GameId, VersionId, string?>? Restore { get; init; }
+    /// <summary>KAN-63: starts keeping a game not syncing yet (backed up only, not synced between PCs); true once it's kept.</summary>
+    public Func<GameId, Task<bool>>? Keep { get; init; }
+
+    /// <summary>
+    /// Brings a version back, a named save's (with its name) or any other; this PC's files are kept first. Null once it's
+    /// in place, or why it couldn't be (KAN-51).
+    /// </summary>
+    public Func<GameId, VersionId, string?, Task<string?>>? Restore { get; init; }
 
     /// <summary>A game's saves in the save manager: its named saves, where they are, every version and its log (MGR-07).</summary>
     public Action<GameId>? OpenSaves { get; init; }
@@ -125,6 +131,12 @@ public sealed record LauncherActions(Action<GameId> Play, Action SyncNow, Action
     /// <summary>Every game's saves at a glance, for the save manager's table, off the UI thread.</summary>
     public Func<CancellationToken, Task<IReadOnlyList<GameSaveSummary>>>? LoadSaves { get; init; }
 
+    /// <summary>MGR-08: every version of every game from every PC, for the save manager's Versions tab.</summary>
+    public Func<CancellationToken, Task<VersionsView>>? LoadVersions { get; init; }
+
+    /// <summary>MGR-09: everything in the activity log, newest first, for the save manager's Log tab.</summary>
+    public Func<CancellationToken, Task<IReadOnlyList<LogEntry>>>? LoadLog { get; init; }
+
     /// <summary>What a game's Properties show, with the files in its save places, off the UI thread (LIB-20, FIND-12).</summary>
     public Func<GameId, CancellationToken, Task<GameProperties?>>? LoadProperties { get; init; }
 
@@ -143,6 +155,9 @@ public sealed record TileItem(GameId Id, string Title, IImage? Art, GameStatus? 
 {
     /// <summary>The badge's words when the status's own aren't enough: which store syncs it (LIB-10).</summary>
     public string? StatusLabel { get; init; }
+
+    /// <summary>The words of the small mark shown for a game whose saves are fine (KAN-48); null shows the badge instead.</summary>
+    public string? MarkLabel { get; init; }
 
     /// <summary>The small cover for the library's list (Steam's 300×450 capsule, decoded small).</summary>
     public IImage? SmallArt { get; init; }
@@ -168,18 +183,23 @@ public sealed record TileItem(GameId Id, string Title, IImage? Art, GameStatus? 
     /// <summary>Makes it a favourite on this PC, or not; null where the page can't.</summary>
     public ICommand? ToggleFavourite { get; init; }
 
+    /// <summary>Its Properties (LIB-20), from the right-click menu too (KAN-56); null where the page can't.</summary>
+    public ICommand? PropertiesCommand { get; init; }
+
+    public bool HasProperties => PropertiesCommand is not null;
+
     public string HideLabel => IsHidden ? "Show in the launcher" : "Hide from the launcher";
 
     public string FavouriteLabel => IsFavourite ? "Remove from favourites" : "Add to favourites";
 
     /// <summary>Anything to offer on a right-click.</summary>
-    public bool HasMenu => ToggleHidden is not null || ToggleFavourite is not null;
+    public bool HasMenu => ToggleHidden is not null || ToggleFavourite is not null || PropertiesCommand is not null;
 
     /// <summary>What a screen reader says for the game's row or tile: its name, what needs doing, and whether it's here (A11Y-03).</summary>
     public string SpokenName => string.Join(", ", new[]
     {
         Title,
-        Status is { } status && status != GameStatus.Synced ? StatusLabel ?? GsStatusBadge.Describe(status).Word : null,
+        MarkLabel ?? (Status is { } status && status != GameStatus.Synced ? StatusLabel ?? GsStatusBadge.Describe(status).Word : null),
         Installed ? null : "not installed on this PC",
     }.OfType<string>());
 
@@ -205,17 +225,91 @@ public sealed record HomeStatus(string Cloud, string CloudLine, string ThisPc, I
     public bool HasCloud => !NoCloud;
 }
 
+/// <summary>A month of Home's Activity (KAN-66): its name, each day's level and games, and what each day says when pointed at.</summary>
+public sealed record ActivityMonthItem(string Name, IReadOnlyList<int> Levels, int StartWeekday, IReadOnlyList<ActivityDay> Days)
+{
+    public IReadOnlyList<string> Tips { get; } = Days.Select(d => d.Tip).ToList();
+}
+
 /// <summary>
-/// The launcher home (PLAY-01): the hero, Needs you, Jump back in and this month's activity. Its pill tabs are the
-/// library's views, as the design system labels them: Recently played is this page, and My games or Needs you open the
-/// library on that view.
+/// A day in Home's Activity (KAN-66): the games played that day and for how long, longest first, for the tooltip
+/// pointing at it shows and the list a click on it opens.
+/// </summary>
+public sealed record ActivityDay(DateTime Date, TimeSpan Played, IReadOnlyList<ActivityGame> Games, string Tip)
+{
+    /// <summary>"Tuesday 29 September".</summary>
+    public string Label => Date.ToString("dddd d MMMM", CultureInfo.InvariantCulture);
+
+    /// <summary>"3 h 10 min played".</summary>
+    public string Total => $"{Launcher.DurationText(Played)} played";
+
+    /// <summary>
+    /// A day from what was played on it: pointing at it says the day and its play, then each game and how long (five at
+    /// most, then how many more); a day without play says so, and a day still to come only its date.
+    /// </summary>
+    public static ActivityDay Of(DateTime date, IReadOnlyList<DayPlay> played, DateTime nowLocal, IReadOnlyDictionary<GameId, string?> covers, Action<GameId> open)
+    {
+        var total = played.Aggregate(TimeSpan.Zero, (sum, game) => sum + game.Played);
+        var games = played.Select(g => new ActivityGame(g.Id, g.Title, Launcher.DurationText(g.Played), covers.GetValueOrDefault(g.Id), open)).ToList();
+        var label = date.ToString("dddd d MMMM", CultureInfo.InvariantCulture);
+        var tip = date.Date > nowLocal.Date ? label
+            : games.Count == 0 ? $"{label} · nothing played"
+            : string.Join('\n', games.Take(5).Select(g => $"{g.Title} · {g.Played}")
+                .Prepend($"{label} · {Launcher.DurationText(total)}")
+                .Concat(games.Count > 5 ? [$"and {games.Count - 5} more"] : []));
+        return new ActivityDay(date, total, games, tip);
+    }
+}
+
+/// <summary>A game in a day's list: its cover, its title and how long it was played; a click opens its page.</summary>
+public sealed class ActivityGame(GameId id, string title, string played, string? coverPath, Action<GameId> open)
+{
+    private IImage? _art;
+    private bool _loaded;
+
+    public GameId Id => id;
+
+    public string Title => title;
+
+    /// <summary>"2 h 40 min".</summary>
+    public string Played => played;
+
+    public string Initial => GsGameTile.InitialOf(title);
+
+    /// <summary>The cover, read only once the list shows.</summary>
+    public IImage? Art
+    {
+        get
+        {
+            if (!_loaded)
+            {
+                _art = ArtImages.Load(coverPath, 96);
+                _loaded = true;
+            }
+
+            return _art;
+        }
+    }
+
+    /// <summary>"Terraria, 30 min played", for screen readers.</summary>
+    public string Spoken => $"{title}, {played} played";
+
+    public ICommand Open { get; } = new RelayCommand(() => open(id));
+}
+
+/// <summary>
+/// The launcher home (PLAY-01): the hero, Needs you, Jump back in and this month's activity. Its pill tabs: Recently played
+/// is this page, My games opens the library, and Needs you the save manager's Needs you (KAN-46).
 /// </summary>
 public sealed partial class HomeViewModel : ObservableObject, IPageSurface
 {
     public const string ThisPage = "recent";
 
-    /// <summary>Glossy's Home strength: a step more solid than full glass (LOOK-17).</summary>
-    public GlassStrength Strength => GlassStrength.Home;
+    /// <summary>Home's Needs you tab, which opens the save manager's Needs you (KAN-46).</summary>
+    public const string NeedsYouTab = "needs";
+
+    /// <summary>Full glass, as a game's page: Home's cards take the art's colour (the owner, 1 Oct 2026; LOOK-17).</summary>
+    public GlassStrength Strength => GlassStrength.Glass;
 
     [ObservableProperty]
     private string _selectedTab = ThisPage;
@@ -231,7 +325,7 @@ public sealed partial class HomeViewModel : ObservableObject, IPageSurface
         });
         SyncNowCommand = new RelayCommand(() => Actions?.SyncNow());
         OpenLibraryCommand = new RelayCommand(() => Actions?.Show("library", "all"));
-        OpenSavesCommand = new RelayCommand(() => Actions?.Show("saves", null));
+        OpenSavesCommand = new RelayCommand(() => Actions?.Show("saves", SaveManagerViewModel.NeedsTab));
         OpenGameCommand = new RelayCommand<GameId>(game => Actions?.OpenGame?.Invoke(game));
         OpenGameSavesCommand = new RelayCommand<GameId>(game =>
         {
@@ -267,10 +361,17 @@ public sealed partial class HomeViewModel : ObservableObject, IPageSurface
             }
         });
         ConnectCloudCommand = new RelayCommand(() => Actions?.ConnectCloud?.Invoke());
+        OpenSettingsCommand = new RelayCommand<string>(section => Actions?.Show("settings", section));
+        ChooseDayCommand = new RelayCommand<int>(day => ChosenDay = day >= 0 && day < ActivityDays.Count ? ActivityDays[day] : null);
+        EarlierMonthCommand = new RelayCommand(() => MonthIndex--, () => MonthIndex > 0);
+        LaterMonthCommand = new RelayCommand(() => MonthIndex++, () => MonthIndex < Months.Count - 1);
     }
 
     /// <summary>The top bar's Connect the cloud, while no cloud is connected.</summary>
     public ICommand ConnectCloudCommand { get; }
+
+    /// <summary>A section of Settings, from the top bar's cloud and PC buttons: "cloud" or "devices".</summary>
+    public ICommand OpenSettingsCommand { get; }
 
     /// <summary>No cloud is connected yet: the top bar offers Connect the cloud.</summary>
     public bool NoCloud => Status?.NoCloud == true;
@@ -332,6 +433,9 @@ public sealed partial class HomeViewModel : ObservableObject, IPageSurface
     /// <summary>The hero's Play, except while the hero game runs (PLAY-12).</summary>
     public bool HeroShowsPlay { get; init; } = true;
 
+    /// <summary>The hero game is running now: the banner glows in the play colour (KAN-50).</summary>
+    public bool HeroIsPlaying => HeroId is not null && !HeroShowsPlay;
+
     public IImage? HeroArt { get; init; }
 
     public IImage? HeroLogo { get; init; }
@@ -373,11 +477,45 @@ public sealed partial class HomeViewModel : ObservableObject, IPageSurface
 
     public IReadOnlyList<TileItem> JumpBackIn { get; init; } = [];
 
-    public string ActivityTitle { get; init; } = "Activity";
+    /// <summary>KAN-66: Activity month by month, this month last; the card shows one, and its arrows go back and forth.</summary>
+    public IReadOnlyList<ActivityMonthItem> Months { get; init; } = [];
 
-    public IReadOnlyList<int> Days { get; init; } = [];
+    /// <summary>The month the Activity card shows, from 0 for the earliest.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ActivityTitle), nameof(MonthName), nameof(Days), nameof(StartWeekday), nameof(ActivityDays), nameof(DayTips))]
+    [NotifyCanExecuteChangedFor(nameof(EarlierMonthCommand), nameof(LaterMonthCommand))]
+    private int _monthIndex;
 
-    public int StartWeekday { get; init; }
+    private ActivityMonthItem? ShownMonth => MonthIndex >= 0 && MonthIndex < Months.Count ? Months[MonthIndex] : null;
+
+    /// <summary>"Activity in September": the card's name for screen readers; the card shows the month between its arrows.</summary>
+    public string ActivityTitle => ShownMonth is { } month ? $"Activity in {month.Name}" : "Activity";
+
+    /// <summary>"September", or "December 2025" in another year.</summary>
+    public string MonthName => ShownMonth?.Name ?? "";
+
+    public IReadOnlyList<int> Days => ShownMonth?.Levels ?? [];
+
+    public int StartWeekday => ShownMonth?.StartWeekday ?? 0;
+
+    /// <summary>Each day of the month shown, with the games played that day and for how long.</summary>
+    public IReadOnlyList<ActivityDay> ActivityDays => ShownMonth?.Days ?? [];
+
+    /// <summary>What each day of the month shown says when pointed at.</summary>
+    public IReadOnlyList<string> DayTips => ShownMonth?.Tips ?? [];
+
+    /// <summary>The month before, back to the first with play (a year at most).</summary>
+    public IRelayCommand EarlierMonthCommand { get; }
+
+    /// <summary>The month after, up to this one.</summary>
+    public IRelayCommand LaterMonthCommand { get; }
+
+    /// <summary>The day whose games the Activity card's flyout lists.</summary>
+    [ObservableProperty]
+    private ActivityDay? _chosenDay;
+
+    /// <summary>A click on a day with play, or Enter on it: its games, in the flyout.</summary>
+    public ICommand ChooseDayCommand { get; }
 
     /// <param name="actions">What the page asks of the app; null where it only shows, as in the snapshot tool.</param>
     /// <param name="status">The cloud and the PCs, for the top bar.</param>
@@ -386,6 +524,12 @@ public sealed partial class HomeViewModel : ObservableObject, IPageSurface
         var games = all.Where(g => g.Shown).ToList();
         var hero = home.Hero;
         var needsYouCount = games.Count(g => g.NeedsYou);
+        var covers = all.ToDictionary(g => g.Id, g => g.CoverPath);
+        var months = home.Months.Select(month => new ActivityMonthItem(
+            month.Name,
+            month.Levels,
+            month.StartWeekday,
+            month.Play.Select((played, i) => ActivityDay.Of(month.First.AddDays(i), played, nowLocal, covers, id => actions?.OpenGame?.Invoke(id))).ToList())).ToList();
         return new HomeViewModel
         {
             Actions = actions,
@@ -394,7 +538,7 @@ public sealed partial class HomeViewModel : ObservableObject, IPageSurface
             [
                 new NavItem(ThisPage, "Recently played"),
                 new NavItem("all", "My games"),
-                new NavItem("attn", "Needs you", Count: needsYouCount > 0 ? needsYouCount.ToString(CultureInfo.InvariantCulture) : null),
+                new NavItem(NeedsYouTab, "Needs you", Count: needsYouCount > 0 ? needsYouCount.ToString(CultureInfo.InvariantCulture) : null),
             ],
             HeroId = hero?.Id,
             NoGames = games.Count == 0,
@@ -411,18 +555,17 @@ public sealed partial class HomeViewModel : ObservableObject, IPageSurface
             HeroPlayLabel = hero?.LastPlayedUtc is null ? "Play" : "Continue playing",
             NeedsYou = home.NeedsYou.Select(g => new NeedsYouItem(g.Id, g.Title, ArtImages.Load(g.CoverPath, 96), GsGameTile.InitialOf(g.Title), g.Status, ActionFor(g.Status))).ToList(),
             AnySyncing = home.Syncing > 0,
-            HasActivity = home.MonthDays.Any(d => d > 0),
+            HasActivity = home.Months.Any(m => m.Levels.Any(d => d > 0)),
             SyncedLabel = home.Syncing == 0 ? $"{games.Count} games found, none syncing yet" : $"{home.Synced} of {home.Syncing} games synced",
             SyncedRight = home.Syncing == 0 ? "" : $"{Math.Round(100.0 * home.Synced / home.Syncing).ToString(CultureInfo.InvariantCulture)}%",
             SyncedPercent = home.Syncing == 0 ? 0 : 100.0 * home.Synced / home.Syncing,
             JumpBackIn = home.JumpBackIn.Select(g => Tile(g, nowLocal, width: 300, withMeta: false, actions)).ToList(),
-            ActivityTitle = $"Activity in {home.MonthName}",
-            Days = home.MonthDays,
-            StartWeekday = home.MonthStartWeekday,
+            Months = months,
+            MonthIndex = months.Count - 1,
         };
     }
 
-    /// <summary>My games and Needs you open the library on that view; Recently played stays chosen here for when you come back.</summary>
+    /// <summary>My games opens the library, and Needs you the save manager's Needs you (KAN-46); Recently played stays chosen here for when you come back.</summary>
     partial void OnSelectedTabChanged(string value)
     {
         if (value == ThisPage || Actions is null)
@@ -430,26 +573,56 @@ public sealed partial class HomeViewModel : ObservableObject, IPageSurface
             return;
         }
 
-        Actions.Show("library", value);
+        // KAN-46: Needs you is the save manager's tab, where the save work is; My games is the library.
+        if (value == NeedsYouTab)
+        {
+            Actions.Show("saves", SaveManagerViewModel.NeedsTab);
+        }
+        else
+        {
+            Actions.Show("library", value);
+        }
+
         SelectedTab = ThisPage;
     }
 
     /// <param name="smallWidth">Also decode the cover this wide for the library's list; 0 leaves it out.</param>
     public static TileItem Tile(LauncherGame game, DateTime nowLocal, int width = 320, bool withMeta = true, LauncherActions? actions = null, int smallWidth = 0) =>
-        new(game.Id, game.Title, ArtImages.Load(game.CoverPath, width), game.IsRunning ? GameStatus.Playing : game.Status, withMeta ? Launcher.Meta(game, nowLocal) : null)
+        new(game.Id, game.Title, ArtImages.LoadCover(game.CoverPath, width), game.IsRunning ? GameStatus.Playing : game.Status, withMeta ? Launcher.Meta(game, nowLocal) : null)
         {
             StatusLabel = StatusLabel(game),
-            SmallArt = smallWidth > 0 ? ArtImages.Load(game.CoverPath, smallWidth) : null,
+            MarkLabel = game.IsRunning ? null : MarkLabel(game.Status, game.Store, game.StoreSyncs),
+            SmallArt = smallWidth > 0 ? ArtImages.LoadCover(game.CoverPath, smallWidth) : null,
             Installed = game.Installed,
             IsHidden = game.IsHidden,
             IsFavourite = game.IsFavourite,
             PlayCommand = actions is null || !game.Installed ? null : new RelayCommand(() => actions.Play(game.Id)),
             ToggleHidden = actions is null ? null : new RelayCommand(() => actions.SetHidden(game.Id, !game.IsHidden)),
             ToggleFavourite = actions?.SetFavourite is { } setFavourite ? new RelayCommand(() => setFavourite(game.Id, !game.IsFavourite)) : null,
+            PropertiesCommand = actions?.OpenProperties is { } properties ? new RelayCommand(() => properties(game.Id, null)) : null,
         };
 
     /// <summary>LIB-10: a game its store's cloud syncs names the store ("Synced by Steam"); other statuses say their own word.</summary>
-    public static string? StatusLabel(LauncherGame? game) => game?.Status == GameStatus.BackupOnly ? StoreNames.SyncedBy(game.Store) : null;
+    public static string? StatusLabel(LauncherGame? game) => game switch
+    {
+        { Status: GameStatus.BackupOnly, StoreSyncs: false } => "Backed up",
+        { Status: GameStatus.BackupOnly } => StoreNames.SyncedBy(game.Store),
+        { FirstBackupPending: true } => "Not backed up yet",
+        _ => null,
+    };
+
+    /// <summary>
+    /// KAN-48: a game whose saves are fine gets a small mark in the ok colour in place of a badge, with these words in its
+    /// tooltip and for screen readers; null for any other status, so the badge shows.
+    /// </summary>
+    /// <param name="storeSyncs">Its store's cloud syncs it; otherwise it's backed up only by the person's choice (KAN-63).</param>
+    public static string? MarkLabel(GameStatus? status, StoreKind? store, bool storeSyncs = true) => status switch
+    {
+        GameStatus.Synced => "Synced",
+        GameStatus.BackupOnly when !storeSyncs => "Backed up; not synced between your PCs",
+        GameStatus.BackupOnly => StoreNames.BackedUpSyncedBy(store),
+        _ => null,
+    };
 
     /// <summary>
     /// The hero's eyebrow: for the game playing now, since when and how it's installed ("Playing now · since 20:41 · In its
@@ -486,7 +659,8 @@ public sealed partial class HomeViewModel : ObservableObject, IPageSurface
     }
 
     private static string HoursPlayed(TimeSpan playtime) =>
-        playtime.TotalHours >= 1 ? $"{Math.Round(playtime.TotalHours).ToString(CultureInfo.InvariantCulture)} hrs played" : $"{Math.Max(1, (int)Math.Round(playtime.TotalMinutes))} min played";
+        playtime.TotalHours >= 1 ? Math.Round(playtime.TotalHours) is var hours && hours == 1 ? "1 hr played" : $"{hours.ToString(CultureInfo.InvariantCulture)} hrs played"
+        : $"{Math.Max(1, (int)Math.Round(playtime.TotalMinutes))} min played";
 
     private static string Blurb(LauncherGame game) => game switch
     {
@@ -494,7 +668,8 @@ public sealed partial class HomeViewModel : ObservableObject, IPageSurface
         { Syncs: false } => "GameSync found its saves. Sync them from its page to back them up and keep them in step.",
         { NeedsYou: true, StatusDetail: { Length: > 0 } detail } => detail,
         { IsRunning: true } => "Its save syncs a few seconds after you quit.",
-        _ => "Its saves are backed up on this PC and in your Google Drive.",
+        { Cloud: { } cloud } => $"Its saves are backed up on this PC and in {cloud}.",
+        _ => "Its saves are backed up on this PC; they go up once you connect a cloud.",
     };
 
     /// <summary>The same words as the game's page and its saves use for what needs doing.</summary>

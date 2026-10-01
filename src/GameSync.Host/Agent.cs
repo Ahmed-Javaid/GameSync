@@ -23,6 +23,12 @@ public interface IAgentOutput
     {
     }
 
+    /// <summary>BG-05: news the person asked for that needs nothing of them, such as the daily backup's line.</summary>
+    void Tell(string title, string message)
+    {
+        Say($"{title}: {message}");
+    }
+
     /// <summary>Called every round: shows what was held back while a fullscreen game ran (BG-06).</summary>
     void Flush()
     {
@@ -398,7 +404,11 @@ internal sealed class Agent(string dataDir, IAgentOutput output) : IDisposable
         if (Syncs(ended.Game))
         {
             _ended[ended.Game] = ended.Session;
+
+            // The game's log says how long it was played, before the line of the sync that follows (MGR-09).
+            _state.Log(ended.Game, "info", $"Played {Launcher.DurationText(ended.Session.EndUtc - ended.Session.StartUtc)}.", EventTags.Session);
         }
+
         var minutes = Math.Max(1, (int)Math.Round((ended.Session.EndUtc - ended.Session.StartUtc).TotalMinutes));
         output.Say($"{Title(ended.Game)}: session over after {minutes} min{(ended.ByHand ? ", ended by hand" : "")}.");
         output.Played(ended.Game, Title(ended.Game), playing: false);
@@ -557,6 +567,22 @@ internal sealed class Agent(string dataDir, IAgentOutput output) : IDisposable
     /// Says what each sync did, and tells the person what needs them (BG-05): a conflict, saves missing or a blocked
     /// file, per game; an expired sign-in once for all of them. A game that's fine again can tell them again later.
     /// </summary>
+    /// <summary>A status in the app's words, as its badges say them: "synced", "backed up", "held for review".</summary>
+    internal static string Said(GameStatus status) => status switch
+    {
+        GameStatus.BackupOnly => "backed up",
+        GameStatus.Conflict => "conflict",
+        GameStatus.HeldForReview => "held for review",
+        GameStatus.FilesInUse => "files in use",
+        GameStatus.NotAvailable => "not available",
+        GameStatus.SavesMissing or GameStatus.NoSaves => "saves not found",
+        GameStatus.Blocked or GameStatus.Error => "blocked",
+        GameStatus.UploadPending => "upload pending",
+        GameStatus.NewerInCloud => "newer in the cloud",
+        GameStatus.Playing => "playing",
+        _ => "synced",
+    };
+
     internal static void Report(IAgentOutput output, IReadOnlyList<GameResult> results)
     {
         static bool SignedOut(GameResult result) =>
@@ -566,7 +592,7 @@ internal sealed class Agent(string dataDir, IAgentOutput output) : IDisposable
         {
             if (result.Action is not (SyncAction.None or null) || result.Status is not (GameStatus.Synced or GameStatus.BackupOnly))
             {
-                output.Say($"{result.Title}: {result.Status}. {result.Message}");
+                output.Say($"{result.Title}: {Said(result.Status)}. {result.Message}");
             }
 
             if (result.Status is GameStatus.Conflict or GameStatus.SavesMissing or GameStatus.Blocked)

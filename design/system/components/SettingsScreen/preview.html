@@ -1,4 +1,4 @@
-<!-- @dsCard group="Screens" height=800 width=1280 page=true subtitle="Settings: Appearance re-themes the whole screen live, its Surface included (every screen follows it); Storage and folders; what to back up" -->
+<!-- @dsCard group="Screens" height=800 width=1280 page=true subtitle="Settings: Appearance re-themes the whole screen live, its Surface included (every screen follows it); Storage and folders; startup, the daily backup and what to back up; the cloud (#cloud-folder, #cloud-none); your PCs; Copy diagnostics" -->
 <!doctype html>
 <html lang="en">
 <head><meta charset="utf-8"><title>preview</title>
@@ -47,7 +47,8 @@ function App(){
  function set(x){t[1](Object.assign({},th,x));}
  React.useEffect(function(){var mo=new MutationObserver(function(){t[1](fresh())});mo.observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});return function(){mo.disconnect()}},[]);
  // A render can open a section: #backup.
- var sec=React.useState((location.hash||'').slice(1)||'appearance');
+ var hash=(location.hash||'').slice(1), sec=React.useState(hash.split('-')[0]||'appearance');
+ var cloudState=hash==='cloud-folder'?'folder':hash==='cloud-none'?'none':'drive';
  var mode=th.system?(window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches?'light':'dark'):th.mode;
  var opts={preset:th.preset,mode:mode,pureBlack:th.pureBlack&&mode==='dark',primary:th.primary,secondary:th.secondary,accent:'#0078d4'};
  var surface=G.surface.use();
@@ -60,6 +61,8 @@ function App(){
  var scan=React.useState([{path:'E:\\Games',meta:'16 games'},{path:'G:\\',meta:'3 games'}]);
  var extra=React.useState([{path:'D:\\Portable Games\\Saves',meta:'Watched for saves'},{path:'D:\\OldPC\\userdata',tag:'By game ID',meta:'Subfolders are Steam app IDs'}]);
  var ask=React.useState(false), hold=React.useState(true), daily=React.useState(false), snaps=React.useState(true), admin=React.useState(false), policy=React.useState('newest');
+ var signin=React.useState(true), dailyOn=React.useState(true), dailyAt=React.useState('20:00'), editTime=React.useState(false), timeText=React.useState('20:00'), ran=React.useState('idle');
+ var copied=React.useState(false), pcName=React.useState('DESKTOP'), renaming=React.useState(false), nameText=React.useState('DESKTOP'), signOut=React.useState(false);
  var cfg=React.useState('this-pc'), shots=React.useState('off'), skip=React.useState(true), also=React.useState([{path:'*.bak',meta:'Backup copies some games keep',icon:'file'},{path:'**/Mods/**',meta:'Mod folders',icon:'folder'}]);
  var touched=cfg[0]!=='this-pc'||shots[0]!=='off'||!skip[0]||also[0].length!==2;
  var views={
@@ -83,9 +86,16 @@ function App(){
       h(G.FolderField,{path:'C:\\Users\\You\\Downloads',meta:'Where Share saves puts its zip files'}),
       h(G.SettingsRow,{title:'Ask where to save each time'},h(G.Switch,{label:'Ask where to save each time',checked:ask[0],onChange:ask[1]}))));},
   backup:function(){return h(Page,{title:'Backup and sync',sub:'Most syncing happens when you quit a game. The daily backup is the safety net.'},
+    h(G.Card,{title:'In the background'},
+      h(G.SettingsRow,{title:'Start GameSync when you sign in',description:'It notices games however you start them, syncs each one after you play, and brings your other PCs\u2019 saves down every 15 minutes.'},h(G.Switch,{label:'Start GameSync when you sign in',checked:signin[0],onChange:signin[1]}))),
     h(G.Card,{title:'Daily backup'},
-      h(G.SettingsRow,{title:'Time',description:'Pick a time your PC is usually on. If it\u2019s off then, the backup runs about 10 minutes after the next sign-in.'},h('span',{className:'gs-mono',style:{fontSize:15}},'20:00'),h(G.Button,{size:'sm',variant:'secondary',icon:'clock'},'Change')),
-      h(G.SettingsRow,{title:'Last run',description:'Today 20:00 \u00b7 12 games checked \u00b7 1 uploaded \u00b7 running games are always skipped'},h(G.Button,{size:'sm',variant:'secondary',icon:'sync'},'Run now'))),
+      h(G.SettingsRow,{title:dailyOn[0]?'Back up every day at '+dailyAt[0]:'Back up every day',description:dailyOn[0]?'Pick a time your PC is usually on. If it\u2019s off then, the backup runs about 10 minutes after the next sign-in.':'Off. Games still sync after you play, while GameSync runs.'},
+        editTime[0]
+          ? h('span',{className:'gs-row',style:{flexWrap:'nowrap'}},h('input',{className:'gs-input',value:timeText[0],maxLength:5,style:{width:72,textAlign:'center'},'aria-label':'Daily backup time, 24-hour',onChange:function(e){timeText[1](e.target.value)},onKeyDown:function(e){if(e.key==='Enter'&&/^([01]?\d|2[0-3]):[0-5]\d$/.test(timeText[0])){dailyAt[1](timeText[0]);editTime[1](false);}}}),h(G.Button,{size:'sm',variant:'primary',onClick:function(){if(/^([01]?\d|2[0-3]):[0-5]\d$/.test(timeText[0])){dailyAt[1](timeText[0]);editTime[1](false);}}},'Save'))
+          : h(G.Button,{size:'sm',variant:'secondary',icon:'clock',disabled:!dailyOn[0],onClick:function(){timeText[1](dailyAt[0]);editTime[1](true)}},'Change time'),
+        h(G.Switch,{label:'Back up every day',checked:dailyOn[0],onChange:function(v){dailyOn[1](v);editTime[1](false)}})),
+      h(G.SettingsRow,{title:'Last run',description:ran[0]==='running'?'Running now \u00b7 every game is checked, and running games are skipped':ran[0]==='done'?'Just now \u00b7 12 games checked \u00b7 nothing new to upload':'Today 20:00 \u00b7 12 games checked \u00b7 1 uploaded \u00b7 running games are always skipped'},
+        h(G.Button,{size:'sm',variant:'secondary',icon:'sync',disabled:ran[0]==='running',onClick:function(){ran[1]('running');setTimeout(function(){ran[1]('done')},1600)}},ran[0]==='running'?'Running\u2026':'Run now'))),
     h(G.Card,{title:'What to back up',subtitle:'Every new game starts from these. A game\u2019s Properties, Saves, can opt files in or out, and that game\u2019s choice travels with its saves.'},
       h(G.SettingsRow,{title:'Game saves',description:'Always backed up, and synced between your PCs.'},h('span',{className:'gs-tag'},'Always')),
       h(G.SettingsRow,{title:'Settings files',description:'A game\u2019s options and key bindings. On this PC they\u2019re kept for you, but each PC keeps its own.'},h(G.Select,{label:'Settings files',value:cfg[0],onChange:cfg[1],options:[{id:'sync',label:'Sync between PCs'},{id:'this-pc',label:'Back up on this PC'},{id:'off',label:'Don\u2019t back up'}]})),
@@ -96,16 +106,30 @@ function App(){
       touched ? h('div',{className:'gs-row',style:{justifyContent:'space-between'}},h('span',{className:'gs-note'},h(G.Icon,{name:'info',size:16}),'New games follow this now. Your 12 synced games keep their own until you say.'),h(G.Button,{size:'sm',variant:'secondary'},'Apply to your 12 games\u2026')) : null),
     h(G.Card,{title:'When two PCs disagree'},
       h(G.SettingsRow,{title:'Default for every game',description:'Newest wins keeps the other side pinned, with a Swap button. GameSync always asks on a first sync, a save that shrank by half, changes outside a session, or a wrong clock.'},h(G.PillTabs,{label:'Conflict default',value:policy[0],onChange:policy[1],items:[{id:'newest',label:'Newest wins'},{id:'ask',label:'Always ask'}]})),
+      policy[0]!=='newest' ? h('div',{className:'gs-row',style:{justifyContent:'space-between'}},h('span',{className:'gs-note'},h(G.Icon,{name:'info',size:16}),'New games follow this now. Your 12 synced games keep their own until you say.'),h(G.Button,{size:'sm',variant:'secondary'},'Apply to your 12 games\u2026')) : null,
       h(G.SettingsRow,{title:'Snapshot long sessions',description:'A local copy every 30 minutes, never uploaded before you quit.'},h(G.Switch,{label:'Snapshot long sessions',checked:snaps[0],onChange:snaps[1]}))));},
-  cloud:function(){return h(Page,{title:'Cloud',sub:'Your saves live in your own Google Drive.'},
+  cloud:function(){
+   var encryption=h(G.Card,{title:'Encryption'},h(G.SettingsRow,{title:'Encrypt everything in the cloud',tag:'Later',description:'Private, but no readable copy in the cloud, and losing the recovery code locks the cloud copy.',disabled:true},h(G.Switch,{label:'Encrypt everything in the cloud',disabled:true})));
+   if(cloudState==='none')return h(Page,{title:'Cloud',sub:'No cloud is connected yet, so every version stays on this PC.'},
+    h(G.Card,{title:'Connect the cloud',subtitle:'Your own Google Drive, or a folder every PC can reach, such as a NAS or another disk.'},
+      h(G.SettingsRow,{title:'Your saves are kept on this PC',description:'Every version stays here until you connect a cloud; what waited goes up then, and your other PCs can join.'},h(G.Button,{size:'sm',variant:'primary',icon:'cloud'},'Connect the cloud'))),encryption);
+   if(cloudState==='folder')return h(Page,{title:'Cloud',sub:'Your saves live in a folder every PC points at.'},
+    h(G.Card,{title:'A folder'},
+      h(G.SettingsRow,{title:h('span',{className:'gs-mono'},'\\\\NAS\\Games\\GameSync'),description:'Every PC that syncs points at this folder \u00b7 1.2 TB free'},h(G.Button,{size:'sm',variant:'secondary',icon:'folder'},'Open in Explorer'))),encryption);
+   return h(Page,{title:'Cloud',sub:'Your saves live in your own Google Drive.'},
     h(G.Card,{title:'Google Drive'},
-      h(G.SettingsRow,{title:'Signed in',description:'GameSync can only see the folder it made, not the rest of your Drive.'},h(G.Button,{size:'sm',variant:'secondary',icon:'folder'},'Open folder in Drive'),h(G.Button,{size:'sm',variant:'ghost'},'Sign out')),
+      signOut[0]
+        ? h(G.SettingsRow,{title:'Signed out',description:'Syncing waits until you sign in again. Everything stays on this PC, and your Drive keeps its copy.'},h(G.Button,{size:'sm',variant:'primary',onClick:function(){signOut[1](false)}},'Sign in with Google'))
+        : h(G.SettingsRow,{title:'Signed in as sam.rivera@gmail.com',description:'GameSync can only see the folder it made, not the rest of your Drive.'},h(G.Button,{size:'sm',variant:'secondary',icon:'external'},'Open folder in Drive'),h(G.Button,{size:'sm',variant:'ghost',title:'Asks first: syncing waits until you sign in again',onClick:function(){signOut[1](true)}},'Sign out')),
       h(G.ProgressBar,{value:7,label:'Drive storage, shared with Gmail and Photos',right:'1.04 of 15 GB'})),
-    h(G.Card,{title:'Encryption'},h(G.SettingsRow,{title:'Encrypt everything in the cloud',tag:'Later',description:'Private, but no readable copy in Drive, and losing the recovery code locks the cloud copy.',disabled:true},h(G.Switch,{label:'Encrypt everything in the cloud',disabled:true}))));},
-  devices:function(){return h(Page,{title:'Devices',sub:'Every PC that syncs with this Google account.'},
-    h(G.Card,{title:'PCs'},
-      h(G.SettingsRow,{title:h('span',{className:'gs-mono'},'DESKTOP'),description:'This PC \u00b7 GameSync 1.0'},h(G.Button,{size:'sm',variant:'secondary',icon:'pencil'},'Rename')),
-      h(G.SettingsRow,{title:h('span',{className:'gs-mono'},'LAPTOP'),description:'Last seen today 19:31 \u00b7 GameSync 1.0'},h(G.Button,{size:'sm',variant:'secondary',icon:'pencil'},'Rename'))));},
+    encryption);},
+  devices:function(){return h(Page,{title:'Devices',sub:'Every PC that syncs with this cloud.'},
+    h(G.Card,{title:'PCs',subtitle:'Each PC names itself; the others see a new name after its next sync.'},
+      h(G.SettingsRow,{title:h('span',{className:'gs-mono'},pcName[0]),description:'This PC \u00b7 GameSync 1.0'},
+        renaming[0]
+          ? h('span',{className:'gs-row',style:{flexWrap:'nowrap'}},h('input',{className:'gs-input',value:nameText[0],maxLength:32,'aria-label':'This PC\u2019s name',onChange:function(e){nameText[1](e.target.value)}}),h(G.Button,{size:'sm',variant:'primary',onClick:function(){if(nameText[0].trim()){pcName[1](nameText[0].trim());renaming[1](false);}}},'Save'),h(G.Button,{size:'sm',variant:'ghost',onClick:function(){renaming[1](false)}},'Cancel'))
+          : h(G.Button,{size:'sm',variant:'secondary',icon:'pencil',onClick:function(){nameText[1](pcName[0]);renaming[1](true)}},'Rename')),
+      h(G.SettingsRow,{title:h('span',{className:'gs-mono'},'LAPTOP'),description:'Last seen today 19:31 \u00b7 GameSync 1.0'})));},
   notifications:function(){return h(Page,{title:'Notifications',sub:'Only for things that need you: a conflict, an expired sign-in, saves not found, a blocked file.'},
     h(G.Card,{title:'Windows notifications'},
       h(G.SettingsRow,{title:'Hold while a fullscreen game runs',description:'Shown after you quit, so nothing pops up mid-game.'},h(G.Switch,{label:'Hold while a fullscreen game runs',checked:hold[0],onChange:hold[1]})),
@@ -120,7 +144,11 @@ function App(){
   rail('settings'),
   h('div',{style:{width:248,flexShrink:0,padding:'24px 12px',background:'var(--bg-100)',borderRight:'1px solid var(--line-100)',display:'flex',flexDirection:'column',gap:16}},
     h('div',{style:{font:'600 15px/20px var(--font-sans)',padding:'0 12px'}},'Settings'),
-    h(G.SettingsNav,{items:SECTIONS,current:sec[0],onChange:sec[1]})),
+    h(G.SettingsNav,{items:SECTIONS,current:sec[0],onChange:sec[1]}),
+    h('div',{style:{marginTop:'auto',padding:'0 12px',display:'flex',flexDirection:'column',gap:8,alignItems:'flex-start'}},
+      h('div',{className:'gs-faint',style:{fontSize:12}},'GameSync 1.0 \u00b7 this PC is '+pcName[0]),
+      h(G.Button,{size:'sm',variant:'secondary',icon:copied[0]?'check':'copy',onClick:function(){copied[1](true);setTimeout(function(){copied[1](false)},2000)}},copied[0]?'Copied':'Copy diagnostics'),
+      h('div',{className:'gs-faint',style:{fontSize:12,lineHeight:'16px'}},'For a bug report: the logs and each game\u2019s versions. Never your sign-in or your saves.'))),
   h('main',{style:{flex:1,minWidth:0,padding:'24px 32px',overflow:'auto'}},views[sec[0]]()));
 }
 ReactDOM.createRoot(document.getElementById('root')).render(h(App));

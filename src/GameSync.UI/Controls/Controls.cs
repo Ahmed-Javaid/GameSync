@@ -40,6 +40,81 @@ public class GsButton : Button
     }
 }
 
+/// <summary>A choice in a <see cref="GsSelect"/>: what it stands for, and what it says.</summary>
+public sealed record SelectOption(string Id, string Label);
+
+/// <summary>
+/// A choice of three or more (design system → Select): the current choice on a small secondary button with a chevron,
+/// and a menu of the choices under it with the current one checked. <see cref="Label"/> names it for a screen reader,
+/// which hears "Game: All games".
+/// </summary>
+public class GsSelect : GsButton
+{
+    public static readonly StyledProperty<IReadOnlyList<SelectOption>> OptionsProperty =
+        AvaloniaProperty.Register<GsSelect, IReadOnlyList<SelectOption>>(nameof(Options), []);
+
+    public static readonly StyledProperty<string?> ValueProperty =
+        AvaloniaProperty.Register<GsSelect, string?>(nameof(Value), defaultBindingMode: Avalonia.Data.BindingMode.TwoWay);
+
+    public static readonly StyledProperty<string?> LabelProperty = AvaloniaProperty.Register<GsSelect, string?>(nameof(Label));
+
+    public GsSelect()
+    {
+        Classes.Add("sm");
+        IconAfter = "chevronDown";
+        Flyout = new MenuFlyout { Placement = PlacementMode.BottomEdgeAlignedRight };
+    }
+
+    public IReadOnlyList<SelectOption> Options
+    {
+        get => GetValue(OptionsProperty);
+        set => SetValue(OptionsProperty, value);
+    }
+
+    /// <summary>The chosen option's <see cref="SelectOption.Id"/>.</summary>
+    public string? Value
+    {
+        get => GetValue(ValueProperty);
+        set => SetValue(ValueProperty, value);
+    }
+
+    public string? Label
+    {
+        get => GetValue(LabelProperty);
+        set => SetValue(LabelProperty, value);
+    }
+
+    protected override Type StyleKeyOverride => typeof(GsButton);
+
+    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
+    {
+        base.OnPropertyChanged(change);
+        if (change.Property == OptionsProperty || change.Property == ValueProperty || change.Property == LabelProperty)
+        {
+            Rebuild();
+        }
+    }
+
+    private void Rebuild()
+    {
+        var current = Options.FirstOrDefault(o => o.Id == Value) ?? Options.FirstOrDefault();
+        Content = current?.Label;
+        AutomationProperties.SetName(this, Label is null ? current?.Label : $"{Label}: {current?.Label}");
+        if (Flyout is not MenuFlyout menu)
+        {
+            return;
+        }
+
+        menu.Items.Clear();
+        foreach (var option in Options)
+        {
+            var item = new MenuItem { Header = option.Label, ToggleType = MenuItemToggleType.CheckBox, IsChecked = option == current };
+            item.Click += (_, _) => Value = option.Id;
+            menu.Items.Add(item);
+        }
+    }
+}
+
 /// <summary>
 /// 40px round icon button; its label is the tooltip and what a screen reader says (A11Y-03). Classes: <c>glass</c>,
 /// <c>sm</c>. <see cref="IsOn"/> makes it a toggle that's on, such as the favourite star, which then fills.
@@ -356,6 +431,10 @@ public class GsPillTabs : ListBox
 {
     public static readonly StyledProperty<string?> SelectedIdProperty =
         AvaloniaProperty.Register<GsPillTabs, string?>(nameof(SelectedId), defaultBindingMode: Avalonia.Data.BindingMode.TwoWay);
+
+    // Tabs are always in view of themselves; selecting one, as a page loads, must never scroll the page it's on (a
+    // Settings section opened scrolled down to its last pill tabs).
+    public GsPillTabs() => AutoScrollToSelectedItem = false;
 
     public string? SelectedId
     {

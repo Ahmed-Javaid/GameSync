@@ -238,7 +238,7 @@ function GamePage(p){
             : h(G.Facts,{items:[{label:'Found',value:g.files||'Its saves'}]}),
           h('div',{className:'gs-well-line'},h('span',{title:s.path||g.at},s.path||g.at||'Its save folder'),h(G.IconButton,{size:'sm',icon:'folder',label:'Open the save folder'})),
           need ? h('div',{className:'gs-row'},h(G.Button,{size:'sm',variant:'secondary',icon:need[1],onClick:p.onSaves},need[0]))
-          : syncs ? h('div',{className:'gs-row'},h(G.Button,{size:'sm',variant:'secondary',icon:'upload',disabled:g.status==='playing',title:g.status==='playing'?'Once you quit, it backs up by itself':null},'Back up now'),h(G.Button,{size:'sm',variant:'ghost',icon:'plus'},'Save as\u2026'))
+          : syncs ? h('div',{className:'gs-row'},h(G.Button,{size:'sm',variant:'secondary',icon:'upload',disabled:g.status==='playing',title:g.status==='playing'?'Once you quit, it backs up by itself':null},'Back up now'),h(G.Button,{size:'sm',variant:'ghost',icon:'plus'},'New named save\u2026'))
           : h('div',{className:'gs-row'},h(G.Button,{size:'sm',variant:'secondary',icon:'check'},'Sync these saves'),h(G.Button,{size:'sm',variant:'ghost',onClick:function(){p.onProps('saves')}},'Choose files\u2026'))),
         h(G.Card,{title:'On this PC'},
           away ? h('div',{className:'gs-note'},h(G.Icon,{name:'info',size:16}),'Not installed here. Its saves are still on this PC, and still back up.')
@@ -306,7 +306,7 @@ function App(){
         menu[1](null);}}));
   }
   return h('div',{ref:frame,style:{position:'relative',width:1280,height:800}},
-    h(G.ThemeScope,{strength:current?'glass':'home',art:current&&current.hero?current.hero:HERO_AMBER,style:{width:1280,height:800,display:'flex'}},
+    h(G.ThemeScope,{strength:'glass',art:current&&current.hero?current.hero:HERO_AMBER,style:{width:1280,height:800,display:'flex'}},
       rail('library',function(id){ if(id==='search'&&search.current) search.current.focus(); }),
       h('main',{style:{flex:1,minWidth:0,padding:'20px 24px',display:'flex',gap:16}},
         h('aside',{className:'gs-card lib-pane','aria-label':'Your games'},

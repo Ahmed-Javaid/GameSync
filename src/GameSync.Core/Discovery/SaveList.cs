@@ -93,6 +93,60 @@ public sealed class SaveList
     public SaveListGame? ByTitle(string title) => _byTitle.GetValueOrDefault(Normalize(title));
 
     /// <summary>
+    /// KAN-69: the one game whose title ends with this name's words, Roman and plain numbers alike, for a game in its own
+    /// folder named without its series: "Black Ops 3" is "Call of Duty: Black Ops III", "Dark Souls 3" is "Dark Souls
+    /// III". Only a name of two words or more, with six letters and digits at least, and only when exactly one title
+    /// ends so ("Warfare 2" ends four); null otherwise, as a guess is worse than no match (LIB-06).
+    /// </summary>
+    public SaveListGame? ByNameEnd(string name)
+    {
+        var words = Words(name);
+        if (words.Length < 2 || words.Sum(w => w.Length) < 6)
+        {
+            return null;
+        }
+
+        var endings = LazyInitializer.EnsureInitialized(ref _endings, () => Games.SelectMany(g => g.Aliases.Prepend(g.Title).Select(t => (Words: Words(t), Game: g))).ToList());
+        var found = endings.Where(e => e.Words.Length >= words.Length && e.Words.AsSpan(e.Words.Length - words.Length).SequenceEqual(words))
+            .Select(e => e.Game)
+            .Distinct()
+            .Take(2)
+            .ToList();
+        return found is [var only] ? only : null;
+    }
+
+    private List<(string[] Words, SaveListGame Game)>? _endings;
+
+    /// <summary>
+    /// A name's words in lower case, without marks, notes in brackets or accents, and Roman numbers II to X as digits:
+    /// "Call of Duty(R): Black Ops III" is call, of, duty, black, ops, 3.
+    /// </summary>
+    public static string[] Words(string name)
+    {
+        var words = new List<string>();
+        var word = new StringBuilder();
+        foreach (var c in Fingerprinter.Plain(name).Normalize(NormalizationForm.FormD).Append(' '))
+        {
+            if (char.IsLetterOrDigit(c))
+            {
+                word.Append(char.ToLowerInvariant(c));
+            }
+            else if (char.GetUnicodeCategory(c) != System.Globalization.UnicodeCategory.NonSpacingMark && word.Length > 0)
+            {
+                words.Add(Roman.GetValueOrDefault(word.ToString(), word.ToString()));
+                word.Clear();
+            }
+        }
+
+        return [.. words];
+    }
+
+    private static readonly Dictionary<string, string> Roman = new(StringComparer.Ordinal)
+    {
+        ["ii"] = "2", ["iii"] = "3", ["iv"] = "4", ["v"] = "5", ["vi"] = "6", ["vii"] = "7", ["viii"] = "8", ["ix"] = "9", ["x"] = "10",
+    };
+
+    /// <summary>
     /// "Slay the Spire 2" and "SlayTheSpire2" both become "slaythespire2" (LIB-06). Accents go too, since decomposing
     /// splits them off as marks that aren't letters: "Ragnarök" becomes "ragnarok".
     /// </summary>

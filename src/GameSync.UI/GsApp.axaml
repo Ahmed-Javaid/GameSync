@@ -45,6 +45,9 @@
     <DataTemplate DataType="vm:ConnectCloudViewModel">
       <v:ConnectCloudDialog />
     </DataTemplate>
+    <DataTemplate DataType="vm:SettingsViewModel">
+      <v:SettingsPage />
+    </DataTemplate>
     <DataTemplate DataType="vm:PlaceholderViewModel">
       <v:PlaceholderPage />
     </DataTemplate>

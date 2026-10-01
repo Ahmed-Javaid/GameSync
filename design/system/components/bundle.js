@@ -62,8 +62,8 @@
     function rgba(hex, a) { var c = hexToRgb(hex); return "rgba(" + c[0] + ", " + c[1] + ", " + c[2] + ", " + a + ")"; }
 
     var STATUS = {
-      dark: { ok: "#7fe6f2", "ok-soft": "#0f3035", warn: "#f2b544", "warn-soft": "#2a2213", danger: "#ff8a7d", "danger-soft": "#2e1917", play: "#b9a3ff", "play-soft": "#231d38", neutral: "#9aa1a9" },
-      light: { ok: "#006b77", "ok-soft": "#d8f3f6", warn: "#855600", "warn-soft": "#fbeed3", danger: "#b3261e", "danger-soft": "#fde4e1", play: "#6547d1", "play-soft": "#ece7ff", neutral: "#58616b" }
+      dark: { ok: "#7fe6f2", "ok-soft": "#0f3035", warn: "#f2b544", "warn-soft": "#2a2213", danger: "#ff8a7d", "danger-soft": "#2e1917", play: "#1ed760", "play-soft": "#0f2a1b", neutral: "#9aa1a9" },
+      light: { ok: "#006b77", "ok-soft": "#d8f3f6", warn: "#855600", "warn-soft": "#fbeed3", danger: "#b3261e", "danger-soft": "#fde4e1", play: "#0f6e35", "play-soft": "#dcf5e5", neutral: "#58616b" }
     };
     var FIXED = { "on-art": "#f5f7f9", "art-scrim": "rgba(5, 6, 8, 0.72)", glass: "rgba(12, 14, 17, 0.58)", "glass-edge": "rgba(255, 255, 255, 0.16)" };
 
@@ -180,8 +180,9 @@
     }
 
     /* Glossy (LOOK-17, LOOK-18): what a page's surfaces become so a blurred, darkened copy of a game's art shows
-       through, in three strengths: "glass" on game detail, conflict and the save manager; "home", a step more solid;
-       "glow" on first run and settings, a soft glow at the top over nearly solid cards. Returns the tokens to lay over
+       through, in three strengths: "glass" on Home, the game library, game detail, conflict and the save manager;
+       "home", a step more solid, which no screen takes since 1 Oct 2026; "glow" on first run and settings, a soft glow
+       at the top over nearly solid cards. Returns the tokens to lay over
        build()'s and the backdrop: its base colour, then the art, then the scrim colour at alpha stops [position,
        alpha] from top to bottom. Dark mode only, and never with pure black: then it's null and the page stays Solid.
        The app darkens bright art further, until text keeps 4.5:1 on every surface. */
@@ -1293,7 +1294,7 @@
     var theme = props.theme || pageTheme;
     var surface = props.surface || storedSurface;
     var vars = Theme.build(theme);
-    var glass = surface === "glossy" && props.art ? Theme.glass(theme, props.strength || "home") : null;
+    var glass = surface === "glossy" && props.art ? Theme.glass(theme, props.strength || "glass") : null;
     if (glass) Object.assign(vars, glass.tokens);
     var style = Object.assign(varsStyle(vars), glass ? { background: glass.backdrop.base } : null, props.style);
     return h("div", { className: cx("gs-scope", glass && "gs-glossy", props.className), style: style, "data-gs-theme": theme.preset || "arcade", "data-gs-surface": glass ? "glossy" : "solid" },

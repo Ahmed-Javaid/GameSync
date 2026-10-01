@@ -9,6 +9,8 @@
   <ItemGroup>
     <PackageReference Include="Avalonia" Version="12.1.3" />
     <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.3" />
+    <!-- The Glossy backdrop draws straight onto Skia (KAN-54, KAN-58); the same version the app ships. -->
+    <PackageReference Include="Avalonia.Skia" Version="12.1.3" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
   </ItemGroup>
 

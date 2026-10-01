@@ -5,6 +5,28 @@
              xmlns:sys="using:System"
              x:Class="GameSync.UI.Views.HomePage"
              x:DataType="vm:HomeViewModel">
+  <UserControl.Resources>
+    <!-- A game in a day's list (KAN-66): the whole row opens it, lit under the pointer -->
+    <ControlTheme x:Key="DayGameButton" TargetType="Button">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Padding" Value="8,6" />
+      <Setter Property="CornerRadius" Value="10" />
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="FocusAdorner" Value="{DynamicResource InsetFocus}" />
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Border Background="{TemplateBinding Background}" CornerRadius="{TemplateBinding CornerRadius}" Padding="{TemplateBinding Padding}">
+            <ContentPresenter Content="{TemplateBinding Content}" ContentTemplate="{TemplateBinding ContentTemplate}" HorizontalContentAlignment="Stretch" />
+          </Border>
+        </ControlTemplate>
+      </Setter>
+      <Style Selector="^:pointerover">
+        <Setter Property="Background" Value="{DynamicResource bg-300}" />
+      </Style>
+    </ControlTheme>
+  </UserControl.Resources>
   <!-- The launcher home (design system → Launcher home): the top bar, the last-played game, then Needs you, Jump back in and
        Activity. HomeLayout fills any window: the cards take what their content needs and the banner the rest. -->
   <c:HomeLayout Margin="24,20" Spacing="16">
@@ -16,7 +38,7 @@
       <c:GsPillTabs Grid.Column="1" ItemsSource="{Binding Tabs}" SelectedId="{Binding SelectedTab, Mode=TwoWay}" />
       <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
         <c:GsIconButton Icon="sync" Label="Sync now" Command="{Binding SyncNowCommand}" />
-        <!-- Where the saves go and which PCs sync: what the app is doing, a click away (settings for both come with Settings) -->
+        <!-- Where the saves go and which PCs sync: what the app is doing, a click away, with the way to their settings -->
         <!-- First run skipped the cloud: every version is kept on this PC until one is connected (design system → ConnectCloudDialog) -->
         <c:GsButton Classes="sm" Icon="cloud" Content="Connect the cloud" Command="{Binding ConnectCloudCommand}" IsVisible="{Binding NoCloud}"
                     ToolTip.Tip="Every version is kept on this PC until a cloud is connected" VerticalAlignment="Center" />
@@ -27,6 +49,8 @@
               <StackPanel Width="280" Spacing="8" Margin="8">
                 <TextBlock Text="{Binding Status.Cloud}" FontWeight="SemiBold" TextWrapping="Wrap" />
                 <TextBlock Classes="caption muted" Text="{Binding Status.CloudLine}" TextWrapping="Wrap" />
+                <c:GsButton Classes="ghost sm" Icon="settings" Content="Cloud settings" HorizontalAlignment="Left" Click="CloseFlyout"
+                            Command="{Binding OpenSettingsCommand}" CommandParameter="cloud" />
               </StackPanel>
             </Flyout>
           </c:GsIconButton.Flyout>
@@ -45,6 +69,8 @@
                     </DataTemplate>
                   </ItemsControl.ItemTemplate>
                 </ItemsControl>
+                <c:GsButton Classes="ghost sm" Icon="settings" Content="Devices" HorizontalAlignment="Left" Click="CloseFlyout"
+                            Command="{Binding OpenSettingsCommand}" CommandParameter="devices" AutomationProperties.Name="Devices in Settings" />
               </StackPanel>
             </Flyout>
           </c:GsIconButton.Flyout>
@@ -55,7 +81,7 @@
     <Panel>
     <c:GsHeroBanner MinHeight="0" Art="{Binding HeroArt}" Logo="{Binding HeroLogo}" Title="{Binding HeroTitle}"
                     Eyebrow="{Binding HeroEyebrow}" Chip="{Binding HeroChip}" Status="{Binding HeroStatus}" StatusLabel="{Binding HeroStatusLabel}"
-                    Blurb="{Binding HeroBlurb}" PlayLabel="{Binding HeroPlayLabel}" PlayCommand="{Binding PlayCommand}" ShowsPlay="{Binding HeroShowsPlay}" IsVisible="{Binding HasHero}"
+                    Blurb="{Binding HeroBlurb}" PlayLabel="{Binding HeroPlayLabel}" PlayCommand="{Binding PlayCommand}" ShowsPlay="{Binding HeroShowsPlay}" IsPlaying="{Binding HeroIsPlaying}" IsVisible="{Binding HasHero}"
                     SavesCommand="{Binding OpenHeroSavesCommand}" SettingsCommand="{Binding OpenHeroPropertiesCommand}" />
     <c:GsCard Title="No games yet" Subtitle="GameSync hasn't found any games on this PC." IsVisible="{Binding NoGames}">
       <c:GsNote Icon="search" MaxWidth="640" HorizontalAlignment="Left" VerticalAlignment="Top"
@@ -127,7 +153,7 @@
           </ItemsControl.ItemsPanel>
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="vm:TileItem">
-              <c:GsGameTile Classes="compact" Width="NaN" Title="{Binding Title}" Art="{Binding Art}" Status="{Binding Status}" StatusLabel="{Binding StatusLabel}" Meta="{Binding Meta}"
+              <c:GsGameTile Classes="compact" Width="NaN" Title="{Binding Title}" Art="{Binding Art}" Status="{Binding Status}" StatusLabel="{Binding StatusLabel}" MarkLabel="{Binding MarkLabel}" Meta="{Binding Meta}"
                           Command="{Binding $parent[UserControl].((vm:HomeViewModel)DataContext).OpenGameCommand}" CommandParameter="{Binding Id}">
               <c:GsGameTile.ContextMenu>
                 <ContextMenu IsVisible="{Binding HasMenu}">
@@ -139,6 +165,10 @@
                     <MenuItem.Icon><c:GsIcon Icon="star" Size="16" Filled="{Binding IsFavourite}" /></MenuItem.Icon>
                   </MenuItem>
                   <MenuItem Header="{Binding HideLabel}" Command="{Binding ToggleHidden}" />
+                  <Separator IsVisible="{Binding HasProperties}" />
+                  <MenuItem Header="Properties" Command="{Binding PropertiesCommand}" IsVisible="{Binding HasProperties}">
+                    <MenuItem.Icon><c:GsIcon Icon="settings" Size="16" /></MenuItem.Icon>
+                  </MenuItem>
                 </ContextMenu>
               </c:GsGameTile.ContextMenu>
             </c:GsGameTile>
@@ -147,9 +177,48 @@
         </ItemsControl>
       </c:GsCard>
 
-      <c:GsCard Grid.Column="2" Title="{Binding ActivityTitle}">
+      <c:GsCard Grid.Column="2" Title="Activity" AutomationProperties.Name="{Binding ActivityTitle}">
+        <c:GsCard.Action>
+          <StackPanel Orientation="Horizontal" Spacing="4" IsVisible="{Binding HasActivity}">
+            <c:GsIconButton Icon="chevronLeft" Label="The month before" Command="{Binding EarlierMonthCommand}" />
+            <TextBlock Text="{Binding MonthName}" MinWidth="76" TextAlignment="Center" VerticalAlignment="Center" FontWeight="SemiBold" />
+            <c:GsIconButton Icon="chevronRight" Label="The month after" Command="{Binding LaterMonthCommand}" />
+          </StackPanel>
+        </c:GsCard.Action>
         <StackPanel Spacing="12">
-          <c:GsActivity Days="{Binding Days}" StartWeekday="{Binding StartWeekday}" />
+          <!-- KAN-66: pointing at a day says what was played; a click on a day with play lists its games, each opening its page -->
+          <c:GsActivity Days="{Binding Days}" StartWeekday="{Binding StartWeekday}" Tips="{Binding DayTips}" DayCommand="{Binding ChooseDayCommand}">
+            <FlyoutBase.AttachedFlyout>
+              <Flyout Placement="Top">
+                <StackPanel Width="300" Spacing="10" Margin="8" DataContext="{Binding ChosenDay}" x:DataType="vm:ActivityDay">
+                  <StackPanel Spacing="2" Margin="8,0">
+                    <TextBlock Text="{Binding Label}" FontWeight="SemiBold" />
+                    <TextBlock Classes="caption muted" Text="{Binding Total}" />
+                  </StackPanel>
+                  <ItemsControl ItemsSource="{Binding Games}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="vm:ActivityGame">
+                        <Button Theme="{StaticResource DayGameButton}" Command="{Binding Open}" Click="CloseFlyout"
+                                AutomationProperties.Name="{Binding Spoken}" ToolTip.Tip="Open its page">
+                          <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                            <Border Width="24" Height="32" CornerRadius="6" ClipToBounds="True" Background="{DynamicResource bg-300}">
+                              <Panel>
+                                <TextBlock Text="{Binding Initial}" FontWeight="SemiBold" FontSize="11" Foreground="{DynamicResource ink-muted}"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                <c:GsCoverImage Source="{Binding Art}" />
+                              </Panel>
+                            </Border>
+                            <TextBlock Grid.Column="1" Text="{Binding Title}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                            <TextBlock Grid.Column="2" Classes="caption muted" Text="{Binding Played}" VerticalAlignment="Center" />
+                          </Grid>
+                        </Button>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </StackPanel>
+              </Flyout>
+            </FlyoutBase.AttachedFlyout>
+          </c:GsActivity>
           <c:GsNote Icon="clock" Text="Your play shows here, day by day, from your first session with GameSync." IsVisible="{Binding NoActivity}" />
         </StackPanel>
       </c:GsCard>

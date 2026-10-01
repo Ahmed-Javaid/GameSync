@@ -302,7 +302,7 @@ public static partial class Cli
         });
         var others = await service.OtherGamesAsync(ct);
         var entries = Library.Reconcile(here.Library.All(), scan.Found, DateTime.UtcNow, others.ToDictionary(o => o.Id, o => o.Title), scan.Leftovers);
-        here.Library.SaveAll(entries);
+        here.Library.ReplaceAll(entries);
 
         Console.WriteLine();
         PrintLibrary(entries, others, showIgnored: false);
@@ -365,6 +365,23 @@ public static partial class Cli
         state.SetSetting(GameFoldersKey, JsonSerializer.Serialize(folders));
         return true;
     }
+
+    /// <summary>FOLD-07: a folder stops being one every scan looks in; false when it wasn't one.</summary>
+    internal static bool RemoveGameFolder(StateStore state, string folder)
+    {
+        var folders = GameFolders(state);
+        if (folders.RemoveAll(f => Path.TrimEndingDirectorySeparator(f).Equals(Path.TrimEndingDirectorySeparator(folder), StringComparison.OrdinalIgnoreCase)) == 0)
+        {
+            return false;
+        }
+
+        state.SetSetting(GameFoldersKey, JsonSerializer.Serialize(folders));
+        return true;
+    }
+
+    /// <summary>FOLD-08: this PC's extra save folders, as Settings changes them.</summary>
+    internal static void SetSaveFolders(StateStore state, IEnumerable<ExtraSaveFolder> folders) =>
+        state.SetSetting(SaveFoldersKey, JsonSerializer.Serialize(folders.ToList(), Json.Options));
 
     /// <summary>The library by what's next for each game, like the onboarding groups in design.md.</summary>
     private static void PrintLibrary(IReadOnlyList<LibraryEntry> entries, IReadOnlyList<CloudGame> others, bool showIgnored)
@@ -607,12 +624,12 @@ public static partial class Cli
                     continue;
                 }
 
-                confirmed = Library.Adopt(entry, rules.Rules);
+                confirmed = Library.Adopt(entry, rules.Rules, GameDefaults.Load(here.State));
                 source = theirs ? $"{rules.From}'s rules" : $"{rules.From}'s rules, so both PCs take the same files";
             }
             else if (FoundAnything(entry))
             {
-                confirmed = Library.Confirm(entry);
+                confirmed = Library.Confirm(entry, defaults: GameDefaults.Load(here.State));
                 source = entry.Confirmed is null ? "what the scan found" : "the new places the scan found";
             }
             else
@@ -688,7 +705,7 @@ public static partial class Cli
             }
 
             var entry = Library.WithLudusaviGame(library, game, places, now, keys);
-            var confirmed = Library.Confirm(entry with { State = entry.State == LibraryState.Ignored ? LibraryState.Found : entry.State });
+            var confirmed = Library.Confirm(entry with { State = entry.State == LibraryState.Ignored ? LibraryState.Found : entry.State }, defaults: GameDefaults.Load(here.State));
             if (Problems(confirmed.Confirmed!, here.Resolver.Resolve(confirmed.Confirmed!), here) is [var problem, ..])
             {
                 Console.WriteLine($"  {game.Name}: left out. {problem}");

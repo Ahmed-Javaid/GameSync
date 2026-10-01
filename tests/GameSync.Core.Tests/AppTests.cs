@@ -296,10 +296,8 @@ public class AppTests
         var library = LibraryViewModel.From(games, DateTime.Now, "all", actions, LibrarySort.Name);
         var changed = new List<string?>();
         library.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
-        Assert.Equal(["all", "installed", "local", "attn", "software", "hidden"], library.Tabs.Select(t => t.Id));
+        Assert.Equal(["all", "local", "software", "hidden"], library.Tabs.Select(t => t.Id));
         Assert.Equal(["celeste", "hades"], library.OtherTiles.Select(t => t.Title));
-        library.SelectedTab = "attn";
-        Assert.Equal(["celeste"], library.OtherTiles.Select(t => t.Title));
         library.SelectedTab = "hidden";
         Assert.Equal(["rounds"], library.OtherTiles.Select(t => t.Title));
         Assert.Contains(nameof(LibraryViewModel.OtherTiles), changed);
@@ -308,15 +306,116 @@ public class AppTests
         using var world = new TestWorld();
         using var pc = world.Pc("DESKTOP");
         var home = HomeViewModel.From(Launcher.Home(games, pc.State, DateTime.Now), games, DateTime.Now, actions);
-        home.SelectedTab = "attn";
+        // KAN-46: Home's Needs you tab and its card's arrow open the save manager's Needs you.
+        home.SelectedTab = HomeViewModel.NeedsYouTab;
         Assert.Equal(HomeViewModel.ThisPage, home.SelectedTab);
         home.PlayCommand.Execute(null);
         home.SyncNowCommand.Execute(null);
         home.OpenLibraryCommand.Execute(null);
         home.OpenSavesCommand.Execute(null);
-        Assert.Equal([("library", "attn"), ("library", "all"), ("saves", null)], shown);
+        Assert.Equal([("saves", "needs"), ("library", "all"), ("saves", "needs")], shown);
         Assert.Equal([GameId.Parse("hades")], played);
         Assert.Equal(1, synced);
+    }
+
+    [Fact]
+    public void KAN_46_the_rail_opens_the_library_itself_and_what_needs_you_is_the_save_managers_tab()
+    {
+        LauncherGame Game(string id, GameStatus? status = GameStatus.Synced, bool local = false) =>
+            new() { Id = GameId.Parse(id), Title = id, Status = status, Syncs = true, Installed = true, Store = local ? StoreKind.Loose : StoreKind.Steam, LastPlayedUtc = DateTime.UtcNow };
+        IReadOnlyList<LauncherGame> games = [Game("hades"), Game("celeste", GameStatus.Conflict), Game("rounds", GameStatus.HeldForReview, local: true)];
+        var actions = new LauncherActions(_ => { }, () => { }, (_, _) => { }, (_, _) => { });
+
+        // The library as it was left: a view, a search and a game's page open; the rail's Game library shows every game.
+        var library = LibraryViewModel.From(games, DateTime.Now, "local", actions);
+        library.Search = "ro";
+        library.Open(GameId.Parse("rounds"), "home");
+        library.ReachedFromRail();
+        Assert.Null(library.Selected);
+        Assert.True(library.ShowsCovers);
+        Assert.Equal("", library.Search);
+        Assert.Equal("all", library.SelectedTab);
+        Assert.Null(library.ReturnTo);
+        Assert.Equal(3, library.OtherTiles.Count);
+
+        // The save manager's Needs you: its count on the tab, each game with what happened and its button.
+        var saves = new SaveManagerViewModel(actions);
+        saves.Update(games);
+        Assert.Equal(["saves", "needs", "plan", "versions", "log"], saves.Tabs.Select(t => t.Id));
+        Assert.Equal("2", saves.Tabs.Single(t => t.Id == "needs").Count);
+        saves.ShowTab(SaveManagerViewModel.NeedsTab);
+        Assert.True(saves.ShowsNeeds);
+        Assert.False(saves.ShowsTable);
+        Assert.Equal("2 games need you", saves.TopSubtitle);
+        Assert.Equal(["celeste", "rounds"], saves.NeedsRows.Select(r => r.Title).Order());
+        Assert.Equal("Resolve", saves.NeedsRows.Single(r => r.Title == "celeste").Action);
+        Assert.Equal("Review rounds", saves.NeedsRows.Single(r => r.Title == "rounds").ActionName);
+        Assert.Contains("held it for you to look at", saves.NeedsRows.Single(r => r.Title == "rounds").Sentence);
+
+        // Resolve opens the conflict; Review the game's saves; Back from them returns to Needs you.
+        saves.NeedsCommand.Execute(saves.NeedsRows.Single(r => r.Title == "celeste"));
+        Assert.Equal(GameId.Parse("celeste"), saves.Conflict?.Id);
+        saves.ShowTab(SaveManagerViewModel.NeedsTab);
+        Assert.Null(saves.Conflict);
+        saves.NeedsCommand.Execute(saves.NeedsRows.Single(r => r.Title == "rounds"));
+        Assert.Equal(GameId.Parse("rounds"), saves.Game?.Id);
+        saves.BackCommand.Execute(null);
+        Assert.True(saves.ShowsNeeds);
+
+        // Nothing waiting: the tab says so, with no count.
+        saves.Update([Game("hades")]);
+        Assert.True(saves.NoNeeds);
+        Assert.Null(saves.Tabs.Single(t => t.Id == "needs").Count);
+        Assert.Equal("Nothing needs you", saves.TopSubtitle);
+    }
+
+    [Fact]
+    public void KAN_49_the_saves_tab_has_the_games_that_sync_above_every_game_and_a_heading_sorts_both()
+    {
+        var at = DateTime.UtcNow;
+        LauncherGame Game(string id, GameStatus? status, bool syncs = true, int hoursAgo = 1) =>
+            new() { Id = GameId.Parse(id), Title = id, Status = status, Syncs = syncs, LastPlayedUtc = at.AddHours(-hoursAgo) };
+        IReadOnlyList<LauncherGame> games =
+        [
+            Game("hades", GameStatus.Synced, hoursAgo: 1),
+            Game("celeste", GameStatus.Conflict, hoursAgo: 9),
+            Game("balatro", GameStatus.BackupOnly, hoursAgo: 3),
+            Game("terraria", null, syncs: false, hoursAgo: 2),
+            Game("ashen", GameStatus.UploadPending, hoursAgo: 5),
+        ];
+        var saves = new SaveManagerViewModel(new LauncherActions(_ => { }, () => { }, (_, _) => { }, (_, _) => { }));
+        saves.Update(games);
+
+        // As before: what needs you first, then the games that sync by last play, then the rest.
+        Assert.Equal(["celeste", "hades", "balatro", "ashen", "terraria"], saves.Rows.Select(r => r.Title));
+        Assert.Equal(["celeste", "hades", "balatro", "ashen"], saves.SyncingRows.Select(r => r.Title));
+        Assert.Equal("saves --syncing --sort last-played", saves.SyncingSort.CommandLine);
+        Assert.True(saves.AllSort.NameIdle && saves.AllSort.StatusIdle);
+
+        // Game sorts its own table by name, the other stays as it was (the owner, 30 Sep); again reverses it.
+        saves.AllSort.SortCommand.Execute("Name");
+        Assert.Equal(["ashen", "balatro", "celeste", "hades", "terraria"], saves.Rows.Select(r => r.Title));
+        Assert.Equal(["celeste", "hades", "balatro", "ashen"], saves.SyncingRows.Select(r => r.Title));
+        Assert.Equal("saves --all --sort name", saves.AllSort.CommandLine);
+        Assert.Equal("saves --syncing --sort last-played", saves.SyncingSort.CommandLine);
+        Assert.Equal("Game, sorted A to Z; click to reverse", saves.AllSort.GameHeadingName);
+        Assert.Equal((false, true), (saves.AllSort.NameIdle, saves.AllSort.StatusIdle));
+        saves.AllSort.SortCommand.Execute("Name");
+        Assert.Equal(["terraria", "hades", "celeste", "balatro", "ashen"], saves.Rows.Select(r => r.Title));
+        Assert.Equal("saves --all --sort name --reverse", saves.AllSort.CommandLine);
+
+        // Status: what needs you, playing, pending, synced, backed up, not syncing; a new heading starts unreversed.
+        saves.AllSort.SortCommand.Execute("Status");
+        Assert.False(saves.AllSort.Reversed);
+        Assert.Equal(["celeste", "ashen", "hades", "balatro", "terraria"], saves.Rows.Select(r => r.Title));
+        Assert.True(saves.AllSort.ByStatus);
+        Assert.False(saves.AllSort.ByName);
+        saves.SyncingSort.SortCommand.Execute("Name");
+        Assert.Equal(["ashen", "balatro", "celeste", "hades"], saves.SyncingRows.Select(r => r.Title));
+        Assert.Equal(["celeste", "ashen", "hades", "balatro", "terraria"], saves.Rows.Select(r => r.Title));
+        Assert.Equal(0, SaveManagerViewModel.StatusRank(GameStatus.HeldForReview, true));
+        Assert.Equal(1, SaveManagerViewModel.StatusRank(GameStatus.Playing, true));
+        Assert.Equal(6, SaveManagerViewModel.StatusRank(GameStatus.Conflict, false));
     }
 
     [Fact]

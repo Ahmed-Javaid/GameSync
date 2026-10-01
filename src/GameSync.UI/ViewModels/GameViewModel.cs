@@ -41,6 +41,13 @@ public sealed partial class GameViewModel : ObservableObject, IPageSurface
     [ObservableProperty]
     private string? _eyebrow;
 
+    /// <summary>KAN-55: where it's installed as a mark on the hero (a store's, or a folder), with <see cref="StoreTip"/> under the pointer.</summary>
+    [ObservableProperty]
+    private string? _storeIcon;
+
+    [ObservableProperty]
+    private string? _storeTip;
+
     [ObservableProperty]
     private IReadOnlyList<PlayStat> _stats = [];
 
@@ -292,10 +299,15 @@ public sealed partial class GameViewModel : ObservableObject, IPageSurface
         }
     }
 
+    /// <summary>What Save as… says first on a game not syncing yet, with what keeping it starts with (KAN-63).</summary>
+    [ObservableProperty]
+    private string _keepLine = GameSavesViewModel.KeepNote;
+
     /// <summary>The page's content, from what this PC knows of the game.</summary>
     public void Show(GameDetail detail, DateTime nowLocal)
     {
         _detail = detail;
+        KeepLine = GameSavesViewModel.KeepNoteFor(detail.FoundFiles, detail.FoundBytes);
         var about = detail.About;
         About = about.Description;
         AboutSource = about.Description is null ? null : "From its Steam store page";
@@ -332,7 +344,7 @@ public sealed partial class GameViewModel : ObservableObject, IPageSurface
                 new Fact("Starts", about.StoreLink is not null ? $"Through {StoreNames.Name(about.Store) ?? "its store"}" : "Its own program"),
                 new Fact("Options", options ?? "None", Mono: options is not null))
             : [];
-        Eyebrow = EyebrowOf(_game, detail);
+        (Eyebrow, StoreIcon, StoreTip) = EyebrowOf(_game, detail);
     }
 
     /// <summary>The game as the library knows it now: its status, play and marks may have changed since the page opened.</summary>
@@ -347,7 +359,7 @@ public sealed partial class GameViewModel : ObservableObject, IPageSurface
             Logo = ArtImages.Load(game.LogoPath, 760);
         }
 
-        Eyebrow = EyebrowOf(game, _detail);
+        (Eyebrow, StoreIcon, StoreTip) = EyebrowOf(game, _detail);
         IsFavourite = game.IsFavourite;
         IsHidden = game.IsHidden;
         Installed = game.Installed;
@@ -421,8 +433,8 @@ public sealed partial class GameViewModel : ObservableObject, IPageSurface
         [
             new PlayStat("Last played", game.IsRunning ? "Playing now" : game.LastPlayedUtc is { } at ? Launcher.WhenText(at, nowLocal) ?? "Never" : "Never"),
             new PlayStat("Play time", game.Playtime <= TimeSpan.Zero ? "None yet"
-                : game.Playtime.TotalHours >= 1 ? $"{Math.Round(game.Playtime.TotalHours).ToString(CultureInfo.InvariantCulture)} hours"
-                : $"{Math.Max(1, (int)Math.Round(game.Playtime.TotalMinutes))} minutes"),
+                : game.Playtime.TotalHours >= 1 ? Math.Round(game.Playtime.TotalHours) is var hours && hours == 1 ? "1 hour" : $"{hours.ToString(CultureInfo.InvariantCulture)} hours"
+                : Math.Max(1, (int)Math.Round(game.Playtime.TotalMinutes)) is var minutes && minutes == 1 ? "1 minute" : $"{minutes} minutes"),
             saves,
         ];
     }
@@ -435,13 +447,16 @@ public sealed partial class GameViewModel : ObservableObject, IPageSurface
     public static string SentenceOf(LauncherGame game) => game switch
     {
         { Syncs: false, Installed: false } => "Its saves are still on this PC. Sync them to keep them safe for when you play again.",
-        { Syncs: false } => "GameSync found its saves on this PC. Nothing is backed up until you sync them.",
+        { Syncs: false } => "GameSync found its saves on this PC. Nothing is backed up yet.",
         { Status: GameStatus.HeldForReview } => "Its save changed while the game wasn't running, so GameSync held it for you to look at.",
         { NeedsYou: true, StatusDetail: { Length: > 0 } detail } => detail,
         { Status: GameStatus.Playing } => "Running now. Its save syncs a few seconds after you quit.",
+        { FirstBackupPending: true } => "Not backed up yet: its first backup happens when GameSync next syncs, or now with Back up now.",
         { IsFolder: true, Syncs: true, NeedsYou: false } => "It syncs once its folder has been quiet for 5 minutes, so a server's world is kept between its autosaves; every version is kept.",
+        { Status: GameStatus.BackupOnly, StoreSyncs: false } => "Backed up, every version kept; not synced between your PCs.",
         { Status: GameStatus.BackupOnly } => $"{StoreNames.SyncingStore(game.Store)} syncs its saves between your PCs; GameSync keeps a backup of every version.",
-        _ => "Backed up on this PC and in your Google Drive, every version kept.",
+        { Cloud: { } cloud } => $"Backed up on this PC and in {cloud}, every version kept.",
+        _ => "Backed up on this PC, every version kept; it goes up once you connect a cloud.",
     };
 
     /// <summary>The status's own action and its icon, for a game that needs you: Resolve leads to its conflict, the others to its saves.</summary>
@@ -455,19 +470,49 @@ public sealed partial class GameViewModel : ObservableObject, IPageSurface
     };
 
     /// <summary>
-    /// "Steam"; "In its own folder · G:\Black Myth Wukong · Unreal Engine"; "Not installed on this PC · Steam"; "Not
-    /// installed on this PC · Found by its saves"; "Added by hand".
+    /// The hero's eyebrow (KAN-55): where the game is installed as a mark, with the words under the pointer, and only what
+    /// the mark doesn't say as text. A store's game: its mark ("Installed through Steam"), no text. In its own folder: a
+    /// folder, then "G:\Black Myth Wukong · Unreal Engine". Not installed: "Not installed on this PC", with the store's
+    /// mark when a store has it. With no mark: "Not installed on this PC · Found by its saves", "Added by hand".
     /// </summary>
-    private static string EyebrowOf(LauncherGame game, GameDetail? detail)
+    public static (string Text, string? Icon, string? Tip) EyebrowOf(LauncherGame game, GameDetail? detail)
     {
-        var where = StoreNames.Name(game.Store) ?? game.Store switch
+        var icon = MarkOf(game.Store);
+        if (StoreNames.Name(game.Store) is { } store)
         {
-            StoreKind.Loose when game.Installed => string.Join(" · ", new[] { "In its own folder", detail?.InstallDir, detail?.About.Engine }.OfType<string>()),
-            StoreKind.Loose => "In its own folder",
-            _ => game.IsOwn ? "Added by you" : game.ByHand ? "Added by hand" : "Found by its saves",
-        };
-        return game.Installed ? where : $"Not installed on this PC · {where}";
+            return game.Installed
+                ? ("", icon, $"Installed through {StoreTipName(game.Store)}")
+                : ("Not installed on this PC", icon, $"On {store}; not installed on this PC");
+        }
+
+        if (game.Store == StoreKind.Loose)
+        {
+            return game.Installed
+                ? (string.Join(" · ", new[] { detail?.InstallDir, detail?.About.Engine }.OfType<string>()), "folder",
+                    "In its own folder, started without a store's launcher")
+                : ("Not installed on this PC", "folder", "In its own folder when it's installed");
+        }
+
+        var where = game.IsOwn ? "Added by you" : game.ByHand ? "Added by hand" : "Found by its saves";
+        return (game.Installed ? where : $"Not installed on this PC · {where}", null, null);
     }
+
+    /// <summary>A store's mark for <see cref="GsIcon"/>: <c>steam</c>, <c>epic</c>, <c>ea</c>; a folder for a game in its own folder.</summary>
+    public static string? MarkOf(StoreKind? store) => store switch
+    {
+        StoreKind.Steam => "steam",
+        StoreKind.Epic => "epic",
+        StoreKind.Ea => "ea",
+        StoreKind.Loose => "folder",
+        _ => null,
+    };
+
+    private static string StoreTipName(StoreKind? store) => store switch
+    {
+        StoreKind.Epic => "the Epic Games Launcher",
+        StoreKind.Ea => "the EA app",
+        _ => StoreNames.Name(store) ?? "its store",
+    };
 
     private static string? Join(IReadOnlyList<string> names) => names.Count == 0 ? null : string.Join(", ", names);
 }

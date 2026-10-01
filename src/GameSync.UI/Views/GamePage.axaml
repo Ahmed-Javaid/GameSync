@@ -20,11 +20,11 @@
       </StackPanel>
     </StackPanel>
 
-    <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+    <ScrollViewer Classes="page" HorizontalScrollBarVisibility="Disabled">
       <StackPanel Spacing="16" Margin="0,0,0,8">
         <!-- The hero is only the art and the name; Play and the facts sit under it, as on Steam -->
         <c:GsHeroBanner MinHeight="188" RoomyHeight="0" Art="{Binding HeroArt}" Logo="{Binding Logo}" Title="{Binding Title}" Eyebrow="{Binding Eyebrow}"
-                        ShowsPlay="False" ShowsStatus="False">
+                        EyebrowIcon="{Binding StoreIcon}" EyebrowTip="{Binding StoreTip}" ShowsPlay="False" ShowsStatus="False">
           <c:GsHeroBanner.Actions>
             <Panel />
           </c:GsHeroBanner.Actions>
@@ -109,13 +109,13 @@
                   <c:GsIconButton Grid.Column="1" Classes="sm" Icon="folder" Label="Open the save folder" Command="{Binding OpenSaveFolderCommand}" />
                 </Grid>
               </Border>
-              <!-- When it needs you: the status's own action; else Back up now and Save as…; not syncing yet: Sync these saves and Choose files… -->
+              <!-- When it needs you: the status's own action; else Back up now and New named save…; not syncing yet: Sync these saves and Choose files… -->
               <c:GsButton Classes="sm" Icon="{Binding NeedIcon}" Content="{Binding NeedAction}" Command="{Binding NeedCommand}" HorizontalAlignment="Left"
                           IsVisible="{Binding SavesNeedYou}" />
               <WrapPanel ItemSpacing="8" LineSpacing="8" IsVisible="{Binding SavesSyncing}">
                 <c:GsButton Classes="sm" Icon="upload" Content="Back up now" Command="{Binding BackUpNowCommand}" IsEnabled="{Binding !IsPlaying}"
                             ToolTip.Tip="Keeps this PC's save as a new version now" />
-                <c:GsButton Classes="ghost sm" Icon="plus" Content="Save as…">
+                <c:GsButton Classes="ghost sm" Icon="plus" Content="New named save…">
                   <c:GsButton.Flyout>
                     <Flyout Placement="BottomEdgeAlignedLeft">
                       <StackPanel Width="300" Spacing="12" Margin="8">
@@ -136,6 +136,23 @@
               <WrapPanel ItemSpacing="8" LineSpacing="8" IsVisible="{Binding SavesNotSyncing}">
                 <c:GsButton Classes="sm" Icon="check" Content="Sync these saves" Command="{Binding SyncGameCommand}"
                             ToolTip.Tip="Backs these saves up and keeps them in step between your PCs" />
+                <!-- KAN-63: a named save before syncing; GameSync starts keeping its saves, not synced between PCs -->
+                <c:GsButton Classes="ghost sm" Icon="plus" Content="New named save…">
+                  <c:GsButton.Flyout>
+                    <Flyout Placement="BottomEdgeAlignedLeft">
+                      <StackPanel Width="300" Spacing="12" Margin="8">
+                        <TextBlock Text="Keep this save under a name" FontWeight="SemiBold" />
+                        <TextBlock Classes="caption muted" TextWrapping="Wrap" Text="{Binding KeepLine}" />
+                        <TextBox Text="{Binding SaveName}" PlaceholderText="Before Lady Maria" AutomationProperties.Name="Name for this save" MaxLength="100">
+                          <TextBox.KeyBindings>
+                            <KeyBinding Gesture="Enter" Command="{Binding SaveAsCommand}" />
+                          </TextBox.KeyBindings>
+                        </TextBox>
+                        <c:GsButton Classes="primary sm" Icon="pin" Content="Save" HorizontalAlignment="Right" Command="{Binding SaveAsCommand}" Click="CloseFlyout" />
+                      </StackPanel>
+                    </Flyout>
+                  </c:GsButton.Flyout>
+                </c:GsButton>
                 <c:GsButton Classes="ghost sm" Content="Choose files…" Command="{Binding OpenPropertiesCommand}" CommandParameter="saves" />
               </WrapPanel>
             </StackPanel>

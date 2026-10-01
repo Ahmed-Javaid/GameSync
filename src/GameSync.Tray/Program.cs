@@ -36,9 +36,14 @@ internal static class Program
 
         try
         {
+            // KAN-58: how the window is drawn. The CPU keeps GameSync small while it waits in the tray; the GPU scrolls a
+            // screen of covers smoothly. GAMESYNC_RENDERING=gpu or software picks one, for measuring both.
+            Win32RenderingMode[] rendering = Environment.GetEnvironmentVariable("GAMESYNC_RENDERING") == "gpu"
+                ? [Win32RenderingMode.AngleEgl, Win32RenderingMode.Software]
+                : [Win32RenderingMode.Software];
             return AppBuilder.Configure<GsApp>()
                 .UseWin32()
-                .With(new Win32PlatformOptions { RenderingMode = [Win32RenderingMode.Software] })
+                .With(new Win32PlatformOptions { RenderingMode = rendering })
                 .UseSkia()
                 .UseHarfBuzz()
                 .StartWithClassicDesktopLifetime(args, lifetime =>

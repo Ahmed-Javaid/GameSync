@@ -11,8 +11,11 @@ public static class LauncherData
     {
         using var engine = Engine.Open(dataDir);
         using var art = new ArtCache(dataDir);
+        var cloud = engine.Config.HasNoCloud ? null : engine.Config.UsesDrive ? "your Google Drive" : "your cloud folder";
         var games = Launcher.Games(engine.Library.All(), engine.Config.Games.Select(g => (g.Id, g.Title)), engine.State,
-            new SaveListStore(dataDir).Load(), SteamPlay(), art, Running(engine));
+                new SaveListStore(dataDir).Load(), SteamPlay(), art, Running(engine))
+            .Select(g => g with { Cloud = cloud })
+            .ToList();
         return (games, Launcher.Home(games, engine.State, nowLocal));
     }
 
@@ -51,6 +54,7 @@ public static class LauncherData
     {
         var ids = SteamIds(dataDir);
         using var art = new ArtCache(dataDir, steamRoot: StoreLocations.SteamRoot());
+        CopyLocalArt(dataDir, art);
         return (ids.Count, await art.RefreshAsync(ids, ct, askAll));
     }
 
@@ -58,7 +62,23 @@ public static class LauncherData
     public static int CopyArtFromSteam(string dataDir)
     {
         using var art = new ArtCache(dataDir, steamRoot: StoreLocations.SteamRoot());
-        return art.CopyFromSteamClient(SteamIds(dataDir));
+        return art.CopyFromSteamClient(SteamIds(dataDir)) + CopyLocalArt(dataDir, art);
+    }
+
+    /// <summary>
+    /// KAN-59: the art installed games with no Steam app ID carry in their own folders (a PS4 dump's icon and background),
+    /// copied into the cache; no network. A game with a Steam app ID takes Steam's. With nothing there, a game in its own
+    /// folder takes its program's icon as its cover (KAN-70).
+    /// </summary>
+    private static int CopyLocalArt(string dataDir, ArtCache art)
+    {
+        using var engine = Engine.OpenForSetup(dataDir);
+        var list = new SaveListStore(dataDir).Load();
+        return engine.Library.All()
+            .Where(e => e.MergedInto is null && e.State != LibraryState.Ignored && e.Installed && e.InstallDir is not null && Launcher.SteamIdOf(e, list) is null)
+            .Sum(e => art.CopyLocal(e.Id, e.InstallDir, e.Store == StoreKind.Loose
+                ? GameLaunch.Program(e.InstallDir, engine.State.GetSetting(GameLaunch.ProgramKey(e.Id)))
+                : null));
     }
 
     /// <summary>Every game's Steam app ID; before GameSync is set up too, for first run.</summary>
@@ -99,17 +119,17 @@ public static class LauncherData
         state.SetSetting(Launcher.SortKey, sort.ToString());
     }
 
-    /// <summary>LIB-22: the library's view on this PC (<c>all</c>, <c>installed</c>, <c>local</c>…); All games until the person picks another.</summary>
-    public static string ReadView(string dataDir)
+    /// <summary>KAN-47: the library's Installed only on this PC; off until the person ticks it.</summary>
+    public static bool ReadInstalledOnly(string dataDir)
     {
         using var state = new GameSync.Core.State.StateStore(dataDir);
-        return state.GetSetting(Launcher.ViewKey) is { Length: > 0 } view ? view : "all";
+        return state.GetSetting(Launcher.InstalledOnlyKey) == "true";
     }
 
-    public static void SetView(string dataDir, string view)
+    public static void SetInstalledOnly(string dataDir, bool installedOnly)
     {
         using var state = new GameSync.Core.State.StateStore(dataDir);
-        state.SetSetting(Launcher.ViewKey, view);
+        state.SetSetting(Launcher.InstalledOnlyKey, installedOnly ? "true" : "false");
     }
 
     /// <summary>

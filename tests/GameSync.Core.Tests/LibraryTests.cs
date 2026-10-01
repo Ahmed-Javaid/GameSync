@@ -3,6 +3,7 @@ using GameSync.Core.Games;
 using GameSync.Core.Model;
 using GameSync.Core.State;
 using GameSync.Core.Sync;
+using GameSync.Host;
 using static GameSync.Core.Tests.DiscoveryTests;
 
 namespace GameSync.Core.Tests;
@@ -10,6 +11,63 @@ namespace GameSync.Core.Tests;
 /// <summary>The library: IDs, fixes that stick across rescans (LIB-07), games that disappear (LIB-08), confirming (FIND-06).</summary>
 public class LibraryTests
 {
+    [Fact]
+    public void KAN_44_a_copy_of_the_person_s_own_is_never_synced_by_a_store()
+    {
+        using var world = new TestWorld();
+        var folder = Path.Combine(world.Root, "Games", "Child of Light");
+        Directory.CreateDirectory(folder);
+
+        // Child of Light's saves are found before the game is, and the save list says Ubisoft's cloud keeps them.
+        var listed = new SaveListGame { Title = "Child of Light", Cloud = ["ubisoft"] };
+        LeftoverGame Saves() => new(listed, [new Proposal(FoundBy.SaveList, "<programData>/Orbit/611", "**", SaveCategory.Save, 1, 38_195, Now)], StoreCloud: true);
+        var found = Assert.Single(Library.Reconcile([], [], Now, leftovers: [Saves()]));
+        Assert.True(found.StoreCloud);
+        var confirmed = Library.Confirm(found);
+        Assert.Equal(GameMode.BackupOnly, confirmed.Confirmed!.Mode);
+
+        // Located in a folder of the person's own: no store syncs that copy, so GameSync syncs it between PCs.
+        var located = Library.Locate(confirmed, folder, null, Now);
+        Assert.Equal((false, GameMode.Sync), (located.StoreCloud, located.Confirmed!.Mode));
+
+        // Rescans keep it so, though the save list still says the store's cloud keeps its saves.
+        var again = Assert.Single(Library.Reconcile([located], [], Now, leftovers: [Saves()]));
+        Assert.Equal((false, GameMode.Sync, true), (again.StoreCloud, again.Confirmed!.Mode, again.Installed));
+
+        // One located before this was put right is put right by the next scan; one the person set to back up only stays so.
+        var stale = located with { StoreCloud = true, Confirmed = located.Confirmed with { Mode = GameMode.BackupOnly } };
+        Assert.Equal(GameMode.Sync, Assert.Single(Library.Reconcile([stale], [], Now, leftovers: [Saves()])).Confirmed!.Mode);
+        var chosen = again with { Confirmed = again.Confirmed with { Mode = GameMode.BackupOnly } };
+        Assert.Equal(GameMode.BackupOnly, Assert.Single(Library.Reconcile([chosen], [], Now, leftovers: [Saves()])).Confirmed!.Mode);
+
+        // A game not located anywhere is still taken for its store's, as its saves are.
+        Assert.True(Assert.Single(Library.Reconcile([found], [], Now, leftovers: [Saves()])).StoreCloud);
+
+        // The owner's case: located by hand before this rule, with no scan that sees it again (its folder isn't a scan
+        // folder, and its saves aren't leftovers once it's installed). Opening GameSync's data puts it right, and keeps it so.
+        Assert.Equal(GameMode.Sync, Assert.Single(Library.Reconcile([stale], [], Now)).Confirmed!.Mode);
+        Assert.Equal((false, GameMode.Sync), Assert.Single(Library.SettleOwnCopies([stale, found])) is var s ? (s.StoreCloud, s.Confirmed!.Mode) : default);
+        Assert.Empty(Library.SettleOwnCopies([chosen, found]));
+
+        var data = Path.Combine(world.Root, "data");
+        new AppConfig { Remote = world.Cloud }.Save(data);
+        using (var library = new LibraryStore(data))
+        {
+            library.SaveAll([stale]);
+        }
+
+        using (var engine = GameSync.Host.Engine.Open(data))
+        {
+            var game = Assert.Single(engine.Games, g => g.Id == stale.Id);
+            Assert.Equal(GameMode.Sync, game.Mode);
+        }
+
+        using (var library = new LibraryStore(data))
+        {
+            Assert.Equal((false, GameMode.Sync), Assert.Single(library.All()) is var saved ? (saved.StoreCloud, saved.Confirmed!.Mode) : default);
+        }
+    }
+
     private static readonly DateTime Now = new(2026, 9, 28, 12, 0, 0, DateTimeKind.Utc);
 
     [Theory]

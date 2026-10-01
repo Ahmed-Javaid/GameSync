@@ -112,14 +112,23 @@ public sealed partial class Discoverer(SaveList? saveList, IReadOnlyDictionary<s
         var listed = Match(game, print);
         var proposals = Allowed(listed is null ? [] : FromSaveList(listed, game.Store, game.StoreId, game.InstallDir), game.InstallDir);
         proposals.AddRange(Allowed(FromIdFolders(game, listed), game.InstallDir));
-        if (proposals.Count == 0)
-        {
-            proposals = Allowed(FromEngine(game, print), game.InstallDir);
-        }
 
-        if (proposals.Count == 0)
+        // The later layers look when the list found nothing, and, for a game in its own folder, when it found only
+        // settings: the list often knows a store's save path and not a GOG or other copy's (KAN-69: Guacamelee's GOG
+        // copy keeps SAVE.DAT beside the settings file every copy shares). Places the list found stay first.
+        if (proposals.Count == 0 || (game.Store == StoreKind.Loose && proposals.All(p => p.Category != SaveCategory.Save)))
         {
-            proposals = Allowed(FromNames(game, listed, print), game.InstallDir);
+            var more = Allowed(FromEngine(game, print), game.InstallDir);
+            if (more.Count == 0)
+            {
+                more = Allowed(FromNames(game, listed, print), game.InstallDir);
+            }
+
+            // A place found this way joins only if it holds more than the settings files it takes in, so an online game's
+            // settings folder isn't taken for its saves.
+            var settings = proposals.ToList();
+            proposals.AddRange(more.Where(m => !settings.Any(p => p.Root == m.Root && p.Include == m.Include) &&
+                (settings.Count == 0 || m.Files > settings.Where(s => Covers(m, s)).Sum(s => s.Files))));
         }
 
         var cloudName = StoreName(game.Store);
@@ -259,6 +268,17 @@ public sealed partial class Discoverer(SaveList? saveList, IReadOnlyDictionary<s
             return bySteam;
         }
 
+        // KAN-69: the IDs a game's folder carries, a GOG install's record, then a steam_appid.txt.
+        if (print.GogId is { } gogId && saveList.ByGogId(gogId) is { } byGog)
+        {
+            return byGog;
+        }
+
+        if (game.Store == StoreKind.Loose && print.SteamAppId is { } appId && saveList.BySteamId(appId) is { } byAppId)
+        {
+            return byAppId;
+        }
+
         if (saveList.ByInstallDir(Path.GetFileName(game.InstallDir)) is [var byFolder])
         {
             return byFolder;
@@ -272,7 +292,8 @@ public sealed partial class Discoverer(SaveList? saveList, IReadOnlyDictionary<s
             }
         }
 
-        return null;
+        // KAN-69: a game in its own folder named without its series, the one title that ends with its name.
+        return game.Store == StoreKind.Loose ? saveList.ByNameEnd(game.Title) : null;
     }
 
     /// <summary>

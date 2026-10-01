@@ -2,6 +2,7 @@ using GameSync.Core.Games;
 using GameSync.Core.Model;
 using GameSync.Core.Safety;
 using GameSync.Core.Scanning;
+using GameSync.Core.State;
 
 namespace GameSync.Core.Sync;
 
@@ -102,6 +103,6 @@ public sealed partial class SyncService
         }
 
         _state.SetSetting(RegistryPending(game.Id), "0");
-        _state.Log(game.Id, "info", "Wrote the restored registry keys back.");
+        _state.Log(game.Id, "info", "Wrote the restored registry keys back.", EventTags.Restore);
     }
 }

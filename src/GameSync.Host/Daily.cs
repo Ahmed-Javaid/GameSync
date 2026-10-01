@@ -18,6 +18,9 @@ internal sealed record DailyRun(DateTime AtUtc, int Games, int Uploads, int Need
 /// </summary>
 internal static class Daily
 {
+    /// <summary>The note on the saves the daily backup makes current, as a game's history and the Versions tab show them (MGR-08).</summary>
+    public const string VersionNote = "Daily backup";
+
     private const string LastKey = "daily.last";
 
     public static async Task<DailyRun> RunAsync(string dataDir, IAgentOutput output, Func<GameId, bool>? isRunning, CancellationToken ct)
@@ -31,19 +34,46 @@ internal static class Daily
         }
 
         var running = isRunning ?? new RunningGames(engine).IsRunning;
-        var (service, recovered) = await engine.OpenServiceAsync(new SyncOptions { IsRunning = running }, ct);
+        var (service, recovered) = await engine.OpenServiceAsync(new SyncOptions { IsRunning = running, UploadLabel = VersionNote }, ct);
         await Builds.KeepAsync(engine, service, Builds.Changed(engine), output, ct);
         var results = recovered.Concat(await service.SyncAsync(null, ct)).ToList();
-        foreach (var result in results)
+
+        // A game that changed has its sync's own line already; one that didn't gets the daily backup's, so every game has one.
+        foreach (var result in results.Where(r => r.Action is SyncAction.None))
         {
-            engine.State.Log(result.Game, "info", $"Daily run: {result.Status}. {result.Message}");
+            engine.State.Log(result.Game, "info", $"Daily backup: {result.Message}", EventTags.Daily);
         }
 
         var run = new DailyRun(DateTime.UtcNow, results.Count, results.Count(r => r.NewVersion is not null),
             results.Count(r => r.Status is GameStatus.Conflict or GameStatus.SavesMissing or GameStatus.Blocked or GameStatus.HeldForReview));
         engine.State.SetSetting(LastKey, JsonSerializer.Serialize(run, Json.Options));
         output.Say($"Daily run: {run.Games} games checked, {run.Uploads} uploaded{(run.NeedYou > 0 ? $", {run.NeedYou} need you" : "")}.");
+
+        // BG-05: the optional daily summary, one line the person asked for in Settings → Notifications.
+        if (engine.State.GetSetting(SettingsData.DailyNoteKey) == "1")
+        {
+            output.Tell("Daily backup", Summary(run));
+        }
+
         return run;
+    }
+
+    /// <summary>The daily summary's line (BG-05): what was checked and what changed.</summary>
+    public static string Summary(DailyRun run)
+    {
+        var games = run.Games == 1 ? "1 game" : $"{run.Games} games";
+        var changed = run.Uploads switch
+        {
+            0 => $"Checked {games}; nothing new to upload.",
+            1 => $"Checked {games} and uploaded 1 new save.",
+            _ => $"Checked {games} and uploaded {run.Uploads} new saves.",
+        };
+        return run.NeedYou switch
+        {
+            0 => changed,
+            1 => $"{changed} 1 game needs you: open GameSync to see it.",
+            _ => $"{changed} {run.NeedYou} games need you: open GameSync to see them.",
+        };
     }
 
     public static DailyRun? Last(StateStore state) =>

@@ -27,16 +27,61 @@ public static class Backdrop
     /// <summary>A row's extra darkening is found to within 1/4,096 of what's left.</summary>
     private const int SearchSteps = 12;
 
+    /// <summary>
+    /// How colourful the art may stay, as OKLab chroma before the scrim: below <see cref="ChromaKnee"/> it's as the design
+    /// saturates it; above, it eases towards <see cref="ChromaLimit"/>, so one vivid colour filling the art (Counter-Strike
+    /// 2's orange) doesn't flood the app while muted art keeps its colour (the owner, 1 Oct 2026).
+    /// </summary>
+    public const double ChromaKnee = 0.1;
+
+    public const double ChromaLimit = 0.15;
+
     /// <summary>The finished picture for a game's art, or null when the file can't be read, and the page stays Solid.</summary>
-    public static Bitmap? Make(string artPath, GlassSurface glass, IReadOnlyDictionary<string, string> theme)
+    public static Bitmap? Make(string artPath, GlassSurface glass, IReadOnlyDictionary<string, string> theme) =>
+        Read(artPath) is { } art ? Finish(Tame(Soften(art.Pixels, art.Width, art.Height)), glass, theme) : null;
+
+    /// <summary>Softened art under its strength's scrim, darkened wherever text would lose contrast, as a bitmap.</summary>
+    public static Bitmap Finish(double[] rgb, GlassSurface glass, IReadOnlyDictionary<string, string> theme) =>
+        ToBitmap(Bake(rgb, glass, Darkening(rgb, glass, theme)));
+
+    /// <summary>A picture's pixels as BGRA, decoded as the backdrop reads them, or null when it can't be read.</summary>
+    public static (byte[] Pixels, int Width, int Height)? Pixels(string path) => Read(path);
+
+    /// <summary>
+    /// Eases each pixel's colourfulness (OKLab chroma) above <see cref="ChromaKnee"/> towards <see cref="ChromaLimit"/>,
+    /// keeping its lightness and hue: RGB from 0 to 255 in, changed in place, and returned.
+    /// </summary>
+    public static double[] Tame(double[] rgb, double knee = ChromaKnee, double limit = ChromaLimit)
     {
-        if (Read(artPath) is not { } art)
+        var room = limit - knee;
+        for (var i = 0; i < rgb.Length; i += 3)
         {
-            return null;
+            var (l, a, b) = OkLab.From(rgb[i], rgb[i + 1], rgb[i + 2]);
+            var chroma = Math.Sqrt(a * a + b * b);
+            if (chroma <= knee)
+            {
+                continue;
+            }
+
+            var eased = knee + room * Math.Tanh((chroma - knee) / room);
+            (rgb[i], rgb[i + 1], rgb[i + 2]) = OkLab.To(l, a * eased / chroma, b * eased / chroma);
         }
 
-        var soft = Soften(art.Pixels, art.Width, art.Height);
-        return ToBitmap(Bake(soft, glass, Darkening(soft, glass, theme)));
+        return rgb;
+    }
+
+    /// <summary>The average and the highest OKLab chroma of softened pixels, for measuring art.</summary>
+    public static (double Average, double Highest) Chroma(double[] rgb)
+    {
+        double sum = 0, highest = 0;
+        for (var i = 0; i < rgb.Length; i += 3)
+        {
+            var (_, a, b) = OkLab.From(rgb[i], rgb[i + 1], rgb[i + 2]);
+            var chroma = Math.Sqrt(a * a + b * b);
+            (sum, highest) = (sum + chroma, Math.Max(highest, chroma));
+        }
+
+        return (sum / (rgb.Length / 3), highest);
     }
 
     /// <summary>
@@ -348,6 +393,39 @@ public static class Backdrop
         finally
         {
             pinned.Free();
+        }
+    }
+
+    /// <summary>Björn Ottosson's OKLab, from and to sRGB from 0 to 255, for changing colourfulness without shifting lightness or hue.</summary>
+    private static class OkLab
+    {
+        public static (double L, double A, double B) From(double r, double g, double b)
+        {
+            var (lr, lg, lb) = (ToLinear(r / 255), ToLinear(g / 255), ToLinear(b / 255));
+            var l = Math.Cbrt(0.4122214708 * lr + 0.5363325363 * lg + 0.0514459929 * lb);
+            var m = Math.Cbrt(0.2119034982 * lr + 0.6806995451 * lg + 0.1073969566 * lb);
+            var s = Math.Cbrt(0.0883024619 * lr + 0.2817188376 * lg + 0.6299787005 * lb);
+            return (0.2104542553 * l + 0.7936177850 * m - 0.0040720468 * s,
+                1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * s,
+                0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * s);
+        }
+
+        public static (double R, double G, double B) To(double lightness, double a, double b)
+        {
+            var l = Math.Pow(lightness + 0.3963377774 * a + 0.2158037573 * b, 3);
+            var m = Math.Pow(lightness - 0.1055613458 * a - 0.0638541728 * b, 3);
+            var s = Math.Pow(lightness - 0.0894841775 * a - 1.2914855480 * b, 3);
+            return (255 * FromLinear(4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s),
+                255 * FromLinear(-1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s),
+                255 * FromLinear(-0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s));
+        }
+
+        private static double ToLinear(double c) => c <= 0.04045 ? c / 12.92 : Math.Pow((c + 0.055) / 1.055, 2.4);
+
+        private static double FromLinear(double c)
+        {
+            c = Math.Clamp(c, 0, 1);
+            return c <= 0.0031308 ? 12.92 * c : 1.055 * Math.Pow(c, 1 / 2.4) - 0.055;
         }
     }
 

@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "design-system",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["tools/design-system/serve.js", "design/system", "5178"],
+      "port": 5178
+    }
+  ]
+}

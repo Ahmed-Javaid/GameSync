@@ -4,7 +4,7 @@
                     xmlns:c="using:GameSync.UI.Controls"
                     xmlns:sys="using:System">
 
-  <!-- GameTile: 2:3 art, a status badge unless synced, the name and a meta line; a title cover when there's no art -->
+  <!-- GameTile: 2:3 art, a status badge unless its saves are fine (then a small mark, KAN-48), the name and a meta line; a title cover when there's no art -->
   <ControlTheme x:Key="{x:Type c:GsGameTile}" TargetType="c:GsGameTile">
     <!-- Avalonia 12 clips a templated control to its bounds, which cut the rings outside the art on three sides -->
     <Setter Property="ClipToBounds" Value="False" />
@@ -30,6 +30,11 @@
                 </Panel>
                 <c:GsStatusBadge Classes="art" Status="{TemplateBinding Status}" Label="{TemplateBinding StatusLabel}" IsVisible="{TemplateBinding ShowsStatus}"
                                  HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="8" />
+                <!-- Saves fine: a check in the ok colour on the art's deep tint, its words in the tooltip -->
+                <Border Name="PART_Mark" Width="22" Height="22" CornerRadius="11" Background="{DynamicResource ok-art}" IsVisible="{TemplateBinding ShowsMark}"
+                        HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="8" ToolTip.Tip="{TemplateBinding MarkLabel}">
+                  <c:GsIcon Icon="check" Size="14" StrokeWidth="2.5" Foreground="{DynamicResource ok}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Border>
               </Panel>
             </Border>
             <!-- Glossy's 1px ring just outside the art (clear in Solid), and the hover outline 2px further out, as in the design system -->
@@ -74,7 +79,7 @@
     <Setter Property="Template">
       <ControlTemplate>
         <Border Background="{TemplateBinding Background}" CornerRadius="{DynamicResource radius-md}" Padding="{TemplateBinding Padding}">
-          <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+          <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
             <Border Name="PART_Cover" Width="20" Height="30" CornerRadius="{DynamicResource radius-sm}" ClipToBounds="True" Background="{DynamicResource bg-300}"
                     VerticalAlignment="Center">
               <Panel>
@@ -88,6 +93,9 @@
               <c:GsStatusBadge Status="{TemplateBinding Status}" Label="{TemplateBinding StatusLabel}" Plain="True" FontSize="11"
                                IsVisible="{TemplateBinding ShowsStatus}" />
             </StackPanel>
+            <!-- Saves fine (KAN-48): the same check as the covers', small at the row's end -->
+            <c:GsIcon Grid.Column="2" Name="PART_Mark" Icon="check" Size="14" StrokeWidth="2.5" Foreground="{DynamicResource ok}" VerticalAlignment="Center"
+                      Margin="0,0,2,0" IsVisible="{TemplateBinding ShowsMark}" />
           </Grid>
         </Border>
       </ControlTemplate>
@@ -162,9 +170,14 @@
     <Setter Property="Template">
       <ControlTemplate>
         <Panel>
+        <!-- KAN-50: the game is running: a glow in the play colour behind the art (its light painted in code), easing in
+             and out (KAN-72) -->
+        <Border Name="PART_Glow" CornerRadius="16" Opacity="0" IsHitTestVisible="False" />
         <Border CornerRadius="16" ClipToBounds="True" Background="{DynamicResource glass}">
           <Panel>
             <c:GsCoverImage Source="{TemplateBinding Art}" />
+            <!-- KAN-72: the picture before, fading away over the new one when the game changes -->
+            <c:GsCoverImage Name="PART_ArtBefore" Opacity="0" IsHitTestVisible="False" />
             <Grid RowDefinitions="35*,30*,35*" IsHitTestVisible="False">
               <Border Grid.Row="0">
                 <Border.Background>
@@ -184,7 +197,15 @@
               </Border>
             </Grid>
             <DockPanel Margin="20">
-              <TextBlock DockPanel.Dock="Top" Text="{TemplateBinding Eyebrow}" TextTrimming="CharacterEllipsis" />
+              <!-- Where it's installed: a store's mark (or a folder) with its words under the pointer, then the eyebrow (KAN-55) -->
+              <DockPanel DockPanel.Dock="Top">
+                <Border DockPanel.Dock="Left" Background="Transparent" Margin="0,0,8,0" VerticalAlignment="Center"
+                        IsVisible="{Binding $parent[c:GsHeroBanner].EyebrowIcon, Converter={x:Static ObjectConverters.IsNotNull}}"
+                        ToolTip.Tip="{TemplateBinding EyebrowTip}" AutomationProperties.Name="{TemplateBinding EyebrowTip}">
+                  <c:GsIcon Icon="{TemplateBinding EyebrowIcon}" Size="20" />
+                </Border>
+                <TextBlock Text="{TemplateBinding Eyebrow}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+              </DockPanel>
               <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Bottom">
                 <StackPanel Spacing="8" MaxWidth="560" HorizontalAlignment="Left" VerticalAlignment="Bottom">
                   <c:GsChip Icon="clock" Text="{TemplateBinding Chip}">
@@ -223,9 +244,16 @@
           </Panel>
         </Border>
         <Border CornerRadius="17" Margin="-1" BorderBrush="{DynamicResource edge-art}" BorderThickness="1" IsHitTestVisible="False" />
+        <Border Name="PART_PlayRing" CornerRadius="19" Margin="-3" BorderBrush="{DynamicResource play}" BorderThickness="2" Opacity="0" IsHitTestVisible="False" />
         </Panel>
       </ControlTemplate>
     </Setter>
+    <Style Selector="^:playing /template/ Border#PART_Glow">
+      <Setter Property="Opacity" Value="1" />
+    </Style>
+    <Style Selector="^:playing /template/ Border#PART_PlayRing">
+      <Setter Property="Opacity" Value="1" />
+    </Style>
     <Style Selector="^:logo /template/ Image#PART_Logo">
       <Setter Property="IsVisible" Value="True" />
     </Style>
@@ -317,7 +345,8 @@
             <StackPanel Orientation="Horizontal" Spacing="6"><c:GsLevelDot Level="2" VerticalAlignment="Center" /><TextBlock Text="2–4h" /></StackPanel>
             <StackPanel Orientation="Horizontal" Spacing="6"><c:GsLevelDot Level="3" VerticalAlignment="Center" /><TextBlock Text="&gt; 4h" /></StackPanel>
           </StackPanel>
-          <c:GsActivityGrid Days="{TemplateBinding Days}" StartWeekday="{TemplateBinding StartWeekday}" />
+          <c:GsActivityGrid Days="{TemplateBinding Days}" StartWeekday="{TemplateBinding StartWeekday}" Tips="{TemplateBinding Tips}"
+                            DayCommand="{TemplateBinding DayCommand}" />
           <UniformGrid Columns="7" TextElement.Foreground="{DynamicResource ink-faint}" TextElement.FontSize="11">
             <TextBlock Text="Mon" HorizontalAlignment="Center" />
             <TextBlock Text="Tue" HorizontalAlignment="Center" />

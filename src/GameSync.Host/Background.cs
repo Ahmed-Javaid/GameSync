@@ -48,15 +48,26 @@ public static class Background
 /// The background app's output: a log file a day in the data folder's <c>logs</c>, and a notification for each thing
 /// that needs the person, held while a fullscreen game runs (BG-05, BG-06).
 /// </summary>
-internal sealed class BackgroundOutput(string dataDir, Action<string, string> notify) : IAgentOutput
+internal sealed class BackgroundOutput : IAgentOutput
 {
-    private readonly NotificationQueue _notifications = new(FullScreen.IsBusy, notify);
+    private readonly string _dataDir;
+    private readonly NotificationQueue _notifications;
+
+    public BackgroundOutput(string dataDir, Action<string, string> notify)
+    {
+        _dataDir = dataDir;
+        Hold = SettingsData.HoldsWhileFullscreen(dataDir);
+        _notifications = new NotificationQueue(() => Hold && FullScreen.IsBusy(), notify);
+    }
+
+    /// <summary>BG-06: notifications wait while a fullscreen game runs; Settings → Notifications turns it off.</summary>
+    public bool Hold { get; set; }
 
     public void Say(string line)
     {
         try
         {
-            var logs = Directory.CreateDirectory(Path.Combine(dataDir, "logs")).FullName;
+            var logs = Directory.CreateDirectory(Path.Combine(_dataDir, "logs")).FullName;
             File.AppendAllText(Path.Combine(logs, $"agent-{DateTime.Now:yyyy-MM-dd}.log"), $"{DateTime.Now:HH:mm:ss}  {line}{Environment.NewLine}");
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
@@ -72,6 +83,13 @@ internal sealed class BackgroundOutput(string dataDir, Action<string, string> no
     }
 
     public void Fine(string title) => _notifications.Forget(title);
+
+    public void Tell(string title, string message)
+    {
+        Say($"{title}: {message}");
+        _notifications.Forget(title);
+        _notifications.Add(title, message);
+    }
 
     public void Flush() => _notifications.Flush();
 }
@@ -121,6 +139,35 @@ public sealed class AppOutput(string dataDir, Action<string, string> notify) : I
         lock (_inner)
         {
             _inner.Fine(title);
+        }
+    }
+
+    public void Tell(string title, string message)
+    {
+        lock (_inner)
+        {
+            _inner.Tell(title, message);
+        }
+
+        Line?.Invoke($"{title}: {message}");
+    }
+
+    /// <summary>BG-06: notifications wait while a fullscreen game runs, as Settings → Notifications says.</summary>
+    public bool HoldWhileFullscreen
+    {
+        get
+        {
+            lock (_inner)
+            {
+                return _inner.Hold;
+            }
+        }
+        set
+        {
+            lock (_inner)
+            {
+                _inner.Hold = value;
+            }
         }
     }
 

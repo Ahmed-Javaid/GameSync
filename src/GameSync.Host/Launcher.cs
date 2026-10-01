@@ -13,10 +13,16 @@ public sealed record LauncherGame
 
     public required string Title { get; init; }
 
-    /// <summary>Null until the game has synced once.</summary>
+    /// <summary>
+    /// Null for a game not syncing yet; a game that syncs but hasn't been backed up yet is Upload pending, with
+    /// <see cref="FirstBackupPending"/> (KAN-60), never Synced.
+    /// </summary>
     public GameStatus? Status { get; init; }
 
     public string? StatusDetail { get; init; }
+
+    /// <summary>It syncs, but its first backup hasn't happened yet (KAN-60): it says "Not backed up yet".</summary>
+    public bool FirstBackupPending { get; init; }
 
     /// <summary>Its saves sync: confirmed in the library, or added by hand.</summary>
     public bool Syncs { get; init; }
@@ -58,10 +64,22 @@ public sealed record LauncherGame
     public bool IsOwn { get; init; }
 
     /// <summary>
+    /// Its store's cloud syncs its saves (LIB-10), so backing up only is the store's doing; a game backed up only without
+    /// it is kept by the person's choice, not synced between their PCs (KAN-63).
+    /// </summary>
+    public bool StoreSyncs { get; init; }
+
+    /// <summary>
     /// LIB-13: one of the person's own with no program on this PC, such as a server's world: nothing to play, and it syncs
     /// once quiet. Its spells of changes aren't play, so play time and the activity calendar leave them out.
     /// </summary>
     public bool IsFolder { get; init; }
+
+    /// <summary>
+    /// Where its saves go besides this PC, in a sentence's words: "your Google Drive", or "your cloud folder" for a folder
+    /// such as a NAS; null with no cloud yet, after first run's Skip for now (ONB-06).
+    /// </summary>
+    public string? Cloud { get; init; } = "your Google Drive";
 
     /// <summary>
     /// PLAY-12: when the session playing it now started, however the game was started and whether its saves sync or
@@ -92,15 +110,37 @@ public enum LibrarySort
 }
 
 /// <summary>What the launcher home shows (PLAY-01): the last-played game, what needs you, what to jump back into, and this month's play.</summary>
+/// <param name="Months">
+/// Activity, month by month (KAN-66): from the first month with play, a year back at most, to this month, which is last.
+/// </param>
 public sealed record LauncherHome(
     LauncherGame? Hero,
     IReadOnlyList<LauncherGame> NeedsYou,
     IReadOnlyList<LauncherGame> JumpBackIn,
-    IReadOnlyList<int> MonthDays,
-    int MonthStartWeekday,
-    string MonthName,
+    IReadOnlyList<ActivityMonth> Months,
     int Synced,
-    int Syncing);
+    int Syncing)
+{
+    /// <summary>This month's level of play each day, 0 to 3.</summary>
+    public IReadOnlyList<int> MonthDays => Months[^1].Levels;
+
+    /// <summary>The weekday this month starts on, 0 for Monday.</summary>
+    public int MonthStartWeekday => Months[^1].StartWeekday;
+
+    public string MonthName => Months[^1].Name;
+
+    /// <summary>This month's days, each with the games played that day and for how long, longest first.</summary>
+    public IReadOnlyList<IReadOnlyList<DayPlay>> MonthPlay => Months[^1].Play;
+}
+
+/// <summary>
+/// A month of Activity: each day's level of play (0 none, 1 under 2 hours, 2 two to four, 3 over four), the weekday it
+/// starts on (0 for Monday), its name ("September", or "December 2025" in another year), and each day's games (KAN-66).
+/// </summary>
+public sealed record ActivityMonth(DateTime First, IReadOnlyList<int> Levels, int StartWeekday, string Name, IReadOnlyList<IReadOnlyList<DayPlay>> Play);
+
+/// <summary>A game played on a day, and for how long in all that day (KAN-66).</summary>
+public sealed record DayPlay(GameId Id, string Title, TimeSpan Played);
 
 /// <summary>
 /// The launcher's view of this PC (PLAY-01, PLAY-09, LIB-11): every game in the library that isn't ignored, and the
@@ -130,6 +170,7 @@ public static class Launcher
                 RunningSinceUtc = running?.GetValueOrDefault(entry.Id) is { } since && since != default ? since : null,
                 IsOwn = entry.IsOwn,
                 IsFolder = entry.IsOwnFolder,
+                StoreSyncs = entry.StoreCloud,
             };
             games.Add(game.IsFolder ? game with { Playtime = TimeSpan.Zero } : game);
         }
@@ -172,29 +213,44 @@ public static class Launcher
             jump.AddRange(playable.Where(g => g != hero && !jump.Contains(g)).Take(JumpBackInAtMost - jump.Count));
         }
 
-        var first = new DateTime(nowLocal.Year, nowLocal.Month, 1);
-        var days = new TimeSpan[DateTime.DaysInMonth(nowLocal.Year, nowLocal.Month)];
-        foreach (var game in playable)
+        // Activity: each month from the first with play, a year back at most, to this one; a session counts on the day it started.
+        var thisMonth = new DateTime(nowLocal.Year, nowLocal.Month, 1);
+        var sessions = playable
+            .SelectMany(game => state.GetSessions(game.Id).Select(s => (Game: game, Start: s.StartUtc.ToLocalTime(), Length: s.EndUtc - s.StartUtc)))
+            .Where(s => s.Start >= thisMonth.AddMonths(-11) && s.Start < thisMonth.AddMonths(1))
+            .ToList();
+        var months = new List<ActivityMonth>();
+        for (var month = sessions.Count == 0 ? thisMonth : sessions.Min(s => new DateTime(s.Start.Year, s.Start.Month, 1)); month <= thisMonth; month = month.AddMonths(1))
         {
-            foreach (var session in state.GetSessions(game.Id))
-            {
-                var start = session.StartUtc.ToLocalTime();
-                if (start >= first && start < first.AddMonths(1))
-                {
-                    days[start.Day - 1] += session.EndUtc - session.StartUtc;
-                }
-            }
+            months.Add(Month(month, sessions.Where(s => s.Start >= month && s.Start < month.AddMonths(1)).ToList(), nowLocal));
         }
 
         return new LauncherHome(
             hero,
             games.Where(g => g.NeedsYou).Take(3).ToList(),
             jump,
-            days.Select(ActivityLevel).ToList(),
-            ((int)first.DayOfWeek + 6) % 7,
-            first.ToString("MMMM", CultureInfo.InvariantCulture),
+            months,
             games.Count(g => g.Syncs && g.Status is GameStatus.Synced or GameStatus.BackupOnly),
             games.Count(g => g.Syncs));
+    }
+
+    private static ActivityMonth Month(DateTime first, IReadOnlyList<(LauncherGame Game, DateTime Start, TimeSpan Length)> sessions, DateTime nowLocal)
+    {
+        var days = new TimeSpan[DateTime.DaysInMonth(first.Year, first.Month)];
+        var byGame = days.Select(_ => new Dictionary<LauncherGame, TimeSpan>()).ToArray();
+        foreach (var (game, start, length) in sessions)
+        {
+            days[start.Day - 1] += length;
+            byGame[start.Day - 1][game] = byGame[start.Day - 1].GetValueOrDefault(game) + length;
+        }
+
+        return new ActivityMonth(
+            first,
+            days.Select(ActivityLevel).ToList(),
+            ((int)first.DayOfWeek + 6) % 7,
+            first.ToString(first.Year == nowLocal.Year ? "MMMM" : "MMMM yyyy", CultureInfo.InvariantCulture),
+            byGame.Select(day => (IReadOnlyList<DayPlay>)day.OrderByDescending(p => p.Value).ThenBy(p => p.Key.Title, StringComparer.OrdinalIgnoreCase)
+                .Select(p => new DayPlay(p.Key.Id, p.Key.Title, p.Value)).ToList()).ToList());
     }
 
     /// <summary>The setting that hides a game from the launcher on this PC.</summary>
@@ -206,8 +262,8 @@ public static class Launcher
     /// <summary>The setting that keeps the library's order on this PC (LIB-16).</summary>
     public const string SortKey = "library.sort";
 
-    /// <summary>The setting that keeps the library's view on this PC: all games, installed, local and the rest (LIB-22).</summary>
-    public const string ViewKey = "library.view";
+    /// <summary>The setting that keeps the library's Installed only on this PC (KAN-47).</summary>
+    public const string InstalledOnlyKey = "library.installed-only";
 
     private const string HiddenPrefix = "hidden.";
     private const string FavouritePrefix = "favourite.";
@@ -295,6 +351,16 @@ public static class Launcher
     public static string? PlaytimeText(TimeSpan playtime) =>
         playtime <= TimeSpan.Zero ? null : playtime.TotalHours >= 1 ? $"{(int)Math.Round(playtime.TotalHours)} h" : $"{Math.Max(1, (int)Math.Round(playtime.TotalMinutes))} min";
 
+    /// <summary>How long something lasted: "1 h 52 min", "47 min", "2 h", "under a minute".</summary>
+    public static string DurationText(TimeSpan span)
+    {
+        var minutes = (int)Math.Round(span.TotalMinutes);
+        return minutes < 1 ? "under a minute"
+            : minutes < 60 ? $"{minutes.ToString(CultureInfo.InvariantCulture)} min"
+            : minutes % 60 == 0 ? $"{(minutes / 60).ToString(CultureInfo.InvariantCulture)} h"
+            : $"{(minutes / 60).ToString(CultureInfo.InvariantCulture)} h {(minutes % 60).ToString(CultureInfo.InvariantCulture)} min";
+    }
+
     /// <summary>"Today 21:04", "Yesterday", "20 Sep", or "20 Sep 2025" before this year.</summary>
     public static string? WhenText(DateTime? utc, DateTime nowLocal)
     {
@@ -341,17 +407,19 @@ public static class Launcher
         {
             Id = id,
             Title = title,
-            Status = gameState.Status,
+            // KAN-60: a game that syncs but has never synced waits for its first backup; it isn't Synced yet.
+            Status = gameState.Status ?? (syncs ? GameStatus.UploadPending : null),
             StatusDetail = gameState.Detail,
+            FirstBackupPending = syncs && gameState.Status is null,
             Syncs = syncs,
             Installed = installed,
             Store = store,
             SteamAppId = steamId,
             Playtime = steam is null || steam.Playtime < sessionTime ? sessionTime : steam.Playtime,
             LastPlayedUtc = Latest(lastSession, steam?.LastPlayedUtc),
-            // The person's own image first (ART-06), then Steam's.
-            CoverPath = art?.FindOwn(id, ArtKind.Cover) ?? (steamId is { } a ? art?.Find(a, ArtKind.Cover) : null),
-            HeroPath = art?.FindOwn(id, ArtKind.Hero) ?? (steamId is { } h ? art?.Find(h, ArtKind.Hero) : null),
+            // The person's own image first (ART-06), then Steam's, then what the game carries in its own folder (KAN-59).
+            CoverPath = art?.FindOwn(id, ArtKind.Cover) ?? (steamId is { } a ? art?.Find(a, ArtKind.Cover) : null) ?? art?.FindLocal(id, ArtKind.Cover),
+            HeroPath = art?.FindOwn(id, ArtKind.Hero) ?? (steamId is { } h ? art?.Find(h, ArtKind.Hero) : null) ?? art?.FindLocal(id, ArtKind.Hero),
             LogoPath = art?.FindOwn(id, ArtKind.Logo) ?? (steamId is { } l ? art?.Find(l, ArtKind.Logo) : null),
             IsSoftware = steamId is { } s && art?.IsSoftware(s) == true,
             IsHidden = marks.Hidden.ContainsKey(HiddenKey(id)),

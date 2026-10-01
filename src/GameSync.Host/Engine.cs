@@ -79,6 +79,13 @@ internal sealed class Engine : IDisposable
             var guard = SensitivePathGuard.ForThisPc(dataDir, folders.GetValueOrDefault("<steamRoot>"));
             library = new LibraryStore(dataDir);
             var entries = library.All();
+
+            // KAN-44: own copies still taken for their store's are put right once, and kept so.
+            if (GameSync.Core.Discovery.Library.SettleOwnCopies(entries) is { Count: > 0 } settled)
+            {
+                library.SaveAll(settled);
+                entries = library.All();
+            }
             var installDirs = Cli.InstallDirs(state, config, entries);
             var resolver = new RootResolver(folders, Cli.Accounts(state), installDirs);
             var games = config.Games.Select(resolver.Resolve).ToList();

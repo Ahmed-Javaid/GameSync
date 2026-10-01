@@ -1,0 +1,374 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="using:GameSync.UI.Controls"
+             xmlns:vm="using:GameSync.UI.ViewModels"
+             xmlns:v="using:GameSync.UI.Views"
+             x:Class="GameSync.UI.Views.SettingsPage"
+             x:DataType="vm:SettingsViewModel">
+  <!-- Settings (design system → SettingsScreen, version 26): the sections down the left, one at a time on the right, and
+       the version with Copy diagnostics at the foot of the column. Not shown until they're built: where shared zips go
+       (with sharing), snapshots of long sessions (PLAY-10) and learn mode's admin (with learn mode). -->
+  <UserControl.DataTemplates>
+
+    <!-- Appearance (LOOK-01 to LOOK-07, LOOK-10, LOOK-17) -->
+    <DataTemplate DataType="vm:AppearanceSettings">
+      <StackPanel Spacing="16">
+        <StackPanel Spacing="4" Margin="0,0,0,4">
+          <TextBlock Classes="page-title" Text="Appearance" />
+          <TextBlock Classes="muted" TextWrapping="Wrap" Text="Changes apply straight away and are saved on this PC only." />
+        </StackPanel>
+        <c:GsCard Title="Theme" Subtitle="{Binding ThemeNote}">
+          <c:GsCard.Action>
+            <c:GsPillTabs ItemsSource="{Binding Modes}" SelectedId="{Binding Mode, Mode=TwoWay}" AutomationProperties.Name="Mode" />
+          </c:GsCard.Action>
+          <StackPanel>
+            <c:GsThemePicker ItemsSource="{Binding Themes}" SelectedId="{Binding Preset, Mode=TwoWay}" AutomationProperties.Name="Theme" />
+            <StackPanel Margin="0,12,0,0">
+              <c:GsSettingsRow Title="Surface" TagText="New" Description="{Binding SurfaceDescription}">
+                <c:GsPillTabs ItemsSource="{Binding Surfaces}" SelectedId="{Binding Surface, Mode=TwoWay}" AutomationProperties.Name="Surface" />
+              </c:GsSettingsRow>
+              <c:GsSettingsRow Title="Pure black backgrounds" Description="{Binding PureBlackDescription}" IsEnabled="{Binding CanPureBlack}">
+                <c:GsSwitch IsChecked="{Binding PureBlack}" AutomationProperties.Name="Pure black backgrounds" />
+              </c:GsSettingsRow>
+            </StackPanel>
+          </StackPanel>
+        </c:GsCard>
+        <c:GsCard Title="Colours" Subtitle="Each theme sets both; change either one here.">
+          <c:GsCard.Action>
+            <c:GsButton Classes="ghost sm" Icon="reset" Content="Reset to default" Command="{Binding ResetCommand}" />
+          </c:GsCard.Action>
+          <StackPanel>
+            <StackPanel>
+              <c:GsSettingsRow Title="Primary" Description="Main buttons, progress, focus rings and your busiest days.">
+                <c:GsSwatchPicker ItemsSource="{Binding PrimarySwatches}" SelectedId="{Binding PrimaryPick, Mode=TwoWay}" MaxWidth="480" AutomationProperties.Name="Primary colour" />
+              </c:GsSettingsRow>
+              <c:GsSettingsRow Title="Secondary" Description="Selection, the page you're on and tab counts.">
+                <c:GsSwatchPicker ItemsSource="{Binding SecondarySwatches}" SelectedId="{Binding SecondaryPick, Mode=TwoWay}" MaxWidth="480" AutomationProperties.Name="Secondary colour" />
+              </c:GsSettingsRow>
+            </StackPanel>
+            <c:GsNote Icon="info" Margin="0,8,0,0"
+                      Text="Status colours never change: Synced, Needs you, Playing and Blocked keep their colours in every theme, with an icon and a word. Custom colours come later." />
+          </StackPanel>
+        </c:GsCard>
+      </StackPanel>
+    </DataTemplate>
+
+    <!-- Storage and folders (FOLD-02 to FOLD-08, FOLD-10) -->
+    <DataTemplate DataType="vm:StorageSettings">
+      <StackPanel Spacing="16">
+        <StackPanel Spacing="4" Margin="0,0,0,4">
+          <TextBlock Classes="page-title" Text="Storage and folders" />
+          <TextBlock Classes="muted" TextWrapping="Wrap" Text="Where GameSync keeps backups on this PC, and where it looks for games and saves." />
+        </StackPanel>
+        <c:GsCard Title="Backup folder" Subtitle="Your saves' history on this PC. The cloud keeps every version either way.">
+          <StackPanel>
+            <c:GsFolderField Path="{Binding BackupFolder}" Meta="{Binding BackupMeta}" State="{Binding BackupState}" Message="{Binding BackupMessage}"
+                             Progress="{Binding BackupProgress}" ChangeCommand="{Binding $parent[v:SettingsPage].MoveBackupCommand}"
+                             OpenCommand="{Binding OpenBackupCommand}" Margin="0,0,0,12" />
+            <c:GsSettingsRow Title="History to keep on this PC" Description="{Binding KeepDescription}" Classes="after">
+              <c:GsPillTabs ItemsSource="{Binding KeepChoices}" SelectedId="{Binding Keep, Mode=TwoWay}" AutomationProperties.Name="History to keep on this PC" />
+            </c:GsSettingsRow>
+          </StackPanel>
+        </c:GsCard>
+        <Grid ColumnDefinitions="*,*" ColumnSpacing="16">
+          <c:GsCard Title="Game folders to scan" Subtitle="For games outside Steam, Epic, EA and Xbox.">
+            <c:GsFolderList Items="{Binding GameFolders}" AddCommand="{Binding $parent[v:SettingsPage].AddGameFolderCommand}"
+                            RemoveCommand="{Binding RemoveGameFolderCommand}" IsEnabled="{Binding NotScanning}"
+                            Empty="None yet. Add the folder your games are in, such as E:\Games." />
+          </c:GsCard>
+          <c:GsCard Grid.Column="1" Title="Extra save folders" Subtitle="Saves outside the usual places. Kept on this PC only.">
+            <c:GsFolderList Items="{Binding SaveFolders}" AddCommand="{Binding $parent[v:SettingsPage].AddSaveFolderCommand}"
+                            RemoveCommand="{Binding RemoveSaveFolderCommand}" IsEnabled="{Binding NotScanning}" Empty="None yet." />
+          </c:GsCard>
+        </Grid>
+        <c:GsNote Icon="info" Text="{Binding Note.Text}" Classes.warn="{Binding Note.Failed}" IsVisible="{Binding HasNote}" />
+      </StackPanel>
+    </DataTemplate>
+
+    <!-- Backup and sync (BG-01, SET-02, SET-03, SET-06) -->
+    <DataTemplate DataType="vm:BackupSettings">
+      <StackPanel Spacing="16">
+        <StackPanel Spacing="4" Margin="0,0,0,4">
+          <TextBlock Classes="page-title" Text="Backup and sync" />
+          <TextBlock Classes="muted" TextWrapping="Wrap" Text="Most syncing happens when you quit a game. The daily backup is the safety net." />
+        </StackPanel>
+        <c:GsCard Title="In the background">
+          <StackPanel>
+            <c:GsSettingsRow Title="Start GameSync when you sign in"
+                             Description="It notices games however you start them, syncs each one after you play, and brings your other PCs' saves down every 15 minutes.">
+              <c:GsSwitch IsChecked="{Binding StartAtSignIn}" AutomationProperties.Name="Start GameSync when you sign in" />
+            </c:GsSettingsRow>
+            <c:GsNote Icon="info" Text="{Binding StartNote.Text}" Classes.warn="{Binding StartNote.Failed}" IsVisible="{Binding HasStartNote}" Margin="0,4,0,0" />
+          </StackPanel>
+        </c:GsCard>
+        <c:GsCard Title="Daily backup">
+          <StackPanel>
+            <StackPanel>
+              <c:GsSettingsRow Title="{Binding DailyTitle}" Description="{Binding DailyDescription}">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <c:GsButton Classes="sm" Icon="clock" Content="Change time" Command="{Binding EditTimeCommand}" IsVisible="{Binding NotEditingTime}"
+                              IsEnabled="{Binding DailyOn}" />
+                  <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding EditingTime}">
+                    <TextBox Width="84" Text="{Binding TimeText}" TextAlignment="Center" MaxLength="5" AutomationProperties.Name="Daily backup time, 24-hour">
+                      <TextBox.KeyBindings>
+                        <KeyBinding Gesture="Enter" Command="{Binding SaveTimeCommand}" />
+                        <KeyBinding Gesture="Escape" Command="{Binding CancelTimeCommand}" />
+                      </TextBox.KeyBindings>
+                    </TextBox>
+                    <c:GsButton Classes="primary sm" Content="Save" Command="{Binding SaveTimeCommand}" />
+                  </StackPanel>
+                  <c:GsSwitch IsChecked="{Binding DailyOn}" AutomationProperties.Name="Back up every day" VerticalAlignment="Center" />
+                </StackPanel>
+              </c:GsSettingsRow>
+              <c:GsSettingsRow Title="Last run" Description="{Binding LastRun}">
+                <c:GsButton Classes="sm" Icon="sync" Content="{Binding RunLabel}" Command="{Binding RunNowCommand}" IsEnabled="{Binding CanRun}"
+                            AutomationProperties.Name="Run the daily backup now" />
+              </c:GsSettingsRow>
+            </StackPanel>
+            <TextBlock Foreground="{DynamicResource warn}" Text="{Binding TimeError}" TextWrapping="Wrap" IsVisible="{Binding HasTimeError}" HorizontalAlignment="Right" />
+            <c:GsNote Icon="info" Text="{Binding DailyNote.Text}" Classes.warn="{Binding DailyNote.Failed}" IsVisible="{Binding HasDailyNote}" Margin="0,4,0,0" />
+          </StackPanel>
+        </c:GsCard>
+        <c:GsCard Title="What to back up"
+                  Subtitle="Every new game starts from these. A game's Properties, Saves, can opt files in or out, and that game's choice travels with its saves.">
+          <StackPanel>
+            <StackPanel>
+              <c:GsSettingsRow Title="Game saves" Description="Always backed up, and synced between your PCs.">
+                <c:GsTag Text="Always" />
+              </c:GsSettingsRow>
+              <c:GsSettingsRow Title="Settings files" Description="A game's options and key bindings. On this PC they're kept for you, but each PC keeps its own.">
+                <c:GsSelect Options="{Binding SettingsFilesOptions}" Value="{Binding SettingsFiles}" Label="Settings files" />
+              </c:GsSettingsRow>
+              <c:GsSettingsRow Title="Screenshots" Description="Pictures a game saves in its own folders.">
+                <c:GsSelect Options="{Binding ScreenshotOptions}" Value="{Binding Screenshots}" Label="Screenshots" />
+              </c:GsSettingsRow>
+              <c:GsSettingsRow Title="Skip logs, crash dumps and caches" Description="They never hold saves, and some are large.">
+                <c:GsSwitch IsChecked="{Binding SkipJunk}" AutomationProperties.Name="Skip logs, crash dumps and caches" />
+              </c:GsSettingsRow>
+              <c:GsSettingsRow Title="Also skip" Description="Files or folders no game should back up, as patterns: * is any name, ** any folders." IsStack="True">
+                <StackPanel Spacing="8">
+                  <c:GsFolderList Items="{Binding Patterns}" RemoveCommand="{Binding RemovePatternCommand}" Empty="Nothing else is skipped." />
+                  <c:GsButton Classes="ghost sm" Icon="plus" Content="Add a pattern" Command="{Binding StartPatternCommand}" HorizontalAlignment="Left"
+                              IsVisible="{Binding NotAddingPattern}" />
+                  <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding AddingPattern}">
+                    <TextBox Width="260" Text="{Binding PatternText}" PlaceholderText="*.bak or **/Mods/**" FontFamily="{DynamicResource font-mono}"
+                             AutomationProperties.Name="A pattern to skip">
+                      <TextBox.KeyBindings>
+                        <KeyBinding Gesture="Enter" Command="{Binding AddPatternCommand}" />
+                        <KeyBinding Gesture="Escape" Command="{Binding CancelPatternCommand}" />
+                      </TextBox.KeyBindings>
+                    </TextBox>
+                    <c:GsButton Classes="primary sm" Content="Add" Command="{Binding AddPatternCommand}" />
+                    <c:GsButton Classes="ghost sm" Content="Cancel" Command="{Binding CancelPatternCommand}" />
+                  </StackPanel>
+                  <TextBlock Foreground="{DynamicResource warn}" Text="{Binding PatternError}" TextWrapping="Wrap" IsVisible="{Binding HasPatternError}" />
+                </StackPanel>
+              </c:GsSettingsRow>
+            </StackPanel>
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16" Margin="0,12,0,0" IsVisible="{Binding ShowsFilesApply}">
+              <c:GsNote Icon="info" Text="{Binding FilesApplyNote}" VerticalAlignment="Center" />
+              <c:GsButton Grid.Column="1" Classes="sm" Content="{Binding FilesApplyLabel}">
+                <c:GsButton.Flyout>
+                  <Flyout Placement="TopEdgeAlignedRight">
+                    <StackPanel Width="320" Spacing="12" Margin="8">
+                      <TextBlock Text="Apply the defaults to them?" FontWeight="SemiBold" />
+                      <TextBlock Classes="caption muted" TextWrapping="Wrap" Text="{Binding FilesApplyQuestion}" />
+                      <c:GsButton Classes="primary sm" Content="Apply" HorizontalAlignment="Right" Click="CloseFlyout" Command="{Binding ApplyFilesCommand}" />
+                    </StackPanel>
+                  </Flyout>
+                </c:GsButton.Flyout>
+              </c:GsButton>
+            </Grid>
+            <c:GsNote Icon="info" Text="{Binding FilesNote.Text}" Classes.warn="{Binding FilesNote.Failed}" IsVisible="{Binding HasFilesNote}" Margin="0,12,0,0" />
+          </StackPanel>
+        </c:GsCard>
+        <c:GsCard Title="When two PCs disagree">
+          <StackPanel>
+            <c:GsSettingsRow Title="Default for every game"
+                             Description="Newest wins keeps the other side pinned, with a Swap button. GameSync always asks on a first sync, a save that shrank by half, changes outside a session, or a wrong clock.">
+              <c:GsPillTabs ItemsSource="{Binding ConflictChoices}" SelectedId="{Binding Conflict, Mode=TwoWay}" AutomationProperties.Name="Default when two PCs disagree" />
+            </c:GsSettingsRow>
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16" Margin="0,12,0,0" IsVisible="{Binding ShowsConflictApply}">
+              <c:GsNote Icon="info" Text="{Binding ConflictApplyNote}" VerticalAlignment="Center" />
+              <c:GsButton Grid.Column="1" Classes="sm" Content="{Binding ConflictApplyLabel}">
+                <c:GsButton.Flyout>
+                  <Flyout Placement="TopEdgeAlignedRight">
+                    <StackPanel Width="320" Spacing="12" Margin="8">
+                      <TextBlock Text="Apply it to them?" FontWeight="SemiBold" />
+                      <TextBlock Classes="caption muted" TextWrapping="Wrap" Text="{Binding ConflictApplyQuestion}" />
+                      <c:GsButton Classes="primary sm" Content="Apply" HorizontalAlignment="Right" Click="CloseFlyout" Command="{Binding ApplyConflictCommand}" />
+                    </StackPanel>
+                  </Flyout>
+                </c:GsButton.Flyout>
+              </c:GsButton>
+            </Grid>
+            <c:GsNote Icon="info" Text="{Binding ConflictNote.Text}" Classes.warn="{Binding ConflictNote.Failed}" IsVisible="{Binding HasConflictNote}" Margin="0,12,0,0" />
+          </StackPanel>
+        </c:GsCard>
+      </StackPanel>
+    </DataTemplate>
+
+    <!-- Cloud (CLOUD-05, CLOUD-08, CLOUD-13, ONB-06) -->
+    <DataTemplate DataType="vm:CloudSettings">
+      <StackPanel Spacing="16">
+        <StackPanel Spacing="4" Margin="0,0,0,4">
+          <TextBlock Classes="page-title" Text="Cloud" />
+          <TextBlock Classes="muted" TextWrapping="Wrap" Text="{Binding Subtitle}" />
+        </StackPanel>
+        <c:GsCard Title="Google Drive" IsVisible="{Binding IsDrive}">
+          <StackPanel Spacing="12">
+            <Panel IsVisible="{Binding SignedIn}">
+              <c:GsSettingsRow Title="{Binding AccountTitle}" Description="GameSync can only see the folder it made, not the rest of your Drive.">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <c:GsButton Classes="sm" Icon="external" Content="Open folder in Drive" Command="{Binding OpenDriveCommand}" />
+                  <c:GsButton Classes="ghost sm" Content="Sign out" IsEnabled="{Binding NotBusy}">
+                    <c:GsButton.Flyout>
+                      <Flyout Placement="BottomEdgeAlignedRight">
+                        <StackPanel Width="300" Spacing="12" Margin="8">
+                          <TextBlock Text="Sign out of Google Drive?" FontWeight="SemiBold" />
+                          <TextBlock Classes="caption muted" TextWrapping="Wrap"
+                                     Text="Syncing waits until you sign in again. Everything stays on this PC, and your Drive keeps its copy." />
+                          <c:GsButton Classes="primary sm" Content="Sign out" HorizontalAlignment="Right" Click="CloseFlyout" Command="{Binding SignOutCommand}" />
+                        </StackPanel>
+                      </Flyout>
+                    </c:GsButton.Flyout>
+                  </c:GsButton>
+                </StackPanel>
+              </c:GsSettingsRow>
+            </Panel>
+            <Panel IsVisible="{Binding SignedOut}">
+              <c:GsSettingsRow Title="Signed out" Description="Syncing waits until you sign in again. Everything stays on this PC, and your Drive keeps its copy.">
+                <c:GsButton Classes="primary sm" Content="Sign in with Google" Command="{Binding SignInCommand}" IsEnabled="{Binding NotBusy}" />
+              </c:GsSettingsRow>
+            </Panel>
+            <c:GsProgress Value="{Binding StoragePercent}" Label="Drive storage, shared with Gmail and Photos" Right="{Binding StorageRight}" IsVisible="{Binding ShowsStorage}" />
+            <c:GsNote Icon="alert" Classes="warn" Text="{Binding StorageWarning}" IsVisible="{Binding HasStorageWarning}" />
+          </StackPanel>
+        </c:GsCard>
+        <c:GsCard Title="A folder" IsVisible="{Binding IsFolder}">
+          <!-- A path has no spaces to wrap at, so it keeps its end in view and gives way to the button -->
+          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="20" MinHeight="56">
+            <StackPanel Spacing="2" VerticalAlignment="Center">
+              <TextBlock Classes="mono" Text="{Binding FolderPath}" FontWeight="Medium" TextTrimming="LeadingCharacterEllipsis" ToolTip.Tip="{Binding FolderPath}" />
+              <TextBlock Classes="caption muted" Text="{Binding FolderMeta}" TextWrapping="Wrap" />
+            </StackPanel>
+            <c:GsButton Grid.Column="1" Classes="sm" Icon="folder" Content="Open in Explorer" Command="{Binding OpenFolderCommand}" VerticalAlignment="Center" />
+          </Grid>
+        </c:GsCard>
+        <c:GsCard Title="Connect the cloud" Subtitle="Your own Google Drive, or a folder every PC can reach, such as a NAS or another disk." IsVisible="{Binding IsNone}">
+          <c:GsSettingsRow Title="Your saves are kept on this PC"
+                           Description="Every version stays here until you connect a cloud; what waited goes up then, and your other PCs can join.">
+            <c:GsButton Classes="primary sm" Icon="cloud" Content="Connect the cloud" Command="{Binding ConnectCommand}" />
+          </c:GsSettingsRow>
+        </c:GsCard>
+        <c:GsCard Title="Encryption">
+          <c:GsSettingsRow Title="Encrypt everything in the cloud" TagText="Later" IsEnabled="False"
+                           Description="Private, but no readable copy in the cloud, and losing the recovery code locks the cloud copy.">
+            <c:GsSwitch IsEnabled="False" AutomationProperties.Name="Encrypt everything in the cloud, later" />
+          </c:GsSettingsRow>
+        </c:GsCard>
+        <c:GsNote Icon="info" Text="{Binding Note.Text}" Classes.warn="{Binding Note.Failed}" IsVisible="{Binding HasNote}" />
+      </StackPanel>
+    </DataTemplate>
+
+    <!-- Devices (PC-01, PC-02) -->
+    <DataTemplate DataType="vm:DevicesSettings">
+      <StackPanel Spacing="16">
+        <StackPanel Spacing="4" Margin="0,0,0,4">
+          <TextBlock Classes="page-title" Text="Devices" />
+          <TextBlock Classes="muted" TextWrapping="Wrap" Text="Every PC that syncs with this cloud." />
+        </StackPanel>
+        <c:GsCard Title="PCs" Subtitle="Each PC names itself; the others see a new name after its next sync.">
+          <StackPanel>
+            <c:GsSettingsRow Classes="mono" Title="{Binding ThisPc}" Description="{Binding ThisPcDescription}">
+              <Panel>
+                <c:GsButton Classes="sm" Icon="pencil" Content="Rename" Command="{Binding RenameCommand}" IsVisible="{Binding NotRenaming}"
+                            AutomationProperties.Name="Rename this PC" />
+                <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding Renaming}">
+                  <TextBox Width="200" Text="{Binding NameText}" MaxLength="32" FontFamily="{DynamicResource font-mono}" AutomationProperties.Name="This PC's name">
+                    <TextBox.KeyBindings>
+                      <KeyBinding Gesture="Enter" Command="{Binding SaveNameCommand}" />
+                      <KeyBinding Gesture="Escape" Command="{Binding CancelRenameCommand}" />
+                    </TextBox.KeyBindings>
+                  </TextBox>
+                  <c:GsButton Classes="primary sm" Content="Save" Command="{Binding SaveNameCommand}" />
+                  <c:GsButton Classes="ghost sm" Content="Cancel" Command="{Binding CancelRenameCommand}" />
+                </StackPanel>
+              </Panel>
+            </c:GsSettingsRow>
+            <ItemsControl ItemsSource="{Binding Others}" IsVisible="{Binding HasOthers}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:PcRow">
+                  <c:GsSettingsRow Classes="mono after" Title="{Binding Name}" Description="{Binding Description}" AutomationProperties.Name="{Binding}" />
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <c:GsNote Icon="monitor" Text="{Binding NoOthersText}" IsVisible="{Binding NoOthers}" Margin="0,8,0,0" />
+          </StackPanel>
+        </c:GsCard>
+        <c:GsNote Icon="info" Text="{Binding Note.Text}" Classes.warn="{Binding Note.Failed}" IsVisible="{Binding HasNote}" />
+      </StackPanel>
+    </DataTemplate>
+
+    <!-- Notifications (BG-05, BG-06) -->
+    <DataTemplate DataType="vm:NotificationSettings">
+      <StackPanel Spacing="16">
+        <StackPanel Spacing="4" Margin="0,0,0,4">
+          <TextBlock Classes="page-title" Text="Notifications" />
+          <TextBlock Classes="muted" TextWrapping="Wrap" Text="Only for things that need you: a conflict, an expired sign-in, saves not found, a blocked file." />
+        </StackPanel>
+        <c:GsCard Title="Windows notifications">
+          <StackPanel>
+            <c:GsSettingsRow Title="Hold while a fullscreen game runs" Description="Shown after you quit, so nothing pops up mid-game.">
+              <c:GsSwitch IsChecked="{Binding Hold}" AutomationProperties.Name="Hold while a fullscreen game runs" />
+            </c:GsSettingsRow>
+            <c:GsSettingsRow Title="Daily summary" Description="One line after the daily backup: what was checked and what changed.">
+              <c:GsSwitch IsChecked="{Binding DailyNote}" AutomationProperties.Name="Daily summary" />
+            </c:GsSettingsRow>
+          </StackPanel>
+        </c:GsCard>
+      </StackPanel>
+    </DataTemplate>
+
+    <!-- Safety -->
+    <DataTemplate DataType="vm:SafetySettings">
+      <StackPanel Spacing="16">
+        <StackPanel Spacing="4" Margin="0,0,0,4">
+          <TextBlock Classes="page-title" Text="Safety" />
+          <TextBlock Classes="muted" TextWrapping="Wrap" Text="Only save data ever moves, and nothing touches a running game beyond watching it." />
+        </StackPanel>
+        <c:GsCard Title="Games with an anti-cheat" Subtitle="No learn mode and no sharing; they launch only through their own launcher.">
+          <c:GsFolderList Items="{Binding AntiCheat}" Empty="None of your games ships an anti-cheat GameSync knows of." />
+        </c:GsCard>
+      </StackPanel>
+    </DataTemplate>
+  </UserControl.DataTemplates>
+
+  <Grid ColumnDefinitions="248,*">
+
+    <!-- The sections, and the version with Copy diagnostics at the foot (SET-05) -->
+    <Border BorderBrush="{DynamicResource line-100}" BorderThickness="0,0,1,0" Padding="12,8,12,20">
+      <DockPanel>
+        <TextBlock DockPanel.Dock="Top" Text="Settings" FontSize="15" LineHeight="20" FontWeight="SemiBold" Margin="12,0,12,16" />
+        <StackPanel DockPanel.Dock="Bottom" Spacing="8" Margin="12,16,12,0">
+          <TextBlock Classes="caption faint" Text="{Binding Footer}" TextWrapping="Wrap" />
+          <c:GsButton Classes="sm" Icon="{Binding CopyIcon}" Content="{Binding CopyLabel}" Command="{Binding CopyDiagnosticsCommand}" HorizontalAlignment="Left"
+                      AutomationProperties.Name="Copy diagnostics" />
+          <TextBlock Classes="caption faint" TextWrapping="Wrap" Text="For a bug report: the logs and each game's versions. Never your sign-in or your saves." />
+        </StackPanel>
+        <c:GsSettingsNav ItemsSource="{Binding Sections}" SelectedId="{Binding Section, Mode=TwoWay}" AutomationProperties.Name="Settings sections" VerticalAlignment="Top" />
+      </DockPanel>
+    </Border>
+
+    <!-- The section, at most 920 wide, from the left -->
+    <ScrollViewer Name="Scroller" Grid.Column="1" Classes="page" HorizontalScrollBarVisibility="Disabled">
+      <Grid Margin="32,8,32,32">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*" MaxWidth="920" />
+          <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
+        <ContentControl Content="{Binding Current}" />
+      </Grid>
+    </ScrollViewer>
+  </Grid>
+</UserControl>

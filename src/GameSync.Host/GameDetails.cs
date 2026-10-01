@@ -22,10 +22,12 @@ public sealed record GamePlace(string Portable, string? Folder, string? Tag, str
 public sealed record GameVersion(VersionId Id, DateTime SavedUtc, string Pc, string? Note, bool IsCurrent, bool IsPinned, long Bytes, bool Uploaded);
 
 /// <summary>A named save (BAK-18): a pinned version with a name, on every PC.</summary>
-public sealed record GameNamedSave(string Name, VersionId Version, DateTime SavedUtc, string Pc, bool Uploaded);
+/// <param name="InPlace">Its files are the game's current save: the one restored last, or saved and not played since (KAN-51).</param>
+public sealed record GameNamedSave(string Name, VersionId Version, DateTime SavedUtc, string Pc, bool Uploaded, bool InPlace = false);
 
 /// <summary>A line of the game's own log.</summary>
-public sealed record GameLogLine(DateTime AtUtc, string Level, string Message);
+/// <param name="Tag">What it was about (<see cref="Core.State.EventTags"/>); null in lines logged before tags were kept.</param>
+public sealed record GameLogLine(DateTime AtUtc, string Level, string Message, string? Tag = null);
 
 /// <summary>
 /// What a game's page says about the game itself (LIB-19, ART-09, PLAY-11): its store page's basics, from Steam's store once, and
@@ -100,6 +102,11 @@ public sealed record GameDetail
 
     /// <summary>Places a later scan found that the game's rules don't take yet; the person adds them (R8).</summary>
     public IReadOnlyList<GamePlace> Suggestions { get; init; } = [];
+
+    /// <summary>For a game not syncing yet, the files the last scan found and their size: what keeping it starts with (KAN-63).</summary>
+    public int FoundFiles { get; init; }
+
+    public long FoundBytes { get; init; }
 
     public IReadOnlyList<GameNamedSave> NamedSaves { get; init; } = [];
 
@@ -245,9 +252,12 @@ public static class GameDetails
             FoundBy = foundBy,
             Places = places,
             Suggestions = suggestions,
+            FoundFiles = syncs || entry is null ? 0 : entry.Proposals.Sum(p => p.Files),
+            FoundBytes = syncs || entry is null ? 0 : entry.Proposals.Sum(p => p.Bytes),
             NamedSaves = pins.Values
                 .Where(p => p.Named)
-                .Select(p => versions.FirstOrDefault(v => v.Id == p.Version) is { } v ? new GameNamedSave(p.Label, v.Id, SavedAt(v), Pc(v), !pending.Contains(v.Id)) : null)
+                .Select(p => versions.FirstOrDefault(v => v.Id == p.Version) is { } v ? new GameNamedSave(p.Label, v.Id, SavedAt(v), Pc(v), !pending.Contains(v.Id),
+                    current is not null && FileSet.SameContent(current.Files, v.Files)) : null)
                 .OfType<GameNamedSave>()
                 .OrderByDescending(s => s.SavedUtc)
                 .ToList(),
@@ -258,7 +268,7 @@ public static class GameDetails
                     v.Pinned || pins.ContainsKey(v.Id), FileSet.TotalSize(v.Files), !pending.Contains(v.Id)))
                 .ToList(),
             HistoryBytes = versions.SelectMany(v => v.Files).DistinctBy(f => f.Hash).Sum(f => f.Size),
-            Log = events.Select(e => new GameLogLine(e.AtUtc, e.Level, e.Message)).ToList(),
+            Log = events.Select(e => new GameLogLine(e.AtUtc, e.Level, e.Message, e.Tag)).ToList(),
             InstallDir = entry?.Installed == true ? entry.InstallDir : null,
             HasAntiCheat = entry?.HasAntiCheat == true,
             LastBackupUtc = current is null ? null : SavedAt(current),
@@ -417,7 +427,7 @@ public static class GameDetails
     };
 
     /// <summary>When the save itself was made: its newest file, not when GameSync stored it.</summary>
-    private static DateTime SavedAt(VersionRecord version) => version.Files.Count > 0 ? version.Files.Max(f => f.ModifiedUtc) : version.CreatedUtc;
+    internal static DateTime SavedAt(VersionRecord version) => version.Files.Count > 0 ? version.Files.Max(f => f.ModifiedUtc) : version.CreatedUtc;
 
     private static string Values(RegistryProposal key) => key.Values == 1 ? "1 value" : $"{key.Values.ToString(CultureInfo.InvariantCulture)} values";
 

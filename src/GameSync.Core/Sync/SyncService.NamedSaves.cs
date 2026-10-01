@@ -78,7 +78,7 @@ public sealed partial class SyncService
         }
 
         await _log.SetPinAsync(stream.Id, new PinRecord(named.Id, name, DateTime.UtcNow, Device, Named: true), ct);
-        _state.Log(stream.Id, "info", $"Named save '{name}' is {named.Id}.");
+        _state.Log(stream.Id, "info", $"Saved as '{name}'.", EventTags.Named);
         return await AfterManualAsync(stream, new GameResult(stream.Id, stream.Definition.Title, action, StatusFor(stream), message)
         {
             NewVersion = named.Id,
@@ -121,7 +121,7 @@ public sealed partial class SyncService
         newName = CheckName(newName);
         await _log.SetPinAsync(stream.Id, new PinRecord(save.Version.Id, newName, DateTime.UtcNow, Device, Named: true), ct);
         await TryPushAsync(stream, ct);
-        _state.Log(stream.Id, "info", $"Renamed the named save '{save.Name}' to '{newName}'.");
+        _state.Log(stream.Id, "info", $"Renamed the named save '{save.Name}' to '{newName}'.", EventTags.Named);
     }
 
     /// <summary>Removes a save's name. The version stays in history; unnamed, it can be thinned like any other. Needs the cloud.</summary>
@@ -130,7 +130,7 @@ public sealed partial class SyncService
         var stream = Main(game);
         var save = await FindNamedAsync(stream, name, ct);
         await _log.RemovePinAsync(stream.Id, save.Version.Id, ct);
-        _state.Log(stream.Id, "info", $"Removed the name '{save.Name}' from {save.Version.Id}; the version stays in history.");
+        _state.Log(stream.Id, "info", $"Took the name '{save.Name}' away; the save stays in its history.", EventTags.Named);
     }
 
     /// <summary>
@@ -236,7 +236,7 @@ public sealed partial class SyncService
                 added++;
             }
 
-            _state.Log(stream.Id, "info", $"Imported {added} named saves from {folder}.");
+            _state.Log(stream.Id, "info", $"Imported {added} named saves from {folder}.", EventTags.Named);
             var result = await AfterManualAsync(stream, new GameResult(stream.Id, definition.Title, SyncAction.Upload, StatusFor(stream),
                 $"Imported {added} named saves."), ct);
             return new ImportReport(items, [.. skipped, .. result.Warnings], added);

@@ -726,13 +726,33 @@ public static partial class Cli
     /// <summary>FOLD-02 to FOLD-04: copies and checks everything first; if anything fails, the old folder stays in use.</summary>
     private static int MoveHistory(string dataDir, StateStore state, IReadOnlyList<GameDefinition> games, IEnumerable<string> installDirs, string target)
     {
+        var skipped = MoveHistoryFolder(dataDir, state, games, installDirs, target, null, CancellationToken.None);
+        Console.WriteLine(skipped is null
+            ? $"The backup folder is already {target}."
+            : $"Moved the backup folder to {target}. Every file was checked there before the old folder was removed.");
+        if (skipped > 0)
+        {
+            Console.WriteLine($"{skipped} damaged files stayed behind; the cloud still has them.");
+        }
+
+        return 0;
+    }
+
+    /// <summary>
+    /// FOLD-02 to FOLD-04: moves the backup folder to <paramref name="target"/>, copying everything and checking every
+    /// file there before the old folder is removed; if anything fails, the old folder stays in use and the reason is
+    /// thrown. Run it under the engine lock, so no sync writes to the old folder meanwhile.
+    /// </summary>
+    /// <returns>Damaged files left behind (the cloud still has them), or null when the folder was already there.</returns>
+    internal static int? MoveHistoryFolder(string dataDir, StateStore state, IReadOnlyList<GameDefinition> games, IEnumerable<string> installDirs, string target,
+        IProgress<(int Done, int Total)>? progress, CancellationToken ct)
+    {
         var current = Path.GetFullPath(HistoryFolder(state, dataDir));
         var from = Path.TrimEndingDirectorySeparator(current);
         var to = Path.TrimEndingDirectorySeparator(target);
         if (from.Equals(to, StringComparison.OrdinalIgnoreCase))
         {
-            Console.WriteLine($"The backup folder is already {target}.");
-            return 0;
+            return null;
         }
 
         if (to.StartsWith(from + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) ||
@@ -754,7 +774,7 @@ public static partial class Cli
         int skipped;
         try
         {
-            skipped = Directory.Exists(current) ? new LocalHistory(current).CopyTo(target) : 0;
+            skipped = Directory.Exists(current) ? new LocalHistory(current).CopyTo(target, progress, ct) : 0;
             Directory.CreateDirectory(target);
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
@@ -764,13 +784,7 @@ public static partial class Cli
 
         state.SetSetting("history.folder", target);
         LocalHistory.TryDelete(current);
-        Console.WriteLine($"Moved the backup folder to {target}. Every file was checked there before the old folder was removed.");
-        if (skipped > 0)
-        {
-            Console.WriteLine($"{skipped} damaged files stayed behind; the cloud still has them.");
-        }
-
-        return 0;
+        return skipped;
     }
 
     /// <summary>LIB-13: <c>add &lt;name&gt; &lt;folder&gt; [--program &lt;exe&gt;]</c>, a game or folder of your own, as the app's Add a game or folder.</summary>

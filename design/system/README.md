@@ -1,9 +1,3 @@
-# GameSync design system
-
-> Snapshot of the [online design system](https://claude.ai/code/artifact/6a117b31-dc9a-4cd7-be46-037c91f1f074), 30 Sep 2026, version 23. Designs are edited there; copy changed files here afterwards, as with `design/mockups/`. Open `viewer.html` in a browser to see every component and screen offline, in all eight themes.
->
-> For building: `tokens.json` holds every colour, type style, spacing and radius, per theme; `Theming.md` says how themes are generated; each `components/<Name>/README.md` is that component's spec. `components/bundle.js` and `bundle.css` are a React reference implementation for the previews, not app code; the app itself is Avalonia.
-
 GameSync is a Windows game launcher that also keeps every game's saves backed up and synced across the owner's PCs. The system has two registers that share one palette: the **Launcher**, soft and art-led, for picking a game and playing it; and the **Console**, dense and monospaced, for managing saves, where the extra detail is the point. Dark first, with Light, Match Windows and pure black modes and six preset themes, and two surfaces: Glossy, the default, where each page sits on a blurred copy of the game's art, and Solid; the Theming section has the rules.
 
 ## Voice and copy
@@ -23,7 +17,7 @@ GameSync is a Windows game launcher that also keeps every game's saves backed up
 - Controls inside a card sit on `bg-300`; hover goes to `bg-400`.
 - Every theme has two colours. `primary` (cyan in the default Arcade theme) is for the one primary button per view, progress fills, the busiest activity days, checkbox and switch fills, the console prompt, the logo and focus rings. Text on a primary fill is always `on-primary`.
 - `secondary` marks where you are and what you picked: `secondary-soft` fills selected rows, ticked share and import items, the current rail button, the selected tab and settings section; `secondary` itself tints their icons, the tab count chip and 2 to 4 hour activity days. Never use it for an action.
-- Status colours are fixed meanings and never change with the theme: `ok` = fine or moving (Synced, Upload pending, Newer in cloud); `warn` = needs you (Conflict, Held for review, Files in use, Saves not found); `play` = a game is running; `danger` = Blocked only; `neutral` = Synced by its store (say which: "Synced by Steam"), Not available. Each has a `-soft` background for chips and banners, and an `-art` tint for a badge on cover art.
+- Status colours are fixed meanings and never change with the theme: `ok` = fine or moving (Synced, Upload pending, Newer in cloud); `warn` = needs you (Conflict, Held for review, Files in use, Saves not found); `play` = a game is running (Spotify's green); `danger` = Blocked only; `neutral` = Synced by its store (say which: "Synced by Steam"), Not available. Each has a `-soft` background for chips and banners, and an `-art` tint for a badge on cover art.
 - The Console panes (save table, log) use `bg-000`, so they read as a terminal set into the app.
 - Text: `ink` for content, `ink-muted` for secondary, `ink-faint` for timestamps and labels. All three pass 4.5:1 on `bg-000` to `bg-300`, `secondary-soft` and `primary-soft` in every theme.
 - Anything on cover art (the hero's title, eyebrow, chip and glass buttons) uses `on-art`, `glass`, `glass-edge` and `art-scrim`, which stay the same in every theme and surface; a status badge on art takes its `-art` tint. In Glossy, art gets a 1px `edge-art` ring so it stays apart from the backdrop.
@@ -95,4 +89,4 @@ The screens follow Nielsen's ten heuristics and Shneiderman's eight golden rules
 - A toggle icon button that's on (the favourite star) fills its icon, in `secondary` off art and `on-art` on it.
 - Switches and checkboxes: off shows a `line-200` edge, on fills with `primary`.
 - Disabled controls drop to 45% opacity and keep their label.
-- Motion is short (120–200ms) and only on colour and progress width.
+- Motion is short (120–200ms) on colour and progress width. Changes of game are slower and softer: a game's picture fades to the next (0.7s), Glossy's backdrop brightens in from where the person clicked (0.75s), and the playing glow eases in and out (0.9s). With Windows' animation effects off, nothing moves.

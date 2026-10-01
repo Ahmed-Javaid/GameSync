@@ -119,7 +119,7 @@ public static partial class OwnGames
         var entry = Library.AddOwn(name, look.Folder, place, programFolder, taken, DateTime.UtcNow);
         if (setUp)
         {
-            entry = Library.Confirm(entry);
+            entry = Library.Confirm(entry, defaults: Core.Games.GameDefaults.Load(engine.State));
             var portable = entry.Confirmed!;
             if (Cli.Problems(portable, engine.Here.Resolver.Resolve(portable), engine.Here) is [var problem, ..])
             {

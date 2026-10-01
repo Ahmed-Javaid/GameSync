@@ -6,7 +6,7 @@
              x:Class="GameSync.UI.Views.LibraryPage"
              x:DataType="vm:LibraryViewModel">
   <!-- The game library, like Steam's (design system → LibraryScreen): every game by name in a list on the left, with the
-       search, the sort and favourites first; the covers, or the page of the game picked, on the right. -->
+       search, the sort, Installed only and favourites first; the covers, or the page of the game picked, on the right. -->
   <Grid ColumnDefinitions="272,*" ColumnSpacing="16" Margin="24,20">
 
     <!-- The list -->
@@ -18,19 +18,26 @@
             <c:GsIcon Icon="search" Size="16" Margin="12,0,0,0" Foreground="{DynamicResource ink-faint}" VerticalAlignment="Center" />
           </TextBox.InnerLeftContent>
           <TextBox.InnerRightContent>
-            <Border BorderBrush="{DynamicResource line-200}" BorderThickness="1" CornerRadius="4" Padding="5,0" Margin="0,0,8,0" VerticalAlignment="Center"
-                    IsVisible="{Binding Search, Converter={x:Static StringConverters.IsNullOrEmpty}}">
-              <TextBlock Text="Ctrl F" FontFamily="{DynamicResource font-mono}" FontSize="11" LineHeight="16" FontWeight="Medium" Foreground="{DynamicResource ink-faint}" />
-            </Border>
+            <Panel VerticalAlignment="Center">
+              <Border BorderBrush="{DynamicResource line-200}" BorderThickness="1" CornerRadius="4" Padding="5,0" Margin="0,0,8,0" VerticalAlignment="Center"
+                      IsVisible="{Binding ShowsShortcut}">
+                <TextBlock Text="Ctrl F" FontFamily="{DynamicResource font-mono}" FontSize="11" LineHeight="16" FontWeight="Medium" Foreground="{DynamicResource ink-faint}" />
+              </Border>
+              <!-- While searching, how many match, before the clear button -->
+              <TextBlock Classes="caption faint" Text="{Binding SearchCount}" IsVisible="{Binding !ShowsShortcut}" Margin="0,0,4,0" VerticalAlignment="Center"
+                         FontFamily="{DynamicResource font-mono}" />
+            </Panel>
           </TextBox.InnerRightContent>
           <TextBox.KeyBindings>
             <KeyBinding Gesture="Enter" Command="{Binding OpenFirstMatchCommand}" />
           </TextBox.KeyBindings>
         </TextBox>
 
+        <!-- Installed only (KAN-47), kept on this PC like the order; the list's headings count the games -->
         <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="4,10,0,6">
-          <TextBlock Classes="caption faint" Text="{Binding CountLabel}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-          <c:GsButton Grid.Column="1" Classes="ghost sm" Icon="sort" IconAfter="chevronDown" Content="{Binding SortLabel}"
+          <CheckBox Content="Installed" AutomationProperties.Name="Installed only" IsChecked="{Binding InstalledOnly}" FontSize="12" MinWidth="0" Padding="6,0,0,0" VerticalAlignment="Center"
+                    ToolTip.Tip="Only the games installed on this PC, in the list and the covers" />
+          <c:GsButton Grid.Column="1" Classes="ghost sm" IconAfter="chevronDown" Content="{Binding SortLabel}"
                       AutomationProperties.Name="{Binding SortName}">
             <c:GsButton.Flyout>
               <MenuFlyout Placement="BottomEdgeAlignedRight">
@@ -64,7 +71,7 @@
                                    CommandParameter="{Binding GroupId}" />
                 </DataTemplate>
                 <DataTemplate DataType="vm:GameListRow">
-                  <c:GsGameRow Title="{Binding Game.Title}" Art="{Binding Game.SmallArt}" Status="{Binding Game.Status}" StatusLabel="{Binding Game.StatusLabel}"
+                  <c:GsGameRow Title="{Binding Game.Title}" Art="{Binding Game.SmallArt}" Status="{Binding Game.Status}" StatusLabel="{Binding Game.StatusLabel}" MarkLabel="{Binding Game.MarkLabel}"
                                ShowsStatus="{Binding Game.ShowsListStatus}" IsInstalled="{Binding Game.Installed}"
                                AutomationProperties.Name="{Binding Game.SpokenName}" ToolTip.Tip="{Binding Game.SpokenName}"
                                Command="{Binding $parent[v:LibraryPage].((vm:LibraryViewModel)DataContext).OpenCommand}" CommandParameter="{Binding Game.Id}">
@@ -84,6 +91,10 @@
                           <MenuItem.Icon><c:GsIcon Icon="star" Size="16" Filled="{Binding Game.IsFavourite}" /></MenuItem.Icon>
                         </MenuItem>
                         <MenuItem Header="{Binding Game.HideLabel}" Command="{Binding Game.ToggleHidden}" />
+                        <Separator IsVisible="{Binding Game.HasProperties}" />
+                        <MenuItem Header="Properties" Command="{Binding Game.PropertiesCommand}" IsVisible="{Binding Game.HasProperties}">
+                          <MenuItem.Icon><c:GsIcon Icon="settings" Size="16" /></MenuItem.Icon>
+                        </MenuItem>
                       </ContextMenu>
                     </c:GsGameRow.ContextMenu>
                   </c:GsGameRow>
@@ -125,8 +136,9 @@
           </Grid>
         </c:GsCard>
         <!-- The covers' hover ring reaches 4px past each cover: the scroller gives it room on every side, so the first
-             row's and column's rings aren't cut off, and the covers stay where they were -->
-        <ScrollViewer Name="CoverScroller" HorizontalScrollBarVisibility="Disabled" Margin="-6,-6,-6,0">
+             row's and column's rings aren't cut off, and the covers stay where they were. Its bar sits in the middle of
+             the page's right gutter, clear of the covers and the window's edge, as every page scroller's does (KAN-71) -->
+        <ScrollViewer Name="CoverScroller" HorizontalScrollBarVisibility="Disabled" Margin="-6,-6,-18,0" Padding="0,0,12,0">
           <StackPanel Spacing="12" Margin="6,6,6,8">
             <TextBlock Classes="caption faint" Text="{Binding Nothing}" TextWrapping="Wrap" IsVisible="{Binding HasNothing}" />
             <TextBlock Classes="overline faint" Text="FAVOURITES" IsVisible="{Binding HasFavouriteTiles}" />

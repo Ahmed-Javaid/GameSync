@@ -4,6 +4,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Layout;
 using Avalonia.Media;
+using Avalonia.Media.Imaging;
 using GameSync.Core.State;
 
 namespace GameSync.UI.Controls;
@@ -46,8 +47,8 @@ public sealed class AspectPanel : Panel
 }
 
 /// <summary>
-/// A 2:3 cover tile with the game's name, a meta line, and a status badge unless the game is synced, so problems stand
-/// out. No art makes a title cover: the name on <c>bg-300</c> with its first letter large behind it, never an empty box.
+/// A 2:3 cover tile with the game's name, a meta line, and a status badge unless the game's saves are fine, so problems
+/// stand out; a fine game gets only a small mark in the ok colour, its words in the tooltip (KAN-48). No art makes a title cover: the name on <c>bg-300</c> with its first letter large behind it, never an empty box.
 /// </summary>
 public class GsGameTile : Button
 {
@@ -61,6 +62,11 @@ public class GsGameTile : Button
 
     public static readonly StyledProperty<string?> MetaProperty = AvaloniaProperty.Register<GsGameTile, string?>(nameof(Meta));
 
+    public static readonly StyledProperty<string?> MarkLabelProperty = AvaloniaProperty.Register<GsGameTile, string?>(nameof(MarkLabel));
+
+    public static readonly DirectProperty<GsGameTile, bool> ShowsMarkProperty =
+        AvaloniaProperty.RegisterDirect<GsGameTile, bool>(nameof(ShowsMark), t => t.ShowsMark);
+
     public static readonly DirectProperty<GsGameTile, string> InitialProperty =
         AvaloniaProperty.RegisterDirect<GsGameTile, string>(nameof(Initial), t => t.Initial);
 
@@ -69,6 +75,7 @@ public class GsGameTile : Button
 
     private string _initial = "?";
     private bool _showsStatus;
+    private bool _showsMark;
 
     public string? Title
     {
@@ -101,6 +108,13 @@ public class GsGameTile : Button
         set => SetValue(MetaProperty, value);
     }
 
+    /// <summary>The words of the small mark for a game whose saves are fine ("Synced", "Backed up; Steam syncs it").</summary>
+    public string? MarkLabel
+    {
+        get => GetValue(MarkLabelProperty);
+        set => SetValue(MarkLabelProperty, value);
+    }
+
     public string Initial
     {
         get => _initial;
@@ -113,6 +127,13 @@ public class GsGameTile : Button
         private set => SetAndRaise(ShowsStatusProperty, ref _showsStatus, value);
     }
 
+    /// <summary>The small mark in place of the badge: synced, or backed up while the store syncs it.</summary>
+    public bool ShowsMark
+    {
+        get => _showsMark;
+        private set => SetAndRaise(ShowsMarkProperty, ref _showsMark, value);
+    }
+
     /// <summary>The first letter or digit of a title, for its title cover.</summary>
     public static string InitialOf(string? title) => title?.FirstOrDefault(char.IsLetterOrDigit) is { } c and not '\0' ? char.ToUpperInvariant(c).ToString() : "?";
 
@@ -123,16 +144,18 @@ public class GsGameTile : Button
         {
             Initial = InitialOf(Title);
         }
-        else if (change.Property == StatusProperty)
+        else if (change.Property == StatusProperty || change.Property == MarkLabelProperty)
         {
-            // Synced games and games not syncing yet show no badge, so the problems stand out.
-            ShowsStatus = Status is { } s && s != GameStatus.Synced;
+            // Games whose saves are fine get the small mark, games not syncing yet nothing, so the problems stand out.
+            ShowsMark = MarkLabel is not null && Status is GameStatus.Synced or GameStatus.BackupOnly;
+            ShowsStatus = Status is { } s && s != GameStatus.Synced && !ShowsMark;
         }
 
-        if (change.Property == TitleProperty || change.Property == StatusProperty || change.Property == StatusLabelProperty)
+        if (change.Property == TitleProperty || change.Property == StatusProperty || change.Property == StatusLabelProperty || change.Property == MarkLabelProperty)
         {
-            // What a screen reader says: the name, and the badge's words when there's a badge (A11Y-03).
-            Avalonia.Automation.AutomationProperties.SetName(this, ShowsStatus ? $"{Title}, {StatusLabel ?? GsStatusBadge.Describe(Status).Word}" : Title);
+            // What a screen reader says: the name, and the badge's or the mark's words (A11Y-03).
+            var words = ShowsStatus ? StatusLabel ?? GsStatusBadge.Describe(Status).Word : ShowsMark ? MarkLabel : null;
+            Avalonia.Automation.AutomationProperties.SetName(this, words is null ? Title : $"{Title}, {words}");
         }
         else if (change.Property == ArtProperty)
         {
@@ -162,10 +185,16 @@ public class GsGameRow : Button
 
     public static readonly StyledProperty<bool> IsCurrentProperty = AvaloniaProperty.Register<GsGameRow, bool>(nameof(IsCurrent));
 
+    public static readonly StyledProperty<string?> MarkLabelProperty = AvaloniaProperty.Register<GsGameRow, string?>(nameof(MarkLabel));
+
+    public static readonly DirectProperty<GsGameRow, bool> ShowsMarkProperty =
+        AvaloniaProperty.RegisterDirect<GsGameRow, bool>(nameof(ShowsMark), r => r.ShowsMark);
+
     public static readonly DirectProperty<GsGameRow, string> InitialProperty =
         AvaloniaProperty.RegisterDirect<GsGameRow, string>(nameof(Initial), r => r.Initial);
 
     private string _initial = "?";
+    private bool _showsMark;
 
     public string? Title
     {
@@ -189,6 +218,19 @@ public class GsGameRow : Button
     {
         get => GetValue(StatusLabelProperty);
         set => SetValue(StatusLabelProperty, value);
+    }
+
+    /// <summary>The words of the small mark at the row's end for a game whose saves are fine (KAN-48).</summary>
+    public string? MarkLabel
+    {
+        get => GetValue(MarkLabelProperty);
+        set => SetValue(MarkLabelProperty, value);
+    }
+
+    public bool ShowsMark
+    {
+        get => _showsMark;
+        private set => SetAndRaise(ShowsMarkProperty, ref _showsMark, value);
     }
 
     /// <summary>Show the status under the name: only when the game needs the person or is running, so those stand out.</summary>
@@ -227,6 +269,10 @@ public class GsGameRow : Button
         else if (change.Property == IsCurrentProperty)
         {
             PseudoClasses.Set(":current", IsCurrent);
+        }
+        else if (change.Property == MarkLabelProperty || change.Property == ShowsStatusProperty)
+        {
+            ShowsMark = MarkLabel is not null && !ShowsStatus;
         }
         else if (change.Property == IsInstalledProperty)
         {
@@ -572,6 +618,24 @@ public class GsHeroBanner : TemplatedControl
         set => SetValue(EyebrowProperty, value);
     }
 
+    public static readonly StyledProperty<string?> EyebrowIconProperty = AvaloniaProperty.Register<GsHeroBanner, string?>(nameof(EyebrowIcon));
+
+    public static readonly StyledProperty<string?> EyebrowTipProperty = AvaloniaProperty.Register<GsHeroBanner, string?>(nameof(EyebrowTip));
+
+    /// <summary>A mark before the eyebrow: where the game is installed (a store's mark, or a folder), KAN-55.</summary>
+    public string? EyebrowIcon
+    {
+        get => GetValue(EyebrowIconProperty);
+        set => SetValue(EyebrowIconProperty, value);
+    }
+
+    /// <summary>The mark's words, in its tooltip and for screen readers: "Installed through Steam".</summary>
+    public string? EyebrowTip
+    {
+        get => GetValue(EyebrowTipProperty);
+        set => SetValue(EyebrowTipProperty, value);
+    }
+
     public string? Chip
     {
         get => GetValue(ChipProperty);
@@ -627,12 +691,88 @@ public class GsHeroBanner : TemplatedControl
     public const double RoomyAt = 280;
 
     private bool _hasRoom = true;
+    private Border? _glow;
+    private Control? _before;
 
     /// <summary>Tall enough for the playtime chip and the blurb.</summary>
     public bool HasRoom
     {
         get => _hasRoom;
         private set => SetAndRaise(HasRoomProperty, ref _hasRoom, value);
+    }
+
+    public static readonly StyledProperty<bool> IsPlayingProperty = AvaloniaProperty.Register<GsHeroBanner, bool>(nameof(IsPlaying));
+
+    /// <summary>
+    /// KAN-50: its game is running, so the banner glows in the play colour: a ring just outside the art and a soft light
+    /// around it. It holds still; a pulse waits for the animations, which follow Windows' animation effects (A11Y-04).
+    /// </summary>
+    public bool IsPlaying
+    {
+        get => GetValue(IsPlayingProperty);
+        set => SetValue(IsPlayingProperty, value);
+    }
+
+    /// <summary>How long the picture takes to fade to the next game's, and the playing glow to come and go (KAN-72).</summary>
+    public static readonly TimeSpan FadeTime = TimeSpan.FromMilliseconds(700);
+
+    public static readonly TimeSpan GlowTime = TimeSpan.FromMilliseconds(900);
+
+    protected override void OnApplyTemplate(TemplateAppliedEventArgs e)
+    {
+        base.OnApplyTemplate(e);
+        _glow = e.NameScope.Find<Border>("PART_Glow");
+        _before = e.NameScope.Find<Control>("PART_ArtBefore");
+        PaintGlow();
+
+        // KAN-72: the glow and its ring ease in as the game starts and out as it ends, unless Windows' animation effects are off (A11Y-04).
+        if (Motion.On)
+        {
+            foreach (var part in new Control?[] { _glow, e.NameScope.Find<Border>("PART_PlayRing") })
+            {
+                if (part is not null)
+                {
+                    part.Transitions = [new Avalonia.Animation.DoubleTransition { Property = OpacityProperty, Duration = GlowTime, Easing = new Avalonia.Animation.Easings.CubicEaseInOut() }];
+                }
+            }
+        }
+    }
+
+    // KAN-72: the next game's picture comes in under the one before, which fades away, unless animations are off.
+    private void FadeFrom(IImage before)
+    {
+        if (_before is not GsCoverImage layer || !Motion.On)
+        {
+            return;
+        }
+
+        layer.Transitions = null;
+        layer.Source = before;
+        layer.Opacity = 1;
+        layer.Transitions = [new Avalonia.Animation.DoubleTransition { Property = OpacityProperty, Duration = FadeTime, Easing = new Avalonia.Animation.Easings.CubicEaseInOut() }];
+        layer.Opacity = 0;
+        Avalonia.Threading.DispatcherTimer.RunOnce(() =>
+        {
+            if (layer.Opacity == 0 && ReferenceEquals(layer.Source, before))
+            {
+                layer.Source = null;
+            }
+        }, FadeTime + TimeSpan.FromMilliseconds(100));
+    }
+
+    // The soft light is a box shadow, whose colour can't be bound, so it's painted from the theme's play colour here, and
+    // again when the theme changes (status colours differ between dark and light).
+    public GsHeroBanner() => ResourcesChanged += (_, _) => PaintGlow();
+
+    private void PaintGlow()
+    {
+        if (_glow is null)
+        {
+            return;
+        }
+
+        var play = this.TryFindResource("play-color", ActualThemeVariant, out var found) && found is Color c ? c : Color.Parse("#1ed760");
+        _glow.BoxShadow = new BoxShadows(new BoxShadow { Blur = 32, Spread = 2, Color = Color.FromArgb(0x8C, play.R, play.G, play.B) });
     }
 
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
@@ -642,6 +782,10 @@ public class GsHeroBanner : TemplatedControl
         {
             HasRoom = Bounds.Height >= RoomyHeight;
         }
+        else if (change.Property == IsPlayingProperty)
+        {
+            PseudoClasses.Set(":playing", IsPlaying);
+        }
         else if (change.Property == LogoProperty)
         {
             PseudoClasses.Set(":logo", Logo is not null);
@@ -649,6 +793,10 @@ public class GsHeroBanner : TemplatedControl
         else if (change.Property == ArtProperty)
         {
             PseudoClasses.Set(":art", Art is not null);
+            if (change.OldValue is IImage before && !ReferenceEquals(before, change.NewValue))
+            {
+                FadeFrom(before);
+            }
         }
         else if (change.Property == TitleProperty)
         {
@@ -659,7 +807,9 @@ public class GsHeroBanner : TemplatedControl
 
 /// <summary>
 /// The play-time calendar (design system → ActivityGrid): a cell a day, Monday first. Level 0 none, 1 under 2 hours
-/// (hatched: some, but not much), 2 two to four hours (<c>secondary</c>), 3 over four (<c>primary</c>).
+/// (hatched: some, but not much), 2 two to four hours (<c>secondary</c>), 3 over four (<c>primary</c>). Pointing at a
+/// day says what was played and for how long, and a click on a day with play, or Enter on it, opens that day's games
+/// in the flyout attached to the <see cref="GsActivity"/> around it (KAN-66); the arrow keys move between days.
 /// </summary>
 public class GsActivityGrid : Control
 {
@@ -669,16 +819,39 @@ public class GsActivityGrid : Control
 
     public static readonly StyledProperty<double> CellRatioProperty = AvaloniaProperty.Register<GsActivityGrid, double>(nameof(CellRatio), 1 / 1.45);
 
+    public static readonly StyledProperty<IReadOnlyList<string>> TipsProperty = AvaloniaProperty.Register<GsActivityGrid, IReadOnlyList<string>>(nameof(Tips), []);
+
+    public static readonly StyledProperty<ICommand?> DayCommandProperty = AvaloniaProperty.Register<GsActivityGrid, ICommand?>(nameof(DayCommand));
+
     private const double Gap = 6;
+
+    // The tooltip's words change with the day pointed at, in the one tooltip.
+    private readonly TextBlock _tip = new() { MaxWidth = 320, TextWrapping = TextWrapping.Wrap };
+
+    private int _pointed = -1;
+    private int _pressed = -1;
+    private int _cursor = -1;
+    private bool _byKeyboard;
 
     static GsActivityGrid()
     {
         AffectsRender<GsActivityGrid>(DaysProperty, StartWeekdayProperty);
         AffectsMeasure<GsActivityGrid>(DaysProperty, StartWeekdayProperty, CellRatioProperty);
+        FocusableProperty.OverrideDefaultValue<GsActivityGrid>(true);
     }
 
     /// <summary>The cells take their colours when drawn, so they're drawn again when Glossy or Solid swaps the colours.</summary>
-    public GsActivityGrid() => ResourcesChanged += (_, _) => InvalidateVisual();
+    public GsActivityGrid()
+    {
+        ResourcesChanged += (_, _) => InvalidateVisual();
+
+        // One tooltip, whose words follow the pointer from day to day.
+        _tip.Text = Hint;
+        ToolTip.SetTip(this, _tip);
+    }
+
+    /// <summary>What the tooltip says between the days.</summary>
+    public const string Hint = "Point at a day to see what you played; click it for the list.";
 
     /// <summary>Each day's level, 0 to 3, from the first of the month.</summary>
     public IReadOnlyList<int> Days
@@ -701,6 +874,20 @@ public class GsActivityGrid : Control
         set => SetValue(CellRatioProperty, value);
     }
 
+    /// <summary>What each day says when pointed at: its date, and the games played and for how long.</summary>
+    public IReadOnlyList<string> Tips
+    {
+        get => GetValue(TipsProperty);
+        set => SetValue(TipsProperty, value);
+    }
+
+    /// <summary>Run with the day's index, from 0 for the first, when a day with play is chosen.</summary>
+    public ICommand? DayCommand
+    {
+        get => GetValue(DayCommandProperty);
+        set => SetValue(DayCommandProperty, value);
+    }
+
     private int Rows => (StartWeekday + Days.Count + 6) / 7;
 
     protected override Size MeasureOverride(Size availableSize)
@@ -712,14 +899,176 @@ public class GsActivityGrid : Control
 
     public override void Render(DrawingContext context)
     {
-        var cellWidth = (Bounds.Width - Gap * 6) / 7;
-        var cellHeight = cellWidth * CellRatio;
         for (var i = 0; i < Days.Count; i++)
         {
-            var slot = StartWeekday + i;
-            var rect = new Rect(slot % 7 * (cellWidth + Gap), slot / 7 * (cellHeight + Gap), cellWidth, cellHeight);
-            ActivityLevels.Paint(this, context, new RoundedRect(rect, 10), Days[i]);
+            ActivityLevels.Paint(this, context, new RoundedRect(Cell(i), 10), Days[i]);
         }
+
+        // The day pointed at, and the day the arrow keys are on, as focus rings are drawn (A11Y-02).
+        IBrush? Brush(string key) => this.TryFindResource(key, ActualThemeVariant, out var value) ? value as IBrush : null;
+        if (_pointed >= 0 && _pointed < Days.Count && (_pointed != _cursor || !_byKeyboard))
+        {
+            context.DrawRectangle(null, new Pen(Brush("ink-muted"), 1.5), new RoundedRect(Cell(_pointed).Deflate(0.75), 10));
+        }
+
+        if (_byKeyboard && IsFocused && _cursor >= 0 && _cursor < Days.Count)
+        {
+            context.DrawRectangle(null, new Pen(Brush("primary"), 2), new RoundedRect(Cell(_cursor).Inflate(2), 12));
+        }
+    }
+
+    /// <summary>The day under a point, or -1 in a gap or outside the month.</summary>
+    public int DayAt(Point point)
+    {
+        for (var i = 0; i < Days.Count; i++)
+        {
+            if (Cell(i).Contains(point))
+            {
+                return i;
+            }
+        }
+
+        return -1;
+    }
+
+    private Rect Cell(int day)
+    {
+        var width = (Bounds.Width - Gap * 6) / 7;
+        var height = width * CellRatio;
+        var slot = StartWeekday + day;
+        return new Rect(slot % 7 * (width + Gap), slot / 7 * (height + Gap), width, height);
+    }
+
+    protected override void OnPointerMoved(Avalonia.Input.PointerEventArgs e)
+    {
+        base.OnPointerMoved(e);
+        var day = DayAt(e.GetPosition(this));
+        if (day == _pointed)
+        {
+            return;
+        }
+
+        _pointed = day;
+        _tip.Text = day >= 0 && day < Tips.Count ? Tips[day] : Hint;
+        InvalidateVisual();
+    }
+
+    protected override void OnPointerExited(Avalonia.Input.PointerEventArgs e)
+    {
+        base.OnPointerExited(e);
+        _pointed = -1;
+        InvalidateVisual();
+    }
+
+    protected override void OnPointerPressed(Avalonia.Input.PointerPressedEventArgs e)
+    {
+        base.OnPointerPressed(e);
+        _byKeyboard = false;
+        _pressed = e.GetCurrentPoint(this).Properties.IsLeftButtonPressed ? DayAt(e.GetPosition(this)) : -1;
+    }
+
+    protected override void OnPointerReleased(Avalonia.Input.PointerReleasedEventArgs e)
+    {
+        base.OnPointerReleased(e);
+        var day = DayAt(e.GetPosition(this));
+        if (day >= 0 && day == _pressed)
+        {
+            e.Handled = Choose(day, atPointer: true);
+        }
+
+        _pressed = -1;
+    }
+
+    protected override void OnGotFocus(Avalonia.Input.FocusChangedEventArgs e)
+    {
+        base.OnGotFocus(e);
+        if (e.NavigationMethod is Avalonia.Input.NavigationMethod.Tab or Avalonia.Input.NavigationMethod.Directional)
+        {
+            _byKeyboard = true;
+            Move(_cursor >= 0 ? _cursor : Math.Max(0, LastPlayed()));
+        }
+    }
+
+    protected override void OnLostFocus(Avalonia.Input.FocusChangedEventArgs e)
+    {
+        base.OnLostFocus(e);
+        InvalidateVisual();
+    }
+
+    protected override void OnKeyDown(Avalonia.Input.KeyEventArgs e)
+    {
+        base.OnKeyDown(e);
+        if (Days.Count == 0)
+        {
+            return;
+        }
+
+        var step = e.Key switch
+        {
+            Avalonia.Input.Key.Left => -1,
+            Avalonia.Input.Key.Right => 1,
+            Avalonia.Input.Key.Up => -7,
+            Avalonia.Input.Key.Down => 7,
+            _ => 0,
+        };
+        if (step != 0)
+        {
+            _byKeyboard = true;
+            Move(Math.Clamp((_cursor < 0 ? 0 : _cursor) + step, 0, Days.Count - 1));
+            e.Handled = true;
+        }
+        else if (e.Key is Avalonia.Input.Key.Enter or Avalonia.Input.Key.Space && _cursor >= 0)
+        {
+            e.Handled = Choose(_cursor, atPointer: false);
+        }
+    }
+
+    private void Move(int day)
+    {
+        _cursor = day;
+        if (day < Tips.Count)
+        {
+            // A screen reader hears the day with the grid's name (A11Y-03).
+            Avalonia.Automation.AutomationProperties.SetHelpText(this, Tips[day]);
+        }
+
+        InvalidateVisual();
+    }
+
+    private int LastPlayed()
+    {
+        for (var i = Days.Count - 1; i >= 0; i--)
+        {
+            if (Days[i] > 0)
+            {
+                return i;
+            }
+        }
+
+        return -1;
+    }
+
+    // A day with play opens its games; a day without has nothing to list, and its tooltip says so.
+    private bool Choose(int day, bool atPointer)
+    {
+        if (day >= Days.Count || Days[day] <= 0)
+        {
+            return false;
+        }
+
+        _cursor = day;
+        if (DayCommand?.CanExecute(day) == true)
+        {
+            DayCommand.Execute(day);
+        }
+
+        ToolTip.SetIsOpen(this, false);
+        if (TemplatedParent is Control owner && FlyoutBase.GetAttachedFlyout(owner) is PopupFlyoutBase flyout)
+        {
+            flyout.ShowAt(this, showAtPointer: atPointer);
+        }
+
+        return true;
     }
 
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
@@ -741,6 +1090,10 @@ public class GsActivity : TemplatedControl
 
     public static readonly StyledProperty<int> StartWeekdayProperty = AvaloniaProperty.Register<GsActivity, int>(nameof(StartWeekday));
 
+    public static readonly StyledProperty<IReadOnlyList<string>> TipsProperty = GsActivityGrid.TipsProperty.AddOwner<GsActivity>();
+
+    public static readonly StyledProperty<ICommand?> DayCommandProperty = GsActivityGrid.DayCommandProperty.AddOwner<GsActivity>();
+
     public IReadOnlyList<int> Days
     {
         get => GetValue(DaysProperty);
@@ -751,6 +1104,20 @@ public class GsActivity : TemplatedControl
     {
         get => GetValue(StartWeekdayProperty);
         set => SetValue(StartWeekdayProperty, value);
+    }
+
+    /// <summary>What each day says when pointed at (KAN-66).</summary>
+    public IReadOnlyList<string> Tips
+    {
+        get => GetValue(TipsProperty);
+        set => SetValue(TipsProperty, value);
+    }
+
+    /// <summary>Run with a day's index when a day with play is chosen; its games then show in this control's attached flyout.</summary>
+    public ICommand? DayCommand
+    {
+        get => GetValue(DayCommandProperty);
+        set => SetValue(DayCommandProperty, value);
     }
 }
 

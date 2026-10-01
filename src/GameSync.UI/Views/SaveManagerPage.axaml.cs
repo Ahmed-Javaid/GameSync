@@ -1,6 +1,9 @@
 using System.Windows.Input;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Input.Platform;
+using Avalonia.Interactivity;
+using Avalonia.Threading;
 using GameSync.UI.ViewModels;
 
 namespace GameSync.UI.Views;
@@ -28,6 +31,27 @@ public partial class SaveManagerPage : UserControl
                 e.Handled = true;
             }
         }, handledEventsToo: true);
+    }
+
+    /// <summary>Copy the log (MGR-09): the lines shown go on the clipboard, and the button says Copied for a moment.</summary>
+    private async void CopyLog(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not SaveManagerViewModel { LogTab: { } log } || TopLevel.GetTopLevel(this)?.Clipboard is not { } clipboard)
+        {
+            return;
+        }
+
+        await clipboard.SetTextAsync(log.CopyText());
+        if (sender is Controls.GsButton button)
+        {
+            button.Content = "Copied";
+            button.Icon = "check";
+            DispatcherTimer.RunOnce(() =>
+            {
+                button.Content = "Copy the log";
+                button.Icon = "copy";
+            }, TimeSpan.FromSeconds(2));
+        }
     }
 
     /// <summary>The Back of the page showing: the conflict's, or the game's saves'; none over every game's saves.</summary>

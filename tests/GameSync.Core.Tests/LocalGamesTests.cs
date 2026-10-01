@@ -43,6 +43,7 @@ public class LocalGamesTests
         Assert.Equal($"Playing now · since {since.ToLocalTime():HH:mm} · In its own folder", page.HeroEyebrow);
         Assert.Equal((GameStatus.Playing, "Playing now"), (page.HeroStatus, page.HeroStatusLabel));
         Assert.False(page.HeroShowsPlay);
+        Assert.True(page.HeroIsPlaying); // KAN-50: the banner glows in the play colour
         Assert.StartsWith("GameSync saw it start, so its play counts.", page.HeroBlurb);
 
         // Its tile says Playing, its row in the library shows it, and its page has Playing in place of Play.
@@ -57,10 +58,12 @@ public class LocalGamesTests
         // Nothing running: the last played is the hero again.
         var quiet = Launcher.Games(library, [], state, null, plays, null);
         Assert.Equal("Risk of Rain 2", Launcher.Home(quiet, state, Now).Hero!.Title);
+        Assert.False(HomeViewModel.From(Launcher.Home(quiet, state, Now), quiet, Now).HeroIsPlaying);
+        Assert.False(new HomeViewModel().HeroIsPlaying);
     }
 
     [Fact]
-    public void LIB_22_the_library_shows_installed_games_or_local_ones_and_keeps_the_view_on_this_PC()
+    public void LIB_22_KAN_47_the_library_shows_local_games_and_Installed_only_which_is_kept_on_this_PC()
     {
         using var world = new TestWorld();
         using var state = new StateStore(Path.Combine(world.Root, "data"));
@@ -72,27 +75,35 @@ public class LocalGamesTests
             Entry("hades", "Hades", StoreKind.Epic, "min") with { Installed = false },
         };
         var games = Launcher.Games(library, [], state, null, new Dictionary<long, SteamPlay>(), null);
-        var kept = new List<string>();
-        var actions = new LauncherActions(_ => { }, () => { }, (_, _) => { }, (_, _) => { }) { SetView = kept.Add };
+        var kept = new List<bool>();
+        var actions = new LauncherActions(_ => { }, () => { }, (_, _) => { }, (_, _) => { }) { SetInstalledOnly = kept.Add };
 
-        var view = LibraryViewModel.From(games, Now, "installed", actions);
-        Assert.Equal(["all", "installed", "local", "attn"], view.Tabs.Select(t => t.Id));
+        var view = LibraryViewModel.From(games, Now, "all", actions, installedOnly: true);
+        Assert.Equal(["all", "local"], view.Tabs.Select(t => t.Id));
         Assert.Equal(["Black Myth: Wukong", "Risk of Rain 2"], view.OtherTiles.Select(t => t.Title).Order());
+        Assert.Equal(["Black Myth: Wukong", "Risk of Rain 2"], view.ListItems.OfType<GameListRow>().Select(r => r.Game.Title).Order());
         view.SelectedTab = "local";
         Assert.Equal(["Black Myth: Wukong"], view.OtherTiles.Select(t => t.Title));
         Assert.True(view.IsLocalView);
 
-        // The view the person picks is kept; Home's My games only visits All games.
+        // Installed only is the person's setting, kept on this PC; unticked, every game shows again.
         view.ShowView("all");
+        view.InstalledOnly = false;
         Assert.Equal(4, view.OtherTiles.Count);
-        view.SelectedTab = "installed";
-        Assert.Equal(["installed", "local", "installed"], kept);
-        Assert.Equal("local", new LibraryViewModel(actions, view: "local").SelectedTab);
-        Assert.Equal("all", new LibraryViewModel(actions, view: "attn").SelectedTab);
+        Assert.Equal([false], kept);
+        Assert.True(new LibraryViewModel(actions, installedOnly: true).InstalledOnly);
+        view.ShowView("installed");
+        Assert.Equal("all", view.SelectedTab);
+
+        // LauncherData keeps it in state.db, off until ticked.
+        var data = Path.Combine(world.Root, "data");
+        Assert.False(LauncherData.ReadInstalledOnly(data));
+        LauncherData.SetInstalledOnly(data, true);
+        Assert.True(LauncherData.ReadInstalledOnly(data));
     }
 
     [Fact]
-    public void LIB_21_reached_from_the_rail_a_game_page_still_open_leads_Back_to_the_covers_not_Home()
+    public void LIB_21_KAN_46_reached_from_the_rail_the_library_shows_the_covers_even_with_a_game_page_left_open()
     {
         var shown = new List<string>();
         var actions = new LauncherActions(_ => { }, () => { }, (page, _) => shown.Add(page), (_, _) => { });
@@ -109,14 +120,14 @@ public class LocalGamesTests
         shell.Open("library");
         Assert.Equal("home", library.ReturnTo);
 
-        // The person goes Home by the rail, then back to the library by the rail: CS2's page is still open, and Back
-        // leads to the covers.
+        // The person goes Home by the rail, then back to the library by the rail: the library itself, every game's
+        // covers, with nothing to go Back to (KAN-46).
         shell.NavigateCommand.Execute("home");
         shell.NavigateCommand.Execute("library");
-        Assert.Equal(cs2, library.Selected);
+        Assert.Null(library.Selected);
+        Assert.True(library.ShowsCovers);
         Assert.Null(library.ReturnTo);
         library.BackCommand.Execute(null);
-        Assert.Null(library.Selected);
         Assert.Empty(shown);
     }
 

@@ -115,7 +115,7 @@ public static class FirstRun
             looked: (done, total) => progress?.Report(new ScanProgress("Looking for each game's saves", done, total)),
             sources: sources);
         var entries = Library.Reconcile(engine.Library.All(), findings.Found, DateTime.UtcNow, null, findings.Leftovers);
-        engine.Library.SaveAll(entries);
+        engine.Library.ReplaceAll(entries);
 
         var games = detection?.Games ?? [];
         var live = entries.Where(e => e.MergedInto is null && e.State != LibraryState.Ignored).ToList();
@@ -308,6 +308,7 @@ public static class FirstRun
         using (var engine = Engine.Open(dataDir))
         {
             var entries = engine.Library.All().Where(e => e.MergedInto is null).ToDictionary(e => e.Id);
+            var defaults = Core.Games.GameDefaults.Load(engine.State);
             var confirmed = new List<LibraryEntry>();
             foreach (var id in choice.Games.Distinct())
             {
@@ -316,7 +317,7 @@ public static class FirstRun
                     continue;
                 }
 
-                var next = Library.Confirm(entry);
+                var next = Library.Confirm(entry, defaults: defaults);
                 var portable = next.Confirmed!;
                 if (Cli.Problems(portable, engine.Here.Resolver.Resolve(portable), engine.Here) is [var problem, ..])
                 {

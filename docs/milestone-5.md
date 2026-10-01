@@ -97,6 +97,43 @@ The screens are designed: the Launcher, Save manager and Settings since 27 Sep, 
 
   Then **the Versions and Log tabs**, drawn for the owner to look at before they're built (design system version 23): every version of every game, newest first, by game and PC; and the whole log, searchable, with Only what needs you and Copy the log.
 
+- 30 Sep, later that night: **the Versions and Log tabs built** (MGR-08, MGR-09) as drawn, the owner having said to go on.
+  - Versions: every version of every game from every PC, newest first, with why each was kept (after play and for how long, after 5 quiet minutes for a folder of your own, the daily backup, the first backup, held for review, a named save's name, or the note a kept save was made with), filtered by game and PC, with Named and kept only; the newest 100, then Show N older. A row opens its game's saves with that version marked, where Restore is.
+  - Log: the whole activity log, newest first and dated, each line with its game's name and a tag for what it was about; the search as the library's, a game filter, Only what needs you, and Uploads, downloads and restores; Copy the log puts the lines shown on the clipboard, dated in full, with anything shaped like a sign-in token taken out.
+  - Under them: the log keeps a tag with each line, the daily backup notes "Daily backup" on the saves it makes current, a session that ends is logged with how long it was played, and the log's lines lost their version IDs and status names.
+  - Checked with 6 new tests (399 pass), in snapshots, and in the real window on a scratch data folder.
+
+  Then **Add a game or folder, in the real window** (KAN-22): a server's world with no program and an old game with its `.exe`, both added and backed up on a scratch data folder. It showed the Saves card saying Google Drive whatever the cloud was: now a game says where its saves go, Google Drive, a cloud folder, or this PC until a cloud is connected (ONB-06; 400 pass).
+
+- 30 Sep, overnight: **the owner's late-night wishes** (KAN-44 to KAN-51), built while they slept; decisions in design.md → UI → The owner's wishes of 30 Sep 2026.
+  - A copy not from a store is never "synced by its store" (their Child of Light); a small check in the ok colour on covers and rows for games whose saves are fine, in place of a badge that ran past the cover.
+  - The rail's Game library always opens every game; Needs you left the library for the save manager's own Needs you tab, where Home's Needs you leads; Installed only is a tick box in the library's list.
+  - The save manager's Saves tab: Syncing above Every game, sorted by a click on GAME or STATUS.
+  - The game playing now glows on Home, held still.
+  - Restoring a named save, checked in the real window: it worked, but said nothing once done; now the page says it's bringing it back, then that it's in place (or why not), and the named save in place says so.
+  - Checked with 7 new or reworked tests (405 pass), in snapshots, and in the real window on a scratch data folder. Not committed.
+
+- 30 Sep, evening: **the owner's review of the overnight build** (KAN-54 to KAN-62).
+  - Choppy scrolling, measured before fixing: the Glossy backdrop was stretched across the window by the CPU every frame (62 ms a frame in the real window). Drawn once now: 16 ms. The GPU was measured too and not taken (no faster after the fix, heavier in memory).
+  - A game's colours grow in as a circle when its page opens; a game's page shows its store's mark; Properties on right-click; each save manager table sorts on its own, with sort marks; round scroll bars.
+  - Art from a game's own folder (Bloodborne's PS4 dump), composed into a 2:3 cover; "Not backed up yet" before a game's first backup; Child of Light put right when GameSync opens its data.
+  - Open: syncing a save folder that holds copies kept by hand (KAN-61, to draw first) and memory after the window closes (KAN-62).
+  - Checked with new and reworked tests (409 pass), snapshots and the real window. Not committed.
+
+- 30 Sep, night (built by 1 Oct): **the owner's second review** (KAN-54 again, KAN-63 to KAN-66); design.md → UI → The owner's review of 30 Sep 2026, night.
+  - The colour change is light now, not a circle: a soft glow spreads from the click and brightens until the new backdrop is fully lit, drawn with Skia in one pass (about 29 ms a frame).
+  - Named saves, Back up now and Import kept saves… work before a game syncs, keeping it backed up only, with Sync between PCs for later; the saves page has all three in its top bar and one Choose files….
+  - Scan a folder for games reads folders of several games (COD's four Call of Duty games), games in a folder of their own (FNF is Friday Night Funkin', OG is MAME), names from programs, and leaves tools out; what an earlier scan got wrong leaves the library. Checked read-only on the owner's own folders.
+  - Home's Activity says what was played each day and for how long, lists a day's games on a click, and goes back a month at a time.
+  - Checked with 6 new tests (415 pass), snapshots and read-only scans; not in the real window, as the owner was at the PC. Not committed.
+
+- 1 Oct, early morning: **Settings** (SET-01 to SET-08, KAN-24), drawn first where the design lacked it (design system version 26: start at sign-in and the daily backup's switch and Run now, the conflict default offering to apply to the games syncing, the cloud's three states, Rename for this PC only, Copy diagnostics at the foot of the column), then built. Every section works from a public layer in Host (`SettingsData`) over what the command line already did: the look live, the backup folder moved with its progress, history to keep, game and save folders with a scan after each change, start at sign-in and the daily backup (only on GameSync's usual data folder), Run now, what new games start from (new: `GameDefaults`, used whenever a game starts syncing) and applying it to the games syncing, the cloud's account and storage, Sign out and in, renaming this PC, the notification switches (holding during a fullscreen game can be turned off; the daily summary is new), the anti-cheat games, and Copy diagnostics. Checked in snapshots, 17 new tests (436 pass) and the real window on a scratch data folder. Not committed.
+- 1 Oct, later still: the scroll bar in the middle of the page's gutter, not against the window's edge (KAN-71), and New named save… on the Named saves card, where named saves are listed (KAN-75; design system version 25). Not committed.
+
+- 1 Oct, later: **the owner's look at the rescan** (KAN-69 to KAN-73; KAN-74 for later): Black Ops 3 is Call of Duty: Black Ops III and the GOG copy of Guacamelee is known by its GOG record, both with Steam's art; Friday Night Funkin' and MAME take their programs' icons as covers; scroll bars sit clear of the covers and cards; Home's hero fades to the next game and its playing glow eases in and out; Playing is Spotify's green, in the design system first (version 24, with Home and the library in full glass). 419 tests pass. Not committed. The Activity card's overhaul, with statistics and graphs, is to talk through and draw first.
+
+- 1 Oct: **the owner's look at that build** (KAN-67, KAN-68): Counter-Strike 2's backdrop was too orange, so a backdrop's colour is capped (measured on their own art: CS2 now shows as colourful as Peak, and the art that looked right barely changes); Home's cards and the library's list were grey over the art, so both take full glass, as a game's page does. 416 tests pass. Not committed.
+
 ## How to try the app
 
 ```powershell
@@ -113,7 +150,7 @@ It uses `%LOCALAPPDATA%\GameSync` like the command line, so on the owner's PC it
 1. The foundation: `GameSync.UI` with the theme engine and its tests, tokens as resources, the icon set, and the styled components. **Done.**
 2. The app shell: the tray icon and its states, the main window with the side rail, one instance and the pipe, the agent inside, the theme applied live. **Done 28 Sep.**
 3. Read models for the library, a game, the plan, a conflict and the save manager.
-4. The screens, in order of use: first run (**working since 30 Sep**, with Skip for now, and Add a game or folder), the launcher home and library (**working since 28 Sep**; the library like Steam's since 29 Sep, with Installed and Local views and the game playing now on Home since that night), game detail (**working since 29 Sep**, about the game since the owner's review), the save manager (**a game's saves working since 29 Sep**, **Plan since 30 Sep**) with Versions and Log (drawn 30 Sep), the conflict screen (**working since 29 Sep**), settings, and the share and import windows.
+4. The screens, in order of use: first run (**working since 30 Sep**, with Skip for now, and Add a game or folder), the launcher home and library (**working since 28 Sep**; the library like Steam's since 29 Sep, with Installed and Local views and the game playing now on Home since that night), game detail (**working since 29 Sep**, about the game since the owner's review), the save manager (**a game's saves working since 29 Sep**, **Plan, Versions and Log since 30 Sep**), the conflict screen (**working since 29 Sep**), settings (**working since 1 Oct**), and the share and import windows.
 5. Cover art and the activity calendar.
 6. The command line handing off to the app.
 7. Accessibility (keyboard, focus, screen-reader names, text size, animations off) and speed with 500 games.

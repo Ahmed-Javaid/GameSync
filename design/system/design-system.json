@@ -31,9 +31,9 @@
   ],
   "lastChange": {
     "by": "Vulsight",
-    "at": "2026-09-29T22:28:00Z",
+    "at": "2026-09-30T23:30:31Z",
     "via": "Claude Code",
-    "note": "Version 23: the save manager's Versions tab (every version of every game, newest first, by game and PC) and Log tab (everything GameSync did, searchable, with Copy the log), and ConsoleLog's dated lines."
+    "note": "Version 26: Settings as it's built: Start GameSync when you sign in and the daily backup's switch, time and Run now under Backup and sync; the conflict default offers to apply to the games already syncing; the cloud's three states (Google Drive signed in or out, a folder, no cloud yet); Rename for this PC only; the version and Copy diagnostics at the foot of the settings column."
   },
   "layout": "files",
   "libraries": [

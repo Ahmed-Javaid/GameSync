@@ -32,9 +32,14 @@ public sealed record PlaceItem(string Portable, string? Folder, string? Tag, str
 }
 
 /// <summary>A named save: its name, when and on which PC it was saved, and the new name typed to rename it.</summary>
-public sealed partial class NamedSaveItem(string name, VersionId version, string when, string pc) : ObservableObject
+public sealed partial class NamedSaveItem(string name, VersionId version, string when, string pc, bool inPlace = false) : ObservableObject
 {
     public string Name { get; } = name;
+
+    /// <summary>Its files are the game's save now (KAN-51): it says In place instead of offering Restore.</summary>
+    public bool IsInPlace { get; } = inPlace;
+
+    public bool CanRestore => !IsInPlace;
 
     public VersionId Version { get; } = version;
 
@@ -48,20 +53,23 @@ public sealed partial class NamedSaveItem(string name, VersionId version, string
 
     public string Meta => $"{When} · {Pc}";
 
-    public override string ToString() => $"{Name}, saved {When} on {Pc}";
+    public override string ToString() => $"{Name}, saved {When} on {Pc}{(IsInPlace ? ", in place now" : "")}";
 }
 
 /// <summary>A version in a game's history: when it was saved, the PC, what sets it apart, its size.</summary>
 public sealed record VersionItem(VersionId Id, string Saved, string Pc, string? Note, bool IsCurrent, bool IsPinned, string Size, bool Uploaded)
 {
-    /// <summary>What sets a version apart, beside a pin when it's pinned; the current one shows Current instead.</summary>
-    public bool ShowsNote => !IsCurrent && Note is not null;
+    /// <summary>The version the Versions tab opened these saves on (MGR-08), marked where its Restore is.</summary>
+    public bool IsPicked { get; init; }
+
+    /// <summary>What sets a version apart, beside a pin when it's pinned; the current one shows Current beside it ("Restored from …", KAN-51).</summary>
+    public bool ShowsNote => Note is not null;
 
     public bool ShowsPin => ShowsNote && IsPinned;
 
     public bool CanRestore => !IsCurrent;
 
-    public override string ToString() => string.Join(", ", new[] { Saved, Pc, IsCurrent ? "current" : Note, Size, Uploaded ? null : "not uploaded yet" }.OfType<string>());
+    public override string ToString() => string.Join(", ", new[] { Saved, Pc, IsCurrent ? "current" : null, Note, Size, Uploaded ? null : "not uploaded yet" }.OfType<string>());
 }
 
 /// <summary>
@@ -82,7 +90,7 @@ public sealed partial class GameSavesViewModel : ObservableObject, IPageSurface
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsHeld), nameof(IsConflict), nameof(IsFilesInUse), nameof(IsSavesMissing), nameof(NeedsYou), nameof(IsPlaying), nameof(BackUpTip),
-        nameof(ShowsSettled))]
+        nameof(ShowsSettled), nameof(IsKeptOnly))]
     private GameStatus? _status;
 
     /// <summary>The last conflict GameSync settled, while its winner is still the current save: which PC's was kept, and Swap (SYNC-04).</summary>
@@ -102,7 +110,7 @@ public sealed partial class GameSavesViewModel : ObservableObject, IPageSurface
     private bool _hasDetail;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(Syncing), nameof(NotSyncing))]
+    [NotifyPropertyChangedFor(nameof(Syncing), nameof(NotSyncing), nameof(IsKeptOnly))]
     private bool _syncs;
 
     [ObservableProperty]
@@ -159,10 +167,10 @@ public sealed partial class GameSavesViewModel : ObservableObject, IPageSurface
             switch (item)
             {
                 case NamedSaveItem named:
-                    _actions?.Restore?.Invoke(Id, named.Version, named.Name);
+                    Restore(named.Version, named.Name, $"“{named.Name}”");
                     break;
                 case VersionItem version:
-                    _actions?.Restore?.Invoke(Id, version.Id, null);
+                    Restore(version.Id, null, $"the save from {version.Saved}");
                     break;
             }
         }, _ => _actions?.Restore is not null);
@@ -171,7 +179,7 @@ public sealed partial class GameSavesViewModel : ObservableObject, IPageSurface
         {
             if (_current is { } previous)
             {
-                _actions?.Restore?.Invoke(Id, previous, null);
+                Restore(previous, null, "the save from before the change");
             }
         }, () => _actions?.Restore is not null);
         ChooseFilesCommand = new RelayCommand(() => _actions?.OpenProperties?.Invoke(Id, "saves"), () => _actions?.OpenProperties is not null);
@@ -195,6 +203,14 @@ public sealed partial class GameSavesViewModel : ObservableObject, IPageSurface
         SwapCommand = new RelayCommand(() => _actions?.Swap?.Invoke(Id), () => _actions?.Swap is not null);
         OpenAddPlaceCommand = new RelayCommand(() => _actions?.OpenAddPlace?.Invoke(Id), () => _actions?.OpenAddPlace is not null);
         OpenImportKeptCommand = new RelayCommand(() => _actions?.OpenImportKept?.Invoke(Id), () => _actions?.OpenImportKept is not null);
+        KeepAndImportCommand = new AsyncRelayCommand(async () =>
+        {
+            // KAN-63: a game not syncing yet is kept first (backed up, not synced between PCs), so its places are known.
+            if (_actions?.Keep is { } keep && await keep(Id))
+            {
+                _actions.OpenImportKept?.Invoke(Id);
+            }
+        }, () => _actions?.Keep is not null && _actions.OpenImportKept is not null);
         Update(game);
     }
 
@@ -251,6 +267,30 @@ public sealed partial class GameSavesViewModel : ObservableObject, IPageSurface
 
     /// <summary>Import kept saves: copies of its saves kept by hand, as named saves (BAK-19).</summary>
     public ICommand OpenImportKeptCommand { get; }
+
+    /// <summary>Import kept saves… for a game not syncing yet: GameSync keeps its saves first, then the dialog opens (KAN-63).</summary>
+    public ICommand KeepAndImportCommand { get; }
+
+    /// <summary>
+    /// KAN-63: kept by the person's choice, backed up only, not synced between their PCs (a store's cloud game backs up
+    /// only because its store syncs it): the status offers Sync between PCs.
+    /// </summary>
+    public bool IsKeptOnly => Syncs && Status == GameStatus.BackupOnly && !_game.StoreSyncs;
+
+    /// <summary>What Save as…, Back up now and Import kept saves… say first for a game not syncing yet (KAN-63).</summary>
+    public static string KeepNote =>
+        "GameSync starts keeping its saves: every version backed up on this PC and in the cloud. They don't sync between your PCs until you choose Sync these saves.";
+
+    /// <summary>
+    /// The same, with what the last scan found, so a big folder (Bloodborne's, with its copies kept by hand) is no surprise:
+    /// "GameSync starts keeping its saves, 1,051 files and 1022.2 MB as they are now: …".
+    /// </summary>
+    public static string KeepNoteFor(int files, long bytes) => files <= 0 ? KeepNote
+        : $"GameSync starts keeping its saves, {(files == 1 ? "1 file" : $"{files.ToString("N0", CultureInfo.InvariantCulture)} files")} and {Cli.FormatSize(bytes).Replace(' ', ' ')} as they are now: every version backed up on this PC and in the cloud. They don't sync between your PCs until you choose Sync these saves.";
+
+    /// <summary>What the buttons say first on this game, with its size (<see cref="KeepNoteFor"/>).</summary>
+    [ObservableProperty]
+    private string _keepLine = KeepNote;
 
     /// <summary>A conflict GameSync settled by itself or you did, and nothing else needs you: which save is current, with Swap.</summary>
     public bool ShowsSettled => Settled is not null && !NeedsYou && !IsPlaying;
@@ -340,30 +380,69 @@ public sealed partial class GameSavesViewModel : ObservableObject, IPageSurface
         }
     }
 
+    /// <summary>The version the Versions tab opened these saves on (MGR-08); null when they were opened another way.</summary>
+    public VersionId? Picked { get; private set; }
+
+    /// <summary>
+    /// KAN-51: what a restore is doing, then that it's done ("“Before the lighthouse” is back in place…") or why it
+    /// couldn't be; null before any. It stays while the page is open, so the person sees how it ended.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasRestoreNote), nameof(RestoreDone))]
+    private string? _restoreNote;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(RestoreDone))]
+    private bool _restoring;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(RestoreDone))]
+    private bool _restoreFailed;
+
+    public bool HasRestoreNote => RestoreNote is not null;
+
+    public bool RestoreDone => HasRestoreNote && !Restoring && !RestoreFailed;
+
+    /// <summary>One question was asked already (the flyout); this brings the save back and says how it went.</summary>
+    private async void Restore(VersionId version, string? name, string what)
+    {
+        if (_actions?.Restore is not { } restore || Restoring)
+        {
+            return;
+        }
+
+        (Restoring, RestoreFailed, RestoreNote) = (true, false, $"Bringing back {what}…");
+        var problem = await restore(Id, version, name);
+        (Restoring, RestoreFailed) = (false, problem is not null);
+        RestoreNote = problem ?? $"{char.ToUpperInvariant(what[0])}{what[1..]} is back in place. The files it replaced are kept in the history, so you can go back to them.";
+    }
+
+    /// <summary>Marks a version in the history, where its Restore is, as a row of the Versions tab opens it (MGR-08).</summary>
+    public void Pick(VersionId version)
+    {
+        Picked = version;
+        Versions = Versions.Select(v => v with { IsPicked = v.Id == version }).ToList();
+    }
+
     /// <summary>The page's content, from what this PC knows of the game.</summary>
     public void Show(GameDetail detail, DateTime nowLocal)
     {
         Syncs = detail.Syncs;
         FoundBy = detail.FoundBy;
+        KeepLine = KeepNoteFor(detail.FoundFiles, detail.FoundBytes);
         PlaceItem Place(GamePlace p) => new(p.Portable, p.Folder, p.Tag, p.Evidence,
             p.Folder is { } folder && _actions?.OpenFolder is { } open ? new RelayCommand(() => open(folder)) : null);
         Places = detail.Places.Select(Place).ToList();
         Suggestions = detail.Suggestions.Select(Place).ToList();
-        NamedSaves = detail.NamedSaves.Select(n => new NamedSaveItem(n.Name, n.Version, When(n.SavedUtc, nowLocal), n.Pc.ToUpperInvariant())).ToList();
+        NamedSaves = detail.NamedSaves.Select(n => new NamedSaveItem(n.Name, n.Version, When(n.SavedUtc, nowLocal), n.Pc.ToUpperInvariant(), n.InPlace)).ToList();
         Versions = detail.Versions.Select(v => new VersionItem(v.Id, When(v.SavedUtc, nowLocal), v.Pc.ToUpperInvariant(), v.Note, v.IsCurrent, v.IsPinned,
-            Cli.FormatSize(v.Bytes), v.Uploaded)).ToList();
+            Cli.FormatSize(v.Bytes), v.Uploaded) { IsPicked = v.Id == Picked }).ToList();
         _current = detail.Versions.FirstOrDefault(v => v.IsCurrent)?.Id;
         HistorySummary = detail.Versions.Count == 0 ? "no versions yet"
             : $"{(detail.Versions.Count == 1 ? "1 version" : $"{detail.Versions.Count.ToString(CultureInfo.InvariantCulture)} versions")} · {Cli.FormatSize(detail.HistoryBytes)}";
         Settled = detail.Conflict is { Waiting: false } settled ? settled : null;
         OnPropertyChanged(nameof(SettledText));
-        LogLines = detail.Log.Select(l => new LogLine(When(l.AtUtc, nowLocal), l.Level switch
-        {
-            "error" => LogLevel.Error,
-            "warn" => LogLevel.Warn,
-            "ok" => LogLevel.Ok,
-            _ => LogLevel.Info,
-        }, l.Level, l.Message)).ToList();
+        LogLines = detail.Log.Select(l => ActivityLog.Line(When(l.AtUtc, nowLocal), l.Level, l.Tag, l.Message)).ToList();
         HasDetail = true;
     }
 
@@ -378,14 +457,18 @@ public sealed partial class GameSavesViewModel : ObservableObject, IPageSurface
     public static string SentenceOf(LauncherGame game) => game switch
     {
         { Syncs: false, Installed: false } => "Its saves are still on this PC. Sync them to keep them safe for when you play again.",
-        { Syncs: false } => "GameSync found its saves on this PC. Nothing is backed up until you sync them.",
+        { Syncs: false } => "GameSync found its saves on this PC. Nothing is backed up yet.",
         { Status: GameStatus.HeldForReview } =>
             "Its save changed while the game wasn't running, so GameSync held it for you to look at. Keep the new save, or restore the previous one; either way the other stays in the history.",
         { Status: GameStatus.Conflict } =>
             $"{DecisionEngine.WaitingReason(game.StatusDetail) ?? "It changed on two PCs since they last agreed."} Both copies are safe; Resolve shows them side by side.",
         { NeedsYou: true, StatusDetail: { Length: > 0 } detail } => detail,
         { Status: GameStatus.Playing } => "Running now. Its save syncs a few seconds after you quit.",
+        { FirstBackupPending: true } => "It isn't backed up yet: its first backup happens in a moment, when GameSync next syncs. Back up now does it at once.",
+        { Status: GameStatus.BackupOnly, StoreSyncs: false } =>
+            "GameSync keeps every version of its saves, backed up on this PC and in the cloud, and they don't sync between your PCs. Sync between PCs keeps them in step.",
         { Status: GameStatus.BackupOnly } => $"{StoreNames.SyncingStore(game.Store)} syncs its saves between your PCs; GameSync keeps a backup of every version.",
-        _ => "Its saves are backed up on this PC and in your Google Drive, and every version is kept.",
+        { Cloud: { } cloud } => $"Its saves are backed up on this PC and in {cloud}, and every version is kept.",
+        _ => "Its saves are backed up on this PC, and every version is kept; they go up once you connect a cloud.",
     };
 }

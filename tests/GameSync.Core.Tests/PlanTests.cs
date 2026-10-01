@@ -104,7 +104,7 @@ public class PlanTests
         var saves = new SaveManagerViewModel(actions);
 
         // The tab makes the plan the first time it's shown.
-        Assert.Equal(["saves", "plan"], saves.Tabs.Select(t => t.Id));
+        Assert.Equal(["saves", "needs", "plan", "versions", "log"], saves.Tabs.Select(t => t.Id));
         saves.Tab = "plan";
         Assert.Equal((true, false, 1), (saves.ShowsPlan, saves.ShowsTable, checks));
         var plan = saves.Plan;

@@ -15,7 +15,8 @@
        blurred, darkened copy of a game's art sits behind them (LOOK-17). The page reaches up into the title bar, which is
        GameSync's own (Styles/Window.axaml): a strip to drag by and three caption buttons in the theme's ink. -->
   <Panel>
-    <c:GsCoverImage x:Name="Art" IsHitTestVisible="False" RenderOptions.BitmapInterpolationMode="HighQuality" />
+    <!-- The backdrop; a new game's colours glow in on it like a light behind frosted glass (KAN-54) -->
+    <c:GsBackdrop x:Name="Art" IsHitTestVisible="False" />
     <v:Shell x:Name="Frame" />
   </Panel>
 </Window>

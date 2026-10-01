@@ -143,10 +143,7 @@ public class GamePageTests
         Assert.Equal("No game here matches “zelda”.", library.Nothing);
         library.Search = "";
 
-        // Needs you's view, and a group closed from its heading.
-        library.SelectedTab = "attn";
-        Assert.Equal(["Needs you", "Sekiro: Shadows Die Twice"], Names(library));
-        library.SelectedTab = "all";
+        // A group closed from its heading.
         library.ToggleGroupCommand.Execute("favourites");
         Assert.Equal(["Favourites", "Games", "Risk of Rain 2", "Sekiro: Shadows Die Twice"], Names(library));
 
@@ -158,7 +155,7 @@ public class GamePageTests
         Assert.Equal([games[0].Id], opened);
         library.BackCommand.Execute(null);
         Assert.True(library.ShowsCovers);
-        Assert.Equal(UI.Theming.GlassStrength.Home, library.Strength);
+        Assert.Equal(UI.Theming.GlassStrength.Glass, library.Strength);
     }
 
     [Fact]
@@ -193,6 +190,41 @@ public class GamePageTests
 
         saves.ForgetSaveCommand.Execute(named);
         Assert.Equal([(Game, "Before the Radiance")], forgotten);
+    }
+
+    [Fact]
+    public void ONB_06_a_game_says_where_its_saves_go_Google_Drive_a_cloud_folder_or_this_PC_until_a_cloud_is_connected()
+    {
+        using var world = new TestWorld();
+        var data = Path.Combine(world.Root, "data");
+        LauncherGame Read(string remote)
+        {
+            new AppConfig
+            {
+                Remote = remote,
+                Games = [new GameDefinition { Id = Game, Title = "Hollow Knight", Roots = new Dictionary<string, string> { ["saves"] = Path.Combine(world.Root, "Saves") }, Rules = [new SaveRule { Root = "saves" }] }],
+            }.Save(data);
+            return LauncherData.Read(data, DateTime.Now).Games.Single() with { Status = GameStatus.Synced, FirstBackupPending = false };
+        }
+
+        // KAN-60: until its first backup, a game that syncs says so, never Synced.
+        var drive = Read("drive");
+        var first = LauncherData.Read(data, DateTime.Now).Games.Single();
+        Assert.Equal((GameStatus.UploadPending, true), (first.Status, first.FirstBackupPending));
+        Assert.Equal("Not backed up yet", HomeViewModel.StatusLabel(first));
+        Assert.StartsWith("It isn't backed up yet", GameSavesViewModel.SentenceOf(first));
+        Assert.StartsWith("Not backed up yet", GameViewModel.SentenceOf(first));
+        Assert.Null(HomeViewModel.MarkLabel(first.Status, first.Store));
+
+        Assert.Equal("Backed up on this PC and in your Google Drive, every version kept.", GameViewModel.SentenceOf(drive));
+        Assert.Equal("Its saves are backed up on this PC and in your Google Drive, and every version is kept.", GameSavesViewModel.SentenceOf(drive));
+        Assert.Equal("Backed up on this PC and in your cloud folder, every version kept.", GameViewModel.SentenceOf(Read(world.Cloud)));
+
+        // Skip for now: every version waits on this PC until a cloud is connected.
+        var none = Read(AppConfig.NoCloud);
+        Assert.Null(none.Cloud);
+        Assert.Equal("Backed up on this PC, every version kept; it goes up once you connect a cloud.", GameViewModel.SentenceOf(none));
+        Assert.Equal("Its saves are backed up on this PC, and every version is kept; they go up once you connect a cloud.", GameSavesViewModel.SentenceOf(none));
     }
 
     private static IEnumerable<string> Names(LibraryViewModel library) =>

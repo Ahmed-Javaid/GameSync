@@ -6,7 +6,7 @@
              x:Class="GameSync.UI.Views.LibraryTile"
              x:DataType="vm:TileItem" ClipToBounds="False">
   <!-- A cover in the library: a click opens the game's page beside the list; a right-click offers Play, favourite and hide. -->
-  <c:GsGameTile Width="NaN" Title="{Binding Title}" Art="{Binding Art}" Status="{Binding Status}" StatusLabel="{Binding StatusLabel}" Meta="{Binding Meta}"
+  <c:GsGameTile Width="NaN" Title="{Binding Title}" Art="{Binding Art}" Status="{Binding Status}" StatusLabel="{Binding StatusLabel}" MarkLabel="{Binding MarkLabel}" Meta="{Binding Meta}"
                 Command="{Binding $parent[v:LibraryPage].((vm:LibraryViewModel)DataContext).OpenCommand}" CommandParameter="{Binding Id}">
     <c:GsGameTile.ContextMenu>
       <ContextMenu IsVisible="{Binding HasMenu}">
@@ -18,6 +18,10 @@
           <MenuItem.Icon><c:GsIcon Icon="star" Size="16" Filled="{Binding IsFavourite}" /></MenuItem.Icon>
         </MenuItem>
         <MenuItem Header="{Binding HideLabel}" Command="{Binding ToggleHidden}" />
+        <Separator IsVisible="{Binding HasProperties}" />
+        <MenuItem Header="Properties" Command="{Binding PropertiesCommand}" IsVisible="{Binding HasProperties}">
+          <MenuItem.Icon><c:GsIcon Icon="settings" Size="16" /></MenuItem.Icon>
+        </MenuItem>
       </ContextMenu>
     </c:GsGameTile.ContextMenu>
   </c:GsGameTile>

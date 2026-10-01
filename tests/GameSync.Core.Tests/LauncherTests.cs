@@ -126,13 +126,47 @@ public class LauncherTests
     [Fact]
     public void LIB_10_a_game_its_store_syncs_shows_which_store_never_backup_only()
     {
-        LauncherGame Game(StoreKind? store, GameStatus? status) => new() { Id = GameId.Parse("cyberpunk-2077"), Title = "Cyberpunk 2077", Store = store, Status = status, Syncs = true };
+        LauncherGame Game(StoreKind? store, GameStatus? status) => new() { Id = GameId.Parse("cyberpunk-2077"), Title = "Cyberpunk 2077", Store = store, Status = status, Syncs = true, StoreSyncs = true };
 
         Assert.Equal("Synced by Steam", UI.ViewModels.HomeViewModel.Tile(Game(StoreKind.Steam, GameStatus.BackupOnly), Now).StatusLabel);
         Assert.Equal("Synced by Epic", UI.ViewModels.HomeViewModel.StatusLabel(Game(StoreKind.Epic, GameStatus.BackupOnly)));
         Assert.Equal("Synced by its store", StoreNames.SyncedBy(StoreKind.Loose));
         Assert.Null(UI.ViewModels.HomeViewModel.StatusLabel(Game(StoreKind.Steam, GameStatus.Conflict)));
         Assert.Equal("Synced by its store", UI.Controls.GsStatusBadge.Describe(GameStatus.BackupOnly).Word);
+    }
+
+    [Fact]
+    public void KAN_48_a_game_whose_saves_are_fine_shows_a_small_mark_with_its_words_and_the_badge_is_for_the_rest()
+    {
+        LauncherGame Game(StoreKind? store, GameStatus? status) => new() { Id = GameId.Parse("cyberpunk-2077"), Title = "Cyberpunk 2077", Store = store, Status = status, Syncs = status is not null, StoreSyncs = true };
+        UI.ViewModels.TileItem Tile(StoreKind? store, GameStatus? status) => UI.ViewModels.HomeViewModel.Tile(Game(store, status), Now);
+
+        Assert.Equal("Synced", Tile(StoreKind.Steam, GameStatus.Synced).MarkLabel);
+        Assert.Equal("Backed up; Steam syncs it", Tile(StoreKind.Steam, GameStatus.BackupOnly).MarkLabel);
+        Assert.Equal("Backed up; its store syncs it", Tile(null, GameStatus.BackupOnly).MarkLabel);
+        Assert.Null(Tile(StoreKind.Steam, GameStatus.Conflict).MarkLabel);
+        Assert.Null(Tile(StoreKind.Steam, null).MarkLabel);
+        Assert.Null(UI.ViewModels.HomeViewModel.Tile(Game(StoreKind.Steam, GameStatus.Synced) with { RunningSinceUtc = Now.ToUniversalTime() }, Now).MarkLabel);
+
+        // A screen reader hears the mark's words on the list's row and the cover (A11Y-01, A11Y-03).
+        Assert.Equal("Cyberpunk 2077, Backed up; Steam syncs it", Tile(StoreKind.Steam, GameStatus.BackupOnly).SpokenName);
+        Assert.Equal("Cyberpunk 2077, Synced", Tile(StoreKind.Steam, GameStatus.Synced).SpokenName);
+
+        var tile = new UI.Controls.GsGameTile { Title = "Cyberpunk 2077", Status = GameStatus.BackupOnly, StatusLabel = "Synced by Steam", MarkLabel = "Backed up; Steam syncs it" };
+        Assert.True(tile.ShowsMark);
+        Assert.False(tile.ShowsStatus);
+        Assert.Equal("Cyberpunk 2077, Backed up; Steam syncs it", Avalonia.Automation.AutomationProperties.GetName(tile));
+        tile.Status = GameStatus.Conflict;
+        tile.StatusLabel = null;
+        tile.MarkLabel = null;
+        Assert.False(tile.ShowsMark);
+        Assert.True(tile.ShowsStatus);
+        Assert.Equal("Cyberpunk 2077, Conflict", Avalonia.Automation.AutomationProperties.GetName(tile));
+
+        var row = new UI.Controls.GsGameRow { MarkLabel = "Synced" };
+        Assert.True(row.ShowsMark);
+        row.ShowsStatus = true;
+        Assert.False(row.ShowsMark);
     }
 
     [Fact]
@@ -202,6 +236,55 @@ public class LauncherTests
         Assert.Equal(found, games.Single(g => g.Title == "Terraria").AddedUtc);
         Assert.Null(games.Single(g => g.Title == "Valheim").AddedUtc);
         Assert.Null(games.Single(g => g.Title == "Minecraft server world").AddedUtc);
+    }
+
+    [Fact]
+    public void KAN_66_each_day_of_Activity_says_what_was_played_and_for_how_long_and_a_click_lists_the_games()
+    {
+        using var world = new TestWorld();
+        using var state = new StateStore(Path.Combine(world.Root, "data"));
+        var sekiro = GameId.Parse("sekiro");
+        var terraria = GameId.Parse("terraria");
+        DateTime At(int day, int hour) => new DateTime(2026, 9, day, hour, 0, 0, DateTimeKind.Local).ToUniversalTime();
+        state.AddSession(sekiro, new SessionInfo(At(27, 20), At(27, 20).AddMinutes(100)));
+        state.AddSession(sekiro, new SessionInfo(At(27, 23), At(27, 23).AddMinutes(60)));
+        state.AddSession(terraria, new SessionInfo(At(27, 18), At(27, 18).AddMinutes(30)));
+        state.AddSession(terraria, new SessionInfo(At(3, 18), At(3, 18).AddHours(5)));
+        var august = new DateTime(2026, 8, 30, 21, 0, 0, DateTimeKind.Local).ToUniversalTime();
+        state.AddSession(terraria, new SessionInfo(august, august.AddMinutes(45)));
+        GameId? opened = null;
+        var actions = new UI.ViewModels.LauncherActions(_ => { }, () => { }, (_, _) => { }, (_, _) => { }) { OpenGame = game => opened = game };
+
+        var games = Launcher.Games([Entry("sekiro", "Sekiro: Shadows Die Twice", StoreKind.Loose, null), Entry("terraria", "Terraria", StoreKind.Steam, "105600")],
+            [], state, null, new Dictionary<long, SteamPlay>(), null);
+        var home = Launcher.Home(games, state, Now);
+
+        // The day's games, longest first, each with its time that day; a session counts on the day it started.
+        Assert.Equal(30, home.MonthPlay.Count);
+        Assert.Equal([("Sekiro: Shadows Die Twice", 160), ("Terraria", 30)], home.MonthPlay[26].Select(p => (p.Title, (int)p.Played.TotalMinutes)));
+        Assert.Equal([("Terraria", 300)], home.MonthPlay[2].Select(p => (p.Title, (int)p.Played.TotalMinutes)));
+        Assert.Empty(home.MonthPlay[27]);
+        Assert.Equal(["August", "September"], home.Months.Select(m => m.Name));
+
+        var page = UI.ViewModels.HomeViewModel.From(home, games, Now, actions);
+        Assert.Equal("Activity in September", page.ActivityTitle);
+        Assert.False(page.LaterMonthCommand.CanExecute(null));
+        Assert.Equal("Sunday 27 September · 3 h 10 min\nSekiro: Shadows Die Twice · 2 h 40 min\nTerraria · 30 min", page.DayTips[26]);
+        Assert.Equal("Monday 28 September · nothing played", page.DayTips[27]);
+        Assert.Equal("Tuesday 29 September", page.DayTips[28]);
+
+        page.ChooseDayCommand.Execute(26);
+        var day = page.ChosenDay!;
+        Assert.Equal(("Sunday 27 September", "3 h 10 min played"), (day.Label, day.Total));
+        Assert.Equal(["Sekiro: Shadows Die Twice, 2 h 40 min played", "Terraria, 30 min played"], day.Games.Select(g => g.Spoken));
+        day.Games[1].Open.Execute(null);
+        Assert.Equal(terraria, opened);
+
+        // The month before, with the arrow: its own days, as far back as the first month with play.
+        page.EarlierMonthCommand.Execute(null);
+        Assert.Equal(("Activity in August", 31, 5), (page.ActivityTitle, page.Days.Count, page.StartWeekday));
+        Assert.Equal("Sunday 30 August · 45 min\nTerraria · 45 min", page.DayTips[29]);
+        Assert.False(page.EarlierMonthCommand.CanExecute(null));
     }
 
     private static LibraryEntry Entry(string id, string title, StoreKind store, string? storeId) => new()

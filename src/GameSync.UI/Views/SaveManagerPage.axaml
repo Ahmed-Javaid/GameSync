@@ -5,8 +5,10 @@
              x:Class="GameSync.UI.Views.SaveManagerPage"
              x:DataType="vm:SaveManagerViewModel">
   <!-- The save manager (design system → SaveManagerScreen): every game's saves in one console-style table, a strip of
-       numbers and the live log; a game's row opens its saves (GameSavesScreen), where the save work is. Plan (PlanScreen)
-       shows what the next sync would do. Sharing, importing, Versions and Log come with their screens. -->
+       numbers and the live log; a game's row opens its saves (GameSavesScreen), where the save work is. Needs you lists
+       the games waiting for the person, each with its button (KAN-46). Plan (PlanScreen)
+       shows what the next sync would do, Versions (VersionsScreen) every version of every game, and Log (LogScreen)
+       everything GameSync did. Sharing and importing come with their screens. -->
   <UserControl.Resources>
     <!-- A row of the table: the whole row opens the game's saves; bg-200 under the pointer, as the console's rows -->
     <ControlTheme x:Key="SaveRowButton" TargetType="Button">
@@ -32,15 +34,104 @@
         <Setter Property="Background" Value="{DynamicResource bg-200}" />
       </Style>
     </ControlTheme>
+
+    <!-- A heading that sorts both tables (KAN-49): the th's look, ink under the pointer, an arrow while it sorts -->
+    <ControlTheme x:Key="SortHeading" TargetType="Button">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Foreground" Value="{DynamicResource ink-faint}" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="HorizontalContentAlignment" Value="Left" />
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="FocusAdorner" Value="{DynamicResource InsetFocus}" />
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Border Background="{TemplateBinding Background}">
+            <ContentPresenter Content="{TemplateBinding Content}" HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" />
+          </Border>
+        </ControlTemplate>
+      </Setter>
+      <Style Selector="^:pointerover">
+        <Setter Property="Foreground" Value="{DynamicResource ink}" />
+      </Style>
+    </ControlTheme>
+
+    <!-- The columns both tables share, in one size scope so they line up; each table's headings sort that table (KAN-49):
+         a small sort mark on a heading that can sort it, the arrow on the one that does -->
+    <DataTemplate x:Key="SaveHeader" x:DataType="vm:TableSort">
+      <Border BorderBrush="{DynamicResource line-100}" BorderThickness="0,0,0,1">
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="2*" MinWidth="160" />
+            <ColumnDefinition Width="Auto" SharedSizeGroup="Status" />
+            <ColumnDefinition Width="3*" />
+            <ColumnDefinition Width="Auto" SharedSizeGroup="Ver" />
+            <ColumnDefinition Width="Auto" SharedSizeGroup="Size" />
+            <ColumnDefinition Width="Auto" SharedSizeGroup="Backup" />
+          </Grid.ColumnDefinitions>
+          <Button Theme="{StaticResource SortHeading}" Command="{Binding SortCommand}" CommandParameter="Name" AutomationProperties.Name="{Binding GameHeadingName}"
+                  ToolTip.Tip="Sort this table by name; again reverses it">
+            <StackPanel Orientation="Horizontal">
+              <TextBlock Classes="th" Text="GAME" Foreground="{Binding $parent[Button].Foreground}" Margin="12,10,6,10" />
+              <c:GsIcon Icon="sort" Size="12" StrokeWidth="2" VerticalAlignment="Center" IsVisible="{Binding NameIdle}" Foreground="{Binding $parent[Button].Foreground}" />
+              <c:GsIcon Icon="chevronDown" Size="12" StrokeWidth="2" VerticalAlignment="Center" IsVisible="{Binding ByName}" Foreground="{DynamicResource ink}">
+                <c:GsIcon.RenderTransform>
+                  <RotateTransform Angle="{Binding Arrow}" />
+                </c:GsIcon.RenderTransform>
+              </c:GsIcon>
+            </StackPanel>
+          </Button>
+          <Button Grid.Column="1" Theme="{StaticResource SortHeading}" Command="{Binding SortCommand}" CommandParameter="Status"
+                  AutomationProperties.Name="{Binding StatusHeadingName}" ToolTip.Tip="Sort this table by status, what needs you first; again reverses it">
+            <StackPanel Orientation="Horizontal" Margin="0,0,12,0">
+              <TextBlock Classes="th" Text="STATUS" Foreground="{Binding $parent[Button].Foreground}" Margin="12,10,6,10" />
+              <c:GsIcon Icon="sort" Size="12" StrokeWidth="2" VerticalAlignment="Center" IsVisible="{Binding StatusIdle}" Foreground="{Binding $parent[Button].Foreground}" />
+              <c:GsIcon Icon="chevronDown" Size="12" StrokeWidth="2" VerticalAlignment="Center" IsVisible="{Binding ByStatus}" Foreground="{DynamicResource ink}">
+                <c:GsIcon.RenderTransform>
+                  <RotateTransform Angle="{Binding Arrow}" />
+                </c:GsIcon.RenderTransform>
+              </c:GsIcon>
+            </StackPanel>
+          </Button>
+          <TextBlock Grid.Column="2" Classes="th" Text="SAVE PATH" />
+          <TextBlock Grid.Column="3" Classes="th num" Text="VER" />
+          <TextBlock Grid.Column="4" Classes="th num" Text="SIZE" />
+          <TextBlock Grid.Column="5" Classes="th num" Text="LAST BACKUP" />
+        </Grid>
+      </Border>
+    </DataTemplate>
+
+    <DataTemplate x:Key="SaveRowTemplate" x:DataType="vm:SaveRow">
+      <Button Theme="{StaticResource SaveRowButton}" AutomationProperties.Name="{Binding}"
+              Command="{Binding $parent[UserControl].((vm:SaveManagerViewModel)DataContext).OpenCommand}" CommandParameter="{Binding Id}">
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="2*" MinWidth="160" />
+            <ColumnDefinition Width="Auto" SharedSizeGroup="Status" />
+            <ColumnDefinition Width="3*" />
+            <ColumnDefinition Width="Auto" SharedSizeGroup="Ver" />
+            <ColumnDefinition Width="Auto" SharedSizeGroup="Size" />
+            <ColumnDefinition Width="Auto" SharedSizeGroup="Backup" />
+          </Grid.ColumnDefinitions>
+          <TextBlock Classes="td" Text="{Binding Title}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Title}" />
+          <c:GsStatusBadge Grid.Column="1" Plain="True" Status="{Binding Status}" Label="{Binding StatusLabel}" Margin="12,0" FontFamily="{DynamicResource font-mono}" />
+          <TextBlock Grid.Column="2" Classes="td path" Text="{Binding Path}" ToolTip.Tip="{Binding Path}" TextTrimming="LeadingCharacterEllipsis" />
+          <TextBlock Grid.Column="3" Classes="td num" Text="{Binding Versions}" />
+          <TextBlock Grid.Column="4" Classes="td num" Text="{Binding Size}" />
+          <TextBlock Grid.Column="5" Classes="td num" Text="{Binding LastBackup}" />
+        </Grid>
+      </Button>
+    </DataTemplate>
   </UserControl.Resources>
 
   <Panel Margin="24,20">
     <DockPanel IsVisible="{Binding !HasPage}">
-      <!-- The top bar: the view's tabs, and its buttons: Sync now, or on Plan, Check again and Run -->
+      <!-- The top bar: the view's tabs, and its buttons: Sync now; on Plan, Check again and Run; on Versions, the game and
+           the PC shown; on Log, Copy the log -->
       <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto,*" ColumnSpacing="16" MinHeight="40" Margin="0,0,0,16">
         <StackPanel VerticalAlignment="Center">
           <TextBlock Text="{Binding Title}" FontSize="15" LineHeight="20" FontWeight="SemiBold" />
-          <TextBlock Classes="caption faint" Text="{Binding Subtitle}" TextTrimming="CharacterEllipsis" />
+          <TextBlock Classes="caption faint" Text="{Binding TopSubtitle}" TextTrimming="CharacterEllipsis" />
         </StackPanel>
         <c:GsPillTabs Grid.Column="1" ItemsSource="{Binding Tabs}" SelectedId="{Binding Tab, Mode=TwoWay}" AutomationProperties.Name="Save manager view" />
         <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" VerticalAlignment="Center">
@@ -50,6 +141,10 @@
                       ToolTip.Tip="Makes the plan again from how things are now" />
           <c:GsButton Classes="primary" Icon="chevronsRight" Content="{Binding Plan.RunLabel}" Command="{Binding Plan.RunCommand}" IsVisible="{Binding ShowsPlan}"
                       IsEnabled="{Binding Plan.CanRun}" ToolTip.Tip="Does exactly what the plan shows, for the ticked games" />
+          <c:GsSelect Label="Game" Options="{Binding Versions.Games}" Value="{Binding Versions.Game, Mode=TwoWay}" IsVisible="{Binding ShowsVersions}" />
+          <c:GsSelect Label="PC" Options="{Binding Versions.Pcs}" Value="{Binding Versions.Pc, Mode=TwoWay}" IsVisible="{Binding ShowsVersions}" />
+          <c:GsButton Icon="copy" Content="Copy the log" Click="CopyLog" IsVisible="{Binding ShowsLog}" IsEnabled="{Binding LogTab.HasLines}"
+                      ToolTip.Tip="Puts the lines shown on the clipboard, for a bug report: never sign-in tokens or save files" />
         </StackPanel>
       </Grid>
 
@@ -76,59 +171,64 @@
 
       <c:GsConsoleLog DockPanel.Dock="Bottom" Lines="{Binding Log}" Live="True" Height="168" Margin="0,16,0,0" AutomationProperties.Name="What GameSync is doing" />
 
-      <c:GsConsole Command="saves --sort last-played">
-        <c:GsConsole.Toolbar>
-          <TextBlock Text="A game's row opens its saves" />
-        </c:GsConsole.Toolbar>
-        <DockPanel Grid.IsSharedSizeScope="True">
-          <Border DockPanel.Dock="Top" BorderBrush="{DynamicResource line-100}" BorderThickness="0,0,0,1">
-            <Grid>
-              <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="2*" MinWidth="160" />
-                <ColumnDefinition Width="Auto" SharedSizeGroup="Status" />
-                <ColumnDefinition Width="3*" />
-                <ColumnDefinition Width="Auto" SharedSizeGroup="Ver" />
-                <ColumnDefinition Width="Auto" SharedSizeGroup="Size" />
-                <ColumnDefinition Width="Auto" SharedSizeGroup="Backup" />
-              </Grid.ColumnDefinitions>
-              <TextBlock Classes="th" Text="GAME" />
-              <TextBlock Grid.Column="1" Classes="th" Text="STATUS" />
-              <TextBlock Grid.Column="2" Classes="th" Text="SAVE PATH" />
-              <TextBlock Grid.Column="3" Classes="th num" Text="VER" />
-              <TextBlock Grid.Column="4" Classes="th num" Text="SIZE" />
-              <TextBlock Grid.Column="5" Classes="th num" Text="LAST BACKUP" />
-            </Grid>
-          </Border>
-          <ScrollViewer HorizontalScrollBarVisibility="Disabled">
-            <ItemsControl ItemsSource="{Binding Rows}">
+      <!-- KAN-49: the games that sync, then every game, in one scroll; a heading sorts both -->
+      <ScrollViewer Classes="page" HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Spacing="16" Grid.IsSharedSizeScope="True">
+          <c:GsConsole Command="{Binding SyncingSort.CommandLine}" IsVisible="{Binding HasSyncingRows}" AutomationProperties.Name="Syncing">
+            <c:GsConsole.Toolbar>
+              <TextBlock Text="Syncing: the games GameSync backs up and syncs" />
+            </c:GsConsole.Toolbar>
+            <StackPanel>
+              <ContentControl Content="{Binding SyncingSort}" ContentTemplate="{StaticResource SaveHeader}" />
+              <ItemsControl ItemsSource="{Binding SyncingRows}" ItemTemplate="{StaticResource SaveRowTemplate}" />
+            </StackPanel>
+          </c:GsConsole>
+          <c:GsConsole Command="{Binding AllSort.CommandLine}" AutomationProperties.Name="Every game">
+            <c:GsConsole.Toolbar>
+              <TextBlock Text="Every game with saves on this PC · a game's row opens its saves" />
+            </c:GsConsole.Toolbar>
+            <StackPanel>
+              <ContentControl Content="{Binding AllSort}" ContentTemplate="{StaticResource SaveHeader}" />
+              <ItemsControl ItemsSource="{Binding Rows}" ItemTemplate="{StaticResource SaveRowTemplate}" />
+            </StackPanel>
+          </c:GsConsole>
+        </StackPanel>
+      </ScrollViewer>
+      </DockPanel>
+
+      <!-- Needs you (KAN-46): each game waiting for the person, what happened and the button that deals with it -->
+      <ScrollViewer Classes="page" IsVisible="{Binding ShowsNeeds}" HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Spacing="16">
+          <c:GsNote Icon="check" Text="Nothing needs you. Every game that syncs is fine; anything that needs a look shows here." IsVisible="{Binding NoNeeds}" />
+          <c:GsConsole Command="saves --needs-you" IsVisible="{Binding HasNeeds}">
+            <c:GsConsole.Toolbar>
+              <TextBlock Text="Both copies of a save are always kept: nothing here is lost while it waits" />
+            </c:GsConsole.Toolbar>
+            <ItemsControl ItemsSource="{Binding NeedsRows}" Grid.IsSharedSizeScope="True">
               <ItemsControl.ItemTemplate>
-                <DataTemplate x:DataType="vm:SaveRow">
-                  <Button Theme="{StaticResource SaveRowButton}" AutomationProperties.Name="{Binding}"
-                          Command="{Binding $parent[UserControl].((vm:SaveManagerViewModel)DataContext).OpenCommand}" CommandParameter="{Binding Id}">
-                    <Grid>
+                <DataTemplate x:DataType="vm:NeedsRow">
+                  <Border BorderBrush="{DynamicResource line-100}" BorderThickness="0,0,0,1" MinHeight="{DynamicResource row-height}" AutomationProperties.Name="{Binding}">
+                    <Grid VerticalAlignment="Center">
                       <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="2*" MinWidth="160" />
-                        <ColumnDefinition Width="Auto" SharedSizeGroup="Status" />
-                        <ColumnDefinition Width="3*" />
-                        <ColumnDefinition Width="Auto" SharedSizeGroup="Ver" />
-                        <ColumnDefinition Width="Auto" SharedSizeGroup="Size" />
-                        <ColumnDefinition Width="Auto" SharedSizeGroup="Backup" />
+                        <ColumnDefinition Width="Auto" SharedSizeGroup="NeedsStatus" />
+                        <ColumnDefinition Width="4*" />
+                        <ColumnDefinition Width="Auto" SharedSizeGroup="NeedsAction" />
                       </Grid.ColumnDefinitions>
-                      <TextBlock Classes="td" Text="{Binding Title}" />
-                      <c:GsStatusBadge Grid.Column="1" Plain="True" Status="{Binding Status}" Label="{Binding StatusLabel}" Margin="12,0" FontFamily="{DynamicResource font-mono}" />
-                      <TextBlock Grid.Column="2" Classes="td path" Text="{Binding Path}" ToolTip.Tip="{Binding Path}" TextTrimming="LeadingCharacterEllipsis" />
-                      <TextBlock Grid.Column="3" Classes="td num" Text="{Binding Versions}" />
-                      <TextBlock Grid.Column="4" Classes="td num" Text="{Binding Size}" />
-                      <TextBlock Grid.Column="5" Classes="td num" Text="{Binding LastBackup}" />
+                      <TextBlock Classes="td" Text="{Binding Title}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Title}" />
+                      <c:GsStatusBadge Grid.Column="1" Plain="True" Status="{Binding Status}" Margin="12,0" FontFamily="{DynamicResource font-mono}" />
+                      <TextBlock Grid.Column="2" Classes="td" Text="{Binding Sentence}" TextWrapping="Wrap" Foreground="{DynamicResource ink-muted}" />
+                      <c:GsButton Grid.Column="3" Classes="sm" Icon="{Binding ActionIcon}" Content="{Binding Action}" Margin="12,6"
+                                  AutomationProperties.Name="{Binding ActionName}"
+                                  Command="{Binding $parent[UserControl].((vm:SaveManagerViewModel)DataContext).NeedsCommand}" CommandParameter="{Binding}" />
                     </Grid>
-                  </Button>
+                  </Border>
                 </DataTemplate>
               </ItemsControl.ItemTemplate>
             </ItemsControl>
-          </ScrollViewer>
-        </DockPanel>
-      </c:GsConsole>
-      </DockPanel>
+          </c:GsConsole>
+        </StackPanel>
+      </ScrollViewer>
 
       <!-- Plan (SYNC-14): what the next sync would do for each game and why; nothing changes until Run -->
       <Panel IsVisible="{Binding ShowsPlan}">
@@ -160,7 +260,7 @@
           <TextBlock Classes="caption muted" Text="{Binding InSyncText}" TextWrapping="Wrap" IsVisible="{Binding ShowsInSync}" Margin="12,0" />
         </StackPanel>
 
-        <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+        <ScrollViewer Classes="page" HorizontalScrollBarVisibility="Disabled">
           <StackPanel Spacing="16">
             <c:GsNote Icon="search" Text="Working out what the next sync would do for each game…" IsVisible="{Binding IsChecking}" />
             <c:GsNote Icon="check" Text="Nothing to run: every game is in sync, or waits for the reason below." IsVisible="{Binding NoChanges}" />
@@ -243,6 +343,115 @@
           </c:GsConsole>
           </StackPanel>
         </ScrollViewer>
+      </DockPanel>
+      </Panel>
+
+      <!-- Versions (MGR-08): every version of every game from every PC, newest first; a row opens its game's saves with the
+           version picked, where Restore is. This tab only finds a version. -->
+      <Panel IsVisible="{Binding ShowsVersions}">
+      <DockPanel DataContext="{Binding Versions}" x:DataType="vm:VersionsViewModel">
+        <ItemsControl DockPanel.Dock="Top" ItemsSource="{Binding Stats}" Margin="4,4,4,16">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate>
+              <WrapPanel ItemSpacing="48" LineSpacing="12" />
+            </ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:SaveStat">
+              <StackPanel Spacing="2" AutomationProperties.Name="{Binding}">
+                <TextBlock Classes="th" Margin="0" Padding="0" Text="{Binding Label, Converter={x:Static c:UpperConverter.Instance}}" />
+                <TextBlock Classes="mono-stat" Text="{Binding Value}" />
+              </StackPanel>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <StackPanel DockPanel.Dock="Bottom" Spacing="8" Margin="0,12,0,0">
+          <c:GsNote Icon="alert" Foreground="{DynamicResource danger}" Text="{Binding Error}" IsVisible="{Binding HasError}" />
+          <Grid ColumnDefinitions="Auto,*" ColumnSpacing="16">
+            <c:GsButton Classes="ghost sm" Icon="chevronDown" Content="{Binding OlderLabel}" Command="{Binding ShowOlderCommand}" IsVisible="{Binding HasOlder}"
+                        VerticalAlignment="Center" />
+            <TextBlock Grid.Column="1" Classes="caption faint" Text="{Binding Foot}" TextWrapping="Wrap" TextAlignment="Right" VerticalAlignment="Center" />
+          </Grid>
+        </StackPanel>
+
+        <c:GsConsole Command="versions --all">
+          <c:GsConsole.Toolbar>
+            <CheckBox Content="Named and kept only" IsChecked="{Binding KeptOnly}" />
+          </c:GsConsole.Toolbar>
+          <DockPanel>
+            <Border DockPanel.Dock="Top" BorderBrush="{DynamicResource line-100}" BorderThickness="0,0,0,1">
+              <Grid ColumnDefinitions="148,2*,104,3*,64,96">
+                <TextBlock Classes="th" Text="SAVED" />
+                <TextBlock Grid.Column="1" Classes="th" Text="GAME" />
+                <TextBlock Grid.Column="2" Classes="th" Text="PC" />
+                <TextBlock Grid.Column="3" Classes="th" Text="WHY IT WAS KEPT" />
+                <TextBlock Grid.Column="4" Classes="th num" Text="FILES" />
+                <TextBlock Grid.Column="5" Classes="th num" Text="SIZE" />
+              </Grid>
+            </Border>
+            <Panel>
+              <c:GsNote Icon="search" Text="{Binding EmptyText}" IsVisible="{Binding IsEmpty}" VerticalAlignment="Top" Margin="12" FontFamily="{DynamicResource font-sans}" />
+              <!-- Rows are made only as they scroll into view, however many versions there are -->
+              <ScrollViewer HorizontalScrollBarVisibility="Disabled" IsVisible="{Binding HasRows}">
+                <ItemsControl ItemsSource="{Binding Rows}">
+                  <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                      <VirtualizingStackPanel />
+                    </ItemsPanelTemplate>
+                  </ItemsControl.ItemsPanel>
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:VersionRow">
+                      <Button Theme="{StaticResource SaveRowButton}" AutomationProperties.Name="{Binding}"
+                              Command="{Binding $parent[UserControl].((vm:SaveManagerViewModel)DataContext).Versions.OpenCommand}" CommandParameter="{Binding}"
+                              ToolTip.Tip="Opens its game's saves, where Restore is">
+                        <Grid ColumnDefinitions="148,2*,104,3*,64,96">
+                          <TextBlock Classes="td" Text="{Binding Saved}" />
+                          <TextBlock Grid.Column="1" Classes="td" Text="{Binding Game}" TextTrimming="CharacterEllipsis" />
+                          <TextBlock Grid.Column="2" Classes="td" Text="{Binding Pc}" TextTrimming="CharacterEllipsis" />
+                          <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="6" Margin="12,0" ClipToBounds="True">
+                            <c:GsIcon Icon="{Binding Icon}" Size="14" Foreground="{DynamicResource ink-muted}" VerticalAlignment="Center" />
+                            <TextBlock Classes="td" Padding="0" Text="{Binding Why}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                          </StackPanel>
+                          <TextBlock Grid.Column="4" Classes="td num" Text="{Binding Files}" />
+                          <TextBlock Grid.Column="5" Classes="td num" Text="{Binding Size}" />
+                        </Grid>
+                      </Button>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </ScrollViewer>
+            </Panel>
+          </DockPanel>
+        </c:GsConsole>
+      </DockPanel>
+      </Panel>
+
+      <!-- Log (MGR-09): everything GameSync did, per game, newest first and kept for good; search it, or show only what needs you -->
+      <Panel IsVisible="{Binding ShowsLog}">
+      <DockPanel DataContext="{Binding LogTab}" x:DataType="vm:LogViewModel">
+        <Grid DockPanel.Dock="Top" ColumnDefinitions="320,Auto,Auto,*" ColumnSpacing="12" Margin="0,0,0,16">
+          <TextBox Classes="search clearButton" PlaceholderText="Search the log" Text="{Binding Search}" AutomationProperties.Name="Search the log">
+            <TextBox.InnerLeftContent>
+              <c:GsIcon Icon="search" Size="16" Margin="12,0,0,0" Foreground="{DynamicResource ink-faint}" VerticalAlignment="Center" />
+            </TextBox.InnerLeftContent>
+          </TextBox>
+          <c:GsSelect Grid.Column="1" Label="Game" Options="{Binding Games}" Value="{Binding Game, Mode=TwoWay}" VerticalAlignment="Center" />
+          <c:GsSelect Grid.Column="2" Label="Show" Options="{Binding ShowOptions}" Value="{Binding Showing, Mode=TwoWay}" VerticalAlignment="Center" />
+          <TextBlock Grid.Column="3" Classes="caption faint" Text="{Binding CountText}" HorizontalAlignment="Right" VerticalAlignment="Center" />
+        </Grid>
+
+        <StackPanel DockPanel.Dock="Bottom" Spacing="8" Margin="0,12,0,0">
+          <c:GsNote Icon="alert" Foreground="{DynamicResource danger}" Text="{Binding Error}" IsVisible="{Binding HasError}" />
+          <TextBlock Classes="caption faint" TextWrapping="Wrap"
+                     Text="Every line is kept. Copy the log puts the lines shown on the clipboard, for a bug report: never sign-in tokens or save files." />
+        </StackPanel>
+
+        <Panel>
+          <!-- Dated: a day and the time to the second, as the design's ConsoleLog with dated -->
+          <c:GsConsoleLog Lines="{Binding Lines}" TimeWidth="136" IsVisible="{Binding HasLines}" AutomationProperties.Name="GameSync's log" />
+          <c:GsNote Icon="search" Text="{Binding EmptyText}" IsVisible="{Binding NoLines}" VerticalAlignment="Top" />
+        </Panel>
       </DockPanel>
       </Panel>
       </Panel>

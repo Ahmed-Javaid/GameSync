@@ -194,10 +194,11 @@
     <Setter Property="Template">
       <ControlTemplate>
         <Border Background="{TemplateBinding Background}" CornerRadius="999" Padding="{TemplateBinding Padding}">
-          <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+          <!-- A grid, not a row, so a long label ("Synced by its store") ends in an ellipsis instead of running past its box (KAN-45) -->
+          <Grid ColumnDefinitions="Auto,*" ColumnSpacing="6" VerticalAlignment="Center">
             <c:GsIcon Icon="{TemplateBinding IconName}" Size="14" StrokeWidth="2" VerticalAlignment="Center" />
-            <TextBlock Text="{TemplateBinding Text}" VerticalAlignment="Center" />
-          </StackPanel>
+            <TextBlock Grid.Column="1" Text="{TemplateBinding Text}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+          </Grid>
         </Border>
       </ControlTemplate>
     </Setter>
@@ -591,5 +592,92 @@
         </Border>
       </ControlTemplate>
     </Setter>
+  </ControlTheme>
+
+  <!-- Scroll bars (KAN-57): a round thumb in the theme's ink on a clear track, thin until the pointer is over the bar,
+       no arrow buttons; a click on the track still pages. Every ScrollViewer takes it, Fluent's included. -->
+  <ControlTheme x:Key="GsScrollThumb" TargetType="Thumb">
+    <Setter Property="Background" Value="{DynamicResource ink-faint}" />
+    <Setter Property="Opacity" Value="0.55" />
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border Background="{TemplateBinding Background}" CornerRadius="999" />
+      </ControlTemplate>
+    </Setter>
+    <Style Selector="^:pointerover">
+      <Setter Property="Background" Value="{DynamicResource ink-muted}" />
+      <Setter Property="Opacity" Value="0.9" />
+    </Style>
+    <Style Selector="^:pressed">
+      <Setter Property="Background" Value="{DynamicResource primary}" />
+      <Setter Property="Opacity" Value="1" />
+    </Style>
+  </ControlTheme>
+
+  <ControlTheme x:Key="GsScrollPage" TargetType="RepeatButton">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Focusable" Value="False" />
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border Background="{TemplateBinding Background}" />
+      </ControlTemplate>
+    </Setter>
+  </ControlTheme>
+
+  <ControlTheme x:Key="{x:Type ScrollBar}" TargetType="ScrollBar">
+    <Setter Property="Cursor" Value="Arrow" />
+    <Setter Property="Background" Value="Transparent" />
+    <Style Selector="^:vertical">
+      <Setter Property="Width" Value="12" />
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Border Background="{TemplateBinding Background}">
+            <Track Minimum="{TemplateBinding Minimum}" Maximum="{TemplateBinding Maximum}" Value="{TemplateBinding Value, Mode=TwoWay}"
+                   ViewportSize="{TemplateBinding ViewportSize}" Orientation="Vertical" IsDirectionReversed="True"
+                   DeferThumbDrag="{TemplateBinding ScrollViewer.IsDeferredScrollingEnabled}">
+              <Track.DecreaseButton>
+                <RepeatButton Name="PART_PageUpButton" Theme="{StaticResource GsScrollPage}" />
+              </Track.DecreaseButton>
+              <Track.IncreaseButton>
+                <RepeatButton Name="PART_PageDownButton" Theme="{StaticResource GsScrollPage}" />
+              </Track.IncreaseButton>
+              <Thumb Name="PART_Thumb" Theme="{StaticResource GsScrollThumb}" HorizontalAlignment="Center" MinHeight="24" />
+            </Track>
+          </Border>
+        </ControlTemplate>
+      </Setter>
+    </Style>
+    <Style Selector="^:vertical /template/ Thumb#PART_Thumb">
+      <Setter Property="Width" Value="6" />
+    </Style>
+    <Style Selector="^:vertical:pointerover /template/ Thumb#PART_Thumb">
+      <Setter Property="Width" Value="10" />
+    </Style>
+    <Style Selector="^:horizontal">
+      <Setter Property="Height" Value="12" />
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Border Background="{TemplateBinding Background}">
+            <Track Minimum="{TemplateBinding Minimum}" Maximum="{TemplateBinding Maximum}" Value="{TemplateBinding Value, Mode=TwoWay}"
+                   ViewportSize="{TemplateBinding ViewportSize}" Orientation="Horizontal"
+                   DeferThumbDrag="{TemplateBinding ScrollViewer.IsDeferredScrollingEnabled}">
+              <Track.DecreaseButton>
+                <RepeatButton Name="PART_PageUpButton" Theme="{StaticResource GsScrollPage}" />
+              </Track.DecreaseButton>
+              <Track.IncreaseButton>
+                <RepeatButton Name="PART_PageDownButton" Theme="{StaticResource GsScrollPage}" />
+              </Track.IncreaseButton>
+              <Thumb Name="PART_Thumb" Theme="{StaticResource GsScrollThumb}" VerticalAlignment="Center" MinWidth="24" />
+            </Track>
+          </Border>
+        </ControlTemplate>
+      </Setter>
+    </Style>
+    <Style Selector="^:horizontal /template/ Thumb#PART_Thumb">
+      <Setter Property="Height" Value="6" />
+    </Style>
+    <Style Selector="^:horizontal:pointerover /template/ Thumb#PART_Thumb">
+      <Setter Property="Height" Value="10" />
+    </Style>
   </ControlTheme>
 </ResourceDictionary>

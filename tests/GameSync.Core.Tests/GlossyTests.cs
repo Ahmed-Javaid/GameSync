@@ -76,9 +76,10 @@ public class GlossyTests
             _ => new PlaceholderViewModel("Settings", "settings", "Soon."),
         });
 
-        Assert.Equal(GlassStrength.Home, shell.Strength);
+        // Home and the library are full glass, as a game's page is, since 1 Oct 2026 (the owner).
+        Assert.Equal(GlassStrength.Glass, shell.Strength);
         shell.Open("library");
-        Assert.Equal(GlassStrength.Home, shell.Strength);
+        Assert.Equal(GlassStrength.Glass, shell.Strength);
         shell.Open("log");
         Assert.Equal(GlassStrength.Glass, shell.Strength);
         shell.Open("settings");
@@ -106,7 +107,8 @@ public class GlossyTests
     [Fact]
     public void LOOK_18_text_keeps_its_contrast_over_any_art()
     {
-        var softened = Pictures.Select(p => (p.Name, Soft: Backdrop.Soften(p.Bgra, PictureWidth, PictureHeight))).ToList();
+        // As the app makes them: softened, then their colour tamed.
+        var softened = Pictures.Select(p => (p.Name, Soft: Backdrop.Tame(Backdrop.Soften(p.Bgra, PictureWidth, PictureHeight)))).ToList();
         var failures = new ConcurrentBag<string>();
         Parallel.ForEach(DarkChoices(), choice =>
         {
@@ -126,6 +128,29 @@ public class GlossyTests
         });
 
         Assert.True(failures.IsEmpty, string.Join(Environment.NewLine, failures.Take(30)));
+    }
+
+    /// <summary>
+    /// The owner, 1 Oct 2026: Counter-Strike 2's orange flooded the app while Peak's and Risk of Rain 2's colours looked
+    /// right. A backdrop's colourfulness eases off above <see cref="Backdrop.ChromaKnee"/> and never passes
+    /// <see cref="Backdrop.ChromaLimit"/>; muted art is left as it is, and nothing gets lighter or darker.
+    /// </summary>
+    [Fact]
+    public void LOOK_18_a_vivid_backdrop_is_toned_down_and_a_muted_one_kept()
+    {
+        var orange = Backdrop.Soften(Fill((_, _) => (235, 110, 20)), PictureWidth, PictureHeight);
+        var teal = Backdrop.Soften(Fill((_, _) => (40, 70, 80)), PictureWidth, PictureHeight);
+        Assert.True(Backdrop.Chroma(orange).Average > 0.17);
+
+        var tamedOrange = Backdrop.Tame((double[])orange.Clone());
+        var (average, highest) = Backdrop.Chroma(tamedOrange);
+        Assert.InRange(highest, Backdrop.ChromaKnee, Backdrop.ChromaLimit);
+        Assert.True(average < 0.15, $"The orange is still {average:0.000}.");
+        Assert.Equal(Backdrop.Chroma(teal).Average, Backdrop.Chroma(Backdrop.Tame((double[])teal.Clone())).Average, 6);
+
+        // Its lightness stays: about the same luminance as before, so the scrim and the contrast see the same art.
+        double Luma(double[] rgb) => rgb.Chunk(3).Average(c => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]);
+        Assert.InRange(Luma(tamedOrange) / Luma(orange), 0.85, 1.15);
     }
 
     [Fact]

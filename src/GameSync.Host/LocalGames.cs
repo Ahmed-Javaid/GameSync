@@ -11,7 +11,7 @@ public sealed record FolderScan(string Folder, IReadOnlyList<string> Games, int 
     /// <summary>What the app says once the scan is done.</summary>
     public string Sentence => Games.Count switch
     {
-        0 => $"No games in {Folder}: GameSync looks one level down for a folder with a game's program in it, such as {System.IO.Path.Combine(Folder, "Black Myth Wukong")}.",
+        0 => $"No games in {Folder}: GameSync looks in it for folders with a game's program in them, such as {System.IO.Path.Combine(Folder, "Black Myth Wukong")}, and in folders of several games.",
         _ => $"Found {Count(Games.Count)} in {Folder}{(New < Games.Count ? $" ({New} new here)" : "")}: {Names()}. They're in the library's Local view; Play starts each from its folder.",
     };
 
@@ -40,7 +40,6 @@ public static class LocalGames
             throw new UsageException($"{full} isn't there on this PC.");
         }
 
-        Cli.ScanFindings findings;
         HashSet<GameId> before;
         using (var engine = Engine.Open(dataDir))
         {
@@ -51,7 +50,54 @@ public static class LocalGames
 
             before = engine.Library.All().Where(e => e.Installed && e.MergedInto is null).Select(e => e.Id).ToHashSet();
             Cli.AddGameFolder(engine.State, full);
-            output.Say($"Looking for games in {full}, and scanning the rest of this PC with it...");
+        }
+
+        output.Say($"Looking for games in {full}, and scanning the rest of this PC with it...");
+        var entries = await RescanAsync(dataDir, output, ct);
+        var inFolder = entries.Where(e => e is { Installed: true, MergedInto: null, State: not LibraryState.Ignored, InstallDir: { } dir } && Inside(dir, full))
+            .OrderBy(e => e.DisplayTitle, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        return new FolderScan(full, inFolder.Select(e => e.DisplayTitle).ToList(), inFolder.Count(e => !before.Contains(e.Id)));
+    }
+
+    /// <summary>
+    /// FOLD-07, from Settings: a folder stops being one every scan looks in, and this PC is scanned again at once, so
+    /// its games read Not installed now rather than at the next scan. Their saves and history stay, and a game located
+    /// there by hand stays installed while its folder is there. Returns what the app says once it's done.
+    /// </summary>
+    public static async Task<string> RemoveFolderAsync(string dataDir, string folder, IAgentOutput output, CancellationToken ct)
+    {
+        var full = Full(folder);
+        List<LibraryEntry> inFolder;
+        using (var engine = Engine.Open(dataDir))
+        {
+            inFolder = engine.Library.All().Where(e => e is { Installed: true, MergedInto: null, InstallDir: { } dir } && Inside(dir, full)).ToList();
+            if (!Cli.RemoveGameFolder(engine.State, full))
+            {
+                throw new UsageException($"GameSync wasn't looking in {full} for games.");
+            }
+        }
+
+        output.Say($"GameSync no longer looks in {full} for games; scanning this PC again...");
+        var entries = (await RescanAsync(dataDir, output, ct)).ToDictionary(e => e.Id);
+        var gone = inFolder.Count(e => entries.GetValueOrDefault(e.Id) is not { Installed: true });
+        return gone switch
+        {
+            0 => $"GameSync no longer looks in {full} for games.",
+            1 => $"GameSync no longer looks in {full} for games. Its game reads Not installed now; its saves and history stay.",
+            _ => $"GameSync no longer looks in {full} for games. Its {gone} games read Not installed now; their saves and history stay.",
+        };
+    }
+
+    /// <summary>
+    /// Scans this PC as <c>gamesync scan</c> does and folds what it found into the library: the scan runs outside the
+    /// engine lock, and only folding it in waits for a sync in the background to finish. Returns the library after.
+    /// </summary>
+    internal static async Task<IReadOnlyList<LibraryEntry>> RescanAsync(string dataDir, IAgentOutput output, CancellationToken ct)
+    {
+        Cli.ScanFindings findings;
+        using (var engine = Engine.Open(dataDir))
+        {
             findings = await Cli.DiscoverAsync(engine.Here, refreshList: false, ct, note: n => output.Say($"! {n}"));
         }
 
@@ -59,11 +105,8 @@ public static class LocalGames
         using var here = Engine.Open(dataDir);
         var others = await OtherGamesAsync(here, ct);
         var entries = Library.Reconcile(here.Library.All(), findings.Found, DateTime.UtcNow, others, findings.Leftovers);
-        here.Library.SaveAll(entries);
-        var inFolder = entries.Where(e => e is { Installed: true, MergedInto: null, State: not LibraryState.Ignored, InstallDir: { } dir } && Inside(dir, full))
-            .OrderBy(e => e.DisplayTitle, StringComparer.OrdinalIgnoreCase)
-            .ToList();
-        return new FolderScan(full, inFolder.Select(e => e.DisplayTitle).ToList(), inFolder.Count(e => !before.Contains(e.Id)));
+        here.Library.ReplaceAll(entries);
+        return entries;
     }
 
     /// <summary>

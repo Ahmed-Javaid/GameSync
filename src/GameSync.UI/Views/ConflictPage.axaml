@@ -31,7 +31,7 @@
       <TextBlock Grid.Column="2" Classes="caption muted" Text="{Binding WaitNote}" VerticalAlignment="Center" TextWrapping="Wrap" IsVisible="{Binding ShowsWaiting}" />
     </Grid>
 
-    <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+    <ScrollViewer Classes="page" HorizontalScrollBarVisibility="Disabled">
       <StackPanel Spacing="16" Margin="0,0,0,8">
         <StackPanel Spacing="8">
           <c:GsStatusBadge Status="{x:Static s:GameStatus.Conflict}" Label="{Binding StatusLabel}" HorizontalAlignment="Left"

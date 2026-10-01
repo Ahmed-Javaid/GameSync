@@ -158,6 +158,45 @@ public sealed class LibraryStore : IDisposable
     public void SaveAll(IEnumerable<LibraryEntry> entries)
     {
         using var transaction = _db.BeginTransaction();
+        Upsert(entries, transaction);
+        transaction.Commit();
+    }
+
+    /// <summary>The library after a scan: these entries and no others, since a scan can find that a folder isn't a game (LIB-28).</summary>
+    public void ReplaceAll(IReadOnlyCollection<LibraryEntry> entries)
+    {
+        var kept = entries.Select(e => e.Id.Value).ToHashSet(StringComparer.Ordinal);
+        using var transaction = _db.BeginTransaction();
+        var gone = new List<string>();
+        using (var select = _db.CreateCommand())
+        {
+            select.Transaction = transaction;
+            select.CommandText = "SELECT id FROM library";
+            using var reader = select.ExecuteReader();
+            while (reader.Read())
+            {
+                if (!kept.Contains(reader.GetString(0)))
+                {
+                    gone.Add(reader.GetString(0));
+                }
+            }
+        }
+
+        foreach (var id in gone)
+        {
+            using var delete = _db.CreateCommand();
+            delete.Transaction = transaction;
+            delete.CommandText = "DELETE FROM library WHERE id = $id";
+            delete.Parameters.AddWithValue("$id", id);
+            delete.ExecuteNonQuery();
+        }
+
+        Upsert(entries, transaction);
+        transaction.Commit();
+    }
+
+    private void Upsert(IEnumerable<LibraryEntry> entries, SqliteTransaction transaction)
+    {
         foreach (var entry in entries)
         {
             using var upsert = _db.CreateCommand();
@@ -167,8 +206,6 @@ public sealed class LibraryStore : IDisposable
             upsert.Parameters.AddWithValue("$json", JsonSerializer.Serialize(entry, Json.Options));
             upsert.ExecuteNonQuery();
         }
-
-        transaction.Commit();
     }
 }
 
@@ -255,30 +292,50 @@ public static class Library
             }
 
             var entry = existing ?? new LibraryEntry { Id = NewIdFor(left.Listed.Title), Title = left.Listed.Title, FirstSeenUtc = nowUtc };
-            entries[entry.Id] = entry with
+
+            // The save list says which stores' clouds keep the game's saves, but a copy the person located or added is their
+            // own, which no store syncs (KAN-44).
+            var own = entry.InstallDirByHand is { Length: > 0 } || entry.Store == StoreKind.Loose || entry.IsOwn;
+            var merged = entry with
             {
                 Title = left.Listed.Title,
                 Installed = Located(entry),
                 SaveListTitle = left.Listed.Title,
-                StoreCloud = left.StoreCloud,
+                StoreCloud = !own && left.StoreCloud,
                 ProbablyOnlineOnly = left.ProbablyOnlineOnly,
                 Proposals = left.Proposals,
                 RegistryProposals = left.Registry,
                 LastSeenUtc = nowUtc,
             };
+            entries[entry.Id] = own ? NotStoreSynced(merged, entry) : merged;
             leftSeen.Add(entry.Id);
         }
 
         // What this scan didn't find at all is Not installed, and nothing was found for it; confirmed rules stay (LIB-08).
         // A game the person located stays installed in its folder while the folder is here (LIB-24), and one they added
-        // keeps the place they added it with (LIB-13).
+        // keeps the place they added it with (LIB-13). A folder a scan took for a game that it no longer does while the
+        // folder is still here, such as a folder of several games or of tools, leaves the library if nothing was decided
+        // about it (LIB-28).
         foreach (var entry in entries.Values.ToList())
         {
-            if (!seen.Contains(entry.Id) && !leftSeen.Contains(entry.Id) && entry.MergedInto is null &&
-                (entry.Installed || entry.Proposals.Count > 0 || entry.RegistryProposals.Count > 0))
+            if (seen.Contains(entry.Id) || leftSeen.Contains(entry.Id) || entry.MergedInto is not null)
+            {
+                continue;
+            }
+
+            if (NotAGameAnyMore(entry) && !entries.Values.Any(e => e.MergedInto == entry.Id))
+            {
+                entries.Remove(entry.Id);
+            }
+            else if (entry.Installed || entry.Proposals.Count > 0 || entry.RegistryProposals.Count > 0)
             {
                 entries[entry.Id] = entry with { Installed = Located(entry), Proposals = ByHand(entry), RegistryProposals = [] };
             }
+        }
+
+        foreach (var settled in SettleOwnCopies(entries.Values))
+        {
+            entries[settled.Id] = settled;
         }
 
         return entries.Values.OrderBy(e => e.Id.Value, StringComparer.Ordinal).ToList();
@@ -289,7 +346,7 @@ public static class Library
     /// on this PC, a game in its own folder that starts from its program there, and rescans keep it so while the folder
     /// is here. What the folder shows (its engine, an anti-cheat) is taken as a scan would.
     /// </summary>
-    public static LibraryEntry Locate(LibraryEntry entry, string folder, Fingerprint? print, DateTime nowUtc) => entry with
+    public static LibraryEntry Locate(LibraryEntry entry, string folder, Fingerprint? print, DateTime nowUtc) => NotStoreSynced(entry with
     {
         Installed = true,
         Store = StoreKind.Loose,
@@ -300,7 +357,27 @@ public static class Library
         Engine = print?.Engine ?? entry.Engine,
         AntiCheat = print is null ? entry.AntiCheat : print.AntiCheat,
         LastSeenUtc = nowUtc,
-    };
+    }, entry);
+
+    /// <summary>
+    /// KAN-44: the entries that are the person's own copies (located by hand, in their own folders, or added by them) but
+    /// still taken for their store's, put right: such a copy syncs between PCs. Run whenever GameSync opens its data, so
+    /// a copy located before this rule, which no scan may ever see again, is put right too; empty when nothing changes.
+    /// </summary>
+    public static IReadOnlyList<LibraryEntry> SettleOwnCopies(IEnumerable<LibraryEntry> entries) => entries
+        .Where(e => e.StoreCloud && e.MergedInto is null && (e.InstallDirByHand is { Length: > 0 } || e.Store == StoreKind.Loose || e.IsOwn))
+        .Select(e => NotStoreSynced(e, e))
+        .ToList();
+
+    /// <summary>
+    /// KAN-44: a copy no store's cloud syncs, such as one in its own folder. A game confirmed as backup only because it was
+    /// taken for its store's (its saves were found before the game, and the save list says a store's cloud keeps them) syncs
+    /// between PCs instead; one the person set to back up only in its Properties stays so.
+    /// </summary>
+    private static LibraryEntry NotStoreSynced(LibraryEntry entry, LibraryEntry before) =>
+        before.StoreCloud && entry.Confirmed is { Mode: GameMode.BackupOnly } confirmed
+            ? entry with { StoreCloud = false, Confirmed = confirmed with { Mode = GameMode.Sync } }
+            : entry with { StoreCloud = false };
 
     /// <summary>
     /// LIB-13: a game or folder of the person's own joins the library under the name they gave it, with the folder they
@@ -341,17 +418,20 @@ public static class Library
     /// a game that has rules accepts the latest scan's suggestions: new locations join, and the rules already there
     /// stay, keys and all.
     /// </summary>
-    public static LibraryEntry Confirm(LibraryEntry entry)
+    /// <param name="mode">How it syncs: between PCs, or backed up only (KAN-63: named saves and imports before syncing);
+    /// by default backed up only when its store's cloud syncs it, else between PCs.</param>
+    /// <param name="defaults">What a game starting to sync takes (SET-06); a game that syncs already keeps its own.</param>
+    public static LibraryEntry Confirm(LibraryEntry entry, GameMode? mode = null, GameDefaults? defaults = null)
     {
         if (entry.Proposals.Count == 0 && entry.RegistryProposals.Count == 0)
         {
             throw new InvalidOperationException($"No saves were found for {entry.DisplayTitle} yet, so there's nothing to confirm.");
         }
 
-        var mode = entry.StoreCloud ? GameMode.BackupOnly : GameMode.Sync;
+        var chosen = mode ?? (entry.StoreCloud ? GameMode.BackupOnly : GameMode.Sync);
         var definition = entry.Confirmed is { } current
-            ? Discoverer.Extend(current with { Title = entry.DisplayTitle, Mode = mode }, entry.Proposals)
-            : Discoverer.ToDefinition(entry.Id, entry.DisplayTitle, entry.Proposals, mode);
+            ? Discoverer.Extend(current with { Title = entry.DisplayTitle, Mode = chosen }, entry.Proposals)
+            : (defaults ?? new GameDefaults()).Apply(Discoverer.ToDefinition(entry.Id, entry.DisplayTitle, entry.Proposals, chosen));
         var keys = definition.Registry.ToList();
         keys.AddRange(entry.RegistryProposals
             .Where(p => !keys.Any(k => Safety.RegistryGuard.SameKey(k.Key, p.Key)))
@@ -361,12 +441,25 @@ public static class Library
 
     /// <summary>
     /// PC-04 and R8: takes up the rules another PC's saves used, exactly and with their root keys, so that PC's versions
-    /// map here and both PCs take the same files. Whatever this PC found beyond them stays a suggestion.
+    /// map here and both PCs take the same files. Whatever this PC found beyond them stays a suggestion. This PC's own
+    /// choices, which the rules don't carry (settings files synced, screenshots, who wins), come from its defaults (SET-06).
     /// </summary>
-    public static LibraryEntry Adopt(LibraryEntry entry, PortableRules shared)
+    public static LibraryEntry Adopt(LibraryEntry entry, PortableRules shared, GameDefaults? defaults = null)
     {
         var mode = entry.StoreCloud ? GameMode.BackupOnly : GameMode.Sync;
-        return entry with { State = LibraryState.Synced, Confirmed = shared.ToDefinition(entry.Id) with { Title = entry.DisplayTitle, Mode = mode } };
+        var mine = defaults ?? new GameDefaults();
+        return entry with
+        {
+            State = LibraryState.Synced,
+            Confirmed = shared.ToDefinition(entry.Id) with
+            {
+                Title = entry.DisplayTitle,
+                Mode = mode,
+                SyncConfig = mine.SettingsFiles == GameDefaults.SyncBetween,
+                IncludeScreenshots = mine.Screenshots,
+                ConflictPolicy = mine.Conflict,
+            },
+        };
     }
 
     /// <summary>
@@ -474,8 +567,13 @@ public static class Library
         return GameId.Parse(id);
     }
 
-    // A game a scan finds is where the scan found it: a folder it was located in by hand no longer counts.
-    private static LibraryEntry Updated(LibraryEntry entry, DiscoveredGame game, DateTime nowUtc) => entry with
+    // A game a scan finds is where the scan found it: a folder it was located in by hand no longer counts. Found where no
+    // store's cloud syncs it, it isn't its store's any more (KAN-44).
+    private static LibraryEntry Updated(LibraryEntry entry, DiscoveredGame game, DateTime nowUtc) => game.StoreCloud
+        ? Found(entry, game, nowUtc)
+        : NotStoreSynced(Found(entry, game, nowUtc), entry);
+
+    private static LibraryEntry Found(LibraryEntry entry, DiscoveredGame game, DateTime nowUtc) => entry with
     {
         Title = game.Title,
         Installed = true,
@@ -493,6 +591,11 @@ public static class Library
         RegistryProposals = game.Registry,
         LastSeenUtc = nowUtc,
     };
+
+    // LIB-28: a folder in a folder of games that a scan found once, still here, with nothing the person decided about it.
+    private static bool NotAGameAnyMore(LibraryEntry entry) =>
+        entry is { Store: StoreKind.Loose, State: LibraryState.Found, TitleByHand: null, InstallDirByHand: null, OwnFolder: null, Confirmed: null, Aliases.Count: 0, InstallDir: { Length: > 0 } dir } &&
+        Directory.Exists(dir);
 
     private static HashSet<string> Identities(InstalledGame game)
     {

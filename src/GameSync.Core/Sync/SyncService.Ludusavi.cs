@@ -3,6 +3,7 @@ using GameSync.Core.Discovery;
 using GameSync.Core.Games;
 using GameSync.Core.Model;
 using GameSync.Core.Safety;
+using GameSync.Core.State;
 using GameSync.Core.Storage;
 
 namespace GameSync.Core.Sync;
@@ -70,7 +71,7 @@ public sealed partial class SyncService
             var version = await UploadAsync(stream, snapshot.Files, VersionKind.Kept, VersionOrigin.Imported, null, [], pinned: false, label: name, ct,
                 open: file => File.OpenRead(LocalPath(backup, file)));
             await _log.SetPinAsync(stream.Id, new PinRecord(version.Id, name, DateTime.UtcNow, Device, Named: true), ct);
-            _state.Log(stream.Id, "info", $"Brought in Ludusavi's backup from {latest.WhenUtc.ToLocalTime():yyyy-MM-dd HH:mm} as '{name}'.");
+            _state.Log(stream.Id, "info", $"Brought in Ludusavi's backup from {latest.WhenUtc.ToLocalTime():yyyy-MM-dd HH:mm} as '{name}'.", EventTags.Named);
             var result = await AfterManualAsync(stream, new GameResult(stream.Id, stream.Definition.Title, SyncAction.Upload, StatusFor(stream),
                 $"Brought in '{name}'."), ct);
             return new ImportReport([item], [.. snapshot.Warnings, .. result.Warnings], 1);

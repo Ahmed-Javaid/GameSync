@@ -195,7 +195,8 @@ public sealed class LocalHistory
     /// anything fails, the copy is removed and this folder stays as it was. Returns the number of damaged blobs left
     /// behind (the cloud still has them).
     /// </summary>
-    public int CopyTo(string target)
+    /// <param name="progress">Told the files copied and checked so far, and how many there are.</param>
+    public int CopyTo(string target, IProgress<(int Done, int Total)>? progress = null, CancellationToken ct = default)
     {
         target = Path.GetFullPath(target);
         if (Directory.Exists(target) && Directory.EnumerateFileSystemEntries(target).Any())
@@ -206,13 +207,20 @@ public sealed class LocalHistory
         var skipped = 0;
         try
         {
-            foreach (var file in Directory.EnumerateFiles(Folder, "*", SearchOption.AllDirectories))
+            var files = Directory.EnumerateFiles(Folder, "*", SearchOption.AllDirectories).Where(f => !f.Contains(".tmp-", StringComparison.Ordinal)).ToList();
+            var (done, told) = (0, -1);
+            foreach (var file in files)
             {
-                if (file.Contains(".tmp-", StringComparison.Ordinal))
+                ct.ThrowIfCancellationRequested();
+
+                // Told at each whole percent, so a folder of many small files doesn't flood the page with news.
+                if (progress is not null && done * 100 / files.Count is var percent && percent != told)
                 {
-                    continue;
+                    progress.Report((done, files.Count));
+                    told = percent;
                 }
 
+                done++;
                 var relative = Path.GetRelativePath(Folder, file);
                 var isBlob = file.EndsWith(".gz", StringComparison.OrdinalIgnoreCase) && relative.Contains($"{Path.DirectorySeparatorChar}blobs{Path.DirectorySeparatorChar}");
                 if (isBlob && !BlobIntact(file))
@@ -230,6 +238,8 @@ public sealed class LocalHistory
                     throw new IOException($"{relative} didn't copy correctly.");
                 }
             }
+
+            progress?.Report((files.Count, files.Count));
         }
         catch
         {

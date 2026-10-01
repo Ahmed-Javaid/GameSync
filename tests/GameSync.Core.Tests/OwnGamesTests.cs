@@ -219,7 +219,7 @@ public class OwnGamesTests
         var folder = ServerWorld(world);
         OwnGame? asked = null;
         var closed = 0;
-        var look = new NewPlaceLook { Path = folder, Folder = folder, Portable = folder, Files = 142, Bytes = 40_265_318, NewestUtc = DateTime.UtcNow.AddMinutes(-5), Programs = 2 };
+        var look = new NewPlaceLook { Path = folder, Folder = folder, Portable = folder, Files = 142, Bytes = 40_265_318, NewestUtc = DateTime.UtcNow, Programs = 2 };
         var actions = new OwnActions(
             (_, _) => Task.FromResult(look),
             (path, _) => path.EndsWith(".exe", StringComparison.Ordinal) ? Task.FromResult(Path.GetDirectoryName(path)!) : throw new UsageException("That isn't a program."),

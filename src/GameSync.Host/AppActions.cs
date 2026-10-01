@@ -30,8 +30,12 @@ public static class AppActions
     /// rules, or, when another PC's saves recorded theirs, takes those up so both PCs take the same files (PC-04, R8).
     /// The rules pass the same checks as the command line's; the game syncs from the agent's next round.
     /// </summary>
-    /// <returns>True when the game now syncs.</returns>
-    public static async Task<bool> SyncGameAsync(string dataDir, GameId game, IAgentOutput output, CancellationToken ct)
+    /// <param name="backupOnly">
+    /// KAN-63: keep its saves without syncing them between PCs (back up only): what Save as…, Back up now and Import kept
+    /// saves do first for a game not syncing yet. Sync these saves, later, makes it sync between PCs.
+    /// </param>
+    /// <returns>True when the game now syncs, or is kept.</returns>
+    public static async Task<bool> SyncGameAsync(string dataDir, GameId game, IAgentOutput output, CancellationToken ct, bool backupOnly = false)
     {
         try
         {
@@ -43,7 +47,13 @@ public static class AppActions
             var theirs = entry.Confirmed is null
                 ? (await history.Log.ListAsync(game, ct)).Where(v => v.Rules is not null && v.Device.Id != engine.Device.Id).MaxBy(v => v.CreatedUtc)
                 : null;
-            var confirmed = theirs is not null ? Library.Adopt(entry, theirs.Rules!) : Library.Confirm(entry);
+            var defaults = Core.Games.GameDefaults.Load(engine.State);
+            var confirmed = theirs is not null ? Library.Adopt(entry, theirs.Rules!, defaults) : Library.Confirm(entry, backupOnly ? Core.Games.GameMode.BackupOnly : null, defaults);
+            if (backupOnly && confirmed.Confirmed is { } rules)
+            {
+                confirmed = confirmed with { Confirmed = rules with { Mode = Core.Games.GameMode.BackupOnly } };
+            }
+
             var portable = confirmed.Confirmed!;
             if (Cli.Problems(portable, engine.Here.Resolver.Resolve(portable), engine.Here) is [var problem, ..])
             {
@@ -52,6 +62,12 @@ public static class AppActions
             }
 
             engine.Library.SaveAll([confirmed]);
+            if (backupOnly && !entry.StoreCloud)
+            {
+                output.Say($"GameSync keeps {entry.DisplayTitle}'s saves from now on, backed up on this PC and in the cloud; they don't sync between your PCs until you choose Sync these saves.");
+                return true;
+            }
+
             var mode = portable.Mode == Core.Games.GameMode.BackupOnly ? $" {StoreNames.SyncedBy(entry.Store)}; GameSync keeps a backup of every version." : "";
             output.Say(theirs is not null
                 ? $"{entry.DisplayTitle} syncs from now on, with {theirs.Device.Name}'s save rules, so both PCs take the same files.{mode}"
@@ -66,18 +82,44 @@ public static class AppActions
     }
 
     /// <summary>BAK-16: Back up now, from a game's history, as <c>gamesync backup</c>; never downloads.</summary>
-    public static Task BackUpNowAsync(string dataDir, GameId game, IAgentOutput output, CancellationToken ct) =>
-        WithServiceAsync(dataDir, output, ct, service => service.BackupNowAsync(game, ct));
+    public static async Task BackUpNowAsync(string dataDir, GameId game, IAgentOutput output, CancellationToken ct)
+    {
+        if (await KeepAsync(dataDir, game, output, ct))
+        {
+            await WithServiceAsync(dataDir, output, ct, service => service.BackupNowAsync(game, ct));
+        }
+    }
 
     /// <summary>BAK-18: Save as…, as <c>gamesync save</c>: this PC's save as it is now, kept under a name on every PC.</summary>
-    public static Task SaveAsAsync(string dataDir, GameId game, string name, IAgentOutput output, CancellationToken ct) =>
-        WithServiceAsync(dataDir, output, ct, async service => [await service.SaveAsAsync(game, name, ct)]);
+    public static async Task SaveAsAsync(string dataDir, GameId game, string name, IAgentOutput output, CancellationToken ct)
+    {
+        if (await KeepAsync(dataDir, game, output, ct))
+        {
+            await WithServiceAsync(dataDir, output, ct, async service => [await service.SaveAsAsync(game, name, ct)]);
+        }
+    }
+
+    /// <summary>
+    /// KAN-63: a game not syncing yet is kept first (backed up only, not synced between PCs), so its saves can be named,
+    /// backed up and imported before the person chooses to sync them. True when the game syncs or is kept.
+    /// </summary>
+    public static async Task<bool> KeepAsync(string dataDir, GameId game, IAgentOutput output, CancellationToken ct)
+    {
+        bool known;
+        using (var engine = Engine.OpenForSetup(dataDir))
+        {
+            known = engine.Games.Any(g => g.Id == game);
+        }
+
+        return known || await SyncGameAsync(dataDir, game, output, ct, backupOnly: true);
+    }
 
     /// <summary>
     /// Restore from a game's page, a named save or any version, as <c>gamesync restore</c>: this PC's files are kept as a
-    /// version first (BAK-08), files go only into the game's own folders (R3), and never while the game runs.
+    /// version first (BAK-08), files go only into the game's own folders (R3), and never while the game runs. Null once
+    /// it's in place, or why it couldn't be, for the page to say (KAN-51).
     /// </summary>
-    public static Task RestoreAsync(string dataDir, GameId game, VersionId version, string? name, IAgentOutput output, CancellationToken ct) =>
+    public static Task<string?> RestoreAsync(string dataDir, GameId game, VersionId version, string? name, IAgentOutput output, CancellationToken ct) =>
         WithServiceAsync(dataDir, output, ct, async service => [await service.RestoreAsync(game, version, ct, name)]);
 
     /// <summary>BAK-12: keeps a save held for review as the game's current one, as <c>gamesync approve</c> does.</summary>
@@ -117,6 +159,11 @@ public static class AppActions
     /// <param name="root">The game's place they're copies of, when it has more than one.</param>
     public static async Task<ImportReport> KeptSavesAsync(string dataDir, GameId game, string folder, string? root, bool apply, IAgentOutput output, CancellationToken ct)
     {
+        if (!await KeepAsync(dataDir, game, output, ct))
+        {
+            throw new InvalidOperationException("Its saves can't be kept yet; the log says why.");
+        }
+
         using var engineLock = await EngineLock.AcquireAsync(dataDir, () => output.Say("Waiting for the sync in the background to finish first."), ct);
         using var engine = Engine.Open(dataDir);
         var running = new RunningGames(engine);
@@ -142,7 +189,8 @@ public static class AppActions
     /// A job on one game, the way a command runs it: it waits while the agent finishes a sync (BG-09), opens the sync
     /// service, does the job, and says how it went as the agent does.
     /// </summary>
-    private static async Task WithServiceAsync(string dataDir, IAgentOutput output, CancellationToken ct, Func<SyncService, Task<IReadOnlyList<GameResult>>> job)
+    /// <returns>Null when the job ran; otherwise why it couldn't, which the log shows too.</returns>
+    private static async Task<string?> WithServiceAsync(string dataDir, IAgentOutput output, CancellationToken ct, Func<SyncService, Task<IReadOnlyList<GameResult>>> job)
     {
         try
         {
@@ -151,10 +199,13 @@ public static class AppActions
             var running = new RunningGames(engine);
             var (service, _) = await engine.OpenServiceAsync(new SyncOptions { IsRunning = running.IsRunning }, ct, recover: false);
             Agent.Report(output, await job(service));
+            return null;
         }
-        catch (Exception e) when (e is UsageException or InvalidOperationException or IOException or CloudException or UnauthorizedAccessException)
+        catch (Exception e) when (e is UsageException or InvalidOperationException or IOException or CloudException or UnauthorizedAccessException
+            or Core.Scanning.InvalidGameDefinitionException)
         {
             output.NeedsYou("GameSync", e.Message);
+            return e.Message;
         }
     }
 }

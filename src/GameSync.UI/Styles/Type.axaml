@@ -14,10 +14,20 @@
     <Setter Property="BorderBrush" Value="{DynamicResource primary}" />
   </Style>
 
-  <!-- Settings rows after the first get a hairline above. -->
-  <Style Selector="c|GsSettingsRow:nth-child(n+2)">
+  <!-- Settings rows after the first get a hairline above; so do rows a list adds after one, which count as first in their own place. -->
+  <Style Selector="c|GsSettingsRow:nth-child(n+2), c|GsSettingsRow.after">
     <Setter Property="BorderBrush" Value="{DynamicResource line-100}" />
     <Setter Property="BorderThickness" Value="0,1,0,0" />
+  </Style>
+
+  <!-- A row named by something in mono: a PC, a folder. -->
+  <Style Selector="c|GsSettingsRow.mono /template/ TextBlock#PART_Title">
+    <Setter Property="FontFamily" Value="{DynamicResource font-mono}" />
+  </Style>
+
+  <!-- A note about something that went wrong, in warn. -->
+  <Style Selector="c|GsNote.warn">
+    <Setter Property="Foreground" Value="{DynamicResource warn}" />
   </Style>
 
   <!-- Console table cells: uppercase mono headers with tracking, mono cells, numbers right-aligned, paths muted. -->
@@ -136,5 +146,12 @@
   </Style>
   <Style Selector="TextBlock.faint">
     <Setter Property="Foreground" Value="{DynamicResource ink-faint}" />
+  </Style>
+  <!-- A page's own scroller (KAN-71): it reaches into the page's 24px right gutter and pads its content back, so its 12px
+       bar sits in the middle of the gutter, its thumb 9px clear of the cards on one side and of the window's edge on the
+       other (the owner, 1 Oct 2026), and the content stays in line with the page's top bar. -->
+  <Style Selector="ScrollViewer.page">
+    <Setter Property="Margin" Value="0,0,-18,0" />
+    <Setter Property="Padding" Value="0,0,18,0" />
   </Style>
 </Styles>

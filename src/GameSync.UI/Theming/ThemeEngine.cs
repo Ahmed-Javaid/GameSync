@@ -85,13 +85,13 @@ public static class ThemeEngine
     private static readonly Dictionary<string, string> StatusDark = new()
     {
         ["ok"] = "#7fe6f2", ["ok-soft"] = "#0f3035", ["warn"] = "#f2b544", ["warn-soft"] = "#2a2213", ["danger"] = "#ff8a7d",
-        ["danger-soft"] = "#2e1917", ["play"] = "#b9a3ff", ["play-soft"] = "#231d38", ["neutral"] = "#9aa1a9",
+        ["danger-soft"] = "#2e1917", ["play"] = "#1ed760", ["play-soft"] = "#0f2a1b", ["neutral"] = "#9aa1a9",
     };
 
     private static readonly Dictionary<string, string> StatusLight = new()
     {
         ["ok"] = "#006b77", ["ok-soft"] = "#d8f3f6", ["warn"] = "#855600", ["warn-soft"] = "#fbeed3", ["danger"] = "#b3261e",
-        ["danger-soft"] = "#fde4e1", ["play"] = "#6547d1", ["play-soft"] = "#ece7ff", ["neutral"] = "#58616b",
+        ["danger-soft"] = "#fde4e1", ["play"] = "#0f6e35", ["play-soft"] = "#dcf5e5", ["neutral"] = "#58616b",
     };
 
     private static readonly Dictionary<string, string> Fixed = new()

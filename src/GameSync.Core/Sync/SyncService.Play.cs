@@ -1,4 +1,5 @@
 using GameSync.Core.Model;
+using GameSync.Core.State;
 using GameSync.Core.Storage;
 
 namespace GameSync.Core.Sync;
@@ -156,7 +157,7 @@ public sealed partial class SyncService
                 pinned: true, label, ct);
         }
 
-        _state.Log(stream.Id, "info", $"Kept the save {label}: {kept.Id}.");
+        _state.Log(stream.Id, "info", $"Kept the save {label}.", EventTags.Backup);
         var result = new GameResult(stream.Id, stream.Definition.Title, SyncAction.Upload, StatusFor(stream), $"Kept the save {label}.")
         {
             NewVersion = kept.Id,

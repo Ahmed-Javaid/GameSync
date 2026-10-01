@@ -21,7 +21,12 @@ public partial class GamePage : UserControl
     /// </summary>
     public static void CloseFlyoutOf(object? sender)
     {
-        if ((sender as Control)?.FindLogicalAncestorOfType<Popup>() is { PlacementTarget: Button { Flyout: { } flyout } })
+        // A button's own flyout, or one attached to a control, such as Home's Activity whose grid shows it (KAN-66).
+        var target = (sender as Control)?.FindLogicalAncestorOfType<Popup>()?.PlacementTarget;
+        var flyout = target is Button { Flyout: { } own } ? own
+            : target is null ? null
+            : FlyoutBase.GetAttachedFlyout(target) ?? (target.TemplatedParent is Control owner ? FlyoutBase.GetAttachedFlyout(owner) : null);
+        if (flyout is not null)
         {
             Dispatcher.UIThread.Post(flyout.Hide, DispatcherPriority.Background);
         }

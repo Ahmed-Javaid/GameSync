@@ -31,6 +31,12 @@ public sealed record SyncOptions
 
     /// <summary>This PC's clock, which a test can move on.</summary>
     public Func<DateTime> UtcNow { get; init; } = () => DateTime.UtcNow;
+
+    /// <summary>
+    /// A note for the saves this run backs up and makes current, as a game's history and the Versions tab show them
+    /// ("Daily backup", MGR-08); held saves keep their own. Null for a sync after play.
+    /// </summary>
+    public string? UploadLabel { get; init; }
 }
 
 /// <summary>
@@ -209,7 +215,7 @@ public sealed partial class SyncService
         foreach (var journal in RestoreJournal.RecoverAll(_dataDir))
         {
             _state.SetBase(journal.Game, journal.Target);
-            _state.Log(journal.Game, "info", "Finished a restore that was interrupted.");
+            _state.Log(journal.Game, "info", "Finished a restore that was interrupted.", EventTags.Restore);
             journal.Delete(_dataDir);
         }
 
@@ -291,7 +297,9 @@ public sealed partial class SyncService
             heads.FirstOrDefault()?.Id, heads.Skip(1).Select(h => h.Id).ToList(), pinned: false, $"Restored from {shown}", ct);
         await RestoreFilesAsync(stream, current, snapshot.Files, ct);
 
-        _state.Log(stream.Id, "info", $"Restored {shown} ({version}) as {current.Id}.");
+        // In the log's plain, per-game voice (MGR-09): which save, not its version's ID.
+        var restored = name is null ? $"the save from {target.Files.Select(f => f.ModifiedUtc).DefaultIfEmpty(target.CreatedUtc).Max().ToLocalTime().ToString("d MMM HH:mm", System.Globalization.CultureInfo.InvariantCulture)}" : shown;
+        _state.Log(stream.Id, "info", $"Restored {restored}; the files it replaced stay in its history.", EventTags.Restore);
         var result = new GameResult(stream.Id, stream.Definition.Title, SyncAction.Download, StatusFor(stream),
             $"Restored {shown}. Your previous files are kept in history.")
         {
@@ -353,7 +361,7 @@ public sealed partial class SyncService
             var kept = await UploadAsync(stream, snapshot.Files, VersionKind.Normal, VersionOrigin.Resolve, heads[0].Id,
                 heads.Skip(1).Select(h => h.Id).ToList(), pinned: false, label: $"Chosen over the cloud's save on {Device.Name}", ct);
             _state.SetBase(stream.Id, kept);
-            _state.Log(stream.Id, "info", $"Conflict resolved by hand: kept {Device.Name}'s save as {kept.Id}.");
+            _state.Log(stream.Id, "info", $"Conflict resolved by hand: kept {Device.Name}'s save; the other stays in history.", EventTags.Conflict);
             var keptResult = new GameResult(stream.Id, stream.Definition.Title, SyncAction.Upload, GameStatus.Synced,
                 $"Kept {Device.Name}'s save. The cloud's is pinned in history.") { NewVersion = kept.Id };
             return await AfterManualAsync(stream, keptResult, ct);
@@ -374,7 +382,7 @@ public sealed partial class SyncService
                 heads.Where(h => h.Id != winner.Id).Select(h => h.Id).ToList(), pinned: false, $"Chosen in a conflict on {Device.Name}", ct)
             : winner;
         await RestoreFilesAsync(stream, current, snapshot.Files, ct);
-        _state.Log(stream.Id, "info", $"Conflict resolved by hand: kept {winner.Device.Name}'s save ({winner.Id}).");
+        _state.Log(stream.Id, "info", $"Conflict resolved by hand: kept {winner.Device.Name}'s save; the other stays in history.", EventTags.Conflict);
         var result = new GameResult(stream.Id, stream.Definition.Title, SyncAction.Download, GameStatus.Synced,
             $"Kept {winner.Device.Name}'s save. {Device.Name}'s is pinned in history.")
         {
@@ -545,7 +553,7 @@ public sealed partial class SyncService
             await _blobs.TrashAsync(preview.Game, blob, ct);
         }
 
-        _state.Log(preview.Game, "info", $"Thinned {preview.Versions.Count} old versions by hand.");
+        _state.Log(preview.Game, "info", $"Thinned {preview.Versions.Count} old versions by hand.", EventTags.Thinned);
         return preview.Versions.Count;
     }
 
@@ -707,7 +715,7 @@ public sealed partial class SyncService
         }
         catch (Exception e) when (e is CloudException or IOException or UnsafePathException or UnauthorizedAccessException)
         {
-            _state.Log(stream.Id, "warn", $"Couldn't update the plain copy of the newest save in the cloud: {e.Message}");
+            _state.Log(stream.Id, "warn", $"Couldn't update the plain copy of the newest save in the cloud: {e.Message}", EventTags.Cloud);
         }
     }
 
@@ -956,8 +964,9 @@ public sealed partial class SyncService
                 break;
             case SyncAction.Upload:
             case SyncAction.UploadHeld:
+                // The run's own note, like the daily backup's, goes on the saves it makes current; a held one says it was held.
                 created = await UploadAsync(stream, plan.Local, decision.UploadKind, decision.UploadOrigin, decision.UploadParent,
-                    decision.Supersedes, pinned: false, label: null, ct);
+                    decision.Supersedes, pinned: false, label: decision.UploadKind == VersionKind.Normal ? _options.UploadLabel : null, ct);
                 foreach (var pin in decision.Pins)
                 {
                     await _log.SetPinAsync(stream.Id, new PinRecord(pin.Version, pin.Label, DateTime.UtcNow, Device, pin.FromConflict), ct);
@@ -1044,8 +1053,11 @@ public sealed partial class SyncService
         _state.SetStatus(stream.Id, status, result.Notice ?? message);
         if (log && result.Action is not SyncAction.None)
         {
-            var level = status is GameStatus.Conflict or GameStatus.NotAvailable or GameStatus.SavesMissing or GameStatus.UploadPending ? "warn" : "info";
-            _state.Log(stream.Id, level, result.Notice is null ? message : $"{message} {result.Notice}");
+            // A conflict newest-wins settled has its Swap, and a held save waits for the person: both are worth a look.
+            var level = result.Notice is not null ||
+                status is GameStatus.Conflict or GameStatus.HeldForReview or GameStatus.NotAvailable or GameStatus.SavesMissing or GameStatus.UploadPending
+                ? "warn" : "info";
+            _state.Log(stream.Id, level, result.Notice is null ? message : $"{message} {result.Notice}", TagOf(stream, result.Action, result.Notice));
         }
 
         return result with { Status = status, Message = message };
@@ -1068,9 +1080,32 @@ public sealed partial class SyncService
             _ => (GameStatus.Error, e.Message),
         };
         _state.SetStatus(stream.Id, status, message);
-        _state.Log(stream.Id, "error", message);
+        _state.Log(stream.Id, "error", message, e switch
+        {
+            FileInUseException => EventTags.InUse,
+            BlockedException or UnsafePathException => EventTags.Blocked,
+            CloudException => EventTags.Cloud,
+            BackupFolderUnavailableException => EventTags.Missing,
+            _ => EventTags.Error,
+        });
         return new GameResult(stream.Id, stream.Definition.Title, null, status, message) { CloudProblem = (e as CloudException)?.Kind ?? plan.Cloud.Problem?.Kind };
     }
+
+    /// <summary>What a sync's line in the activity log is about, as the Log tab tags it (MGR-09).</summary>
+    private static string? TagOf(SyncStream stream, SyncAction? action, string? notice) => action switch
+    {
+        // Newest wins settled a conflict on its way: the line says which save was kept, and that Swap brings the other back.
+        _ when notice is not null => EventTags.Conflict,
+        SyncAction.Upload => stream.Definition.Mode == GameMode.BackupOnly ? EventTags.Backup : EventTags.Upload,
+        SyncAction.UploadHeld => EventTags.Held,
+        SyncAction.Download => EventTags.Download,
+        SyncAction.AdoptHead => EventTags.Sync,
+        SyncAction.NeedsYou => EventTags.Conflict,
+        SyncAction.Unavailable or SyncAction.SavesMissing or SyncAction.NoSaves => EventTags.Missing,
+        SyncAction.WaitForCloud => EventTags.Offline,
+        SyncAction.Playing => EventTags.Playing,
+        _ => null,
+    };
 
     private static string Describe(CloudException e) => e.Kind switch
     {
@@ -1231,7 +1266,7 @@ public sealed partial class SyncService
             catch (Exception e) when (e is IOException or UnauthorizedAccessException or FormatException or System.Security.SecurityException)
             {
                 // The files are restored; the keys are written back before the game's next scan.
-                _state.Log(stream.Id, "warn", $"Couldn't write the restored registry keys back yet: {e.Message}");
+                _state.Log(stream.Id, "warn", $"Couldn't write the restored registry keys back yet: {e.Message}", EventTags.Restore);
             }
         }
     }

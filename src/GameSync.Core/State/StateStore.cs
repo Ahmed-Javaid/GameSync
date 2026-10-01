@@ -32,7 +32,47 @@ public sealed record GameState(GameId Game, VersionRecord? Base, GameStatus? Sta
 
 public sealed record JobRow(long Id, string Kind, GameId Game, string State, int Attempts, string? LastError);
 
-public sealed record EventRow(DateTime AtUtc, GameId Game, string Level, string Message);
+/// <param name="Tag">What it was about (<see cref="EventTags"/>); null in lines logged before tags were kept.</param>
+public sealed record EventRow(DateTime AtUtc, GameId Game, string Level, string Message, string? Tag = null);
+
+/// <summary>What a line of the activity log is about, as the save manager's Log tab tags it (MGR-09).</summary>
+public static class EventTags
+{
+    public const string Upload = "upload";
+    public const string Download = "download";
+
+    /// <summary>A save added to the history only: a game its store's cloud syncs, or one kept before an update.</summary>
+    public const string Backup = "backup";
+
+    public const string Restore = "restore";
+    public const string Named = "named";
+    public const string Conflict = "conflict";
+
+    /// <summary>Changed while the game wasn't running, and held for the person (BAK-11).</summary>
+    public const string Held = "held";
+
+    public const string InUse = "in use";
+    public const string Session = "session";
+    public const string Playing = "playing";
+    public const string Daily = "daily";
+
+    /// <summary>This PC already had the cloud's save: only the record of what was agreed moved on.</summary>
+    public const string Sync = "sync";
+
+    /// <summary>A drive or save folder that isn't there, saves gone from this PC, or none found yet.</summary>
+    public const string Missing = "missing";
+
+    /// <summary>The cloud's side waits: this PC is offline, or the cloud isn't connected yet (PC-05).</summary>
+    public const string Offline = "offline";
+
+    public const string Cloud = "cloud";
+    public const string Blocked = "blocked";
+    public const string Thinned = "thinned";
+    public const string Error = "error";
+
+    /// <summary>The tags of lines where a save moved: the Log tab's Uploads, downloads and restores.</summary>
+    public static IReadOnlySet<string> Moves { get; } = new HashSet<string>(StringComparer.Ordinal) { Upload, Download, Backup, Restore, Named };
+}
 
 /// <summary>This PC's own state, in <c>state.db</c>: never synced, and safe to rebuild from the cloud.</summary>
 public sealed class StateStore : IDisposable
@@ -58,6 +98,7 @@ public sealed class StateStore : IDisposable
             CREATE TABLE IF NOT EXISTS events (id INTEGER PRIMARY KEY, at_utc TEXT NOT NULL, game TEXT NOT NULL, level TEXT NOT NULL, message TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS hash_cache (path TEXT PRIMARY KEY, size INTEGER NOT NULL, mtime INTEGER NOT NULL, hash TEXT NOT NULL);
             """);
+        AddColumn("events", "tag", "TEXT NULL");
     }
 
     public void Dispose() => _db.Dispose();
@@ -200,20 +241,23 @@ public sealed class StateStore : IDisposable
 
     // ---- activity log ----
 
-    public void Log(GameId game, string level, string message) =>
-        Execute("INSERT INTO events (at_utc, game, level, message) VALUES ($t, $g, $l, $m)",
-            ("$t", Now()), ("$g", game.Value), ("$l", level), ("$m", message));
+    /// <param name="tag">What it's about, one of <see cref="EventTags"/>.</param>
+    public void Log(GameId game, string level, string message, string? tag = null) =>
+        Execute("INSERT INTO events (at_utc, game, level, message, tag) VALUES ($t, $g, $l, $m, $tag)",
+            ("$t", Now()), ("$g", game.Value), ("$l", level), ("$m", message), ("$tag", tag));
 
+    /// <summary>The newest lines first; every game's when <paramref name="game"/> is null. The log is kept for good.</summary>
     public IReadOnlyList<EventRow> GetEvents(GameId? game, int limit)
     {
         using var cmd = game is { } g
-            ? Command("SELECT at_utc, game, level, message FROM events WHERE game = $g ORDER BY id DESC LIMIT $n", ("$g", g.Value), ("$n", limit))
-            : Command("SELECT at_utc, game, level, message FROM events ORDER BY id DESC LIMIT $n", ("$n", limit));
+            ? Command("SELECT at_utc, game, level, message, tag FROM events WHERE game = $g ORDER BY id DESC LIMIT $n", ("$g", g.Value), ("$n", limit))
+            : Command("SELECT at_utc, game, level, message, tag FROM events ORDER BY id DESC LIMIT $n", ("$n", limit));
         using var reader = cmd.ExecuteReader();
         var events = new List<EventRow>();
         while (reader.Read())
         {
-            events.Add(new EventRow(ParseTime(reader.GetString(0)), GameId.Parse(reader.GetString(1)), reader.GetString(2), reader.GetString(3)));
+            events.Add(new EventRow(ParseTime(reader.GetString(0)), GameId.Parse(reader.GetString(1)), reader.GetString(2), reader.GetString(3),
+                reader.IsDBNull(4) ? null : reader.GetString(4)));
         }
 
         return events;
@@ -253,6 +297,30 @@ public sealed class StateStore : IDisposable
     {
         using var cmd = Command(sql, parameters);
         cmd.ExecuteNonQuery();
+    }
+
+    /// <summary>
+    /// A column newer than the table, added to a state.db made before it. Another process opening the same file may add it
+    /// first; an older GameSync reading the file never names it, so it keeps working.
+    /// </summary>
+    private void AddColumn(string table, string column, string type)
+    {
+        using (var cmd = Command($"SELECT COUNT(*) FROM pragma_table_info('{table}') WHERE name = $c", ("$c", column)))
+        {
+            if (Convert.ToInt64(cmd.ExecuteScalar(), CultureInfo.InvariantCulture) > 0)
+            {
+                return;
+            }
+        }
+
+        try
+        {
+            Execute($"ALTER TABLE {table} ADD COLUMN {column} {type}");
+        }
+        catch (SqliteException e) when (e.Message.Contains("duplicate column", StringComparison.OrdinalIgnoreCase))
+        {
+            // Added by the other process in the meantime.
+        }
     }
 
     private T? Scalar<T>(string sql, params (string Name, object? Value)[] parameters)

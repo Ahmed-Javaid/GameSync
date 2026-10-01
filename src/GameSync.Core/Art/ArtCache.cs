@@ -37,6 +37,7 @@ public sealed class ArtCache : IDisposable
     {
         Folder = Path.Combine(dataDir, "art", "steam");
         OwnFolder = Path.Combine(dataDir, "art", "own");
+        LocalFolder = Path.Combine(dataDir, "art", "local");
         _utcNow = utcNow ?? (() => DateTime.UtcNow);
         _steamCache = steamRoot is null ? null : Path.Combine(steamRoot, "appcache", "librarycache");
         // No redirects: an image comes from Steam's image server or not at all.
@@ -51,6 +52,9 @@ public sealed class ArtCache : IDisposable
 
     /// <summary>The person's own images (ART-06), a folder per game: on this PC only, never synced or put in a shared zip.</summary>
     public string OwnFolder { get; }
+
+    /// <summary>Art copied from games' own folders (KAN-59), a folder per game, so it shows with their drive unplugged too.</summary>
+    public string LocalFolder { get; }
 
     public void Dispose() => _http.Dispose();
 
@@ -104,6 +108,82 @@ public sealed class ArtCache : IDisposable
         }
 
         return null;
+    }
+
+    /// <summary>The art copied from the game's own folder (KAN-59): a cover or a hero; never a logo.</summary>
+    public string? FindLocal(GameId game, ArtKind kind)
+    {
+        var folder = Path.Combine(LocalFolder, game.Value);
+        return Extensions.Select(e => Path.Combine(folder, Name(kind) + e)).FirstOrDefault(File.Exists);
+    }
+
+    /// <summary>
+    /// KAN-59: copies the art a game carries in its own folder (<see cref="LocalArt"/>) into the cache, checked by content
+    /// like downloaded art (ART-08); a copy already the same is left alone. For a game Steam has no art for. With no
+    /// cover there, its program's own icon is the cover, if it's big enough (KAN-70).
+    /// </summary>
+    /// <param name="program">The game's program, whose icon is the last resort before a title cover.</param>
+    /// <returns>How many pictures were copied.</returns>
+    public int CopyLocal(GameId game, string? installDir, string? program = null)
+    {
+        var (cover, hero) = LocalArt.Find(installDir);
+        var copied = 0;
+        foreach (var (kind, source) in new[] { (ArtKind.Cover, cover), (ArtKind.Hero, hero) })
+        {
+            try
+            {
+                if (source is null || new FileInfo(source) is not { Exists: true, Length: > 0 and <= ArtCheck.MaxBytes } file)
+                {
+                    continue;
+                }
+
+                if (FindLocal(game, kind) is { } known && new FileInfo(known).Length == file.Length)
+                {
+                    continue;
+                }
+
+                copied += Keep(game, kind, File.ReadAllBytes(source)) ? 1 : 0;
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+            {
+                // A drive that went away, or a file in use: the next refresh tries again.
+            }
+        }
+
+        if (cover is null && LocalArt.ProgramIcon(program) is { Length: <= ArtCheck.MaxBytes } icon &&
+            !(FindLocal(game, ArtKind.Cover) is { } kept && new FileInfo(kept).Length == icon.Length))
+        {
+            try
+            {
+                copied += Keep(game, ArtKind.Cover, icon) ? 1 : 0;
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+            {
+                // The next refresh tries again.
+            }
+        }
+
+        return copied;
+    }
+
+    // A picture checked by its content (ART-08) as the game's local art of this kind, in place of any before it.
+    private bool Keep(GameId game, ArtKind kind, byte[] content)
+    {
+        if (ArtCheck.ExtensionOf(content) is not { } extension)
+        {
+            return false;
+        }
+
+        var folder = Directory.CreateDirectory(Path.Combine(LocalFolder, game.Value)).FullName;
+        foreach (var old in Extensions.Select(e => Path.Combine(folder, Name(kind) + e)).Where(File.Exists))
+        {
+            File.Delete(old);
+        }
+
+        var target = Path.Combine(folder, Name(kind) + extension);
+        File.WriteAllBytes(target + ".part", content);
+        File.Move(target + ".part", target, overwrite: true);
+        return true;
     }
 
     /// <summary>Takes the person's own image of this kind away, so Steam's shows again, or the title cover.</summary>

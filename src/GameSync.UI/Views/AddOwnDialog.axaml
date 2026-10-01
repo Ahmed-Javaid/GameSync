@@ -36,7 +36,7 @@
         <!-- Name: what the library calls it -->
         <StackPanel Spacing="8">
           <TextBlock Classes="field-label" Text="Name" />
-          <TextBox Text="{Binding Name}" MaxLength="80" Watermark="Minecraft server world" AutomationProperties.Name="Name" />
+          <TextBox Text="{Binding Name}" MaxLength="80" PlaceholderText="Minecraft server world" AutomationProperties.Name="Name" />
         </StackPanel>
 
         <!-- Folder: nothing picked yet, or this PC's full path and what's there, Change… and Open in Explorer -->

@@ -1,6 +1,10 @@
 // Renders pages of GameSync's UI to PNG files, in the themes asked for, with Avalonia's headless platform and Skia:
-//   dotnet run --project tools/GameSync.Snapshots -- <output folder> [--data <data folder>] [--game <id>] [--size 1920x1128] [--hover x,y] [page ...]
+//   dotnet run --project tools/GameSync.Snapshots -- <output folder> [--data <data folder>] [--game <id>] [--size 1920x1128] [--hover x,y] [--click x,y] [--bench N] [page ...]
 // Pages: gallery, gallery2, gallery3, and with --data, home, home-playing (the hero game running), library, library-installed,
+// library-marks (every game given a made-up status: the marks of games that are fine, KAN-48, and the badges),
+// saves-needs (the save manager's Needs you tab, KAN-46), library-installed (Installed only ticked, KAN-47),
+// saves-by-name and saves-by-status (the Saves tab's tables sorted by a heading, each on its own: Every game by name; Syncing
+// by status and Every game by status reversed, KAN-49),
 // library-local, library-search and library-game (a game's page, the
 // one --game names or the hero game), saves and game-saves (the save manager, and that game's saves in it), conflict and
 // conflict-settled (a made-up conflict of that game, waiting and settled), plan (the save manager's Plan tab, made up),
@@ -10,7 +14,10 @@
 // first run over that data folder's library, as if it weren't set up (its stores' folders made up): setup-scan (the scan
 // under way), setup, setup-choose, setup-cloud, setup-cloud-folder, setup-daily and setup-daily-time; home-nocloud and
 // connect-cloud (Home after Skip for now, and its Connect the cloud dialog); add-game, add-game-program and setup-add-game
-// (Add a game or folder over the library and over first run, made up); and the
+// (Add a game or folder over the library and over first run, made up); settings, settings-storage, settings-backup,
+// settings-cloud, settings-devices, settings-notifications and settings-safety (Settings from that data folder's own
+// settings, SET-01), settings-cloud-drive (signed in to a made-up Drive) and settings-backup-apply (a default changed,
+// offering to apply it); and the
 // Glossy window (LOOK-17) over the last-played game's art: glossy-home, glossy-library, glossy-game, glossy-saves,
 // glossy-game-saves, glossy-conflict, glossy-properties, glossy-console, glossy-settings, glossy-setup, glossy-setup-choose.
 // Themes: every page in Arcade dark, Arcade light and Sakura dark; Glossy goes Solid in light mode, as the app does.
@@ -20,7 +27,9 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using GameSync.Core.Model;
+using GameSync.Core.State;
 using GameSync.Host;
 using GameSync.Snapshots;
 using GameSync.UI;
@@ -36,6 +45,19 @@ var gameId = TakeOption(list, "--game");
 var size = TakeOption(list, "--size")?.Split('x') is [var w, var h] ? (Width: int.Parse(w), Height: int.Parse(h)) : (Width: 1280, Height: 800);
 // The mouse pointer resting at x,y (window coordinates), to see hover states.
 var hover = TakeOption(list, "--hover")?.Split(',') is [var hx, var hy] ? new Point(double.Parse(hx), double.Parse(hy)) : (Point?)null;
+
+// A click at x,y (window coordinates) before the render, to see what it opens, such as a flyout.
+var click = TakeOption(list, "--click")?.Split(',') is [var cx, var cy] ? new Point(double.Parse(cx), double.Parse(cy)) : (Point?)null;
+// KAN-58: --bench N scrolls the page's biggest scroller N times, rendering a whole frame each time, and prints how long
+// the frames took (Skia on the CPU, as the app draws), in place of saving a picture.
+var bench = TakeOption(list, "--bench") is { } benchFrames ? int.Parse(benchFrames) : 0;
+// "backdrops" with --art <folder>: each picture's Glossy backdrop before and after its colour is tamed, with its chroma.
+var artFolder = TakeOption(list, "--art");
+var caps = (TakeOption(list, "--caps") ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries)
+    .Select(c => c.Split(':'))
+    .Select(c => (Knee: double.Parse(c[0], System.Globalization.CultureInfo.InvariantCulture), Limit: double.Parse(c[1], System.Globalization.CultureInfo.InvariantCulture)))
+    .ToList();
+Avalonia.Media.IImage? glowNext = null;
 var output = Path.GetFullPath(list.Count > 0 ? list[0] : "snapshots");
 var wanted = list.Skip(1).ToHashSet(StringComparer.OrdinalIgnoreCase);
 Directory.CreateDirectory(output);
@@ -56,6 +78,15 @@ AppBuilder.Configure<GsApp>()
     .UseSkia()
     .UseHeadless(new AvaloniaHeadlessPlatformOptions { UseHeadlessDrawing = false })
     .SetupWithoutStarting();
+
+if (wanted.Remove("backdrops") && artFolder is not null)
+{
+    BackdropSheet(artFolder);
+    if (wanted.Count == 0)
+    {
+        return;
+    }
+}
 
 var glossy = new Dictionary<string, Func<ThemeChoice, Window>>(StringComparer.OrdinalIgnoreCase);
 var pages = new Dictionary<string, (Func<Control> Make, int Width, int Height)>(StringComparer.OrdinalIgnoreCase)
@@ -83,7 +114,7 @@ if (dataDir is not null)
         SyncGame = _ => { },
         BackUpNow = _ => { },
         SaveAs = (_, _) => { },
-        Restore = (_, _, _) => { },
+        Restore = (_, _, _) => Task.FromResult<string?>(null),
         OpenSaves = _ => { },
         OpenProperties = (_, _) => { },
         OpenLink = _ => { },
@@ -99,7 +130,7 @@ if (dataDir is not null)
         OpenImportKept = _ => { },
         SaveProperties = (_, _) => { },
         CloseDialog = () => { },
-        SetView = _ => { },
+        SetInstalledOnly = _ => { },
         ScanFolder = (folder, _) => Task.FromResult(new FolderScan(folder, [], 0)),
         Locate = (_, _) => { },
         OpenAddGame = () => { },
@@ -112,9 +143,9 @@ if (dataDir is not null)
     // Read off the UI thread, as the app does: waiting on it here would hold the thread its awaits come back to.
     T Off<T>(Func<Task<T>> read) => Task.Run(read).GetAwaiter().GetResult();
 
-    LibraryViewModel Library(string tab = "all", string search = "", bool open = false)
+    LibraryViewModel Library(string tab = "all", string search = "", bool open = false, bool installedOnly = false)
     {
-        var library = LibraryViewModel.From(games, now, tab, actions);
+        var library = LibraryViewModel.From(games, now, tab, actions, installedOnly: installedOnly);
         library.Search = search;
         if (open && shown is not null)
         {
@@ -167,6 +198,106 @@ if (dataDir is not null)
             ["Terraria", "Hades", "Hollow Knight", "Core Keeper", "Valheim", "Risk of Rain 2"],
             now.ToUniversalTime()));
         saves.Tab = "plan";
+        return saves;
+    }
+
+    // The save manager's Versions tab (MGR-08) as the design draws it: the newest versions from two PCs, one for each
+    // reason a version is kept, and 204 older ones behind Show N older; kept: Named and kept only; empty: a game that
+    // hasn't synced since it was added. Made up, like the plan.
+    SaveManagerViewModel VersionsTab(string state)
+    {
+        var saves = Saves();
+        saves.Tab = "versions";
+        DateTime At(int daysAgo, int hour, int minute) => now.Date.AddDays(-daysAgo).AddHours(hour).AddMinutes(minute).ToUniversalTime();
+        SavedVersion V(string game, string title, DateTime at, string pc, string why, KeptFor kind, int files, long bytes, bool named = false, bool kept = false) =>
+            new(GameId.Parse(game), title, VersionId.New(at, pc), at, at, pc, why, kind, named, kept, files, bytes);
+        var versions = new List<SavedVersion>
+        {
+            V("sekiro", "Sekiro: Shadows Die Twice", At(0, 21, 6), "DESKTOP", "After play · 3 h 10 min", KeptFor.Play, 2, 2_202_009),
+            V("sekiro", "Sekiro: Shadows Die Twice", At(0, 21, 4), "LAPTOP", "LAPTOP's save, replaced by DESKTOP's in a conflict", KeptFor.Kept, 2, 2_199_552, kept: true),
+            V("terraria", "Terraria", At(0, 20, 0), "DESKTOP", "Daily backup", KeptFor.Daily, 3, 341_835_776),
+            V("slay-the-spire-2", "Slay the Spire 2", At(0, 19, 30), "LAPTOP", "After play · 47 min", KeptFor.Play, 1, 913_408),
+            V("black-myth-wukong", "Black Myth: Wukong", At(1, 23, 31), "DESKTOP", "Named: Before Erlang Shen", KeptFor.Kept, 3, 522_240, named: true, kept: true),
+            V("black-myth-wukong", "Black Myth: Wukong", At(1, 22, 47), "DESKTOP", "Changed outside play, held for review", KeptFor.Held, 3, 519_168),
+            V("minecraft-server-world", "Minecraft server world", At(1, 21, 10), "DESKTOP", "After 5 quiet minutes", KeptFor.Quiet, 142, 40_265_318),
+            V("hollow-knight", "Hollow Knight", At(2, 18, 5), "LAPTOP", "Kept before update to build 1.5.78 (28 Sep)", KeptFor.Kept, 6, 1_153_434, kept: true),
+            V("dark-souls-3", "Dark Souls III", At(2, 12, 0), "DESKTOP", "Kept before a restore", KeptFor.Kept, 1, 6_815_744, kept: true),
+            V("cuphead", "Cuphead", At(4, 20, 0), "LAPTOP", "First backup", KeptFor.First, 4, 48_128),
+        };
+        var played = new[]
+        {
+            ("sekiro", "Sekiro: Shadows Die Twice", 2_199_552L), ("terraria", "Terraria", 341_000_000L), ("slay-the-spire-2", "Slay the Spire 2", 905_216L),
+            ("hollow-knight", "Hollow Knight", 1_150_000L), ("cuphead", "Cuphead", 48_128L), ("dark-souls-3", "Dark Souls III", 6_815_744L),
+        };
+        for (var i = 0; i < 204; i++)
+        {
+            var (id, title, bytes) = played[i % played.Length];
+            versions.Add(V(id, title, At(5 + i / 16, 22 - i % 16, 10), i % 3 == 0 ? "LAPTOP" : "DESKTOP",
+                $"After play · {Launcher.DurationText(TimeSpan.FromMinutes(20 + i % 7 * 13))}", KeptFor.Play, 2, bytes));
+        }
+
+        var games = versions.Select(v => new HistoryGame(v.Game, v.Title)).DistinctBy(g => g.Id).Append(new HistoryGame(GameId.Parse("hades"), "Hades"))
+            .OrderBy(g => g.Title, StringComparer.CurrentCultureIgnoreCase).ToList();
+        saves.Versions.Show(new VersionsView(versions, games, "DESKTOP", ["DESKTOP", "LAPTOP"], 10, HasCloud: true), now);
+        if (state == "kept")
+        {
+            saves.Versions.KeptOnly = true;
+        }
+        else if (state == "empty")
+        {
+            saves.Versions.Game = "hades";
+        }
+
+        return saves;
+    }
+
+    // The save manager's Log tab (MGR-09): lines as GameSync writes them, newest first and dated, with the daily
+    // backup's for the days before; needs: Only what needs you; search: "dark souls" typed. Made up, like the plan.
+    SaveManagerViewModel SavesLogTab(string state)
+    {
+        var saves = Saves();
+        saves.Tab = "log";
+        DateTime At(int daysAgo, int hour, int minute, int second) =>
+            now.Date.AddDays(-daysAgo).AddHours(hour).AddMinutes(minute).AddSeconds(second).ToUniversalTime();
+        LogEntry L(DateTime at, string game, string title, string level, string tag, string message) => new(at, GameId.Parse(game), title, level, tag, message);
+        const string Sekiro = "Sekiro: Shadows Die Twice", Wukong = "Black Myth: Wukong", Souls = "Dark Souls III";
+        var entries = new List<LogEntry>
+        {
+            L(At(0, 21, 6, 13), "sekiro", Sekiro, "warn", EventTags.Conflict,
+                "Changed on DESKTOP and on LAPTOP; the newest save wins. Kept DESKTOP's save. LAPTOP's is pinned in history; Swap switches to it."),
+            L(At(0, 21, 6, 2), "sekiro", Sekiro, "info", EventTags.Session, "Played 3 h 10 min."),
+            L(At(0, 20, 0, 11), "black-myth-wukong", Wukong, "warn", EventTags.Held, "Changed while the game wasn't running: backed up and held for review."),
+            L(At(0, 20, 0, 9), "terraria", "Terraria", "info", EventTags.Backup, "Backing up this PC's saves (the store's cloud syncs this game)."),
+            L(At(0, 20, 0, 4), "cuphead", "Cuphead", "info", EventTags.Daily, "Daily backup: In sync."),
+            L(At(0, 19, 31, 2), "slay-the-spire-2", "Slay the Spire 2", "info", EventTags.Download, "Newer save from LAPTOP."),
+            L(At(0, 18, 40, 55), "dark-souls-3", Souls, "error", EventTags.InUse, "Can't read DS30000.sl2: another program has it open. Other games carry on."),
+            L(At(1, 23, 31, 40), "black-myth-wukong", Wukong, "info", EventTags.Named, "Saved as 'Before Erlang Shen'."),
+            L(At(1, 22, 47, 3), "black-myth-wukong", Wukong, "info", EventTags.Session, "Played 2 h 4 min."),
+            L(At(2, 12, 0, 31), "dark-souls-3", Souls, "info", EventTags.Restore, "Restored the save from 25 Sep 21:40; the files it replaced stay in its history."),
+        };
+        var quiet = new[]
+        {
+            ("cuphead", "Cuphead"), ("hollow-knight", "Hollow Knight"), ("terraria", "Terraria"), ("dark-souls-3", Souls), ("sekiro", Sekiro),
+            ("slay-the-spire-2", "Slay the Spire 2"),
+        };
+        for (var day = 3; day < 12; day++)
+        {
+            foreach (var (id, title) in quiet)
+            {
+                entries.Add(L(At(day, 20, 0, 4), id, title, "info", EventTags.Daily, "Daily backup: In sync."));
+            }
+        }
+
+        saves.LogTab.Show(entries, now);
+        if (state == "needs")
+        {
+            saves.LogTab.Showing = "needs";
+        }
+        else if (state == "search")
+        {
+            saves.LogTab.Search = "dark souls";
+        }
+
         return saves;
     }
 
@@ -240,9 +371,37 @@ if (dataDir is not null)
     Dictionary<string, Func<object?>> Makers() => new()
     {
         ["home"] = () => HomeViewModel.From(home, games, now),
+        ["home-last-month"] = () =>
+        {
+            // KAN-66: the Activity card's arrow, a month back.
+            var page = HomeViewModel.From(home, games, now);
+            page.EarlierMonthCommand.Execute(null);
+            return page;
+        },
         ["playing"] = Playing,
         ["library"] = () => Library(),
-        ["installed"] = () => Library("installed"),
+        ["marks"] = Marked,
+        ["installed"] = () => Library(installedOnly: true),
+        ["saves-by-name"] = () =>
+        {
+            var saves = Saves();
+            saves.AllSort.SortCommand.Execute("Name");
+            return saves;
+        },
+        ["saves-by-status"] = () =>
+        {
+            var saves = Saves();
+            saves.SyncingSort.SortCommand.Execute("Status");
+            saves.AllSort.SortCommand.Execute("Status");
+            saves.AllSort.SortCommand.Execute("Status");
+            return saves;
+        },
+        ["saves-needs"] = () =>
+        {
+            var saves = Saves();
+            saves.ShowTab(SaveManagerViewModel.NeedsTab);
+            return saves;
+        },
         ["local"] = () => Library("local"),
         ["hidden"] = () => Library("hidden"),
         ["searched"] = () => Library(search: "re"),
@@ -252,6 +411,12 @@ if (dataDir is not null)
         ["conflict"] = () => Conflict(settled: false),
         ["conflict-settled"] = () => Conflict(settled: true),
         ["plan"] = PlanTab,
+        ["versions"] = () => VersionsTab(""),
+        ["versions-kept"] = () => VersionsTab("kept"),
+        ["versions-empty"] = () => VersionsTab("empty"),
+        ["saves-log"] = () => SavesLogTab(""),
+        ["saves-log-needs"] = () => SavesLogTab("needs"),
+        ["saves-log-search"] = () => SavesLogTab("search"),
         ["home-nocloud"] = () => HomeViewModel.From(home, games, now, actions,
             new HomeStatus("No cloud yet", GameSync.Core.Storage.NoCloud.Message, Environment.MachineName, []) { NoCloud = true }),
         ["setup-scan"] = () => Setup("scanning"),
@@ -261,7 +426,55 @@ if (dataDir is not null)
         ["setup-cloud-folder"] = () => Setup("cloud-folder"),
         ["setup-daily"] = () => Setup("daily"),
         ["setup-daily-time"] = () => Setup("daily-time"),
+        ["settings"] = () => SettingsPage(SettingsViewModel.AppearanceId),
+        ["settings-storage"] = () => SettingsPage(SettingsViewModel.StorageId),
+        ["settings-backup"] = () => SettingsPage(SettingsViewModel.BackupId),
+        ["settings-backup-apply"] = () => SettingsPage(SettingsViewModel.BackupId, apply: true),
+        ["settings-cloud"] = () => SettingsPage(SettingsViewModel.CloudId),
+        ["settings-cloud-drive"] = () => SettingsPage(SettingsViewModel.CloudId, drive: true),
+        ["settings-devices"] = () => SettingsPage(SettingsViewModel.DevicesId),
+        ["settings-notifications"] = () => SettingsPage(SettingsViewModel.NotificationsId),
+        ["settings-safety"] = () => SettingsPage(SettingsViewModel.SafetyId),
     };
+
+    // Settings (SET-01) from this data folder's own settings, on a section; the actions only answer, so nothing is
+    // written. With drive, the cloud is a made-up Google Drive, signed in and 81% full (CLOUD-05); with apply, the
+    // settings files default was just changed, so What to back up offers to apply it to games that differ (SET-06).
+    SettingsViewModel SettingsPage(string section, bool drive = false, bool apply = false)
+    {
+        var view = SettingsData.Read(dataDir);
+        if (drive)
+        {
+            view = view with { Cloud = SettingsData.Drive, SignedIn = true, CloudFolder = null };
+        }
+
+        if (apply)
+        {
+            view = view with { FilesDiffer = Math.Max(1, view.Games), Defaults = view.Defaults with { SettingsFiles = GameSync.Core.Games.GameDefaults.SyncBetween } };
+        }
+
+        var figures = Task.Run(() => SettingsData.FiguresAsync(dataDir, CancellationToken.None)).GetAwaiter().GetResult();
+        CloudDetails? details = drive
+            ? new CloudDetails("https://drive.google.com/drive/folders/example", "sam.rivera@gmail.com", 13_300_000_000, 15L * 1024 * 1024 * 1024)
+            : view.CloudFolder is { } folder ? new CloudDetails(folder, null, null, 212L * 1024 * 1024 * 1024) : null;
+        var settings = new SettingsViewModel(new SettingsActions
+        {
+            Read = _ => Task.FromResult<SettingsView?>(view),
+            Figures = _ => Task.FromResult(figures),
+            Cloud = _ => Task.FromResult(details),
+            Diagnostics = _ => Task.FromResult(""),
+        }, new Look(), section);
+        settings.Apply(view);
+        settings.Storage.LoadFigures();
+        settings.Cloud.LoadDetails();
+        if (apply)
+        {
+            // Touched: a change made on the page, which the page then reads back.
+            settings.Backup.SettingsFiles = GameSync.Core.Games.GameDefaults.ThisPc;
+        }
+
+        return settings;
+    }
 
     // First run (ONB-01 to ONB-05) over this data folder's library, as if GameSync weren't set up yet: the scan while it
     // runs, then each step; the cloud with a folder chosen, and the daily time being changed. The stores' folders are
@@ -319,6 +532,16 @@ if (dataDir is not null)
         }
 
         return setup;
+    }
+
+    // The library with every game given a made-up status in turn, to show the fine games' marks and the badges (KAN-45, KAN-48).
+    LibraryViewModel Marked()
+    {
+        GameStatus?[] turns = [GameStatus.Synced, GameStatus.BackupOnly, GameStatus.Synced, null, GameStatus.UploadPending, GameStatus.Conflict, GameStatus.BackupOnly];
+        var marked = games.Select((g, i) => turns[i % turns.Length] is { } status
+            ? g with { Status = status, Syncs = true, Store = status == GameStatus.BackupOnly && i % 2 == 0 ? null : g.Store }
+            : g with { Status = null, Syncs = false }).ToList();
+        return LibraryViewModel.From(marked, now, "all", actions);
     }
 
     // Home with a game running (PLAY-12): the game --game names, or the hero game, playing for the last 35 minutes.
@@ -410,10 +633,15 @@ if (dataDir is not null)
     };
     pages["home"] = (() => Shell("home"), size.Width, size.Height);
     pages["home-playing"] = (() => Shell("playing"), size.Width, size.Height);
+    pages["home-last-month"] = (() => Shell("home-last-month"), size.Width, size.Height);
     pages["library"] = (() => Shell("library"), size.Width, size.Height);
     pages["library-full"] = (() => Shell("library"), 1280, 2400);
     pages["library-hidden"] = (() => Shell("hidden"), 1280, 800);
     pages["library-installed"] = (() => Shell("installed"), size.Width, size.Height);
+    pages["saves-needs"] = (() => Shell("saves-needs"), size.Width, size.Height);
+    pages["saves-by-name"] = (() => Shell("saves-by-name"), size.Width, size.Height);
+    pages["saves-by-status"] = (() => Shell("saves-by-status"), size.Width, size.Height);
+    pages["library-marks"] = (() => Shell("marks"), size.Width, size.Height);
     pages["library-local"] = (() => Shell("local"), size.Width, size.Height);
     pages["library-search"] = (() => Shell("searched"), size.Width, size.Height);
     pages["library-game"] = (() => Shell("game"), size.Width, size.Height);
@@ -422,6 +650,10 @@ if (dataDir is not null)
     pages["conflict"] = (() => Shell("conflict"), size.Width, size.Height);
     pages["conflict-settled"] = (() => Shell("conflict-settled"), size.Width, size.Height);
     pages["plan"] = (() => Shell("plan"), size.Width, size.Height);
+    foreach (var tab in new[] { "versions", "versions-kept", "versions-empty", "saves-log", "saves-log-needs", "saves-log-search" })
+    {
+        pages[tab] = (() => Shell(tab), size.Width, size.Height);
+    }
     foreach (var section in new[] { "general", "art", "launch", "files", "saves", "sync" })
     {
         pages["properties-" + section] = (() => Shell("game", section), size.Width, size.Height);
@@ -434,6 +666,12 @@ if (dataDir is not null)
     pages["add-game"] = (() => Shell("library", "add-game"), size.Width, size.Height);
     pages["add-game-program"] = (() => Shell("library", "add-game-program"), size.Width, size.Height);
     pages["setup-add-game"] = (() => Shell("setup-choose", "setup-add-game"), size.Width, size.Height);
+    foreach (var section in new[] { "settings", "settings-storage", "settings-backup", "settings-backup-apply", "settings-cloud", "settings-cloud-drive", "settings-devices",
+                 "settings-notifications", "settings-safety" })
+    {
+        pages[section] = (() => Shell(section), size.Width, size.Height);
+    }
+
     foreach (var step in new[] { "setup-scan", "setup", "setup-choose", "setup-cloud", "setup-cloud-folder", "setup-daily", "setup-daily-time" })
     {
         pages[step] = (() => Shell(step), size.Width, size.Height);
@@ -449,13 +687,12 @@ if (dataDir is not null)
         "22:31:57  Hades: synced after play (3 files, 1.2 MB).",
         "22:32:02  ! Sekiro: Shadows Die Twice: changed on two PCs. A conflict waits for you.",
     ], now);
-    foreach (var current in new[] { "home", "library", "game", "saves", "game-saves", "conflict", "log", "settings", "properties", "setup", "setup-choose", "plan" })
+    foreach (var current in new[] { "home", "library", "game", "saves", "game-saves", "conflict", "log", "settings", "properties", "setup", "setup-choose", "plan", "versions", "saves-log" })
     {
         glossy[current == "log" ? "glossy-console" : "glossy-" + current] = choice =>
         {
             var makers = Makers();
             makers["log"] = () => console;
-            makers["settings"] = () => new PlaceholderViewModel("Settings", "settings", "Appearance, folders, the daily backup, the cloud, your PCs and notifications.");
             var shell = new ShellViewModel(makers, current == "properties" ? "game" : current)
             {
                 Rail = rail,
@@ -469,6 +706,18 @@ if (dataDir is not null)
             return window;
         };
     }
+
+    // KAN-54: the library with the game --game names glowing in over it, for --bench (a frame of the glow each time).
+    glossy["glossy-glow"] = choice =>
+    {
+        var window = glossy["glossy-library"](choice);
+        if ((shown?.HeroPath ?? shown?.CoverPath ?? art) is { } next && ThemeEngine.Glass(choice, GlassStrength.Glass) is { } glass)
+        {
+            glowNext = Backdrop.Make(next, glass, ThemeEngine.Build(choice));
+        }
+
+        return window;
+    };
 }
 
 var themes = new[]
@@ -500,9 +749,30 @@ void Save(Window window, string fileName)
 {
     window.Show();
     Dispatcher.UIThread.RunJobs();
+    if (bench > 0)
+    {
+        Bench(window, fileName);
+        return;
+    }
+
     if (hover is { } point)
     {
+        // Tooltips show at once, so a hover shows what it says.
+        // The tooltip of what's under the pointer shows at once, as it would after a moment.
         window.MouseMove(point);
+        Dispatcher.UIThread.RunJobs();
+        if ((window.GetVisualAt(point) as Visual)?.GetSelfAndVisualAncestors().OfType<Control>().FirstOrDefault(c => ToolTip.GetTip(c) is not null) is { } tipped)
+        {
+            ToolTip.SetIsOpen(tipped, true);
+            Dispatcher.UIThread.RunJobs();
+        }
+    }
+
+    if (click is { } at)
+    {
+        window.MouseMove(at);
+        window.MouseDown(at, Avalonia.Input.MouseButton.Left);
+        window.MouseUp(at, Avalonia.Input.MouseButton.Left);
         Dispatcher.UIThread.RunJobs();
     }
 
@@ -511,6 +781,102 @@ void Save(Window window, string fileName)
     frame?.Save(file);
     window.Close();
     Console.WriteLine(frame is null ? $"{file}: nothing rendered" : file);
+}
+
+void Bench(Window window, string name)
+{
+    var glowing = name.StartsWith("glossy-glow", StringComparison.Ordinal) && window is MainWindow && glowNext is not null;
+    var scroller = glowing ? null : window.GetVisualDescendants().OfType<ScrollViewer>().Where(s => s.Extent.Height > s.Viewport.Height)
+        .MaxBy(s => s.Viewport.Width * s.Viewport.Height);
+
+    window.CaptureRenderedFrame()?.Dispose();
+    var times = new List<double>();
+    var layouts = new List<double>();
+    for (var i = 0; i < bench; i++)
+    {
+        if (scroller is not null)
+        {
+            var y = scroller.Offset.Y + 37;
+            scroller.Offset = new Vector(0, y > scroller.Extent.Height - scroller.Viewport.Height ? 0 : y);
+        }
+        else if (glowing)
+        {
+            ((MainWindow)window).GlowFrame(glowNext!, (double)i / bench);
+        }
+
+        var watch = System.Diagnostics.Stopwatch.StartNew();
+        Dispatcher.UIThread.RunJobs();
+        window.UpdateLayout();
+        layouts.Add(watch.Elapsed.TotalMilliseconds);
+        using var frame = window.CaptureRenderedFrame();
+        times.Add(watch.Elapsed.TotalMilliseconds);
+    }
+
+    times.Sort();
+    layouts.Sort();
+    Console.WriteLine($"{name}: {window.Width}x{window.Height}, {(glowing ? "glowing" : scroller is null ? "nothing scrolls" : "scrolling")}: median {times[times.Count / 2]:F1} ms (layout {layouts[layouts.Count / 2]:F1}), 90% under {times[(int)(times.Count * 0.9)]:F1} ms, slowest {times[^1]:F1} ms");
+    window.Close();
+}
+
+// Each picture's backdrop as the game's page shows it (Glass, Dark), before and after Backdrop.Tame, side by side and named
+// with the OKLab chroma of its softened pixels (average and highest), for tuning how colourful a backdrop may stay.
+void BackdropSheet(string folder)
+{
+    var choice = new ThemeChoice();
+    ThemeService.Apply(Application.Current!, choice);
+    var glass = ThemeEngine.Glass(choice, GlassStrength.Glass)!;
+    var theme = ThemeEngine.Build(choice);
+    var rows = new StackPanel { Spacing = 8, Margin = new Thickness(16) };
+    foreach (var file in Directory.EnumerateFiles(folder).Order(StringComparer.OrdinalIgnoreCase))
+    {
+        if (Backdrop.Pixels(file) is not { } art)
+        {
+            continue;
+        }
+
+        var soft = Backdrop.Soften(art.Pixels, art.Width, art.Height);
+        var before = Backdrop.Chroma(soft);
+        var tamed = Backdrop.Tame((double[])soft.Clone());
+        var after = Backdrop.Chroma(tamed);
+        var label = $"{Path.GetFileNameWithoutExtension(file)}\nbefore {before.Average:0.000} / {before.Highest:0.000}\nafter {after.Average:0.000} / {after.Highest:0.000}";
+        Console.WriteLine(label.Replace('\n', ' '));
+        var row = new StackPanel { Orientation = Avalonia.Layout.Orientation.Horizontal, Spacing = 8 };
+        row.Children.Add(new TextBlock { Text = label, Width = 170, Foreground = Avalonia.Media.Brushes.White, FontSize = 12 });
+        // Before, then the cap as set, then any others to compare (--caps knee:limit,knee:limit).
+        var variants = new List<double[]> { soft, tamed };
+        foreach (var cap in caps)
+        {
+            variants.Add(Backdrop.Tame((double[])soft.Clone(), cap.Knee, cap.Limit));
+        }
+
+        foreach (var rgb in variants)
+        {
+            // What shows: the chroma of the finished pixels, under the scrim.
+            var baked = Backdrop.Bake(rgb, glass, Backdrop.Darkening(rgb, glass, theme));
+            var shown = new double[baked.Length / 4 * 3];
+            for (int i = 0, o = 0; i < baked.Length; i += 4, o += 3)
+            {
+                (shown[o], shown[o + 1], shown[o + 2]) = (baked[i + 2], baked[i + 1], baked[i]);
+            }
+
+            var finished = Backdrop.Chroma(shown);
+            Console.WriteLine($"  shown {finished.Average:0.000} / {finished.Highest:0.000}");
+            var cell = new Panel { Width = 320, Height = 200 };
+            cell.Children.Add(new Avalonia.Controls.Image { Source = Backdrop.Finish(rgb, glass, theme), Width = 320, Height = 200, Stretch = Avalonia.Media.Stretch.Fill });
+            cell.Children.Add(new TextBlock { Text = $"shown {finished.Average:0.000} / {finished.Highest:0.000}", Foreground = Avalonia.Media.Brushes.White, FontSize = 11, Margin = new Thickness(6) });
+            row.Children.Add(cell);
+        }
+
+        rows.Children.Add(row);
+    }
+
+    var window = new Window { Width = 220 + 328 * (2 + caps.Count), Height = rows.Children.Count * 208 + 32, Background = Avalonia.Media.Brushes.Black, Content = rows };
+    window.Show();
+    Dispatcher.UIThread.RunJobs();
+    var sheet = Path.Combine(output, "backdrops.png");
+    window.CaptureRenderedFrame()?.Save(sheet);
+    window.Close();
+    Console.WriteLine(sheet);
 }
 
 static string? TakeOption(List<string> list, string name)
