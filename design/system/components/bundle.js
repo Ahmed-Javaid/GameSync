@@ -1236,6 +1236,74 @@
       h("div", { className: "gs-dialog-foot" }, foot));
   }
 
+  /* ---------- KeptCopiesDialog (KAN-61) ---------- */
+  // Sync these saves on a game whose save folder holds copies kept by hand beside its live save (Bloodborne's
+  // "Before Orphan\SPRJ0005" beside "SPRJ0005"): only the live save syncs, and each copy becomes a named save, in one
+  // step. "backup" mode is Back up now, New named save… or Import kept saves… on a game not syncing yet (KAN-63).
+  function KeptCopiesDialog(props) {
+    var items = props.items || [];
+    var live = props.live || {};
+    var st = useState(props.stage || "review"), stage = st[0];
+    var br = useState(props.bring !== false), bring = br[0];
+    var named = items.filter(function (it) { return !it.same; });
+    var bytes = named.reduce(function (n, it) { return n + (it.bytes || 0); }, 0);
+    var backup = props.mode === "backup";
+    var verb = backup ? "Back up" : "Sync";
+    var count = named.length + (named.length === 1 ? " named save" : " named saves");
+    function row(it) {
+      return h("div", { key: it.id, className: "gs-kept-row", role: "listitem" },
+        h(Icon, { name: "pin", size: 16 }),
+        h("div", { style: { minWidth: 0 } },
+          h("div", { className: "gs-kept-name" }, it.name),
+          h("div", { className: "gs-kept-meta" }, it.saved + " · " + it.files + (it.files === 1 ? " file" : " files"))),
+        it.same ? h("span", { className: "gs-tag", title: "Its files are the same as " + it.same + "'s, so it isn't named again" }, "Same as " + it.same)
+          : h("span", { className: "gs-kept-size" }, fmt(it.bytes || 0)));
+    }
+    var body = stage === "done"
+      ? h("div", { className: "gs-done" }, h(Icon, { name: "check", size: 20, className: "gs-done-icon" }),
+          h("div", null,
+            h("div", null, backup ? props.game + "'s live save is backed up." : props.game + " syncs its live save now."),
+            h("div", { className: "gs-muted", style: { fontSize: 12 } }, bring
+              ? count + " are under Named saves, on every PC. Restore brings one back, keeping the save there now first."
+              : "The copies stay in their folders, not backed up. Import kept saves… brings them in whenever you like.")))
+      : h("div", { className: "gs-place" },
+          h("div", { className: "gs-kept-head" }, backup ? "Backed up, not synced between your PCs" : "Syncs between your PCs"),
+          h("div", { className: "gs-kept-row gs-kept-live" },
+            h(Icon, { name: "saves", size: 16 }),
+            h("div", { style: { minWidth: 0 } },
+              h("div", { className: "gs-kept-name gs-kept-path", title: live.path }, live.path),
+              h("div", { className: "gs-kept-meta" }, "Your live save · " + live.saved + " · " + live.files + (live.files === 1 ? " file" : " files"))),
+            h("span", { className: "gs-kept-size" }, fmt(live.bytes || 0))),
+          h(Checkbox, { checked: bring, onChange: br[1], showLabel: true, label: "Bring the " + items.length + " copies beside it in as named saves" }),
+          bring ? h("div", { className: "gs-kept-list is-long", role: "list", "aria-label": "Copies kept by hand" }, items.map(row))
+            : h("div", { className: "gs-note" }, h(Icon, { name: "info", size: 16 }), "They stay in their folders, not backed up. Import kept saves… brings them in whenever you like."),
+          (props.skipped || []).map(function (s, i) { return h("div", { key: "s" + i, className: "gs-import-note gs-import-warn" }, h(Icon, { name: "alert", size: 14, strokeWidth: 2 }), s); }));
+    var foot = stage === "done"
+      ? [h("div", { key: "a", className: "gs-dialog-actions" }, h("span"), h(Button, { variant: "primary", onClick: props.onClose }, "Done"))]
+      : [
+        h("div", { key: "s", className: "gs-share-summary" },
+          h("span", null, h("b", null, bring ? "The live save and " + count : "The live save alone"), bring && named.length < items.length ? " · " + (items.length - named.length) + " the same as another, not kept twice" : ""),
+          h("span", null, fmt((live.bytes || 0) + (bring ? bytes : 0)))),
+        h("div", { key: "n", className: "gs-note" }, h(Icon, { name: "shield", size: 16 }),
+          "Your folders stay as they are. Copies you make there later aren't synced: New named save… keeps one in a step."),
+        h("div", { key: "a", className: "gs-dialog-actions" },
+          h(Button, { variant: "ghost", title: "Every version would carry all " + (items.length + 1) + " folders, " + fmt(props.wholeBytes || 0) + ", as one save", onClick: props.onWhole },
+            verb + " all of it instead"),
+          h("span", { className: "gs-row", style: { flexWrap: "nowrap" } },
+            h(Button, { variant: "ghost", onClick: props.onClose }, "Cancel"),
+            h(Button, { variant: "primary", icon: backup ? "upload" : "sync", onClick: function () { st[1]("done"); if (props.onSync) props.onSync(bring); } },
+              bring && named.length ? verb + " and keep " + count : verb + " the live save")))
+      ];
+    return h("div", { className: "gs-dialog", role: "dialog", "aria-modal": "true", "aria-labelledby": "gs-copies-title" },
+      h("div", { className: "gs-dialog-head" },
+        h("div", { className: "gs-card-head" },
+          h("div", null, h("h2", { id: "gs-copies-title", className: "gs-dialog-title" }, (backup ? "Back up " : "Sync ") + props.game + "'s saves"),
+            h("p", { className: "gs-dialog-sub" }, "Its save folder holds your live save and " + items.length + " copies of it you kept by hand.")),
+          h(IconButton, { icon: "x", label: "Close", onClick: props.onClose }))),
+      h("div", { className: "gs-dialog-body gs-dialog-roomy" }, body),
+      h("div", { className: "gs-dialog-foot" }, foot));
+  }
+
   /* ---------- Settings: nav, rows, folders ---------- */
   function SettingsNav(props) {
     return h("nav", { className: "gs-setnav", "aria-label": props.label || "Settings sections" },
@@ -1387,7 +1455,7 @@
     SettingsNav: SettingsNav, SettingsRow: SettingsRow, FolderField: FolderField, FolderList: FolderList,
     ThemeScope: ThemeScope, Backdrop: Backdrop, ThemePicker: ThemePicker, ColorSwatchPicker: ColorSwatchPicker,
     PlayBar: PlayBar, Facts: Facts, Select: Select, FileTree: FileTree, GamePropertiesDialog: GamePropertiesDialog,
-    AddPlaceDialog: AddPlaceDialog, AddGameDialog: AddGameDialog, ImportKeptSavesDialog: ImportKeptSavesDialog,
+    AddPlaceDialog: AddPlaceDialog, AddGameDialog: AddGameDialog, ImportKeptSavesDialog: ImportKeptSavesDialog, KeptCopiesDialog: KeptCopiesDialog,
     fileTree: { toggle: treeToggle, count: treeCount },
     surface: { get: getSurface, set: setSurface, use: useSurface },
     formatBytes: fmt, theme: Theme

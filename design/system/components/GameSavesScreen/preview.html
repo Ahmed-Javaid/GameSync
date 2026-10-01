@@ -1,4 +1,4 @@
-<!-- @dsCard group="Screens" height=800 width=1280 page=true subtitle="One game's saves in the save manager: status, named saves, where the saves are, every version with Restore, its log" -->
+<!-- @dsCard group="Screens" height=800 width=1280 page=true subtitle="One game's saves in the save manager: status, named saves, where the saves are, every version with Restore, its log; #bloodborne, a game not syncing yet whose live save sits beside copies kept by hand" -->
 <!doctype html>
 <html lang="en">
 <head><meta charset="utf-8"><title>preview</title>
@@ -132,9 +132,65 @@ function GameSaves(p){
       {time:'23 Sep 18:02',level:'info',tag:'play',msg:'Started from GameSync. The cloud had nothing newer.'}]})));
 }
 
+/* ---------- A game not syncing yet, its live save beside copies kept by hand (KAN-61) ---------- */
+var MB = 1048576;
+var BB = {name:'Bloodborne GOTY', copies:18,
+  live:{path:'G:\\Bloodborne GOTY\\Shadlix\\user\\savedata\\1\\CUSA00207\\SPRJ0005', saved:'17 Sep 02:14', files:34, bytes:Math.round(33.6*MB)},
+  folder:'G:\\Bloodborne GOTY\\Shadlix\\user\\savedata\\1\\CUSA00207'};
+var BB_ITEMS = [
+  {id:'c1', name:'Witch ded', saved:'25 Aug 22:41', files:15, bytes:Math.round(14.3*MB)},
+  {id:'c2', name:'After Abandoned Workshop Before Amelia', saved:'26 Aug 19:07', files:15, bytes:Math.round(14.3*MB)},
+  {id:'c3', name:'Before Iosefka clinic and FF boss', saved:'26 Aug 20:55', files:30, bytes:Math.round(28.6*MB)},
+  {id:'c4', name:'Before Iosefka clinic and FF boss / anoter', saved:'26 Aug 21:20', files:30, bytes:Math.round(28.6*MB)},
+  {id:'c5', name:'After ROM at chapel', saved:'27 Aug 23:02', files:30, bytes:Math.round(28.6*MB)},
+  {id:'c6', name:'Before Crow', saved:'29 Aug 21:44', files:30, bytes:Math.round(28.6*MB)},
+  {id:'c7', name:'Before Crow (zip)', saved:'29 Aug 21:44', files:30, bytes:Math.round(28.6*MB), same:'Before Crow'},
+  {id:'c8', name:'After crow', saved:'30 Aug 00:13', files:30, bytes:Math.round(28.6*MB)},
+  {id:'c9', name:'SPRJ0005 - Copy', saved:'2 Sep 23:39', files:32, bytes:Math.round(31.1*MB)},
+  {id:'c10', name:'BEFORE church dog lady', saved:'6 Sep 20:18', files:16, bytes:Math.round(15.3*MB)},
+  {id:'c11', name:'Mensis Fog', saved:'8 Sep 22:30', files:34, bytes:Math.round(33.6*MB)},
+  {id:'c12', name:'Near Bloody Bride', saved:'9 Sep 21:06', files:34, bytes:Math.round(33.6*MB)},
+  {id:'c13', name:'befo ludwig', saved:'10 Sep 23:51', files:34, bytes:Math.round(33.6*MB)},
+  {id:'c14', name:'After Failure', saved:'13 Sep 22:12', files:34, bytes:Math.round(33.6*MB)},
+  {id:'c15', name:'Befo living failure', saved:'13 Sep 22:12', files:34, bytes:Math.round(33.6*MB), same:'After Failure'},
+  {id:'c16', name:'after ludwig', saved:'13 Sep 23:40', files:34, bytes:Math.round(33.6*MB)},
+  {id:'c17', name:'After maria', saved:'15 Sep 01:22', files:34, bytes:Math.round(33.6*MB)},
+  {id:'c18', name:'Before Orphan', saved:'16 Sep 23:58', files:34, bytes:Math.round(33.6*MB)}];
+function NotSyncing(p){
+  return h(React.Fragment,null,
+    h('header',{className:'sm-top'},
+      h('div',{className:'gs-row',style:{flexWrap:'nowrap',gap:12,minWidth:0}},
+        h(G.Button,{size:'sm',variant:'secondary',icon:'arrowLeft',onClick:p.onBack,title:'Back to every game\u2019s saves (Esc)'},'Back'),
+        h('nav',{'aria-label':'Breadcrumb',className:'sm-crumb'},h('button',{type:'button',onClick:p.onBack},'Save manager'),h(G.Icon,{name:'chevronRight',size:14}),h('span',{'aria-current':'page'},BB.name))),
+      h('div',{className:'gs-row',style:{flexWrap:'nowrap'}},
+        h(G.Button,{variant:'ghost',icon:'download','aria-haspopup':'dialog',onClick:p.onBackup,title:'Its copies kept by hand become named saves, and the live save is backed up'},'Import kept saves\u2026'),
+        h(G.Button,{variant:'secondary',icon:'upload','aria-haspopup':'dialog',onClick:p.onBackup},'Back up now'))),
+    h('section',{className:'gs-card sm-status','aria-label':'Status'},
+      h(G.StatusBadge,{status:'not-syncing'}),
+      h('p',null,'GameSync found its live save, SPRJ0005, and '+BB.copies+' copies of it you kept by hand beside it. Nothing is backed up yet: Sync these saves syncs the live save and brings the copies in as named saves.'),
+      h(G.Button,{variant:'primary',icon:'sync','aria-haspopup':'dialog',onClick:p.onSync},'Sync these saves')),
+    h('div',{className:'sm-grid'},
+      h(G.Card,{title:'Named saves',subtitle:'On every PC, and back in one step.',action:h(G.Button,{size:'sm',variant:'secondary',icon:'plus','aria-haspopup':'dialog',onClick:p.onBackup},'New named save\u2026')},
+        h('div',{className:'gs-note'},h(G.Icon,{name:'info',size:16}),'None yet. Your '+BB.copies+' copies come in here when its saves start syncing, each under its folder\u2019s name.')),
+      h(G.Card,{title:'Where the saves are',subtitle:'Found by name search on 29 Sep; not syncing yet.',action:h(G.Button,{size:'sm',variant:'ghost',icon:'settings',disabled:true,title:'Once its saves sync'},'Choose files\u2026')},
+        h('div',{className:'gs-well-line',style:{alignItems:'flex-start',fontFamily:'var(--font-sans)'}},
+          h('div',{style:{flex:1,minWidth:0,display:'flex',flexDirection:'column',gap:2}},
+            h('div',{className:'gs-mono',style:{fontSize:13,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',direction:'rtl',textAlign:'left'},title:BB.live.path},BB.live.path),
+            h('div',{className:'gs-faint',style:{fontSize:12,lineHeight:'16px'}},'The live save \u00b7 '+BB.live.files+' files \u00b7 '+G.formatBytes(BB.live.bytes)+' \u00b7 newest '+BB.live.saved)),
+          h(G.IconButton,{size:'sm',icon:'folder',label:'Open the save folder'})),
+        h('div',{className:'gs-well-line',style:{alignItems:'flex-start',fontFamily:'var(--font-sans)'}},
+          h('div',{style:{flex:1,minWidth:0,display:'flex',flexDirection:'column',gap:2}},
+            h('div',{style:{fontSize:13,lineHeight:'18px'}},'Beside it: '+BB.copies+' copies you kept by hand'),
+            h('div',{className:'gs-faint',style:{fontSize:12,lineHeight:'16px'}},'In CUSA00207, such as Before Orphan and After maria \u00b7 1.0 GB \u00b7 not part of the live save')),
+          h(G.Button,{size:'sm',variant:'ghost','aria-haspopup':'dialog',onClick:p.onSync},'Bring them in\u2026')),
+        h('div',{className:'gs-row'},h(G.Button,{size:'sm',variant:'secondary',icon:'plus','aria-haspopup':'dialog',disabled:true,title:'Once its saves sync'},'Add a place\u2026')))),
+    h('div',{className:'sm-hist'},h('div',{className:'gs-note'},h(G.Icon,{name:'clock',size:16}),'No versions yet. Sync these saves makes the first, and each copy you bring in becomes a named save.')));
+}
+
 function App(){
  var s=React.useState(['sekiro','cuphead']), d=React.useState(null);
- var open=React.useState((location.hash||'').slice(1)||INITIAL);
+ var open=React.useState(((location.hash||'').slice(1)||INITIAL).replace(/-sync$|-backup$/,''));
+ var kept=React.useState(/-sync$/.test(location.hash)?'sync':/-backup$/.test(location.hash)?'backup':null);
  var game=open[0]?GAMES.filter(function(g){return g.id===open[0]})[0]:null;
  React.useEffect(function(){
    function key(e){ if(e.key==='Escape'&&!d[0]&&open[0]) open[1](null); else if(e.altKey&&e.key==='ArrowLeft'&&open[0]){ e.preventDefault(); open[1](null); } }
@@ -143,7 +199,8 @@ function App(){
  return h(G.ThemeScope,{strength:'glass',art:ART,style:{width:1280,height:800,display:'flex',position:'relative'}},
   rail('saves'),
   h('main',{className:'sm-main'},
-   game ? h(GameSaves,{key:game.id,game:game,onBack:function(){open[1](null)}}) : [
+   open[0]==='bloodborne' ? h(NotSyncing,{onBack:function(){open[1](null)},onSync:function(){kept[1]('sync')},onBackup:function(){kept[1]('backup')}})
+   : game ? h(GameSaves,{key:game.id,game:game,onBack:function(){open[1](null)}}) : [
    h(React.Fragment,{key:'top'},topbar('Save manager','DESKTOP \u00b7 daily backup 20:00',
      h(G.PillTabs,{label:'Save manager view',items:[{id:'saves',label:'Saves',icon:'saves'},{id:'plan',label:'Plan',icon:'chevronsRight'},{id:'versions',label:'Versions',icon:'clock'},{id:'log',label:'Log',icon:'terminal'}]}),
      [h(G.Button,{key:1,variant:'secondary',icon:'share',disabled:!s[0].length,onClick:function(){d[1]('pick')}},s[0].length?'Share '+s[0].length+' selected':'Share selected'),
@@ -160,6 +217,8 @@ function App(){
     {time:'20:00:11',level:'warn',tag:'held',msg:'Black Myth: Wukong changed while the game was not running. Held for review.'},
     {time:'21:04:40',level:'warn',tag:'conflict',msg:'Sekiro: DESKTOP saved 21:04, LAPTOP saved 19:30. Newest kept, LAPTOP copy pinned.'},
     {time:'21:06:13',level:'ok',tag:'upload',msg:'Sekiro  v14  2.1 MB'}]})]),
+  kept[0]?h('div',{className:'gs-scrim',style:{position:'absolute',inset:0,overflow:'auto'}},
+    h(G.KeptCopiesDialog,{key:kept[0],game:BB.name,mode:kept[0],live:BB.live,items:BB_ITEMS,wholeBytes:1071872663,onClose:function(){kept[1](null)},onWhole:function(){kept[1](null)}})):null,
   d[0]?h('div',{className:'gs-scrim',style:{position:'absolute',inset:0}},
     d[0]==='import'?h(G.ImportSavesDialog,{zipName:'GameSync-saves-2026-09-27.zip',from:'27 Sep 2026',items:IMPORT_ITEMS,onClose:function(){d[1](null)}})
     :h(G.ShareSavesDialog,{key:d[0],mode:d[0],games:shareGames(),initialSelection:s[0],onClose:function(){d[1](null)}})):null);

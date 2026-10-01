@@ -273,5 +273,8 @@ export interface KeptSave {
 /** Save folders kept by hand (BAK-19), as named saves: pick the folder holding them, see each copy by name, Import. The folders are never changed; each copy is a named save on every PC, never current by itself. */
 export function ImportKeptSavesDialog(props: { game: string; folder?: string; items?: KeptSave[]; skipped?: string[]; roots?: { id: string; label: string }[]; root?: string; stage?: "pick" | "review" | "done"; onPick?: () => void; onRoot?: (id: string) => void; onOpen?: () => void; onImport?: () => void; onClose?: () => void }): JSX.Element;
 
+/** KAN-61: Sync these saves on a game whose save folder holds copies kept by hand beside its live save (Bloodborne's "Before Orphan\SPRJ0005" beside "SPRJ0005"): only the live save syncs, and each copy comes in as a named save, in one step; or the whole folder as it is. `mode: "backup"` is Back up now, New named save… or Import kept saves… on a game not syncing yet: the live save is backed up, not synced between PCs. The folders are never changed. */
+export function KeptCopiesDialog(props: { game: string; live: { path: string; saved: string; files: number; bytes: number }; items: KeptSave[]; skipped?: string[]; wholeBytes?: number; mode?: "sync" | "backup"; stage?: "review" | "done"; bring?: boolean; onSync?: (bring: boolean) => void; onWhole?: () => void; onClose?: () => void }): JSX.Element;
+
 /** 1536 → "2 KB", 2202009 → "2.1 MB". */
 export function formatBytes(bytes: number): string;

@@ -410,3 +410,8 @@ button.gs-ftree-twisty:hover { color: var(--ink); background: var(--bg-400); }
 .gs-art-thumb.is-logo { width: 96px; height: 40px; background-size: contain; background-repeat: no-repeat; background-color: var(--bg-300); font-size: 11px; }
 .gs-art-text { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .gs-art-from { font: 400 12px/16px var(--font-sans); color: var(--ink-muted); }
+/* KeptCopiesDialog (KAN-61): the live save in a well above the copies, which scroll when there are many */
+.gs-kept-head { font: 600 12px/16px var(--font-sans); color: var(--ink-muted); }
+.gs-kept-live, .gs-kept-live:hover { background: var(--surface-well); border: 1px solid var(--edge-well); }
+.gs-kept-path { font: 400 12px/18px var(--font-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left; }
+.gs-kept-list.is-long { max-height: 248px; overflow: auto; }

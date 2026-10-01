@@ -333,10 +333,11 @@ GameSync must be usable without colour or a mouse, stay light while games run, a
 
 ## Gaps
 
-Ten things are not designed or decided yet; each row names the requirements it affects. Settled on 28 Sep 2026 and gone from here: the old wireframes (every screen is now designed), Windows 10 (PKG-06), the tray icon (BG-07), your own backup folder and full history (FOLD-02, FOLD-06, BAK-17 stand), Share all and sharing any version (SHARE-04, SHARE-05), what can be shared between friends (R16), the performance targets, Copy diagnostics (SET-05), one Google account per PC (CLOUD-13) and English only (PKG-07).
+Eleven things are not designed or decided yet; each row names the requirements it affects. Settled on 28 Sep 2026 and gone from here: the old wireframes (every screen is now designed), Windows 10 (PKG-06), the tray icon (BG-07), your own backup folder and full history (FOLD-02, FOLD-06, BAK-17 stand), Share all and sharing any version (SHARE-04, SHARE-05), what can be shared between friends (R16), the performance targets, Copy diagnostics (SET-05), one Google account per PC (CLOUD-13) and English only (PKG-07).
 
 | Gap | Affects | Suggested next step |
 | --- | --- | --- |
+| A save folder whose live save sits beside copies kept by hand (Bloodborne's `Before Orphan\SPRJ0005` beside `SPRJ0005`) is found and synced as one save: every copy in every version, 1 GB for the owner's (KAN-61). | BAK-19, FIND-06 | Drawn 1 Oct 2026 (design system version 27): Sync these saves syncs only the live save and brings the copies in as named saves, in one step. Build it once the owner has looked. |
 | The Import saves window is designed, but not how a zip reaches it (file picker, drag and drop, opening the zip from Explorer). | SHARE-10 to SHARE-13 | File picker and drag and drop in v1; opening a zip from Explorer later. |
 | Uninstall behaviour isn't in `design.md`. | PKG-05 | Add it. |
 | Screenshots: ignore, back up or sync is still open. | FIND-09 | Decide; they stay off meanwhile. |

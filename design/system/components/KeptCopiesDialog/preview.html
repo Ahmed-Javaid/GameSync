@@ -1,0 +1,39 @@
+<!-- @dsCard group="Save manager" height=860 subtitle="Sync only the live save, and bring the copies kept by hand beside it in as named saves (KAN-61)" -->
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>preview</title>
+<style>html,body{margin:0;background:var(--bg-100);}</style>
+</head>
+<body class="gs-root">
+<div id="root"></div>
+<script>
+var G = window.GameSync, h = React.createElement;
+// #backup: from Back up now on a game not syncing yet; #done: after the primary; otherwise Sync these saves.
+var STATE = location.hash.slice(1);
+var MB = 1048576;
+var ITEMS = [
+  {id:'c1', name:'Witch ded', saved:'25 Aug 22:41', files:15, bytes:Math.round(14.3*MB)},
+  {id:'c2', name:'After Abandoned Workshop Before Amelia', saved:'26 Aug 19:07', files:15, bytes:Math.round(14.3*MB)},
+  {id:'c3', name:'Before Iosefka clinic and FF boss', saved:'26 Aug 20:55', files:30, bytes:Math.round(28.6*MB)},
+  {id:'c4', name:'Before Iosefka clinic and FF boss / anoter', saved:'26 Aug 21:20', files:30, bytes:Math.round(28.6*MB)},
+  {id:'c5', name:'After ROM at chapel', saved:'27 Aug 23:02', files:30, bytes:Math.round(28.6*MB)},
+  {id:'c6', name:'Before Crow', saved:'29 Aug 21:44', files:30, bytes:Math.round(28.6*MB)},
+  {id:'c7', name:'Before Crow (zip)', saved:'29 Aug 21:44', files:30, bytes:Math.round(28.6*MB), same:'Before Crow'},
+  {id:'c8', name:'After crow', saved:'30 Aug 00:13', files:30, bytes:Math.round(28.6*MB)},
+  {id:'c9', name:'SPRJ0005 - Copy', saved:'2 Sep 23:39', files:32, bytes:Math.round(31.1*MB)},
+  {id:'c10', name:'BEFORE church dog lady', saved:'6 Sep 20:18', files:16, bytes:Math.round(15.3*MB)},
+  {id:'c11', name:'Mensis Fog', saved:'8 Sep 22:30', files:34, bytes:Math.round(33.6*MB)},
+  {id:'c12', name:'Near Bloody Bride', saved:'9 Sep 21:06', files:34, bytes:Math.round(33.6*MB)},
+  {id:'c13', name:'befo ludwig', saved:'10 Sep 23:51', files:34, bytes:Math.round(33.6*MB)},
+  {id:'c14', name:'After Failure', saved:'13 Sep 22:12', files:34, bytes:Math.round(33.6*MB)},
+  {id:'c15', name:'Befo living failure', saved:'13 Sep 22:12', files:34, bytes:Math.round(33.6*MB), same:'After Failure'},
+  {id:'c16', name:'after ludwig', saved:'13 Sep 23:40', files:34, bytes:Math.round(33.6*MB)},
+  {id:'c17', name:'After maria', saved:'15 Sep 01:22', files:34, bytes:Math.round(33.6*MB)},
+  {id:'c18', name:'Before Orphan', saved:'16 Sep 23:58', files:34, bytes:Math.round(33.6*MB)}];
+var props = {game:'Bloodborne GOTY', mode:STATE === 'backup' ? 'backup' : 'sync', stage:STATE === 'done' ? 'done' : 'review', items:ITEMS, wholeBytes:1071872663,
+  live:{path:'G:\\Bloodborne GOTY\\Shadlix\\user\\savedata\\1\\CUSA00207\\SPRJ0005', saved:'17 Sep 02:14', files:34, bytes:Math.round(33.6*MB)}};
+ReactDOM.createRoot(document.getElementById('root')).render(
+  h('div',{className:'gs-scrim',style:{minHeight:840}},h(G.KeptCopiesDialog,props)));
+</script>
+</body>
+</html>

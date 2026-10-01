@@ -31,9 +31,9 @@
   ],
   "lastChange": {
     "by": "Vulsight",
-    "at": "2026-09-30T23:30:31Z",
+    "at": "2026-10-01T00:27:20Z",
     "via": "Claude Code",
-    "note": "Version 26: Settings as it's built: Start GameSync when you sign in and the daily backup's switch, time and Run now under Backup and sync; the conflict default offers to apply to the games already syncing; the cloud's three states (Google Drive signed in or out, a folder, no cloud yet); Rename for this PC only; the version and Copy diagnostics at the foot of the settings column."
+    "note": "Version 27 (KAN-61, to look at before it's built): a save folder whose live save sits beside copies kept by hand (Bloodborne's Before Orphan\\SPRJ0005 beside SPRJ0005). KeptCopiesDialog syncs only the live save and brings the copies in as named saves in one step, or all of it instead; a game's saves show a game not syncing yet (#bloodborne), with the copies beside its live save under Where the saves are and Bring them in..."
   },
   "layout": "files",
   "libraries": [
