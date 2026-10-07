@@ -97,7 +97,10 @@ function Expand-Blob([string]$blob, [string]$target, [string]$hash) {
     } finally {
         $source.Dispose()
     }
-    $actual = (Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash.ToLowerInvariant()
+    # .NET's own SHA-256, not Get-FileHash: started from PowerShell 7, Windows PowerShell can lose that command.
+    $sha = [Security.Cryptography.SHA256]::Create()
+    $written = [IO.File]::OpenRead($target)
+    try { $actual = [BitConverter]::ToString($sha.ComputeHash($written)).Replace('-', '').ToLowerInvariant() } finally { $written.Dispose(); $sha.Dispose() }
     if ($actual -ne $hash) {
         Remove-Item -LiteralPath $target
         throw "A stored file is damaged (it doesn't match its hash): $target"

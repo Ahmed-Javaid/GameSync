@@ -568,6 +568,14 @@ public class AppTests
         var warned = new List<string>();
         await AppActions.PlayAsync(data, GameId.Parse("fake-game"), new Output(said.Add, warned.Add));
 
+        // R17: as administrator (GitHub's runner) the game would run elevated too, so GameSync refuses to start it.
+        if (GameSync.Windows.Elevation.IsElevated())
+        {
+            Assert.Empty(said);
+            Assert.StartsWith("GameSync is running as administrator", Assert.Single(warned), StringComparison.Ordinal);
+            return;
+        }
+
         Assert.Equal(["Launched Fake Game."], said);
         Assert.Empty(warned);
         Assert.Empty(Directory.EnumerateFileSystemEntries(world.Cloud));
