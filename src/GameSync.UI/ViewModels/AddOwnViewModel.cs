@@ -117,7 +117,8 @@ public sealed partial class AddOwnViewModel : ObservableObject
         : Looking ? "Looking at the folder"
         : "Give it a name first";
 
-    public string AddLabel => Adding ? "Adding…" : Setup ? "Add" : "Add and sync";
+    /// <summary>Busy, the button says Adding with its dots counting up (KAN-80).</summary>
+    public string AddLabel => Setup ? "Add" : "Add and sync";
 
     public string FootNote => Setup
         ? "It joins Choose games, ticked. Nothing syncs until you start using GameSync."

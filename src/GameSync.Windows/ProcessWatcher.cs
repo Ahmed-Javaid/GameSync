@@ -76,6 +76,26 @@ public sealed class ProcessWatcher
         return processes;
     }
 
+    /// <summary>When a process started, through a query-limited handle closed straight away (R13); null when it's gone or not allowed.</summary>
+    public static DateTime? StartedUtc(int pid)
+    {
+        using var handle = OpenProcess(QueryLimitedInformation, false, pid);
+        return !handle.IsInvalid && GetProcessTimes(handle, out var created, out _, out _, out _) ? DateTime.FromFileTimeUtc(created) : null;
+    }
+
+    /// <summary>
+    /// Whether the process that started at <paramref name="startedUtc"/> still runs under <paramref name="pid"/> (R13):
+    /// opened with query-limited access only, its start time telling an ID Windows gave out again apart.
+    /// </summary>
+    public static bool IsRunning(int pid, DateTime startedUtc)
+    {
+        using var handle = OpenProcess(QueryLimitedInformation, false, pid);
+        return !handle.IsInvalid && GetProcessTimes(handle, out var created, out _, out _, out _) && DateTime.FromFileTimeUtc(created) == startedUtc
+            && GetExitCodeProcess(handle, out var code) && code == StillActive;
+    }
+
+    private const uint StillActive = 259;
+
     /// <summary>The process's full path and start time, through a query-limited handle closed straight away; null when it's gone or not allowed.</summary>
     private static (string Path, DateTime StartedUtc)? Query(int pid)
     {
@@ -129,4 +149,7 @@ public sealed class ProcessWatcher
 
     [DllImport("kernel32.dll", SetLastError = true)]
     private static extern bool GetProcessTimes(SafeProcessHandle process, out long creation, out long exit, out long kernel, out long user);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool GetExitCodeProcess(SafeProcessHandle process, out uint exitCode);
 }

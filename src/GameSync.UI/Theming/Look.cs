@@ -56,11 +56,12 @@ public sealed record Look(
         windowsAccent);
 
     /// <summary>
-    /// LOOK-17, LOOK-18: whether pages show Glossy now. It needs the person's choice, dark mode (a light Glossy isn't
-    /// designed yet), no pure black, and Windows' transparency effects on; otherwise the app is Solid.
+    /// LOOK-17, LOOK-18: whether pages show Glossy now. It needs the person's choice, no pure black (a dark mode choice),
+    /// and Windows' transparency effects on; otherwise the app is Solid. Light mode has its own Glossy since design system
+    /// version 35 (the owner, 3 Oct 2026).
     /// </summary>
     public bool ShowsGlossy(ThemeChoice resolved, bool transparencyOn) =>
-        Surface == Glossy && resolved.Mode == ThemeMode.Dark && !resolved.PureBlack && transparencyOn;
+        Surface == Glossy && (resolved.Mode == ThemeMode.Light || !resolved.PureBlack) && transparencyOn;
 
     private static string? Nonempty(string? value) => value is { Length: > 0 } ? value : null;
 }

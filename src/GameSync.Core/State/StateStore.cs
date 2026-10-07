@@ -70,8 +70,11 @@ public static class EventTags
     public const string Thinned = "thinned";
     public const string Error = "error";
 
+    /// <summary>Saves packed into a shared zip, or a shared zip's saves imported (SHARE-01, SHARE-10).</summary>
+    public const string Share = "share";
+
     /// <summary>The tags of lines where a save moved: the Log tab's Uploads, downloads and restores.</summary>
-    public static IReadOnlySet<string> Moves { get; } = new HashSet<string>(StringComparer.Ordinal) { Upload, Download, Backup, Restore, Named };
+    public static IReadOnlySet<string> Moves { get; } = new HashSet<string>(StringComparer.Ordinal) { Upload, Download, Backup, Restore, Named, Share };
 }
 
 /// <summary>This PC's own state, in <c>state.db</c>: never synced, and safe to rebuild from the cloud.</summary>

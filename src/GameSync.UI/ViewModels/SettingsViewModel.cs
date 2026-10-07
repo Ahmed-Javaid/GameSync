@@ -41,6 +41,16 @@ public sealed record SettingsActions
 
     public Func<string, Task<Outcome>> RemoveSaveFolder { get; init; } = _ => Task.FromResult(new Outcome(""));
 
+    /// <summary>KAN-123: a folder where copies Steam doesn't run keep their records of what's unlocked, added or taken off.</summary>
+    public Func<string, Task<Outcome>> AddAchievementFolder { get; init; } = _ => Task.FromResult(new Outcome(""));
+
+    public Func<string, Task<Outcome>> RemoveAchievementFolder { get; init; } = _ => Task.FromResult(new Outcome(""));
+
+    /// <summary>FOLD-09: the folder shared zips go to, and asking each time instead.</summary>
+    public Func<string, Task<Outcome>> SetShareFolder { get; init; } = _ => Task.FromResult(new Outcome(""));
+
+    public Func<bool, Task> SetShareAsk { get; init; } = _ => Task.CompletedTask;
+
     public Func<bool, Task<Outcome>> SetStartAtSignIn { get; init; } = _ => Task.FromResult(new Outcome(""));
 
     public Func<TimeOnly?, Task<Outcome>> SetDaily { get; init; } = _ => Task.FromResult(new Outcome(""));
@@ -68,6 +78,40 @@ public sealed record SettingsActions
     public Func<bool?, bool?, Task> SetNotifications { get; init; } = (_, _) => Task.CompletedTask;
 
     public Func<CancellationToken, Task<string>> Diagnostics { get; init; } = _ => Task.FromResult("");
+
+    /// <summary>ACH-09: the popup, its sound and its corner; null leaves one as it is.</summary>
+    public Func<AchievementPopupChange, Task> SetAchievementPopups { get; init; } = _ => Task.CompletedTask;
+
+    /// <summary>KAN-120: plays the chime in a sound at a volume, as Hear it and picking one do.</summary>
+    public Action<string, string> HearChime { get; init; } = (_, _) => { };
+
+    /// <summary>Try the popup, after the delay given (KAN-110).</summary>
+    public Action<TimeSpan> TryPopup { get; init; } = _ => { };
+
+    /// <summary>PKG-03 (design system version 53): Settings → Updates, read from this PC alone.</summary>
+    public Func<CancellationToken, Task<UpdatesView?>> ReadUpdates { get; init; } = _ => Task.FromResult<UpdatesView?>(null);
+
+    /// <summary>Check now: asks GitHub, and gets a newer GameSync ready; the app shows the download as it goes.</summary>
+    public Func<Task<Outcome>> CheckUpdates { get; init; } = () => Task.FromResult(new Outcome(""));
+
+    /// <summary>Restart to update: GameSync closes, installs it and opens again.</summary>
+    public Func<Task<Outcome>> RestartToUpdate { get; init; } = () => Task.FromResult(new Outcome(""));
+
+    public Func<bool, Task> SetUpdatesDaily { get; init; } = _ => Task.CompletedTask;
+
+    /// <summary>KAN-110: every game GameSync tracks achievements for, counted or left out.</summary>
+    public Func<CancellationToken, Task<IReadOnlyList<AchievementGameRow>>> AchievementGames { get; init; } = _ => Task.FromResult<IReadOnlyList<AchievementGameRow>>([]);
+
+    /// <summary>KAN-110: leaves a game out of the achievements, or counts it again.</summary>
+    public Func<GameSync.Core.Model.GameId, bool, Task> SetAchievementsLeftOut { get; init; } = (_, _) => Task.CompletedTask;
+
+    /// <summary>KAN-131: turns GameSync's popup on or off for a game.</summary>
+    public Func<GameSync.Core.Model.GameId, bool, Task> SetAchievementPopup { get; init; } = (_, _) => Task.CompletedTask;
+
+    /// <summary>A dialog over the page (Achievements by game), and closing it.</summary>
+    public Action<object> OpenDialog { get; init; } = _ => { };
+
+    public Action CloseDialog { get; init; } = () => { };
 }
 
 /// <summary>
@@ -83,7 +127,9 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageSurface
     public const string CloudId = "cloud";
     public const string DevicesId = "devices";
     public const string NotificationsId = "notifications";
+    public const string AchievementsId = "achievements";
     public const string SafetyId = "safety";
+    public const string UpdatesId = "updates";
 
     private readonly SettingsActions _actions;
     private bool _reading;
@@ -98,7 +144,9 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageSurface
         Cloud = new CloudSettings(actions, Reload);
         Devices = new DevicesSettings(actions, Reload);
         Notifications = new NotificationSettings(actions);
+        Achievements = new AchievementSettings(actions);
         Safety = new SafetySettings();
+        Updates = new UpdateSettings(actions);
         _section = section is not null && Nav(null).Any(s => s.Id == section) ? section : AppearanceId;
         _sections = Nav(null);
     }
@@ -117,7 +165,11 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageSurface
 
     public NotificationSettings Notifications { get; }
 
+    public AchievementSettings Achievements { get; }
+
     public SafetySettings Safety { get; }
+
+    public UpdateSettings Updates { get; }
 
     /// <summary>The sections, with a warn badge on one that needs the person: a backup drive not connected, Drive signed out.</summary>
     [ObservableProperty]
@@ -135,7 +187,9 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageSurface
         CloudId => Cloud,
         DevicesId => Devices,
         NotificationsId => Notifications,
+        AchievementsId => Achievements,
         SafetyId => Safety,
+        UpdatesId => Updates,
         _ => Appearance,
     };
 
@@ -168,6 +222,10 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageSurface
         if (value == CloudId)
         {
             Cloud.LoadDetails();
+        }
+        else if (value == AchievementsId)
+        {
+            Achievements.LoadGames();
         }
     }
 
@@ -210,6 +268,11 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageSurface
                 {
                     Apply(view);
                 }
+
+                if (await _actions.ReadUpdates(CancellationToken.None) is { } updates)
+                {
+                    Updates.Show(updates, DateTime.Now);
+                }
             }
             while (_readAgain);
         }
@@ -232,6 +295,10 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageSurface
         {
             Cloud.LoadDetails();
         }
+        else if (Section == AchievementsId)
+        {
+            Achievements.LoadGames();
+        }
     }
 
     public void Apply(SettingsView view)
@@ -241,6 +308,7 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageSurface
         Cloud.Show(view);
         Devices.Show(view);
         Notifications.Show(view);
+        Achievements.Show(view);
         Safety.Show(view);
         Footer = $"GameSync {view.AppVersion} · this PC is {view.ThisPc}";
         if (Nav(view) is var sections && !sections.SequenceEqual(Sections))
@@ -257,7 +325,9 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageSurface
         new(CloudId, "Cloud", "cloud", view is { Cloud: SettingsData.Drive, SignedIn: false } ? "1" : null),
         new(DevicesId, "Devices", "monitor"),
         new(NotificationsId, "Notifications", "bell"),
+        new(AchievementsId, "Achievements", "trophy"),
         new(SafetyId, "Safety", "shield"),
+        new(UpdatesId, "Updates", "download"),
     ];
 
     /// <summary>"Today 20:00", "Yesterday 19:31", "23 Sep 20:00".</summary>
@@ -344,14 +414,14 @@ public sealed partial class AppearanceSettings : ObservableObject
         }
     }
 
-    /// <summary>Light, as Windows or the person chose it, which leaves pure black and Glossy out.</summary>
+    /// <summary>Light, as Windows or the person chose it, which leaves pure black out.</summary>
     public bool IsLight => Resolved().Mode == ThemeMode.Light;
 
     public string ThemeNote => PresetOf(Preset) is { FollowsAccent: true } ? "Follows your Windows accent colour." : PresetOf(Preset).Note;
 
-    public string SurfaceDescription => IsLight
-        ? "Glossy lets your game's art show through GameSync, in dark mode; light mode stays Solid for now."
-        : "Glossy lets your game's art show through GameSync; Solid keeps every surface plain. Glossy turns off when Windows' transparency effects are off.";
+    /// <summary>The same in both modes since light mode has its own Glossy (design system version 35).</summary>
+    public string SurfaceDescription =>
+        "Glossy lets your game's art show through GameSync, frosted dark or light with the mode; Solid keeps every surface plain. Glossy turns off when Windows' transparency effects are off.";
 
     public string PureBlackDescription => IsLight ? "Dark mode only." : "For OLED screens: the page and side rail turn fully black, never glossy.";
 
@@ -501,6 +571,13 @@ public sealed partial class StorageSettings : ObservableObject
     [ObservableProperty]
     private IReadOnlyList<FolderItem> _saveFolders = [];
 
+    /// <summary>FOLD-09: where Share saves puts its zips.</summary>
+    [ObservableProperty]
+    private string _shareFolder = "";
+
+    [ObservableProperty]
+    private bool _shareAsk;
+
     /// <summary>A scan after a folder was added or removed is under way.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(NotScanning))]
@@ -528,6 +605,8 @@ public sealed partial class StorageSettings : ObservableObject
 
         _showing = true;
         Keep = view.KeepEverything ? "all" : "recent";
+        ShareFolder = view.ShareFolder;
+        ShareAsk = view.ShareAsks;
         _showing = false;
         var gameFolders = view.GameFolders.Select(f => new FolderItem(f.Path, f.Missing ? "Not there right now" : f.Games switch
         {
@@ -636,6 +715,20 @@ public sealed partial class StorageSettings : ObservableObject
 
     [RelayCommand]
     private void OpenBackup() => _actions.OpenFolder(BackupFolder);
+
+    [RelayCommand]
+    private void OpenShareFolder() => _actions.OpenFolder(ShareFolder);
+
+    /// <summary>FOLD-09: Change… on the shared zips' folder.</summary>
+    public Task SetShareFolder(string folder) => Run(() => _actions.SetShareFolder(folder));
+
+    partial void OnShareAskChanged(bool value)
+    {
+        if (!_showing)
+        {
+            _ = _actions.SetShareAsk(value);
+        }
+    }
 
     partial void OnKeepChanged(string value)
     {

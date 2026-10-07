@@ -31,9 +31,9 @@
   ],
   "lastChange": {
     "by": "Vulsight",
-    "at": "2026-10-01T00:27:20Z",
+    "at": "2026-10-07T14:20:46Z",
     "via": "Claude Code",
-    "note": "Version 27 (KAN-61, to look at before it's built): a save folder whose live save sits beside copies kept by hand (Bloodborne's Before Orphan\\SPRJ0005 beside SPRJ0005). KeptCopiesDialog syncs only the live save and brings the copies in as named saves in one step, or all of it instead; a game's saves show a game not syncing yet (#bloodborne), with the copies beside its live save under Where the saves are and Bring them in..."
+    "note": "Version 53, updates (the owner, 7 Oct 2026: no paid code signing, \"yes, per-user install and tracer after v1\"): Settings has Updates, where GameSync says the version it runs, gets a newer one from GitHub once a day in the background and installs it only when you Restart to update, after its own release signature checks out (SettingsScreen #updates, #updates-latest, #updates-downloading, #updates-refused, #updates-offline); Home's top bar offers Restart to update while one is ready (LauncherScreen #update); Safety's Let learn mode ask for admin is tagged After v1."
   },
   "layout": "files",
   "libraries": [

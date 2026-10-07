@@ -4,7 +4,7 @@
              xmlns:vm="using:GameSync.UI.ViewModels"
              x:Class="GameSync.UI.Views.PropertiesDialog"
              x:DataType="vm:PropertiesViewModel"
-             Width="880" Height="620">
+             Width="{DynamicResource dw-880}" Height="620">
   <!-- A game's Properties, like Steam's (design system → GamePropertiesDialog): sections down the left as in Settings,
        their rows on the right; Saves picks which files are backed up. Changes wait for Save changes. -->
   <UserControl.Styles>
@@ -71,7 +71,7 @@
       </Border>
 
       <!-- The sections -->
-      <Border DockPanel.Dock="Left" Width="208" BorderBrush="{DynamicResource line-100}" BorderThickness="0,0,1,0" Padding="12,16">
+      <Border DockPanel.Dock="Left" Width="{DynamicResource dw-208}" BorderBrush="{DynamicResource line-100}" BorderThickness="0,0,1,0" Padding="12,16">
         <c:GsSettingsNav ItemsSource="{Binding Sections}" SelectedId="{Binding Section, Mode=TwoWay}" AutomationProperties.Name="Properties" />
       </Border>
 
@@ -84,7 +84,7 @@
           <Panel IsVisible="{Binding IsLoaded}">
           <!-- General -->
           <StackPanel Spacing="4" IsVisible="{Binding IsGeneral}">
-            <TextBlock Text="General" FontSize="16" LineHeight="22" FontWeight="Medium" Margin="0,0,0,8" />
+            <TextBlock Text="General" FontSize="{DynamicResource fs-16}" LineHeight="{DynamicResource lh-22}" FontWeight="Medium" Margin="0,0,0,8" />
             <c:GsSettingsRow Title="Name" Description="What GameSync calls it. A rescan keeps the name you give it.">
               <TextBox Width="260" Text="{Binding Name}" MaxLength="120" AutomationProperties.Name="Name" />
             </c:GsSettingsRow>
@@ -102,7 +102,7 @@
 
           <!-- Art: its own cover, banner and logo in place of Steam's (ART-06) -->
           <StackPanel Spacing="4" IsVisible="{Binding IsArt}">
-            <TextBlock Text="Art" FontSize="16" LineHeight="22" FontWeight="Medium" Margin="0,0,0,8" />
+            <TextBlock Text="Art" FontSize="{DynamicResource fs-16}" LineHeight="{DynamicResource lh-22}" FontWeight="Medium" Margin="0,0,0,8" />
             <ItemsControl ItemsSource="{Binding Art}">
               <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="vm:ArtSlot">
@@ -113,7 +113,7 @@
                                 Background="{DynamicResource bg-300}" VerticalAlignment="Center">
                           <Panel>
                             <Image Source="{Binding Thumb}" Stretch="UniformToFill" IsVisible="{Binding HasThumb}" />
-                            <TextBlock Text="{Binding Placeholder}" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource ink-muted}"
+                            <TextBlock Text="{Binding Placeholder}" FontSize="{DynamicResource fs-11}" FontWeight="SemiBold" Foreground="{DynamicResource ink-muted}"
                                        HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding NoThumb}" />
                           </Panel>
                         </Border>
@@ -140,7 +140,7 @@
 
           <!-- Launch -->
           <StackPanel Spacing="4" IsVisible="{Binding IsLaunch}">
-            <TextBlock Text="Launch" FontSize="16" LineHeight="22" FontWeight="Medium" Margin="0,0,0,8" />
+            <TextBlock Text="Launch" FontSize="{DynamicResource fs-16}" LineHeight="{DynamicResource lh-22}" FontWeight="Medium" Margin="0,0,0,8" />
             <c:GsSettingsRow Title="{Binding RouteTitle}" Description="{Binding RouteDescription}">
               <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding OwnProgram}">
                 <c:GsButton Classes="ghost sm" Content="Use the one found" Command="{Binding UseFoundProgramCommand}" IsVisible="{Binding ProgramPicked}" />
@@ -171,7 +171,7 @@
 
           <!-- Installed files -->
           <StackPanel Spacing="16" IsVisible="{Binding IsFiles}">
-            <TextBlock Text="Installed files" FontSize="16" LineHeight="22" FontWeight="Medium" />
+            <TextBlock Text="Installed files" FontSize="{DynamicResource fs-16}" LineHeight="{DynamicResource lh-22}" FontWeight="Medium" />
             <c:GsNote Icon="info" Text="Not installed on this PC. Its saves are still here, and still back up." IsVisible="{Binding NotInstalled}" />
             <c:GsFacts ItemsSource="{Binding InstalledFacts}" />
             <WrapPanel ItemSpacing="8" LineSpacing="8">
@@ -182,8 +182,8 @@
 
           <!-- Saves: which files are backed up -->
           <StackPanel Spacing="12" IsVisible="{Binding IsSaves}">
-            <TextBlock Text="Saves" FontSize="16" LineHeight="22" FontWeight="Medium" />
-            <TextBlock Classes="muted" FontSize="13" LineHeight="19" TextWrapping="Wrap"
+            <TextBlock Text="Saves" FontSize="{DynamicResource fs-16}" LineHeight="{DynamicResource lh-22}" FontWeight="Medium" />
+            <TextBlock Classes="muted" FontSize="{DynamicResource fs-13}" LineHeight="{DynamicResource lh-19}" TextWrapping="Wrap"
                        Text="Ticked files are backed up and synced. Unticked ones stay on this PC only, and older versions keep them; nothing is deleted." />
             <c:GsNote Icon="info" IsVisible="{Binding NotSyncing}"
                       Text="Not syncing yet: this is what the scan found. Sync its saves from its page first; then you can choose its files here." />
@@ -220,11 +220,11 @@
                 <c:GsButton Classes="sm" IconAfter="chevronDown" Content="{Binding SettingsLabel}" AutomationProperties.Name="{Binding SettingsLabel, StringFormat='Settings files: {0}'}">
                   <c:GsButton.Flyout>
                     <MenuFlyout Placement="BottomEdgeAlignedRight">
-                      <MenuItem Header="Sync between PCs" ToggleType="CheckBox" Command="{Binding SelectCommand}" CommandParameter="settings:sync"
+                      <c:GsMenuItem Header="Sync between PCs" ToggleType="CheckBox" Command="{Binding SelectCommand}" CommandParameter="settings:sync"
                                 IsChecked="{Binding SettingsFiles, Mode=OneWay, Converter={x:Static c:EqualsConverter.Instance}, ConverterParameter=sync}" />
-                      <MenuItem Header="Back up on this PC" ToggleType="CheckBox" Command="{Binding SelectCommand}" CommandParameter="settings:this-pc"
+                      <c:GsMenuItem Header="Back up on this PC" ToggleType="CheckBox" Command="{Binding SelectCommand}" CommandParameter="settings:this-pc"
                                 IsChecked="{Binding SettingsFiles, Mode=OneWay, Converter={x:Static c:EqualsConverter.Instance}, ConverterParameter=this-pc}" />
-                      <MenuItem Header="Don't back up" ToggleType="CheckBox" Command="{Binding SelectCommand}" CommandParameter="settings:off"
+                      <c:GsMenuItem Header="Don't back up" ToggleType="CheckBox" Command="{Binding SelectCommand}" CommandParameter="settings:off"
                                 IsChecked="{Binding SettingsFiles, Mode=OneWay, Converter={x:Static c:EqualsConverter.Instance}, ConverterParameter=off}" />
                     </MenuFlyout>
                   </c:GsButton.Flyout>
@@ -234,9 +234,9 @@
                 <c:GsButton Classes="sm" IconAfter="chevronDown" Content="{Binding ScreenshotsLabel}" AutomationProperties.Name="{Binding ScreenshotsLabel, StringFormat='Screenshots: {0}'}">
                   <c:GsButton.Flyout>
                     <MenuFlyout Placement="BottomEdgeAlignedRight">
-                      <MenuItem Header="Back up on this PC" ToggleType="CheckBox" Command="{Binding SelectCommand}" CommandParameter="shots:on"
+                      <c:GsMenuItem Header="Back up on this PC" ToggleType="CheckBox" Command="{Binding SelectCommand}" CommandParameter="shots:on"
                                 IsChecked="{Binding Screenshots, Mode=OneWay, Converter={x:Static c:EqualsConverter.Instance}, ConverterParameter=on}" />
-                      <MenuItem Header="Don't back up" ToggleType="CheckBox" Command="{Binding SelectCommand}" CommandParameter="shots:off"
+                      <c:GsMenuItem Header="Don't back up" ToggleType="CheckBox" Command="{Binding SelectCommand}" CommandParameter="shots:off"
                                 IsChecked="{Binding Screenshots, Mode=OneWay, Converter={x:Static c:EqualsConverter.Instance}, ConverterParameter=off}" />
                     </MenuFlyout>
                   </c:GsButton.Flyout>
@@ -252,7 +252,7 @@
 
           <!-- Sync -->
           <StackPanel Spacing="4" IsVisible="{Binding IsSync}">
-            <TextBlock Text="Sync" FontSize="16" LineHeight="22" FontWeight="Medium" Margin="0,0,0,8" />
+            <TextBlock Text="Sync" FontSize="{DynamicResource fs-16}" LineHeight="{DynamicResource lh-22}" FontWeight="Medium" Margin="0,0,0,8" />
             <c:GsNote Icon="info" IsVisible="{Binding NotSyncing}" Text="Not syncing yet. Sync its saves from its page first; then these settings apply." Margin="0,0,0,8" />
             <StackPanel Spacing="4" IsVisible="{Binding CanChooseFiles}">
               <c:GsSettingsRow Title="Keep it in step" Description="{Binding ModeDescription}">
@@ -263,11 +263,11 @@
                 <c:GsButton Classes="sm" IconAfter="chevronDown" Content="{Binding ConflictLabel}" AutomationProperties.Name="{Binding ConflictLabel, StringFormat='When both PCs changed it: {0}'}">
                   <c:GsButton.Flyout>
                     <MenuFlyout Placement="BottomEdgeAlignedRight">
-                      <MenuItem Header="Newest wins" ToggleType="CheckBox" Command="{Binding SelectCommand}" CommandParameter="conflict:newest"
+                      <c:GsMenuItem Header="Newest wins" ToggleType="CheckBox" Command="{Binding SelectCommand}" CommandParameter="conflict:newest"
                                 IsChecked="{Binding Conflict, Mode=OneWay, Converter={x:Static c:EqualsConverter.Instance}, ConverterParameter=newest}" />
-                      <MenuItem Header="Always ask" ToggleType="CheckBox" Command="{Binding SelectCommand}" CommandParameter="conflict:ask"
+                      <c:GsMenuItem Header="Always ask" ToggleType="CheckBox" Command="{Binding SelectCommand}" CommandParameter="conflict:ask"
                                 IsChecked="{Binding Conflict, Mode=OneWay, Converter={x:Static c:EqualsConverter.Instance}, ConverterParameter=ask}" />
-                      <MenuItem Header="This PC wins" ToggleType="CheckBox" Command="{Binding SelectCommand}" CommandParameter="conflict:this-pc"
+                      <c:GsMenuItem Header="This PC wins" ToggleType="CheckBox" Command="{Binding SelectCommand}" CommandParameter="conflict:this-pc"
                                 IsChecked="{Binding Conflict, Mode=OneWay, Converter={x:Static c:EqualsConverter.Instance}, ConverterParameter=this-pc}" />
                     </MenuFlyout>
                   </c:GsButton.Flyout>

@@ -115,6 +115,9 @@ public sealed class TestPc : IDisposable
     /// <summary>Makes cloud calls fail: given the call's name ("blobs.put", "log.append", "info", ...), the error to throw.</summary>
     public Func<string, CloudException?>? Fault { get; set; }
 
+    /// <summary>KAN-88: makes cloud calls slow, as Google Drive can be: given the call's name, how long it takes first.</summary>
+    public Func<string, TimeSpan>? Slow { get; set; }
+
     /// <summary>PC-05: every cloud call fails as if the network were down.</summary>
     public bool Offline
     {
@@ -317,11 +320,32 @@ public sealed class FaultyCloud(ICloud inner, TestPc pc) : ICloud
         return action();
     }
 
+    /// <summary>A call that takes as long as <see cref="TestPc.Slow"/> says first, and can be cancelled meanwhile.</summary>
+    internal static async Task<T> Slowed<T>(TestPc pc, string call, Func<Task<T>> action, CancellationToken ct)
+    {
+        if (pc.Slow?.Invoke(call) is { } wait && wait > TimeSpan.Zero)
+        {
+            await Task.Delay(wait, ct);
+        }
+
+        return await Check(pc, call, action);
+    }
+
+    internal static async Task Slowed(TestPc pc, string call, Func<Task> action, CancellationToken ct)
+    {
+        if (pc.Slow?.Invoke(call) is { } wait && wait > TimeSpan.Zero)
+        {
+            await Task.Delay(wait, ct);
+        }
+
+        await Check(pc, call, action);
+    }
+
     private sealed class FaultyBlobs(IBlobStore inner, TestPc pc) : IBlobStore
     {
         public Task<bool> ExistsAsync(GameId game, BlobId id, CancellationToken ct) => Check(pc, "blobs.exists", () => inner.ExistsAsync(game, id, ct));
 
-        public Task PutAsync(GameId game, BlobId id, Stream content, CancellationToken ct) => Check(pc, "blobs.put", () => inner.PutAsync(game, id, content, ct));
+        public Task PutAsync(GameId game, BlobId id, Stream content, CancellationToken ct) => Slowed(pc, "blobs.put", () => inner.PutAsync(game, id, content, ct), ct);
 
         public Task<Stream> GetAsync(GameId game, BlobId id, CancellationToken ct) => Check(pc, "blobs.get", () => inner.GetAsync(game, id, ct));
 
@@ -332,13 +356,13 @@ public sealed class FaultyCloud(ICloud inner, TestPc pc) : ICloud
     {
         public Task<IReadOnlyList<VersionRecord>> ListAsync(GameId game, CancellationToken ct) => Check(pc, "log.list", () => inner.ListAsync(game, ct));
 
-        public Task<IReadOnlySet<VersionId>> ListIdsAsync(GameId game, CancellationToken ct) => Check(pc, "log.ids", () => inner.ListIdsAsync(game, ct));
+        public Task<IReadOnlySet<VersionId>> ListIdsAsync(GameId game, CancellationToken ct) => Slowed(pc, "log.ids", () => inner.ListIdsAsync(game, ct), ct);
 
         public Task<VersionRecord?> GetAsync(GameId game, VersionId id, CancellationToken ct) => Check(pc, "log.get", () => inner.GetAsync(game, id, ct));
 
         public Task AppendAsync(GameId game, VersionRecord version, CancellationToken ct) => Check(pc, "log.append", () => inner.AppendAsync(game, version, ct));
 
-        public Task<IReadOnlyList<PinRecord>> ListPinsAsync(GameId game, CancellationToken ct) => Check(pc, "log.pins", () => inner.ListPinsAsync(game, ct));
+        public Task<IReadOnlyList<PinRecord>> ListPinsAsync(GameId game, CancellationToken ct) => Slowed(pc, "log.pins", () => inner.ListPinsAsync(game, ct), ct);
 
         public Task SetPinAsync(GameId game, PinRecord pin, CancellationToken ct) => Check(pc, "log.pin", () => inner.SetPinAsync(game, pin, ct));
 
@@ -359,8 +383,12 @@ public sealed class FakeMalwareScanner : IMalwareScanner
 {
     public const string Marker = "GAMESYNC-TEST-MALWARE-MARKER";
 
+    /// <summary>False as with no antivirus running: every file is Unavailable (R3).</summary>
+    public bool Answers { get; set; } = true;
+
     public ScanVerdict ScanFile(string fullPath) =>
-        File.ReadAllText(fullPath).Contains(Marker, StringComparison.Ordinal) ? ScanVerdict.Detected : ScanVerdict.Clean;
+        !Answers ? ScanVerdict.Unavailable
+        : File.ReadAllText(fullPath).Contains(Marker, StringComparison.Ordinal) ? ScanVerdict.Detected : ScanVerdict.Clean;
 }
 
 public static class Cloud

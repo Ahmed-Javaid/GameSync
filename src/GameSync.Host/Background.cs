@@ -25,6 +25,9 @@ public static class Background
                     return await Cli.DailyAsync(dataDir, list.Skip(1).ToList(), output);
                 case "launch":
                     return await Cli.LaunchAsync(dataDir, list.Skip(1).ToList(), output);
+                case "--link":
+                    // R12: a gamesync:// link, which the installer has Windows open with GameSync.Tray.exe --link "<link>".
+                    return await Links.OpenAsync(dataDir, list.Count > 1 ? list[1] : "", output);
                 default:
                     return await Cli.RunAsync(args);
             }
@@ -114,6 +117,9 @@ public sealed class AppOutput(string dataDir, Action<string, string> notify) : I
     /// <summary>A game started (true) or stopped (false) being played.</summary>
     public event Action<GameId, string, bool>? PlayChanged;
 
+    /// <summary>KAN-80: an upload or a download of a game's saves moved on, or ended.</summary>
+    public event Action<TransferUpdate>? TransferChanged;
+
     public void Say(string line)
     {
         lock (_inner)
@@ -184,6 +190,8 @@ public sealed class AppOutput(string dataDir, Action<string, string> notify) : I
     public void Synced(IReadOnlyList<GameResult> results) => SyncFinished?.Invoke(results);
 
     public void Played(GameId game, string title, bool playing) => PlayChanged?.Invoke(game, title, playing);
+
+    public void Transfer(TransferUpdate update) => TransferChanged?.Invoke(update);
 }
 
 /// <summary>

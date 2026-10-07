@@ -1,4 +1,4 @@
-<!-- @dsCard group="Screens" height=800 width=1280 page=true subtitle="Settings: Appearance re-themes the whole screen live, its Surface included (every screen follows it); Storage and folders; startup, the daily backup and what to back up; the cloud (#cloud-folder, #cloud-none); your PCs; Copy diagnostics" -->
+<!-- @dsCard group="Screens" height=800 width=1280 page=true subtitle="Settings: Appearance re-themes the whole screen live, its Surface included (every screen follows it); Storage and folders; startup, the daily backup and what to back up; the cloud (#cloud-folder, #cloud-none); your PCs; updates (#updates, #updates-latest, #updates-downloading, #updates-refused, #updates-offline); Copy diagnostics" -->
 <!doctype html>
 <html lang="en">
 <head><meta charset="utf-8"><title>preview</title>
@@ -33,12 +33,22 @@ function rail(cur){return h(G.SideRail,{current:cur,items:[
   {id:'search',icon:'search',label:'Search'},
   {id:'home',icon:'home',label:'Home',sep:true},
   {id:'library',icon:'library',label:'Game library',dot:'play',dotLabel:'Slay the Spire 2 is running'},
-  {id:'saves',icon:'saves',label:'Save manager',sep:true,dot:'warn',dotLabel:'2 games need you'},
+  {id:'achievements',icon:'trophy',label:'Achievements'},
+  {id:'saves',icon:'saves',label:'Save manager',sep:true,dot:'warn',dotLabel:'2 conflicts'},
   {id:'log',icon:'terminal',label:'Console'},
   {id:'settings',icon:'settings',label:'Settings',bottom:true}]})}
 function topbar(title,sub,tabs,right){return h('header',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',gap:16}},h('div',null,h('div',{style:{font:'600 15px/20px var(--font-sans)'}},title),h('div',{className:'gs-faint',style:{fontSize:12}},sub)),tabs,h('div',{className:'gs-row',style:{flexWrap:'nowrap'}},right));}
 
-var SECTIONS=[{id:'appearance',label:'Appearance',icon:'palette'},{id:'storage',label:'Storage and folders',icon:'drive'},{id:'backup',label:'Backup and sync',icon:'sync'},{id:'cloud',label:'Cloud',icon:'cloud'},{id:'devices',label:'Devices',icon:'monitor'},{id:'notifications',label:'Notifications',icon:'bell'},{id:'safety',label:'Safety',icon:'shield'}];
+var SECTIONS=[{id:'appearance',label:'Appearance',icon:'palette'},{id:'storage',label:'Storage and folders',icon:'drive'},{id:'backup',label:'Backup and sync',icon:'sync'},{id:'cloud',label:'Cloud',icon:'cloud'},{id:'devices',label:'Devices',icon:'monitor'},{id:'notifications',label:'Notifications',icon:'bell'},{id:'achievements',label:'Achievements',icon:'trophy'},{id:'safety',label:'Safety',icon:'shield'},{id:'updates',label:'Updates',icon:'download'}];
+// Achievements by game (version 41): every game with achievements here, counted or left out, and GameSync's popup on or
+// off; a game a launcher runs (Steam, Epic, Ubisoft Connect, the EA app, GOG Galaxy, Xbox) shows its own, so GameSync's starts off.
+var ACH_GAMES=[{id:'bloons',name:'Bloons TD 6',art:COVERS[3],count:'63 of 156',launcher:'Steam'},{id:'core',name:'Core Keeper',art:COVERS[2],count:'26 of 59',launcher:'Steam'},
+  {id:'cs2',name:'Counter-Strike 2',art:COVERS[4],count:'1 of 1',zenith:true,launcher:'Steam'},{id:'geo',name:'GeoGuessr Steam Edition',art:COVERS[6],count:'8 of 45',launcher:'Steam'},
+  {id:'hd2',name:'Helldivers 2',art:COVERS[5],count:'3 of 38',launcher:'Steam'},{id:'l4d2',name:'Left 4 Dead 2',art:COVERS[0],count:'21 of 101',launcher:'Steam'},
+  {id:'nfs',name:'Need for Speed (2016)',art:COVERS[4],count:'29 of 45',launcher:'Steam'},{id:'ror2',name:'Risk of Rain 2',art:COVERS[1],count:'123 of 171',launcher:'Steam'},
+  {id:'valheim',name:'Valheim',art:COVERS[5],count:'1 of 53',launcher:'Steam'},
+  // A copy Steam doesn't run, from its own record (version 48): no launcher shows its popup, so GameSync's is on.
+  {id:'wukong',name:'Black Myth: Wukong',art:COVERS[2],count:'27 of 81',launcher:null}];
 function currentId(){return document.documentElement.getAttribute('data-theme')||'dark';}
 function fresh(){return Object.assign({primary:null,secondary:null,system:false},G.theme.fromThemeId(currentId()));}
 function Page(p){return h('div',{style:{display:'flex',flexDirection:'column',gap:16,maxWidth:920}},h('header',{style:{marginBottom:4}},h('h1',{style:{margin:0,font:'600 24px/30px var(--font-sans)'}},p.title),h('p',{className:'gs-muted',style:{margin:'4px 0 0'}},p.sub)),p.children);}
@@ -63,18 +73,24 @@ function App(){
  var ask=React.useState(false), hold=React.useState(true), daily=React.useState(false), snaps=React.useState(true), admin=React.useState(false), policy=React.useState('newest');
  var signin=React.useState(true), dailyOn=React.useState(true), dailyAt=React.useState('20:00'), editTime=React.useState(false), timeText=React.useState('20:00'), ran=React.useState('idle');
  var copied=React.useState(false), pcName=React.useState('DESKTOP'), renaming=React.useState(false), nameText=React.useState('DESKTOP'), signOut=React.useState(false);
+ var achDialog=React.useState(location.hash==='#achievements-games'), chime=React.useState('bell'), volume=React.useState('soft');
+ var popOn=React.useState(true), soundOn=React.useState(true), corner=React.useState('top-right'), tried=React.useState(null), achOff=React.useState([]), achPop=React.useState(['wukong']);
+ // Version 48 (KAN-123): folders where copies Steam doesn't run keep their records of what's unlocked; #achievements-none: none added.
+ var recs=React.useState(location.hash==='#achievements-none'?[]:[{path:'C:\\Users\\Public\\Documents\\Records',meta:'Records for 12 of your games',icon:'trophy'}]);
+ // Version 53 (7 Oct 2026): an update's state. #updates: one is ready; #updates-latest, -downloading, -refused, -offline.
+ var upd=React.useState(hash.indexOf('updates-')===0?hash.slice(8):'ready'), updDaily=React.useState(true);
  var cfg=React.useState('this-pc'), shots=React.useState('off'), skip=React.useState(true), also=React.useState([{path:'*.bak',meta:'Backup copies some games keep',icon:'file'},{path:'**/Mods/**',meta:'Mod folders',icon:'folder'}]);
  var touched=cfg[0]!=='this-pc'||shots[0]!=='off'||!skip[0]||also[0].length!==2;
  var views={
   appearance:function(){return h(Page,{title:'Appearance',sub:'Changes apply straight away and are saved on this PC only.'},
     h(G.Card,{title:'Theme',subtitle:pre.dynamic?'Follows your Windows accent colour.':pre.note,action:h(G.PillTabs,{label:'Mode',value:th.system?'system':th.mode,onChange:function(v){set(v==='system'?{system:true}:{system:false,mode:v})},items:[{id:'dark',label:'Dark',icon:'moon'},{id:'light',label:'Light',icon:'sun'},{id:'system',label:'Match Windows',icon:'monitor'}]})},
       h(G.ThemePicker,{value:th.preset,mode:mode,pureBlack:opts.pureBlack,accent:opts.accent,onChange:function(id){set({preset:id,primary:null,secondary:null})}}),
-      h(G.SettingsRow,{title:'Surface',tag:'New',description:mode==='light'?'Glossy lets your game’s art show through GameSync, in dark mode; light mode stays Solid for now.':'Glossy lets your game’s art show through GameSync; Solid keeps every surface plain. Glossy turns off when Windows’ transparency effects are off.'},h(G.PillTabs,{label:'Surface',value:surface,onChange:G.surface.set,items:[{id:'glossy',label:'Glossy'},{id:'solid',label:'Solid'}]})),
+      h(G.SettingsRow,{title:'Surface',tag:'New',description:'Glossy lets your game’s art show through GameSync, frosted dark or light with the mode; Solid keeps every surface plain. Glossy turns off when Windows’ transparency effects are off.'},h(G.PillTabs,{label:'Surface',value:surface,onChange:G.surface.set,items:[{id:'glossy',label:'Glossy'},{id:'solid',label:'Solid'}]})),
       h(G.SettingsRow,{title:'Pure black backgrounds',description:mode==='light'?'Dark mode only.':'For OLED screens: the page and side rail turn fully black, never glossy.',disabled:mode==='light'},h(G.Switch,{label:'Pure black backgrounds',checked:opts.pureBlack,disabled:mode==='light',onChange:function(v){set({pureBlack:v})}}))),
     h(G.Card,{title:'Colours',subtitle:'Each theme sets both; change either one here.',action:h(G.Button,{size:'sm',variant:'ghost',icon:'reset',onClick:function(){t[1]({preset:'arcade',mode:'dark',pureBlack:false,primary:null,secondary:null,system:false})}},'Reset to default')},
       h(G.SettingsRow,{title:'Primary',description:'Main buttons, progress, focus rings and your busiest days.'},h(G.ColorSwatchPicker,{role:'primary',value:pv,theme:opts,onChange:function(id){set({primary:id})}})),
       h(G.SettingsRow,{title:'Secondary',description:'Selection, the page you\u2019re on and tab counts.'},h(G.ColorSwatchPicker,{role:'secondary',value:sv,theme:opts,onChange:function(id){set({secondary:id})}})),
-      h('div',{className:'gs-note'},h(G.Icon,{name:'info',size:16}),'Status colours never change: Synced, Needs you, Playing and Blocked keep their colours in every theme, with an icon and a word. Custom colours come later.')));},
+      h('div',{className:'gs-note'},h(G.Icon,{name:'info',size:16}),'Status colours never change: Synced, Conflict, Playing and Blocked keep their colours in every theme, with an icon and a word. Custom colours come later.')));},
   storage:function(){return h(Page,{title:'Storage and folders',sub:'Where GameSync keeps backups on this PC, and where it looks for games and saves.'},
     h(G.Card,{title:'Backup folder',subtitle:'Your saves\u2019 history on this PC. The cloud keeps every version either way.'},
       h(G.FolderField,{path:bk.path,state:bk.state,progress:bk.progress,message:'Moving 1,340 files, checking each hash before removing the old copy',meta:bk.moved?'Moved and checked. The old folder was removed.':'1.04 GB \u00b7 214 versions \u00b7 312 GB free on '+bk.path.slice(0,2),onChange:moveBackups}),
@@ -134,11 +150,77 @@ function App(){
     h(G.Card,{title:'Windows notifications'},
       h(G.SettingsRow,{title:'Hold while a fullscreen game runs',description:'Shown after you quit, so nothing pops up mid-game.'},h(G.Switch,{label:'Hold while a fullscreen game runs',checked:hold[0],onChange:hold[1]})),
       h(G.SettingsRow,{title:'Daily summary',description:'One line after the daily backup: what was checked and what changed.'},h(G.Switch,{label:'Daily summary',checked:daily[0],onChange:daily[1]}))));},
+  achievements:function(){return h(Page,{title:'Achievements',sub:'What you see and hear when you unlock one while playing, and which games count.'},
+    h(G.Card,{title:'When you unlock one while playing'},
+      h(G.SettingsRow,{title:'Show a popup',description:'GameSync’s own small window over the game for a few seconds. It never takes focus or a click. Over a game in exclusive fullscreen only the sound plays, and the popups wait until you quit.'},h(G.Switch,{label:'Show a popup',checked:popOn[0],onChange:popOn[1]})),
+      h(G.SettingsRow,{title:'Play a sound',description:'A short chime with each popup, brighter for rarer ones; a Zenith has its own.'},h(G.Switch,{label:'Play a sound',checked:soundOn[0],onChange:soundOn[1]})),
+      // Version 37 (the owner: "The popup sound is too loud, it needs to be softer. Give me options i can choose from"):
+      // five sounds GameSync makes itself, picking one plays it; four volumes, Soft unless changed, every one softer than before.
+      h(G.SettingsRow,{title:'Sound',description:'Picking one plays it.',disabled:!soundOn[0]},
+        h(G.Select,{label:'Sound',value:chime[0],onChange:chime[1],disabled:!soundOn[0],options:[{id:'bell',label:'Soft bell'},{id:'marimba',label:'Marimba'},{id:'glass',label:'Glass'},{id:'harp',label:'Harp'},{id:'pop',label:'Pop'}]}),
+        h(G.IconButton,{icon:'volume',label:'Hear it, at the volume picked',disabled:!soundOn[0]})),
+      h(G.SettingsRow,{title:'Volume',description:'Under Windows’ own volume. Soft unless you change it.',disabled:!soundOn[0]},
+        h(G.Select,{label:'Volume',value:volume[0],onChange:volume[1],disabled:!soundOn[0],options:[{id:'quiet',label:'Quiet'},{id:'soft',label:'Soft'},{id:'medium',label:'Medium'},{id:'loud',label:'Loud'}]})),
+      h(G.SettingsRow,{title:'Where it shows',description:'The corner of the screen the game is on.',disabled:!popOn[0]},h(G.Select,{label:'Where it shows',value:corner[0],onChange:corner[1],disabled:!popOn[0],options:[{id:'top-right',label:'Top right'},{id:'top-left',label:'Top left'},{id:'bottom-right',label:'Bottom right'},{id:'bottom-left',label:'Bottom left'}]})),
+      h(G.SettingsRow,{title:'Try the popup',description:tried[0]==='later'?'Showing in 10 seconds: switch to your game now.':'A made-up one, as it shows over a game: now, or in 10 seconds so you can switch to a game first.'},
+        h(G.Button,{size:'sm',variant:'secondary',icon:'trophy',onClick:function(){tried[1]('now')}},'Show it now'),
+        h(G.Button,{size:'sm',variant:'ghost',icon:'clock',onClick:function(){tried[1]('later')}},'In 10 seconds')),
+      tried[0]==='now'?h('div',{style:{display:'flex',justifyContent:corner[0].indexOf('left')>=0?'flex-start':'flex-end'}},h(G.AchievementPopup,{item:{name:'Seeker: Scorched Earth',pct:2.7},game:'Risk of Rain 2',progress:{done:124,total:171},phase:'in',corner:corner[0]})):null,
+      h('div',{className:'gs-note'},h(G.Icon,{name:'info',size:16}),'GameSync sees unlocks in Steam’s files on this PC, and in the records of the copies below. Steam shows its own popup for its games, so GameSync’s is off for each until you turn it on in Achievements by game; a copy of its own has GameSync’s.')),
+    // Version 48 (KAN-123; the owner, 4 Oct 2026: "As long as my offline games also have achievements"): a copy Steam doesn't
+    // run keeps its own record of what's unlocked, one folder per game named by its Steam number; GameSync reads those
+    // records from the folders added here and names each achievement from Steam's list.
+    h(G.Card,{title:'Copies Steam doesn’t run',subtitle:'Copies that keep their own record of what’s unlocked. Kept on this PC only.'},
+      h(G.FolderList,{items:recs[0],addLabel:'Add a folder',empty:'None yet. A copy that isn’t Steam’s shows Steam’s list at 0 on its page.',
+        onRemove:function(it){recs[1](recs[0].filter(function(x){return x!==it}))},
+        onAdd:function(){recs[1](recs[0].concat([{path:'D:\\Game records',meta:'No records for your games here',icon:'trophy'}]))}}),
+      h('div',{className:'gs-note'},h(G.Icon,{name:'info',size:16}),'Add the folder holding one folder per game, named by its Steam number, with the copy’s record inside. GameSync only reads the records; each achievement’s name, icon and how rare it is come from Steam’s list. Their unlocks count on the Achievements page and Home, and pop up while you play.')),
+    // Version 41 (the owner: "Game in your achievements makes no sense. Also it needs to be either a popup or a new window"):
+    // one row with how many count and how many have GameSync's popup; Choose games… opens Achievements by game over the page.
+    h(G.Card,{title:'Games'},
+      h(G.SettingsRow,{title:'Achievements by game',description:(ACH_GAMES.length-achOff[0].length)+' of '+ACH_GAMES.length+' games count on the Achievements page and Home. GameSync’s popup is on for '+achPop[0].length+': Steam shows its own for the rest.'},
+        h(G.Button,{size:'sm',variant:'secondary',icon:'trophy','aria-haspopup':'dialog',onClick:function(){achDialog[1](true)}},'Choose games…'))),
+    achDialog[0]?h('div',{style:{position:'fixed',inset:0,background:'var(--scrim)',display:'grid',placeItems:'center',zIndex:5}},
+      h(G.AchievementGamesDialog,{games:ACH_GAMES.map(function(g){return Object.assign({},g,{counted:achOff[0].indexOf(g.id)<0,popup:achPop[0].indexOf(g.id)>=0})}),
+        onCount:function(id,v){achOff[1](v?achOff[0].filter(function(x){return x!==id}):achOff[0].concat([id]))},
+        onPopup:function(id,v){achPop[1](v?achPop[0].concat([id]):achPop[0].filter(function(x){return x!==id}))},
+        onClose:function(){achDialog[1](false)}})):null);},
   safety:function(){return h(Page,{title:'Safety',sub:'Only save data ever moves, and nothing touches a running game beyond watching it.'},
     h(G.Card,{title:'Learn mode'},
-      h(G.SettingsRow,{title:'Let learn mode ask for admin',description:'One session at a time, to find saves the folder watcher can\u2019t see. Never for games with an anti-cheat.'},h(G.Switch,{label:'Let learn mode ask for admin',checked:admin[0],onChange:admin[1]}))),
+      h(G.SettingsRow,{title:'Let learn mode ask for admin',tag:'After v1',disabled:true,description:'One session at a time, to find saves the folder watcher can\u2019t see. Never for games with an anti-cheat. It comes after v1 (the owner, 7 Oct 2026), and the app shows nothing until then.'},h(G.Switch,{label:'Let learn mode ask for admin',checked:admin[0],onChange:admin[1],disabled:true}))),
     h(G.Card,{title:'Games with an anti-cheat',subtitle:'No learn mode and no sharing; they launch only through their own launcher.'},
-      h(G.FolderList,{items:[{path:'Apex Legends',icon:'shield',tag:'EasyAntiCheat'},{path:'Helldivers 2',icon:'shield',tag:'GameGuard'},{path:'Rocket League',icon:'shield',tag:'EasyAntiCheat'},{path:'GTA V Enhanced',icon:'shield',tag:'BattlEye'}]})));}
+      h(G.FolderList,{items:[{path:'Apex Legends',icon:'shield',tag:'EasyAntiCheat'},{path:'Helldivers 2',icon:'shield',tag:'GameGuard'},{path:'Rocket League',icon:'shield',tag:'EasyAntiCheat'},{path:'GTA V Enhanced',icon:'shield',tag:'BattlEye'}]})));},
+  // Version 53 (the owner, 7 Oct 2026: no paid code signing, "yes, per-user install and tracer after v1"): GameSync asks
+  // GitHub for its latest release once a day and gets it ready in the background; it installs only when you restart it,
+  // and only once GameSync's own release signature has checked out.
+  updates:function(){
+   var st=upd[0], warn={display:'flex',alignItems:'flex-start',gap:6,color:'var(--warn)',fontSize:12,lineHeight:'16px'};
+   var block=st==='ready'?[
+       h(G.SettingsRow,{key:'r',title:'GameSync 1.0.1 is ready',description:'Restart to update: GameSync closes, installs it and opens again in a few seconds. Your games and saves aren\u2019t touched.'},
+         h(G.Button,{size:'sm',variant:'primary',icon:'reset',onClick:function(){upd[1]('restarting')}},'Restart to update')),
+       h('div',{key:'w',style:{display:'flex',flexDirection:'column',gap:8,paddingTop:12,borderTop:'1px solid var(--line-100)'}},
+         h('div',{className:'gs-overline'},'What\u2019s new in 1.0.1'),
+         h('ul',{style:{margin:0,paddingLeft:18,display:'flex',flexDirection:'column',gap:4,font:'400 13px/19px var(--font-sans)',color:'var(--ink-muted)'}},
+           h('li',null,'Restoring a named save says which file a running game still holds.'),
+           h('li',null,'Achievements of copies Steam doesn\u2019t run count from their own record.'),
+           h('li',null,'Home\u2019s Zenith is a dot, orange to red.')),
+         h('div',null,h(G.Button,{size:'sm',variant:'ghost',icon:'external'},'Release notes on GitHub')))]
+     :st==='restarting'?h(G.SettingsRow,{title:'Updating to 1.0.1',description:'GameSync closes, installs it and opens again.'},h(G.Button,{size:'sm',variant:'primary',busy:true,busyLabel:'Restarting'},'Restarting'))
+     :st==='downloading'?[
+       h(G.SettingsRow,{key:'r',title:'Getting GameSync 1.0.1',description:'In the background. It\u2019s checked against GameSync\u2019s own signature before it can install.'}),
+       h(G.ProgressBar,{key:'p',value:42,label:'24 of 58 MB',right:'1.2 MB/s, about 30 s left'})]
+     :st==='refused'?h(G.SettingsRow,{title:'GameSync 1.0.1 wasn\u2019t installed',description:h('span',{style:warn},h(G.Icon,{name:'alert',size:14}),'It didn\u2019t pass GameSync\u2019s own check, so it may have been changed on the way. Nothing was installed; GameSync tries again tomorrow.')},
+         h(G.Button,{size:'sm',variant:'secondary',icon:'sync',onClick:function(){upd[1]('downloading')}},'Try again'))
+     :st==='offline'?h(G.SettingsRow,{title:'Couldn\u2019t check for updates',description:'GitHub couldn\u2019t be reached today at 14:02; this PC seems to be offline. GameSync tries again tomorrow.'},
+         h(G.Button,{size:'sm',variant:'secondary',icon:'sync',onClick:function(){upd[1]('latest')}},'Check now'))
+     :h(G.SettingsRow,{title:'You have the latest version',description:'Checked today at 14:02.'},
+         h(G.Button,{size:'sm',variant:'secondary',icon:'sync',onClick:function(){upd[1]('downloading')}},'Check now'));
+   return h(Page,{title:'Updates',sub:'GameSync checks GitHub for a new version once a day and gets it ready. It installs when you restart GameSync.'},
+     h(G.Card,{title:'GameSync 1.0.0',subtitle:'Installed for you alone, in %LOCALAPPDATA%\\Programs\\GameSync.'},block),
+     h(G.Card,{title:'Checking'},
+       h(G.SettingsRow,{title:'Check for updates every day',description:'GameSync asks GitHub for its latest release once a day and gets it in the background. Nothing installs until you restart it. Off, Check now still works.'},
+         h(G.Switch,{label:'Check for updates every day',checked:updDaily[0],onChange:updDaily[1]})),
+       h('div',{className:'gs-note'},h(G.Icon,{name:'shield',size:16}),'GameSync isn\u2019t code-signed, so Windows may warn the first time you run it. Every update is checked against GameSync\u2019s own release signature before it installs, and anything else is refused.')));}
  };
  return h(G.ThemeScope,{theme:opts,strength:'glow',art:ART,style:{width:1280,height:800,display:'flex',overflow:'hidden'}},
   rail('settings'),

@@ -1,0 +1,25 @@
+<!-- @dsCard group="Save manager" height=700 subtitle="Learn mode's finds: the places a game wrote to while it was watched, the likeliest ticked; #none, nothing seen; #adding" -->
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>preview</title>
+<style>html,body{margin:0;background:var(--bg-100);} .pv{padding:24px;display:flex;justify-content:center}</style>
+</head>
+<body class="gs-root">
+<div id="root" class="pv"></div>
+<script>
+var G = window.GameSync, h = React.createElement;
+var FINDS = [
+  {id:'a', path:'<localLow>/Landfall Games/ROUNDS', here:'C:\\Users\\Sam\\AppData\\LocalLow\\Landfall Games\\ROUNDS', files:3, bytes:49152, newest:'21:51', examples:['Player.sav','Unlocks.sav','Settings.json'], tags:['Looks like saves']},
+  {id:'b', path:'<documents>/My Games/ROUNDS/Replays', here:'C:\\Users\\Sam\\Documents\\My Games\\ROUNDS\\Replays', files:12, bytes:2306867, newest:'21:48', examples:['replay-0412.rpl','replay-0413.rpl']},
+  {id:'c', path:'<installDir>/settings.cfg', here:'E:\\Games\\ROUNDS\\settings.cfg', file:true, files:1, bytes:812, newest:'21:52', examples:['settings.cfg'], tags:['In its own folder']},
+  {id:'d', path:'<steamRoot>/userdata/123456789/1557740/remote', here:'D:\\Steam\\userdata\\123456789\\1557740\\remote', files:1, bytes:1024, newest:'21:52', examples:['stats.bin'], tags:['Steam\u2019s cloud folder']}];
+var NONE = location.hash === '#none', ADDING = location.hash === '#adding';
+function App(){
+  var picked = React.useState(ADDING ? ['a','c'] : ['a']);
+  return h(G.LearnModeDialog,{game:'ROUNDS',session:'4 Oct, 21:04 to 21:52',finds:NONE?[]:FINDS,picked:picked[0],onPick:picked[1],stage:ADDING?'adding':null,
+    onSync:function(){},onAgain:function(){},onNotThese:function(){},onAddPlace:function(){},onClose:function(){}});
+}
+ReactDOM.createRoot(document.getElementById('root')).render(h(App));
+</script>
+</body>
+</html>

@@ -15,6 +15,9 @@ namespace GameSync.Host;
 /// <param name="Full">Where it is on this PC; null when this PC can't place it.</param>
 public sealed record SaveFolderSummary(string Path, string? Full, bool ById, bool Missing);
 
+/// <summary>KAN-123: a folder of copies' records of achievements, and how many games have a record in it.</summary>
+public sealed record RecordFolderSummary(string Path, int Games, bool Missing);
+
 /// <summary>A PC that syncs with this cloud (PC-01): its name, when it was last seen and its GameSync; this PC has no last seen.</summary>
 public sealed record PcSummary(string Name, DateTime? LastSeenUtc, string? AppVersion, bool ThisPc);
 
@@ -44,6 +47,11 @@ public sealed record SettingsView
     public IReadOnlyList<GameFolderSummary> GameFolders { get; init; } = [];
 
     public IReadOnlyList<SaveFolderSummary> SaveFolders { get; init; } = [];
+
+    /// <summary>FOLD-09: where shared zips go, and whether to ask each time instead.</summary>
+    public string ShareFolder { get; init; } = "";
+
+    public bool ShareAsks { get; init; }
 
     /// <summary>BG-01: GameSync starts in the tray when the person signs in.</summary>
     public bool StartsAtSignIn { get; init; }
@@ -98,6 +106,83 @@ public sealed record SettingsView
     public bool DailyNote { get; init; }
 
     public IReadOnlyList<AntiCheatGame> AntiCheat { get; init; } = [];
+
+    /// <summary>ACH-09, ACH-10: the popup when an achievement unlocks while you play, its sound, and its corner.</summary>
+    public AchievementPopupSettings Achievements { get; init; } = new();
+
+    /// <summary>KAN-123: the folders where copies Steam doesn't run keep their records of what's unlocked.</summary>
+    public IReadOnlyList<RecordFolderSummary> AchievementFolders { get; init; } = [];
+}
+
+/// <summary>
+/// ACH-09 (design system version 35 → AchievementPopup, SettingsScreen): the popup GameSync shows over a game when an
+/// achievement unlocks, its chime, and the corner of the screen it shows in: <c>top-right</c> (the default),
+/// <c>top-left</c>, <c>bottom-right</c> or <c>bottom-left</c>. Since version 37: the chime's sound and volume (KAN-120).
+/// Whether the popup shows for a game is that game's own choice since version 41 (KAN-131, <see cref="Achievements.PopupOn"/>).
+/// Kept on this PC.
+/// </summary>
+/// <summary>A change to the popup's settings from Settings: what's given changes, null leaves a setting as it is.</summary>
+public sealed record AchievementPopupChange(bool? Popups = null, bool? Sound = null, string? Corner = null, string? Chime = null, string? Volume = null);
+
+public sealed record AchievementPopupSettings(bool Popups = true, bool Sound = true, string Corner = AchievementPopupSettings.TopRight,
+    string Chime = GameSync.Windows.Chime.DefaultSound, string Volume = GameSync.Windows.Chime.DefaultVolume)
+{
+    public const string TopRight = "top-right";
+
+    public static readonly IReadOnlyList<string> Corners = [TopRight, "top-left", "bottom-right", "bottom-left"];
+
+    public const string PopupsKey = "achievements.popups";
+    public const string SoundKey = "achievements.sound";
+    public const string CornerKey = "achievements.corner";
+    public const string ChimeKey = "achievements.chime";
+    public const string VolumeKey = "achievements.volume";
+
+    public static AchievementPopupSettings Read(GameSync.Core.State.StateStore state) => new(
+        state.GetSetting(PopupsKey) != "off",
+        state.GetSetting(SoundKey) != "off",
+        state.GetSetting(CornerKey) is { } corner && Corners.Contains(corner) ? corner : TopRight,
+        state.GetSetting(ChimeKey) is { } chime && GameSync.Windows.Chime.Sounds.Any(s => s.Id == chime) ? chime : GameSync.Windows.Chime.DefaultSound,
+        state.GetSetting(VolumeKey) is { } volume && GameSync.Windows.Chime.Volumes.Any(v => v.Id == volume) ? volume : GameSync.Windows.Chime.DefaultVolume);
+
+    public static AchievementPopupSettings Read(string dataDir)
+    {
+        using var state = new GameSync.Core.State.StateStore(dataDir);
+        return Read(state);
+    }
+
+    /// <summary>Saves a change from Settings.</summary>
+    public static void Set(string dataDir, AchievementPopupChange change) =>
+        Set(dataDir, change.Popups, change.Sound, change.Corner, change.Chime, change.Volume);
+
+    /// <summary>Saves what's given; null leaves a setting as it is.</summary>
+    public static void Set(string dataDir, bool? popups = null, bool? sound = null, string? corner = null, string? chime = null, string? volume = null)
+    {
+        using var state = new GameSync.Core.State.StateStore(dataDir);
+        if (chime is not null)
+        {
+            state.SetSetting(ChimeKey, GameSync.Windows.Chime.Sounds.Any(s => s.Id == chime) ? chime : GameSync.Windows.Chime.DefaultSound);
+        }
+
+        if (volume is not null)
+        {
+            state.SetSetting(VolumeKey, GameSync.Windows.Chime.Volumes.Any(v => v.Id == volume) ? volume : GameSync.Windows.Chime.DefaultVolume);
+        }
+
+        if (popups is { } on)
+        {
+            state.SetSetting(PopupsKey, on ? "" : "off");
+        }
+
+        if (sound is { } loud)
+        {
+            state.SetSetting(SoundKey, loud ? "" : "off");
+        }
+
+        if (corner is not null)
+        {
+            state.SetSetting(CornerKey, Corners.Contains(corner) ? corner : TopRight);
+        }
+    }
 }
 
 /// <summary>
@@ -139,6 +224,9 @@ public static class SettingsData
             SaveFolders = Cli.SaveFolders(state)
                 .Select(f => resolver.Resolve(f.Path, "") is { } full ? new SaveFolderSummary(f.Path, full, f.ById, !Directory.Exists(full)) : new SaveFolderSummary(f.Path, null, f.ById, true))
                 .ToList(),
+            ShareFolder = state.GetSetting(Sharing.FolderKey) is { Length: > 0 } shareFolder ? shareFolder
+                : KnownFolders.Downloads() ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads"),
+            ShareAsks = state.GetSetting(Sharing.AskKey) == "1",
             StartsAtSignIn = usual ? SignInStart.ForThisUser().IsOn : StartsHere(dataDir),
             DailyAt = state.GetSetting("daily.time") is { Length: > 0 } time && Daily.TryParseTime(time, out var at) ? at : null,
             LastDaily = Daily.Last(state) is { } last ? new DailySummary(last.AtUtc, last.Games, last.Uploads, last.NeedYou) : null,
@@ -159,6 +247,10 @@ public static class SettingsData
             AppVersion = Cli.AppVersion,
             HoldWhileFullscreen = state.GetSetting(HoldKey) != "0",
             DailyNote = state.GetSetting(DailyNoteKey) == "1",
+            Achievements = AchievementPopupSettings.Read(state),
+            AchievementFolders = GameSync.Host.Achievements.RecordFolders(state)
+                .Select(f => new RecordFolderSummary(f, CopyAchievements.CountIn(f), !Directory.Exists(f)))
+                .ToList(),
             AntiCheat = library.Where(e => e.HasAntiCheat && e.State != LibraryState.Ignored)
                 .Select(e => new AntiCheatGame(e.Id, e.DisplayTitle, e.AntiCheatByHand == true && e.AntiCheat is null ? "Marked by you" : e.AntiCheat ?? "Anti-cheat"))
                 .OrderBy(g => g.Title, StringComparer.OrdinalIgnoreCase)
@@ -521,6 +613,7 @@ public static class SettingsData
         text.AppendLine(CultureInfo.InvariantCulture, $"New games: settings files {d.SettingsFiles}, screenshots {(d.Screenshots ? "on" : "off")}, skip logs and caches {(d.SkipJunk ? "on" : "off")}, also skip [{string.Join(", ", d.Skip)}], conflicts {(d.Conflict == ConflictPolicy.AlwaysAsk ? "always ask" : "newest wins")}");
         text.AppendLine(CultureInfo.InvariantCulture, $"Game folders: {string.Join("; ", view.GameFolders.Select(f => $"{f.Path} ({f.Games} games{(f.Missing ? ", not there now" : "")})"))}");
         text.AppendLine(CultureInfo.InvariantCulture, $"Save folders: {string.Join("; ", view.SaveFolders.Select(f => $"{f.Path}{(f.ById ? " (by ID)" : "")}"))}");
+        text.AppendLine(CultureInfo.InvariantCulture, $"Achievement records: {string.Join("; ", view.AchievementFolders.Select(f => $"{f.Path} ({f.Games})"))}");
         text.AppendLine();
 
         using (var engine = Engine.Open(dataDir))

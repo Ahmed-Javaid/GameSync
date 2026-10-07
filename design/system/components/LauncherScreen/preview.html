@@ -1,8 +1,8 @@
-<!-- @dsCard group="Screens" height=800 width=1280 page=true subtitle="Launcher home, Glossy or Solid as picked in Settings" -->
+<!-- @dsCard group="Screens" height=800 width=1280 page=true subtitle="Launcher home, Glossy or Solid as picked in Settings: the hero, the hero game's achievements, Jump back in and Activity; Conflicts in warn when there are some (#fine, #noach, #zenith, #zenith-moment, #learning); an update ready (#update)" -->
 <!doctype html>
 <html lang="en">
 <head><meta charset="utf-8"><title>preview</title>
-<style>html,body{margin:0;background:var(--bg-100);} .pv{padding:24px;} .gs-tile-meta{display:none}.gs-tile .gs-tile-name{font-size:12px;line-height:16px}.gs-activity-grid{gap:5px}.gs-cell{aspect-ratio:1.9}</style>
+<style>html,body{margin:0;background:var(--bg-100);} .pv{padding:24px;} .gs-tile-meta{display:none}.gs-tile .gs-tile-name{font-size:12px;line-height:16px}.gs-activity-grid{gap:5px}.gs-cell{aspect-ratio:1.9}.home-ach-list{display:flex;flex-direction:column;gap:10px}.home-ach-label{font:600 11px/14px var(--font-sans);letter-spacing:.12em;text-transform:uppercase;color:var(--ink-faint)}.home-ach{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:12px}.home-ach-name{font:500 13px/18px var(--font-sans);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.home-ach-when{font:400 12px/16px var(--font-sans);color:var(--ink-faint);white-space:nowrap}</style>
 </head>
 <body class="gs-root">
 <div id="root"></div>
@@ -31,35 +31,84 @@ var IMPORT_ITEMS = [
 
 // #playing: a game runs now (started from GameSync, a store or anywhere, its saves syncing or not): it's the hero.
 // #nocloud: first run skipped the cloud, so the top bar offers Connect the cloud (see Connect cloud dialog).
-var PLAYING = location.hash === '#playing', NOCLOUD = location.hash === '#nocloud';
+// #fine: nothing needs the person: Conflicts is a plain pill and the rail has no caution mark.
+// #noach: the hero game has no achievements a store keeps (a copy of its own), so the card shows the last game that has.
+// #learning: the game playing now has no saves found yet, so learn mode is watching it (version 43).
+// #update: a new version is downloaded and checked, so the top bar offers Restart to update (version 53).
+var LEARNING = location.hash === '#learning', UPDATE = location.hash === '#update';
+var PLAYING = location.hash === '#playing' || LEARNING, NOCLOUD = location.hash === '#nocloud', FINE = location.hash === '#fine', NOACH = location.hash === '#noach';
 function rail(cur){return h(G.SideRail,{current:cur,items:[
   {id:'search',icon:'search',label:'Search'},
   {id:'home',icon:'home',label:'Home',sep:true},
   {id:'library',icon:'library',label:'Game library',dot:'play',dotLabel:(PLAYING?'Ghost of Tsushima':'Slay the Spire 2')+' is running'},
-  {id:'saves',icon:'saves',label:'Save manager',sep:true,dot:'warn',dotLabel:'2 games need you'},
+  {id:'achievements',icon:'trophy',label:'Achievements'},
+  FINE?{id:'saves',icon:'saves',label:'Save manager',sep:true}:{id:'saves',icon:'saves',label:'Save manager',sep:true,dot:'warn',dotLabel:'2 conflicts'},
   {id:'log',icon:'terminal',label:'Console'},
   {id:'settings',icon:'settings',label:'Settings',bottom:true}]})}
 function topbar(title,sub,tabs,right){return h('header',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',gap:16}},h('div',null,h('div',{style:{font:'600 15px/20px var(--font-sans)'}},title),h('div',{className:'gs-faint',style:{fontSize:12}},sub)),tabs,h('div',{className:'gs-row',style:{flexWrap:'nowrap'}},right));}
 
+// Achievements of the game in the hero, as a game's page shows them (its play bar and its Achievements card).
+// Made-up achievement icons: square pictures with a mark, as Steam's are (design system version 33).
+function achIcon(seed){ var hues=[18,200,280,140,45,340,180,95], marks=['M50 16 L60 40 L86 40 L65 57 L73 84 L50 68 L27 84 L35 57 L14 40 L40 40Z','M50 14 L80 30 L80 56 C80 73 66 83 50 90 C34 83 20 73 20 56 L20 30Z','M50 16 C66 36 76 50 76 64 A26 26 0 0 1 24 64 C24 50 34 36 50 16Z','M20 76 L50 20 L80 76Z','M28 28 L72 72 M72 28 L28 72','M26 50 A24 24 0 1 0 74 50 A24 24 0 1 0 26 50'];
+  var hu=hues[seed%hues.length], m=marks[seed%marks.length];
+  var svg="<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><defs><radialGradient id='g' cx='30%' cy='25%' r='95%'><stop offset='0' stop-color='hsl("+hu+",72%,62%)'/><stop offset='1' stop-color='hsl("+hu+",45%,12%)'/></radialGradient></defs><rect width='100' height='100' fill='url(#g)'/><path d='"+m+"' fill='rgba(255,255,255,.18)' stroke='rgba(255,255,255,.92)' stroke-width='5' stroke-linejoin='round' stroke-linecap='round'/></svg>";
+  return "data:image/svg+xml,"+encodeURIComponent(svg); }
+// The hero game's achievements, as its page shows them (design system version 33; the simpler card again since version 46,
+// after version 41's coins and Zenith strip): the ring, its tiers, its Zenith, and the last two unlocked. #noach: the hero
+// keeps none, so it's the last game played that has some. #zenith: the hero's Zenith is earned.
+var ZENITH = location.hash === '#zenith' || location.hash === '#zenith-moment', MOMENT = location.hash === '#zenith-moment';
+var ACH = ZENITH ? {game:'Sekiro: Shadows Die Twice', done:34, total:34, completedOn:'Today', tiers:{gold:5,silver:11,bronze:18},
+  latest:[{name:'Shinobi',when:'Today',pct:3.1,art:achIcon(2)},{name:'Shura',when:'Today',pct:9.1,art:achIcon(0)},{name:'Isshin Ashina',when:'Yesterday',pct:4.2,art:achIcon(4)}]} : {game:'Sekiro: Shadows Die Twice', done:29, total:34, tiers:{gold:4,silver:9,bronze:16},
+  latest:[{name:'Shura',when:'Today',pct:9.1,art:achIcon(0)},{name:'Isshin Ashina',when:'Today',pct:4.2,art:achIcon(4)},{name:'Great Shinobi',when:'26 Sep',pct:21,art:achIcon(6)}]};
+var ACH_OTHER = {game:'Terraria', done:61, total:115, tiers:{gold:9,silver:21,bronze:31},
+  latest:[{name:'Head in the Clouds',when:'Yesterday',pct:22,art:achIcon(1)},{name:'Slippery Shinobi',when:'26 Sep',pct:9.5,art:achIcon(3)},{name:'Timber!!',when:'20 Sep',pct:88,art:achIcon(5)}]};
+function achievements(){
+ var a = NOACH ? ACH_OTHER : ACH;
+ return h(G.Card,{title:'Achievements',subtitle:NOACH?a.game+', played yesterday. Ghost of Tsushima has none GameSync can read.':a.game+' \u00b7 '+a.done+' of '+a.total+' on Steam',
+   action:h(G.IconButton,{icon:'chevronRight',label:'All of '+a.game+'\u2019s achievements'})},
+  h(G.AchievementsOverview,{done:a.done,total:a.total,tiers:a.tiers,size:'sm',completedOn:a.completedOn,moment:MOMENT&&!NOACH}),
+  h('div',{className:'home-ach-list'},
+    h('span',{className:'home-ach-label'},'Last unlocked'),
+    a.latest.slice(0,2).map(function(x){ return h('div',{key:x.name,className:'home-ach',title:x.name+', unlocked '+x.when+', '+G.achievements.percent(x.pct)+' of players'},
+      h(G.AchievementBadge,{icon:x.art,name:x.name,tier:G.achievements.tierOf(x.pct),size:'sm'}),
+      h('span',{className:'home-ach-name'},x.name),
+      h('span',{className:'home-ach-when'},x.when)); })));
+}
+
+// Version 37 (KAN-125, KAN-126): the banner shows the game played last, then the next ones played, by its pager at the top
+// right, the wheel or Left and Right; a click on it, or Enter, opens the game's page.
+var SLIDES = [
+  {title:'Sekiro: Shadows Die Twice',art:ART,eyebrow:'Last played today, 21:04',chip:'61 hrs played',status:'synced',statusLabel:'Save synced \u00b7 21:06',blurb:'Your save at Ashina Castle is backed up and matches the laptop. 14 versions kept.'},
+  {title:'Terraria',art:COVERS[1],eyebrow:'Last played yesterday',chip:'214 hrs played',status:'synced',statusLabel:'Save synced',blurb:'Its saves are backed up on this PC and in your Google Drive.'},
+  {title:'Cuphead',art:COVERS[3],eyebrow:'Last played on 20 Sep',chip:'22 hrs played',status:'newer-in-cloud',blurb:'A newer save from LAPTOP is in the cloud; it comes down before you play.'},
+  {title:'Black Myth: Wukong',art:COVERS[4],eyebrow:'Last played on 18 Sep',chip:'74 hrs played',status:'held',blurb:'Its save changed while it wasn\u2019t running, so GameSync is holding it for you to look at.'},
+  {title:'Dark Souls III',art:COVERS[5],eyebrow:'Last played on 2 Sep',chip:'96 hrs played',status:'backup-only',statusLabel:'Synced by Steam',blurb:'Steam syncs its saves; GameSync keeps a backup on this PC too.'}
+];
 function App(){
- var needs=GAMES.filter(function(g){return ['conflict','held'].indexOf(g.status)>=0});
+ var slide = React.useState(0), shown = SLIDES[slide[0]];
+ var pager = {count:SLIDES.length,index:slide[0],names:SLIDES.map(function(s){return s.title}),onPick:slide[1],
+   onPrev:function(){slide[1]((slide[0]+SLIDES.length-1)%SLIDES.length)},onNext:function(){slide[1]((slide[0]+1)%SLIDES.length)}};
  return h(G.ThemeScope,{strength:'glass',art:ART,style:{width:1280,height:800,display:'flex'}},
   rail('home'),
   h('main',{style:{flex:1,minWidth:0,padding:'20px 24px',display:'flex',flexDirection:'column',gap:16}},
    topbar('Welcome back','Here\u2019s where you left off',
-     h(G.PillTabs,{label:'Library view',value:'recent',items:[{id:'all',label:'My games'},{id:'recent',label:'Recently played'},{id:'fav',label:'Favourites'},{id:'attn',label:'Needs you',count:2}]}),
-     [h(G.IconButton,{key:1,icon:'sync',label:'Sync now'}),
+     h(G.PillTabs,{label:'Library view',value:'recent',items:[{id:'recent',label:'Recently played'},{id:'all',label:'My games'},FINE?{id:'attn',label:'Conflicts'}:{id:'attn',label:'Conflicts',count:2,tone:'warn'}]}),
+     [UPDATE?h(G.Button,{key:0,size:'sm',variant:'secondary',icon:'download',title:'GameSync 1.0.1 is ready: GameSync closes, installs it and opens again in a few seconds'},'Restart to update'):null,
+      h(G.IconButton,{key:1,icon:'sync',label:'Sync now'}),
       NOCLOUD?h(G.Button,{key:2,size:'sm',variant:'secondary',icon:'cloud',title:'Every version is kept on this PC until a cloud is connected'},'Connect the cloud')
        :h(G.IconButton,{key:2,icon:'cloud',label:'Google Drive connected'}),
       h(G.IconButton,{key:3,icon:'monitor',label:'This PC: DESKTOP'})]),
    PLAYING
-     ? h(G.HeroBanner,{art:ART,eyebrow:'Playing now \u00b7 since 20:41 \u00b7 In its own folder',chip:'31 hrs played',title:'Ghost of Tsushima',status:'playing',statusLabel:'Playing now',
+     ? LEARNING ? h(G.HeroBanner,{art:ART,eyebrow:'Playing now \u00b7 since 21:04 \u00b7 In its own folder',chip:'4 hrs played',title:'ROUNDS',status:'playing',statusLabel:'Playing now',
+         blurb:'GameSync hasn\u2019t found where it saves, so learn mode is watching. When you quit, it shows you the places it wrote to; nothing syncs until you choose.',noPlay:true,style:{minHeight:340}})
+     : h(G.HeroBanner,{art:ART,eyebrow:'Playing now \u00b7 since 20:41 \u00b7 In its own folder',chip:'31 hrs played',title:'Ghost of Tsushima',status:'playing',statusLabel:'Playing now',
          blurb:'GameSync saw it start, so its play counts. Its saves aren\u2019t synced yet: sync them from its page when you\u2019re done.',noPlay:true,style:{minHeight:340}})
-     : h(G.HeroBanner,{art:ART,eyebrow:'Last played today, 21:04',chip:'61 hrs played',title:'Sekiro: Shadows Die Twice',status:'synced',statusLabel:'Save synced \u00b7 21:06',blurb:'Your save at Ashina Castle is backed up and matches the laptop. 14 versions kept.',style:{minHeight:340}}),
+     : NOACH ? h(G.HeroBanner,{art:ART,eyebrow:'Last played today, 20:12 · In its own folder',chip:'31 hrs played',title:'Ghost of Tsushima',status:'synced',statusLabel:'Save synced',
+         blurb:'Its saves are backed up on this PC and in your Google Drive.',style:{minHeight:340}})
+     : h(G.HeroBanner,{art:shown.art,eyebrow:shown.eyebrow,chip:shown.chip,title:shown.title,status:shown.status,statusLabel:shown.statusLabel,blurb:shown.blurb,style:{minHeight:340},
+         pager:pager,onOpen:function(){}}),
    h('div',{style:{display:'grid',gridTemplateColumns:'0.95fr 1.5fr 0.95fr',gap:16,flex:1,minHeight:0}},
-    h(G.Card,{title:'Needs you',action:h(G.IconButton,{icon:'chevronRight',label:'Open save manager'})},
-      needs.map(function(g){return h('div',{key:g.id,style:{display:'flex',gap:12,alignItems:'center'}},h('div',{style:{width:36,height:48,borderRadius:8,background:'url('+g.art+') center/cover',flexShrink:0}}),h('div',{style:{flex:1,minWidth:0}},h('div',{style:{fontWeight:600,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}},g.name),h(G.StatusBadge,{status:g.status,plain:true})),h(G.Button,{size:'sm',variant:'secondary'},g.status==='conflict'?'Resolve':'Review'))}),
-      h(G.ProgressBar,{value:83,label:'10 of 12 games synced',right:'83%'})),
+    achievements(),
     h(G.Card,{title:'Jump back in',action:h(G.IconButton,{icon:'chevronRight',label:'All games'})},
       h('div',{style:{display:'flex',gap:12}},(PLAYING?GAMES.slice(0,3).map(function(g){return g.status==='playing'?Object.assign({},g,{status:'synced'}):g}):GAMES.slice(1,4)).map(function(g){return h(G.GameTile,{key:g.id,name:g.name,art:g.art,status:g.status,width:'33%'})}))),
     h(G.Card,{title:'Activity in September'},h(G.ActivityGrid,{days:[0,1,2,1,3,0,0,1,2,3,2,1,1,3,0,2,1,0,3,3,2,1,0,1,2,3,1]})))));

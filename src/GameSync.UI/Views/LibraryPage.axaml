@@ -7,7 +7,12 @@
              x:DataType="vm:LibraryViewModel">
   <!-- The game library, like Steam's (design system → LibraryScreen): every game by name in a list on the left, with the
        search, the sort, Installed only and favourites first; the covers, or the page of the game picked, on the right. -->
-  <Grid ColumnDefinitions="272,*" ColumnSpacing="16" Margin="24,20">
+  <Grid ColumnSpacing="16" Margin="24,20">
+    <!-- The list grows a little with Windows' text size (A11Y-04) -->
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="{DynamicResource col-library-list}" />
+      <ColumnDefinition Width="*" />
+    </Grid.ColumnDefinitions>
 
     <!-- The list -->
     <c:GsCard Padding="12" AutomationProperties.Name="Your games">
@@ -21,7 +26,7 @@
             <Panel VerticalAlignment="Center">
               <Border BorderBrush="{DynamicResource line-200}" BorderThickness="1" CornerRadius="4" Padding="5,0" Margin="0,0,8,0" VerticalAlignment="Center"
                       IsVisible="{Binding ShowsShortcut}">
-                <TextBlock Text="Ctrl F" FontFamily="{DynamicResource font-mono}" FontSize="11" LineHeight="16" FontWeight="Medium" Foreground="{DynamicResource ink-faint}" />
+                <TextBlock Text="Ctrl F" FontFamily="{DynamicResource font-mono}" FontSize="{DynamicResource fs-11}" LineHeight="{DynamicResource lh-16}" FontWeight="Medium" Foreground="{DynamicResource ink-faint}" />
               </Border>
               <!-- While searching, how many match, before the clear button -->
               <TextBlock Classes="caption faint" Text="{Binding SearchCount}" IsVisible="{Binding !ShowsShortcut}" Margin="0,0,4,0" VerticalAlignment="Center"
@@ -35,19 +40,19 @@
 
         <!-- Installed only (KAN-47), kept on this PC like the order; the list's headings count the games -->
         <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="4,10,0,6">
-          <CheckBox Content="Installed" AutomationProperties.Name="Installed only" IsChecked="{Binding InstalledOnly}" FontSize="12" MinWidth="0" Padding="6,0,0,0" VerticalAlignment="Center"
+          <CheckBox Content="Installed" AutomationProperties.Name="Installed only" IsChecked="{Binding InstalledOnly}" FontSize="{DynamicResource fs-12}" MinWidth="0" Padding="6,0,0,0" VerticalAlignment="Center"
                     ToolTip.Tip="Only the games installed on this PC, in the list and the covers" />
           <c:GsButton Grid.Column="1" Classes="ghost sm" IconAfter="chevronDown" Content="{Binding SortLabel}"
                       AutomationProperties.Name="{Binding SortName}">
             <c:GsButton.Flyout>
               <MenuFlyout Placement="BottomEdgeAlignedRight">
-                <MenuItem Header="Recently played" ToggleType="CheckBox" IsChecked="{Binding SortsByRecent, Mode=OneWay}"
+                <c:GsMenuItem Header="Recently played" ToggleType="CheckBox" IsChecked="{Binding SortsByRecent, Mode=OneWay}"
                           Command="{Binding SortByCommand}" CommandParameter="RecentlyPlayed" />
-                <MenuItem Header="Name" ToggleType="CheckBox" IsChecked="{Binding SortsByName, Mode=OneWay}"
+                <c:GsMenuItem Header="Name" ToggleType="CheckBox" IsChecked="{Binding SortsByName, Mode=OneWay}"
                           Command="{Binding SortByCommand}" CommandParameter="Name" />
-                <MenuItem Header="Hours played" ToggleType="CheckBox" IsChecked="{Binding SortsByHours, Mode=OneWay}"
+                <c:GsMenuItem Header="Hours played" ToggleType="CheckBox" IsChecked="{Binding SortsByHours, Mode=OneWay}"
                           Command="{Binding SortByCommand}" CommandParameter="HoursPlayed" />
-                <MenuItem Header="Recently added" ToggleType="CheckBox" IsChecked="{Binding SortsByAdded, Mode=OneWay}"
+                <c:GsMenuItem Header="Recently added" ToggleType="CheckBox" IsChecked="{Binding SortsByAdded, Mode=OneWay}"
                           Command="{Binding SortByCommand}" CommandParameter="RecentlyAdded" />
               </MenuFlyout>
             </c:GsButton.Flyout>
@@ -57,7 +62,7 @@
         <ScrollViewer Name="ListScroller" HorizontalScrollBarVisibility="Disabled" Margin="0,0,-8,0" Padding="0,0,8,0">
           <Panel>
             <TextBlock Classes="caption faint" Text="{Binding Nothing}" TextWrapping="Wrap" Margin="8,8" IsVisible="{Binding HasNothing}" />
-            <ItemsControl Name="List" ItemsSource="{Binding ListItems}">
+            <ItemsControl Name="List" ItemsSource="{Binding ListItems}" KeyboardNavigation.TabNavigation="Once">
               <ItemsControl.ItemsPanel>
                 <ItemsPanelTemplate>
                   <StackPanel Spacing="2" />
@@ -83,18 +88,18 @@
                     </c:GsGameRow.IsCurrent>
                     <c:GsGameRow.ContextMenu>
                       <ContextMenu IsVisible="{Binding Game.HasMenu}">
-                        <MenuItem Header="Play" Command="{Binding Game.PlayCommand}" IsVisible="{Binding Game.PlayCommand, Converter={x:Static ObjectConverters.IsNotNull}}">
-                          <MenuItem.Icon><c:GsIcon Icon="play" Size="16" /></MenuItem.Icon>
-                        </MenuItem>
+                        <c:GsMenuItem Header="Play" Command="{Binding Game.PlayCommand}" IsVisible="{Binding Game.PlayCommand, Converter={x:Static ObjectConverters.IsNotNull}}">
+                          <c:GsMenuItem.Icon><c:GsIcon Icon="play" Size="16" /></c:GsMenuItem.Icon>
+                        </c:GsMenuItem>
                         <Separator IsVisible="{Binding Game.PlayCommand, Converter={x:Static ObjectConverters.IsNotNull}}" />
-                        <MenuItem Header="{Binding Game.FavouriteLabel}" Command="{Binding Game.ToggleFavourite}">
-                          <MenuItem.Icon><c:GsIcon Icon="star" Size="16" Filled="{Binding Game.IsFavourite}" /></MenuItem.Icon>
-                        </MenuItem>
-                        <MenuItem Header="{Binding Game.HideLabel}" Command="{Binding Game.ToggleHidden}" />
+                        <c:GsMenuItem Header="{Binding Game.FavouriteLabel}" Command="{Binding Game.ToggleFavourite}">
+                          <c:GsMenuItem.Icon><c:GsIcon Icon="star" Size="16" Filled="{Binding Game.IsFavourite}" /></c:GsMenuItem.Icon>
+                        </c:GsMenuItem>
+                        <c:GsMenuItem Header="{Binding Game.HideLabel}" Command="{Binding Game.ToggleHidden}" />
                         <Separator IsVisible="{Binding Game.HasProperties}" />
-                        <MenuItem Header="Properties" Command="{Binding Game.PropertiesCommand}" IsVisible="{Binding Game.HasProperties}">
-                          <MenuItem.Icon><c:GsIcon Icon="settings" Size="16" /></MenuItem.Icon>
-                        </MenuItem>
+                        <c:GsMenuItem Header="Properties" Command="{Binding Game.PropertiesCommand}" IsVisible="{Binding Game.HasProperties}">
+                          <c:GsMenuItem.Icon><c:GsIcon Icon="settings" Size="16" /></c:GsMenuItem.Icon>
+                        </c:GsMenuItem>
                       </ContextMenu>
                     </c:GsGameRow.ContextMenu>
                   </c:GsGameRow>
@@ -111,7 +116,7 @@
       <DockPanel IsVisible="{Binding ShowsCovers}">
         <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="16" Margin="0,0,0,16">
           <StackPanel VerticalAlignment="Center">
-            <TextBlock Text="{Binding Title}" FontSize="15" LineHeight="20" FontWeight="SemiBold" />
+            <TextBlock Text="{Binding Title}" FontSize="{DynamicResource fs-15}" LineHeight="{DynamicResource lh-20}" FontWeight="SemiBold" />
             <TextBlock Classes="caption faint" Text="{Binding Subtitle}" TextTrimming="CharacterEllipsis" />
           </StackPanel>
           <c:GsPillTabs Grid.Column="1" ItemsSource="{Binding Tabs}" SelectedId="{Binding SelectedTab, Mode=TwoWay}" AutomationProperties.Name="Library view"
@@ -126,12 +131,12 @@
           <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="14">
             <c:GsIcon Icon="folder" Size="18" Foreground="{DynamicResource ink-muted}" VerticalAlignment="Center" />
             <StackPanel Grid.Column="1" Spacing="6" VerticalAlignment="Center">
-              <TextBlock Classes="muted" FontSize="13" LineHeight="19" TextWrapping="Wrap"
+              <TextBlock Classes="muted" FontSize="{DynamicResource fs-13}" LineHeight="{DynamicResource lh-19}" TextWrapping="Wrap"
                          Text="Games in their own folders, started without a store's launcher. GameSync finds them in the folders you give it, such as G:\ or E:\Games." />
               <TextBlock Classes="caption" Text="{Binding ScanNote}" TextWrapping="Wrap" IsVisible="{Binding HasScanNote}" />
             </StackPanel>
             <c:GsButton Grid.Column="2" Classes="sm" Icon="search" Content="{Binding ScanLabel}" Click="ScanFolder" VerticalAlignment="Center"
-                        IsEnabled="{Binding !IsScanning}" IsVisible="{Binding CanScan}"
+                        IsEnabled="{Binding !IsScanning}" IsVisible="{Binding CanScan}" IsBusy="{Binding IsScanning}" BusyText="Scanning"
                         ToolTip.Tip="Pick a folder of games; GameSync looks in it now and at every scan" />
           </Grid>
         </c:GsCard>
@@ -142,7 +147,8 @@
           <StackPanel Spacing="12" Margin="6,6,6,8">
             <TextBlock Classes="caption faint" Text="{Binding Nothing}" TextWrapping="Wrap" IsVisible="{Binding HasNothing}" />
             <TextBlock Classes="overline faint" Text="FAVOURITES" IsVisible="{Binding HasFavouriteTiles}" />
-            <ItemsControl ItemsSource="{Binding FavouriteTiles}" IsVisible="{Binding HasFavouriteTiles}" Margin="0,0,0,12" ClipToBounds="False">
+            <ItemsControl Name="FavouriteCovers" ItemsSource="{Binding FavouriteTiles}" IsVisible="{Binding HasFavouriteTiles}" Margin="0,0,0,12" ClipToBounds="False"
+                          KeyboardNavigation.TabNavigation="Once">
               <ItemsControl.ItemsPanel>
                 <ItemsPanelTemplate>
                   <c:TilesPanel />
@@ -155,7 +161,8 @@
               </ItemsControl.ItemTemplate>
             </ItemsControl>
             <TextBlock Classes="overline faint" Text="{Binding OtherHeading, Converter={x:Static c:UpperConverter.Instance}}" IsVisible="{Binding HasFavouriteTiles}" />
-            <ItemsControl ItemsSource="{Binding OtherTiles}" ClipToBounds="False">
+            <!-- A11Y-02: the covers are one Tab stop; the arrow keys go from cover to cover -->
+            <ItemsControl Name="OtherCovers" ItemsSource="{Binding OtherTiles}" ClipToBounds="False" KeyboardNavigation.TabNavigation="Once">
               <ItemsControl.ItemsPanel>
                 <ItemsPanelTemplate>
                   <c:TilesPanel />
@@ -170,7 +177,8 @@
           </StackPanel>
         </ScrollViewer>
       </DockPanel>
-      <ContentControl Content="{Binding Page}" IsVisible="{Binding !ShowsCovers}" />
+      <!-- A game's page, or its achievements, every one, over it -->
+      <ContentControl Content="{Binding Shown}" IsVisible="{Binding !ShowsCovers}" />
     </Panel>
   </Grid>
 </UserControl>

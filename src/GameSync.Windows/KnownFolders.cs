@@ -7,6 +7,10 @@ public static class KnownFolders
 {
     private static readonly Guid LocalAppDataLow = new("A520A1A4-1780-4FF6-BD18-167343C5AF16");
     private static readonly Guid SavedGames = new("4C5C32FF-BB9D-43B0-B5B4-2D72E54EAAA4");
+    private static readonly Guid DownloadsFolder = new("374DE290-123F-4565-9164-39C4925E467B");
+
+    /// <summary>The person's Downloads folder, where shared zips go unless they choose another (FOLD-09); null when Windows doesn't say.</summary>
+    public static string? Downloads() => Get(DownloadsFolder);
 
     public static IReadOnlyDictionary<string, string> ForThisPc()
     {

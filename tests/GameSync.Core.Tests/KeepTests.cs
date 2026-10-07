@@ -18,6 +18,40 @@ public class KeepTests
     private static readonly GameId Bloodborne = GameId.Parse("bloodborne");
 
     [Fact]
+    public async Task KAN_23_add_a_place_on_a_game_not_syncing_yet_starts_it_syncing_with_that_place_alone()
+    {
+        using var world = new TestWorld();
+        var data = Path.Combine(world.Root, "data");
+        new AppConfig { Remote = world.Cloud, Games = [] }.Save(data);
+        var found = Path.Combine(world.Root, "Emulator", "savedata", "CUSA00207");
+        Write(Path.Combine(found, "SPRJ0005", "userdata0000"), "found by the scan");
+        var mine = Path.Combine(world.Root, "Elsewhere", "Bloodborne saves");
+        Write(Path.Combine(mine, "userdata0000"), "the real save");
+        using (var library = new LibraryStore(data))
+        {
+            library.SaveAll([new LibraryEntry
+            {
+                Id = Bloodborne,
+                Title = "Bloodborne",
+                FirstSeenUtc = DateTime.UtcNow,
+                Installed = true,
+                Store = StoreKind.Loose,
+                InstallDir = Path.Combine(world.Root, "Games", "Bloodborne"),
+                Proposals = [new Proposal(FoundBy.NameSearch, RootResolver.ToPortable(found, Cli.FoldersForThisPc()), "**", SaveCategory.Save, 1, 17, null)],
+            }]);
+        }
+
+        var said = await GameSettings.ApplyAsync(data, Bloodborne, new GamePropertiesChange { AddPlace = mine }, () => { }, Ct);
+
+        Assert.StartsWith("Bloodborne: syncing from now on, a new place, ", said, StringComparison.Ordinal);
+        using var engine = Engine.Open(data);
+        var game = engine.Games.Single(g => g.Id == Bloodborne);
+        Assert.Equal(GameMode.Sync, game.Mode);
+        Assert.Equal([Path.GetFullPath(mine)], game.Roots.Values.Select(r => Path.GetFullPath(r)));
+        Assert.True(LauncherData.Read(data, DateTime.Now).Games.Single(g => g.Id == Bloodborne).Syncs);
+    }
+
+    [Fact]
     public async Task KAN_63_a_named_save_before_syncing_keeps_the_game_backed_up_but_not_synced_between_PCs()
     {
         using var world = new TestWorld();
@@ -51,6 +85,7 @@ public class KeepTests
 
         // Save as… on a game not syncing yet: it's kept, backed up only, and the named save is there.
         await AppActions.SaveAsAsync(data, Bloodborne, "Before Orphan of Kos", output, Ct);
+        await Uploads.RunAsync(data, null, Ct);
         using (var engine = Engine.Open(data))
         {
             Assert.Equal(GameMode.BackupOnly, engine.Games.Single(g => g.Id == Bloodborne).Mode);

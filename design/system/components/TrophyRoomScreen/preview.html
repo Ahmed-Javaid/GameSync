@@ -1,0 +1,169 @@
+<!-- @dsCard group="Screens" height=860 width=1280 page=true subtitle="Achievements, the rail's trophy: every game's together, your Zeniths, what's closest to one, recent unlocks, what's within reach and every game (#games, #none)" -->
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>preview</title>
+<style>
+html,body{margin:0;background:var(--bg-100);}
+.tr-page{flex:1;min-width:0;overflow:auto;padding:20px 24px;display:flex;flex-direction:column;gap:16px;scrollbar-width:thin;scrollbar-color:var(--bg-400) transparent}
+.tr-page > *{flex-shrink:0}
+.tr-top{display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:40px}
+.tr-band{position:relative;display:flex;align-items:center;gap:32px;padding:24px 276px 24px 28px;border-radius:var(--radius-lg);background:var(--bg-200);border:1px solid var(--edge-card);box-shadow:var(--lift-card);overflow:hidden;min-height:180px;box-sizing:border-box}
+.tr-band > *{position:relative}
+.tr-band > .gs-trophies{position:absolute}
+.tr-stats{flex:1;display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,2.2fr) minmax(0,.9fr) minmax(0,1.5fr);gap:20px;align-items:center}
+.tr-zenith-stat{display:flex;align-items:center;gap:16px;min-width:0}
+.tr-monument{margin:-18px 0 -14px -6px}
+.tr-zenith-text{display:flex;flex-direction:column;gap:2px;min-width:0}
+.tr-zenith-count{font:600 56px/62px var(--font-mono);letter-spacing:-1.5px;color:var(--ink-faint)}
+.tr-zenith-count.is-earned{background:linear-gradient(90deg,var(--zenith-ink),var(--zenith-ink-deep));-webkit-background-clip:text;background-clip:text;color:transparent}
+.tr-stat{display:flex;flex-direction:column;gap:6px;min-width:0}
+.tr-stat-label{font:600 11px/14px var(--font-sans);letter-spacing:.12em;text-transform:uppercase;color:var(--ink-faint)}
+.tr-stat-value{font:600 30px/36px var(--font-mono);color:var(--ink);letter-spacing:-.02em}
+.tr-stat-sub{font:400 12px/16px var(--font-sans);color:var(--ink-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tr-grid{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);grid-auto-rows:auto;gap:16px;align-items:stretch}
+.tr-grid > *{min-width:0}
+.tr-zeniths{position:relative;overflow:hidden}
+.tr-zeniths > *{position:relative}
+.tr-zeniths > .tr-zenith-corner{position:absolute;right:0;bottom:0;opacity:.13;pointer-events:none}
+[data-theme="light"] .tr-zeniths > .tr-zenith-corner{opacity:.1}
+.tr-reach{min-height:54px}
+.tr-shelf{display:flex;gap:16px;flex-wrap:wrap}
+.tr-z{position:relative;width:118px;display:flex;flex-direction:column;gap:6px}
+.tr-z-cover{position:relative;width:118px;height:177px;border-radius:14px;background:center/cover;box-shadow:0 0 0 1px rgba(238,247,255,.35),0 10px 30px -12px rgba(155,182,205,.7)}
+.tr-z-cover .gs-zenith{position:absolute;right:-8px;bottom:-8px}
+.tr-z-name{font:500 12px/16px var(--font-sans);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tr-z-when{font:400 11px/14px var(--font-sans);color:var(--ink-faint)}
+.tr-close{display:grid;grid-template-columns:36px minmax(0,1fr) auto;align-items:center;gap:12px;padding:6px 0}
+.tr-cover{width:36px;height:54px;border-radius:7px;background:center/cover;box-shadow:0 0 0 1px var(--edge-art,rgba(255,255,255,.08))}
+.tr-close-name{font:500 13px/18px var(--font-sans);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tr-togo{font:500 12px/16px var(--font-mono);color:var(--ink-muted);white-space:nowrap}
+.tr-recent{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:12px;padding:6px 0}
+.tr-recent-text{display:flex;flex-direction:column;min-width:0}
+.tr-recent-name{font:500 13px/18px var(--font-sans);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tr-recent-game{font:400 12px/16px var(--font-sans);color:var(--ink-faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tr-recent-when{font:400 12px/16px var(--font-sans);color:var(--ink-faint);white-space:nowrap}
+.tr-reach-pct{font:500 12px/16px var(--font-mono);color:var(--ink-muted);white-space:nowrap}
+.tr-table{width:100%;border-collapse:collapse}
+.tr-table th{font:600 11px/14px var(--font-sans);letter-spacing:.12em;text-transform:uppercase;color:var(--ink-faint);text-align:left;padding:8px 12px;border-bottom:1px solid var(--line-100)}
+.tr-table td{padding:10px 12px;border-bottom:1px solid var(--line-100);font:400 13px/18px var(--font-sans);color:var(--ink);vertical-align:middle}
+.tr-table tr:hover td{background:var(--bg-300);cursor:pointer}
+.tr-game{display:flex;align-items:center;gap:12px;min-width:0}
+.tr-game-name{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tr-num{font-family:var(--font-mono);white-space:nowrap}
+.tr-bar{display:flex;align-items:center;gap:10px;min-width:160px}
+.tr-bar .gs-progress{flex:1}
+.tr-tiers{display:flex;gap:12px}
+.tr-empty{font:400 13px/19px var(--font-sans);color:var(--ink-muted)}
+</style>
+</head>
+<body class="gs-root">
+<div id="root" style="width:1280px;height:860px;display:flex"></div>
+<script>
+var G = window.GameSync, h = React.createElement, useEffect = React.useEffect;
+var A = G.achievements;
+function achIcon(seed){ var hues=[18,200,280,140,45,340,180,95], marks=['M50 16 L60 40 L86 40 L65 57 L73 84 L50 68 L27 84 L35 57 L14 40 L40 40Z','M50 14 L80 30 L80 56 C80 73 66 83 50 90 C34 83 20 73 20 56 L20 30Z','M50 16 C66 36 76 50 76 64 A26 26 0 0 1 24 64 C24 50 34 36 50 16Z','M20 76 L50 20 L80 76Z','M28 28 L72 72 M72 28 L28 72','M26 50 A24 24 0 1 0 74 50 A24 24 0 1 0 26 50'];
+  var hu=hues[seed%hues.length], m=marks[seed%marks.length];
+  var svg="<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><defs><radialGradient id='g' cx='30%' cy='25%' r='95%'><stop offset='0' stop-color='hsl("+hu+",72%,62%)'/><stop offset='1' stop-color='hsl("+hu+",45%,12%)'/></radialGradient></defs><rect width='100' height='100' fill='url(#g)'/><path d='"+m+"' fill='rgba(255,255,255,.18)' stroke='rgba(255,255,255,.92)' stroke-width='5' stroke-linejoin='round' stroke-linecap='round'/></svg>";
+  return "data:image/svg+xml,"+encodeURIComponent(svg); }
+function cover(hue){ var svg="<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 300'><defs><linearGradient id='c' x1='0' y1='0' x2='0' y2='1'><stop offset='0' stop-color='hsl("+hue+",45%,30%)'/><stop offset='1' stop-color='hsl("+hue+",40%,10%)'/></linearGradient></defs><rect width='200' height='300' fill='url(#c)'/><circle cx='140' cy='90' r='38' fill='hsl("+hue+",70%,70%)' opacity='.45'/><path d='M0 220 L70 160 L130 210 L200 150 V300 H0Z' fill='hsl("+hue+",60%,55%)' opacity='.35'/></svg>";
+  return "data:image/svg+xml,"+encodeURIComponent(svg).replace(/\(/g,'%28').replace(/\)/g,'%29').replace(/'/g,'%27'); }
+// The backdrop in Glossy: the last game played, as the app does with no game of the page's own.
+var ART = "linear-gradient(135deg,#123a4a 0%,#0b1d2a 40%,#2a1830 75%,#3a2a12 100%)";
+// #none: no Zenith yet.
+var NONE = location.hash === '#none';
+var GAMES = [
+  {id:'apex',name:'Apex Legends',done:12,total:12,last:'3 Jan 2021',hue:15,tiers:{gold:2,silver:4,bronze:6}},
+  {id:'cs2',name:'Counter-Strike 2',done:1,total:1,last:'1 Oct',hue:30,tiers:{gold:0,silver:0,bronze:1}},
+  {id:'sekiro',name:'Sekiro: Shadows Die Twice',done:34,total:34,last:'2 Oct',hue:5,tiers:{gold:4,silver:11,bronze:19}},
+  {id:'ror2',name:'Risk of Rain 2',done:123,total:171,last:'20 Feb',hue:195,tiers:{gold:21,silver:48,bronze:54}},
+  {id:'rocket',name:'Rocket League',done:61,total:88,last:'12 Aug',hue:220,tiers:{gold:6,silver:19,bronze:36}},
+  {id:'nfs',name:'Need for Speed',done:29,total:45,last:'4 Jul',hue:120,tiers:{gold:3,silver:8,bronze:18}},
+  {id:'bloons',name:'Bloons TD 6',done:63,total:156,last:'28 Sep',hue:90,tiers:{gold:7,silver:20,bronze:36}},
+  {id:'core',name:'Core Keeper',done:26,total:59,last:'23 Sep',hue:160,tiers:{gold:3,silver:8,bronze:15}},
+  {id:'l4d2',name:'Left 4 Dead 2',done:21,total:101,last:'2 May',hue:0,tiers:{gold:2,silver:5,bronze:14}},
+  {id:'valheim',name:'Valheim',done:1,total:53,last:'22 Sep',hue:35,tiers:{gold:0,silver:0,bronze:1}},
+  {id:'geo',name:'GeoGuessr',done:8,total:45,last:'15 Jun',hue:140,tiers:{gold:2,silver:3,bronze:3}}
+];
+if (NONE) GAMES = GAMES.map(function(g){ return g.done>=g.total ? Object.assign({},g,{done:g.total-1}) : g; });
+var RECENT = [{name:'Shura',game:'Sekiro: Shadows Die Twice',when:'2 Oct',pct:9.1,i:0},{name:'Isshin Ashina',game:'Sekiro: Shadows Die Twice',when:'2 Oct',pct:4.2,i:4},
+  {name:'A New Beginning',game:'Counter-Strike 2',when:'1 Oct',pct:41,i:3},{name:'Bloon Master',game:'Bloons TD 6',when:'28 Sep',pct:12,i:2},{name:'Deep Diver',game:'Core Keeper',when:'23 Sep',pct:31,i:1}];
+// Within reach: locked achievements most of Steam's players have, in the games you've started.
+var REACH = [{name:'The Lumberjack',game:'Valheim',pct:68.2,i:5},{name:'Ending a Run',game:'Risk of Rain 2',pct:64.9,i:3},{name:'Rookie Driver',game:'Need for Speed',pct:61.3,i:1},
+  {name:'Monkey Business',game:'Bloons TD 6',pct:58.7,i:2},{name:'Spelunker',game:'Core Keeper',pct:55.1,i:0}];
+function rail(){return h(G.SideRail,{current:'achievements',items:[
+  {id:'search',icon:'search',label:'Search'},{id:'home',icon:'home',label:'Home',sep:true},
+  {id:'library',icon:'library',label:'Game library'},{id:'achievements',icon:'trophy',label:'Achievements'},
+  {id:'saves',icon:'saves',label:'Save manager',sep:true},{id:'log',icon:'terminal',label:'Console'},{id:'settings',icon:'settings',label:'Settings',bottom:true}]})}
+function App(){
+  useEffect(function(){ if(location.hash==='#games'){ var t=document.querySelector('.tr-table'); if(t) t.closest('.gs-card').scrollIntoView({block:'start'}); } },[]);
+  var unlocked = GAMES.reduce(function(s,g){return s+g.done},0);
+  // The average, as Steam reckons it: of the games with at least one unlocked.
+  var started = GAMES.filter(function(g){return g.done>0});
+  var avg = Math.round(started.reduce(function(s,g){return s+100*g.done/g.total},0)/Math.max(1,started.length));
+  var zeniths = GAMES.filter(function(g){return g.done>=g.total});
+  var tiers = {gold:0,silver:0,bronze:0}; GAMES.forEach(function(g){ tiers.gold+=g.tiers.gold; tiers.silver+=g.tiers.silver; tiers.bronze+=g.tiers.bronze; });
+  var close = GAMES.filter(function(g){return g.done<g.total && g.done>0}).sort(function(a,b){return b.done/b.total-a.done/a.total}).slice(0,5);
+  return [rail(),
+    h('main',{key:'m',className:'tr-page'},
+      h('header',{className:'tr-top'},
+        h('div',null,h('div',{style:{font:'600 15px/20px var(--font-sans)'}},'Achievements'),h('div',{className:'gs-faint',style:{fontSize:12}},'Every game’s: from Steam on this PC, and your other copies’ own records')),
+        h(G.Button,{size:'sm',variant:'ghost',icon:'sync',title:'Asks Steam again how rare each is, for every game'},'Refresh rarity')),
+      h('section',{className:'tr-band','aria-label':'Your achievements in all'},
+        h(G.TrophyRise),
+        h(G.ProgressRing,{value:avg,size:132,label:avg+'%',sub:'average',ariaLabel:'Average completion of the games you’ve started: '+avg+'%'}),
+        h('div',{className:'tr-stats'},
+          h('div',{className:'tr-stat'},h('span',{className:'tr-stat-label'},'Unlocked'),h('span',{className:'tr-stat-value'},unlocked.toLocaleString('en-GB')),h('span',{className:'tr-stat-sub'},'across '+started.length+' games')),
+          // Version 40 (the owner: "I want it to be bigger, take more space. It needs to look mighty, something thats monumental"):
+          // the Zeniths monument, its count in big numerals in the Zenith's own colour, "Latest:" over the game's name.
+          h('div',{className:'tr-zenith-stat','aria-label':zeniths.length?'Zeniths: '+zeniths.length+', the latest '+zeniths[zeniths.length-1].name:'Zeniths: none yet'},
+            h(G.ZenithMonument,{earned:zeniths.length>0,width:132,height:116,className:'tr-monument'}),
+            h('div',{className:'tr-zenith-text'},
+              h('span',{className:'tr-stat-label'},'Zeniths'),
+              h('span',{className:'tr-zenith-count'+(zeniths.length?' is-earned':'')},zeniths.length),
+              zeniths.length?h('span',{className:'tr-stat-sub',style:{whiteSpace:'normal'}},'Latest:',h('br'),zeniths[zeniths.length-1].name):h('span',{className:'tr-stat-sub'},'None yet'))),
+          h('div',{className:'tr-stat'},h('span',{className:'tr-stat-label'},'Tiers'),
+            h('div',{className:'gs-stack',style:{gap:4,marginTop:2}},h(G.TierChip,{tier:'gold',count:tiers.gold}),h(G.TierChip,{tier:'silver',count:tiers.silver}),h(G.TierChip,{tier:'bronze',count:tiers.bronze}))),
+          h('div',{className:'tr-stat'},h('span',{className:'tr-stat-label'},'Rarest you have'),
+            h('div',{style:{display:'flex',alignItems:'center',gap:12,minWidth:0}},h(G.AchievementBadge,{icon:achIcon(5),name:'Unranked Team Duelist III',tier:'gold',size:'sm'}),
+              h('div',{style:{display:'flex',flexDirection:'column',minWidth:0}},h('span',{style:{font:'600 13px/18px var(--font-sans)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}},'Unranked Team Duelist III'),
+                h('span',{className:'tr-stat-sub'},'GeoGuessr · 0.6% of players')))))),
+      // Version 37 (the owner: "I really dont like this weird gap left by close to a Zenith and within reach"): two rows the
+      // columns share, each card filling its cell, so the cards beside each other start and end together.
+      h('div',{className:'tr-grid'},
+          h(G.Card,{className:'tr-zeniths',title:'Zeniths',label:'Zeniths',lead:h(G.TierBanner,{tier:'zenith',size:34}),subtitle:'Every achievement of a game unlocked'},
+            h(G.ZenithScene,{className:'tr-zenith-corner'}),
+            zeniths.length ? h('div',{className:'tr-shelf'},zeniths.map(function(g){ return h('div',{key:g.id,className:'tr-z',title:g.name+': Zenith, '+g.last},
+                h('div',{className:'tr-z-cover',style:{backgroundImage:'url("'+cover(g.hue)+'")'}},h(G.ZenithMedal,{earned:true,size:34})),
+                h('span',{className:'tr-z-name'},g.name),h('span',{className:'tr-z-when'},'Zenith · '+g.last)); }))
+              : h('div',{className:'tr-empty'},'None yet. '+close[0].name+' is closest: '+(close[0].total-close[0].done)+' to go.')),
+          h(G.Card,{title:'Recent unlocks'},
+            RECENT.map(function(r){ return h('div',{key:r.name,className:'tr-recent'},
+              h(G.AchievementBadge,{icon:achIcon(r.i),name:r.name,tier:A.tierOf(r.pct),size:'sm'}),
+              h('div',{className:'tr-recent-text'},h('span',{className:'tr-recent-name'},r.name),h('span',{className:'tr-recent-game'},r.game+' · '+A.percent(r.pct)+' of players')),
+              h('span',{className:'tr-recent-when'},r.when)); })),
+          h(G.Card,{title:'Closest to a Zenith',subtitle:'The games you’ve started, by how far you are'},
+            close.map(function(g){ var p=Math.floor(100*g.done/g.total); return h('div',{key:g.id,className:'tr-close'},
+              h('span',{className:'tr-cover',style:{backgroundImage:'url("'+cover(g.hue)+'")'}}),
+              h('div',{className:'gs-stack',style:{gap:6,minWidth:0}},h('span',{className:'tr-close-name'},g.name),h(G.ProgressBar,{value:p,ariaLabel:g.name+': '+p+'%'})),
+              h('span',{className:'tr-togo'},p+'% · '+(g.total-g.done)+' to go')); })),
+          h(G.Card,{title:'Within reach',subtitle:'Locked ones most players have, in games you’ve started'},
+            REACH.map(function(r){ return h('div',{key:r.name,className:'tr-recent tr-reach',title:r.name+', '+r.game+': locked, '+A.percent(r.pct)+' of players have it'},
+              h(G.AchievementBadge,{icon:achIcon(r.i),name:r.name,state:'locked',size:'sm'}),
+              h('div',{className:'tr-recent-text'},h('span',{className:'tr-recent-name'},r.name),h('span',{className:'tr-recent-game'},r.game)),
+              h('span',{className:'tr-reach-pct'},A.percent(r.pct))); }))),
+      h(G.Card,{title:'Every game',subtitle:GAMES.length+' games with achievements on this PC'},
+        h('table',{className:'tr-table'},
+          h('thead',null,h('tr',null,h('th',null,'Game'),h('th',null,'Progress'),h('th',null,'Unlocked'),h('th',null,'Tiers'),h('th',null,'Last unlocked'))),
+          h('tbody',null,GAMES.slice().sort(function(a,b){return b.done/b.total-a.done/a.total}).map(function(g){ var p=Math.floor(100*g.done/g.total), all=g.done>=g.total;
+            return h('tr',{key:g.id},
+              h('td',null,h('div',{className:'tr-game'},h('span',{className:'tr-cover',style:{width:28,height:42,backgroundImage:'url("'+cover(g.hue)+'")'}}),h('span',{className:'tr-game-name'},g.name),all?h(G.ZenithMedal,{earned:true,size:22}):null)),
+              h('td',null,h('div',{className:'tr-bar'},h(G.ProgressBar,{value:p,ariaLabel:p+'%'}),h('span',{className:'tr-num'},p+'%'))),
+              h('td',{className:'tr-num'},g.done+' / '+g.total),
+              h('td',null,h('div',{className:'tr-tiers'},h(G.TierChip,{tier:'gold',count:g.tiers.gold,label:''}),h(G.TierChip,{tier:'silver',count:g.tiers.silver,label:''}),h(G.TierChip,{tier:'bronze',count:g.tiers.bronze,label:''}))),
+              h('td',null,g.last)); })))))];
+}
+// Full glass in Glossy, as Home and the library (version 35; the owner: "the trophy room cards need a bit more transparency").
+ReactDOM.createRoot(document.getElementById('root')).render(h(G.ThemeScope,{strength:'glass',art:ART,style:{width:1280,height:860,display:'flex'}},h(App)));
+</script>
+</body>
+</html>

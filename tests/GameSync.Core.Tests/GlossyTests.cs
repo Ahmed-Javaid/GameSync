@@ -46,23 +46,49 @@ public class GlossyTests
         Assert.Equal(Look.Glossy, Look.Load(pc.State).Surface);
     }
 
+    /// <summary>KAN-78 (the owner, 3 Oct 2026: "there isn't even any difference in glossy/solid in light mode"): light has its own Glossy.</summary>
     [Fact]
-    public void LOOK_18_glossy_goes_solid_in_light_mode_with_pure_black_and_without_transparency_effects()
+    public void LOOK_18_glossy_goes_solid_with_pure_black_and_without_transparency_effects_and_light_mode_has_its_own()
     {
         var look = new Look();
         var dark = look.Resolve(windowsLight: false, null);
         Assert.True(look.ShowsGlossy(dark, transparencyOn: true));
         Assert.False(look.ShowsGlossy(dark, transparencyOn: false));
-        Assert.False(look.ShowsGlossy((look with { Mode = Look.Light }).Resolve(false, null), true));
+        Assert.True(look.ShowsGlossy((look with { Mode = Look.Light }).Resolve(false, null), true));
         Assert.False(look.ShowsGlossy((look with { PureBlack = true }).Resolve(false, null), true));
+        Assert.True(look.ShowsGlossy((look with { Mode = Look.Light, PureBlack = true }).Resolve(false, null), true));
         Assert.False((look with { Surface = Look.Solid }).ShowsGlossy(dark, true));
+        Assert.False((look with { Mode = Look.Light, Surface = Look.Solid }).ShowsGlossy(look.Resolve(true, null), true));
 
         var matchWindows = look with { Mode = Look.MatchWindows };
         Assert.True(matchWindows.ShowsGlossy(matchWindows.Resolve(windowsLight: false, null), true));
-        Assert.False(matchWindows.ShowsGlossy(matchWindows.Resolve(windowsLight: true, null), true));
+        Assert.True(matchWindows.ShowsGlossy(matchWindows.Resolve(windowsLight: true, null), true));
 
-        Assert.Null(ThemeEngine.Glass(new ThemeChoice(Mode: ThemeMode.Light), GlassStrength.Glass));
+        var light = ThemeEngine.Glass(new ThemeChoice(Mode: ThemeMode.Light), GlassStrength.Glass);
+        Assert.NotNull(light);
+        Assert.True(light.Lightens);
+        Assert.Equal("rgba(255, 255, 255, 0.6)", light.Tokens["bg-200"]);
+        Assert.False(ThemeEngine.Glass(new ThemeChoice(), GlassStrength.Glass)!.Lightens);
         Assert.Null(ThemeEngine.Glass(new ThemeChoice(PureBlack: true), GlassStrength.Home));
+    }
+
+    /// <summary>KAN-78: light Solid's cards stand off its page: a grey page, white cards with an edge and a soft lift.</summary>
+    [Fact]
+    public void LOOK_09_light_solid_puts_white_cards_with_an_edge_and_a_lift_on_a_grey_page()
+    {
+        foreach (var preset in ThemeEngine.Presets)
+        {
+            var t = ThemeEngine.Build(new ThemeChoice(preset.Id, ThemeMode.Light));
+            Assert.True(ThemeEngine.Contrast(t["bg-200"], t["bg-100"]) >= 1.18, $"{preset.Id}: cards and page are too alike.");
+            Assert.NotEqual(0, ThemeService.ParseColor(t["edge-card"]).A);
+            Assert.False(ThemeService.ParseShadow(t["lift-card"])[0].IsInset);
+            Assert.Equal(0, ThemeService.ParseColor(t["edge-control"]).A);
+        }
+
+        // Dark Solid stays as it was: no edges and no lift.
+        var dark = ThemeEngine.Build(new ThemeChoice());
+        Assert.Equal(0, ThemeService.ParseColor(dark["edge-card"]).A);
+        Assert.Equal("none", dark["lift-card"]);
     }
 
     [Fact]
@@ -101,16 +127,22 @@ public class GlossyTests
         Assert.False(dialog.IsInset);
         Assert.Equal((0d, 24d, 64d), (dialog.OffsetX, dialog.OffsetY, dialog.Blur));
         Assert.Equal(Color.FromArgb(153, 0, 0, 0), dialog.Color);
+
+        // Light mode's lift under a card (design system version 35).
+        var light = ThemeService.ParseShadow("0 1px 3px rgba(25, 34, 46, 0.08)")[0];
+        Assert.False(light.IsInset);
+        Assert.Equal((0d, 1d, 3d), (light.OffsetX, light.OffsetY, light.Blur));
+        Assert.Equal(Color.FromArgb(20, 25, 34, 46), light.Color);
     }
 
-    /// <summary>LOOK-18: every dark theme, every strength, every worst-case picture: text keeps 4.5:1 and controls 3:1.</summary>
+    /// <summary>LOOK-18: every theme, dark and light, every strength, every worst-case picture: text keeps 4.5:1 and controls 3:1.</summary>
     [Fact]
     public void LOOK_18_text_keeps_its_contrast_over_any_art()
     {
         // As the app makes them: softened, then their colour tamed.
         var softened = Pictures.Select(p => (p.Name, Soft: Backdrop.Tame(Backdrop.Soften(p.Bgra, PictureWidth, PictureHeight)))).ToList();
         var failures = new ConcurrentBag<string>();
-        Parallel.ForEach(DarkChoices(), choice =>
+        Parallel.ForEach(DarkChoices().Concat(DarkChoices().Select(c => c with { Mode = ThemeMode.Light })), choice =>
         {
             var theme = ThemeEngine.Build(choice);
             foreach (var strength in Enum.GetValues<GlassStrength>())
@@ -118,7 +150,7 @@ public class GlossyTests
                 var glass = ThemeEngine.Glass(choice, strength)!;
                 foreach (var (name, soft) in softened)
                 {
-                    var margin = Backdrop.WorstMargin(Backdrop.Bake(soft, glass, Backdrop.Darkening(soft, glass, theme)), glass, theme);
+                    var margin = Backdrop.WorstMargin(Backdrop.Bake(soft, glass, Backdrop.ScrimAlphas(soft, glass, theme)), glass, theme);
                     if (margin < 1)
                     {
                         failures.Add($"{choice} {strength} over {name}: the weakest text has {margin.ToString("0.000", CultureInfo.InvariantCulture)} of the contrast it needs");
@@ -162,8 +194,8 @@ public class GlossyTests
         foreach (var strength in Enum.GetValues<GlassStrength>())
         {
             var glass = ThemeEngine.Glass(new ThemeChoice(), strength)!;
-            var onBlack = Backdrop.Darkening(black, glass, theme);
-            var onWhite = Backdrop.Darkening(white, glass, theme);
+            var onBlack = Backdrop.ScrimAlphas(black, glass, theme);
+            var onWhite = Backdrop.ScrimAlphas(white, glass, theme);
             for (var y = 0; y < Backdrop.Height; y++)
             {
                 Assert.Equal(Between(glass.Stops, (y + 0.5) / Backdrop.Height), onBlack[y], 9);
@@ -171,6 +203,29 @@ public class GlossyTests
             }
 
             Assert.True(onWhite.Sum() > onBlack.Sum() + 1, $"{strength}: white art isn't darkened more.");
+        }
+    }
+
+    /// <summary>KAN-78: light Glossy is the other way round: bright art keeps the design's gradient, dark art is lightened more.</summary>
+    [Fact]
+    public void LOOK_18_light_bright_art_keeps_the_designs_gradient_exactly_and_dark_art_is_lightened_more()
+    {
+        var choice = new ThemeChoice(Mode: ThemeMode.Light);
+        var theme = ThemeEngine.Build(choice);
+        var black = Backdrop.Soften(Pictures.Single(p => p.Name == "black").Bgra, PictureWidth, PictureHeight);
+        var white = Backdrop.Soften(Pictures.Single(p => p.Name == "white").Bgra, PictureWidth, PictureHeight);
+        foreach (var strength in Enum.GetValues<GlassStrength>())
+        {
+            var glass = ThemeEngine.Glass(choice, strength)!;
+            var onBlack = Backdrop.ScrimAlphas(black, glass, theme);
+            var onWhite = Backdrop.ScrimAlphas(white, glass, theme);
+            for (var y = 0; y < Backdrop.Height; y++)
+            {
+                Assert.Equal(Between(glass.Stops, (y + 0.5) / Backdrop.Height), onWhite[y], 9);
+                Assert.True(onBlack[y] >= onWhite[y], $"{strength}: row {y} is less covered over black art than over white.");
+            }
+
+            Assert.True(onBlack.Sum() > onWhite.Sum() + 1, $"{strength}: black art isn't lightened more.");
         }
     }
 

@@ -1,0 +1,153 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="using:GameSync.UI.Controls"
+             xmlns:vm="using:GameSync.UI.ViewModels"
+             xmlns:sys="using:System"
+             x:Class="GameSync.UI.Views.ShareDialog"
+             x:DataType="vm:ShareViewModel"
+             Width="{DynamicResource dw-640}">
+  <UserControl.Styles>
+    <!-- A ticked game's row fills, as the design's -->
+    <Style Selector="Border.share-row.ticked">
+      <Setter Property="Background" Value="{DynamicResource bg-300}" />
+    </Style>
+  </UserControl.Styles>
+  <!-- Share saves (design system → ShareSavesDialog; SHARE-01 to SHARE-09): tick games, each taking its latest save, or
+       open one for exact versions; Share all ticks every game that can be shared. Only save data goes in the zip, with a
+       README for restoring by hand. -->
+  <Border Background="{DynamicResource surface-dialog}" BorderBrush="{DynamicResource edge-dialog}" BorderThickness="1" BackgroundSizing="OuterBorderEdge"
+          CornerRadius="16" BoxShadow="{DynamicResource shadow-dialog}" ClipToBounds="True">
+    <DockPanel>
+      <Border DockPanel.Dock="Top" Padding="24,20,24,8">
+        <StackPanel Spacing="12">
+          <Grid ColumnDefinitions="*,Auto">
+            <StackPanel>
+              <TextBlock Classes="card-title" Text="Share saves" />
+              <TextBlock Classes="muted" Text="{Binding Subtitle}" />
+            </StackPanel>
+            <c:GsIconButton Grid.Column="1" Classes="sm" Icon="x" Label="Close Share saves" Command="{Binding CloseCommand}" VerticalAlignment="Center" />
+          </Grid>
+          <c:GsPillTabs ItemsSource="{Binding Modes}" SelectedId="{Binding Mode, Mode=TwoWay}" AutomationProperties.Name="Share" IsEnabled="{Binding Choosing}"
+                        HorizontalAlignment="Left" IsVisible="{Binding !Done}" />
+        </StackPanel>
+      </Border>
+
+      <!-- Foot: what's ticked and its size, the promise, Cancel and Create zip; packing, Cancel; done, Done -->
+      <Border DockPanel.Dock="Bottom" BorderBrush="{DynamicResource line-100}" BorderThickness="0,1,0,0" Padding="24,14">
+        <Panel>
+          <StackPanel Spacing="12" IsVisible="{Binding !Done}">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12" IsVisible="{Binding Choosing}">
+              <TextBlock Classes="mono-small muted" Text="{Binding Summary}" TextTrimming="CharacterEllipsis" />
+              <TextBlock Grid.Column="1" Classes="mono-small muted" Text="{Binding SizeText}" />
+            </Grid>
+            <c:GsNote Icon="shield" Text="Only save data goes in, never game files. A README inside explains how to restore by hand; in GameSync, use Import saves." />
+            <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+              <c:GsButton Classes="ghost" Content="Cancel" Command="{Binding CloseCommand}" IsVisible="{Binding !Packing}" />
+              <c:GsButton Classes="ghost" Content="Cancel" Command="{Binding CancelPackingCommand}" IsVisible="{Binding Packing}"
+                          AutomationProperties.Name="Stop packing" ToolTip.Tip="Stops, and leaves no zip behind" />
+              <c:GsButton Classes="primary" Icon="zip" Content="Create zip" Command="{Binding CreateCommand}" IsEnabled="{Binding CanCreate}"
+                          IsBusy="{Binding Packing}" BusyText="Packing" />
+            </StackPanel>
+          </StackPanel>
+          <c:GsButton Classes="primary" Content="Done" Command="{Binding CloseCommand}" HorizontalAlignment="Right" IsVisible="{Binding Done}" />
+        </Panel>
+      </Border>
+
+      <StackPanel Margin="24,8,24,16" Spacing="12">
+        <c:GsNote Icon="saves" Text="Reading your saves" IsBusy="True" IsVisible="{Binding Loading}" />
+
+        <!-- Every game that syncs here: ticked takes its latest save; the chevron opens its versions -->
+        <ScrollViewer MaxHeight="360" HorizontalScrollBarVisibility="Disabled" IsVisible="{Binding Choosing}">
+          <ItemsControl ItemsSource="{Binding Games}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate>
+                <StackPanel Spacing="4" />
+              </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:ShareGameRow">
+                <StackPanel Spacing="4">
+                  <Border Classes="share-row" Classes.ticked="{Binding Ticked}" CornerRadius="{DynamicResource radius-md}" Padding="12,6" AutomationProperties.Name="{Binding}">
+                  <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto" ColumnSpacing="12">
+                    <CheckBox MinWidth="0" IsChecked="{Binding Ticked}" IsEnabled="{Binding CanTick}" VerticalAlignment="Center"
+                              AutomationProperties.Name="{Binding Title, StringFormat='Share {0}'}" />
+                    <Border Grid.Column="1" Width="28" Height="36" CornerRadius="6" ClipToBounds="True" Background="{DynamicResource bg-300}">
+                      <Panel>
+                        <TextBlock Text="{Binding Initial}" FontWeight="SemiBold" FontSize="{DynamicResource fs-11}" Foreground="{DynamicResource ink-muted}"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        <c:GsCoverImage Source="{Binding Cover}" />
+                      </Panel>
+                    </Border>
+                    <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                      <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" IsVisible="{Binding CanTick}" />
+                      <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" Foreground="{DynamicResource ink-muted}" IsVisible="{Binding IsBlocked}" />
+                      <TextBlock Classes="mono-small muted" Text="{Binding Meta}" TextTrimming="CharacterEllipsis" IsVisible="{Binding CanTick}" />
+                      <StackPanel Orientation="Horizontal" Spacing="4" IsVisible="{Binding IsBlocked}">
+                        <c:GsIcon Icon="lock" Size="12" Foreground="{DynamicResource ink-muted}" VerticalAlignment="Center" />
+                        <TextBlock Classes="caption muted" Text="{Binding Blocked}" TextWrapping="Wrap" />
+                      </StackPanel>
+                    </StackPanel>
+                    <TextBlock Grid.Column="3" Classes="mono-small muted" Text="{Binding Size}" VerticalAlignment="Center" />
+                    <c:GsIconButton Grid.Column="4" Classes="sm ghost" Icon="{Binding ExpandIcon}" Label="{Binding Title, StringFormat='Versions of {0}'}"
+                                    Command="{Binding ExpandCommand}" IsVisible="{Binding CanTick}" VerticalAlignment="Center" />
+                  </Grid>
+                  </Border>
+                  <!-- Its versions, newest first: pick exact ones, older and pinned ones too (SHARE-02) -->
+                  <Border BorderBrush="{DynamicResource line-200}" BorderThickness="1,0,0,0" Margin="52,0,12,4" Padding="12,0,0,0" IsVisible="{Binding ShowsVersions}">
+                    <ItemsControl ItemsSource="{Binding Versions}">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:ShareVersionRow">
+                          <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12" Margin="0,4">
+                            <CheckBox MinWidth="0" IsChecked="{Binding Ticked}" VerticalAlignment="Center" AutomationProperties.Name="{Binding}" />
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                              <TextBlock Text="{Binding Label}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Label}" />
+                              <TextBlock Classes="mono-small muted" Text="{Binding Meta}" TextTrimming="CharacterEllipsis" />
+                            </StackPanel>
+                            <TextBlock Grid.Column="2" Classes="mono-small muted" Text="{Binding Size}" VerticalAlignment="Center" />
+                          </Grid>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </Border>
+                </StackPanel>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </ScrollViewer>
+        <c:GsNote Icon="lock" Text="{Binding LeftOut}" IsVisible="{Binding HasLeftOut}" />
+
+        <!-- Packing (SHARE-09): how far it is; Cancel leaves no zip behind -->
+        <StackPanel Spacing="8" IsVisible="{Binding Packing}">
+          <c:GsProgress Value="{Binding Progress}" Label="{Binding ProgressText}" Right="{Binding Progress, StringFormat='{}{0:0}%'}" />
+        </StackPanel>
+
+        <!-- Done: where the zip is -->
+        <StackPanel Spacing="12" IsVisible="{Binding Done}">
+          <Border Background="{DynamicResource primary-soft}" CornerRadius="{DynamicResource radius-md}" Padding="16,12">
+            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+              <c:GsIcon Icon="check" Size="20" Foreground="{DynamicResource primary}" VerticalAlignment="Center" />
+              <StackPanel Grid.Column="1" Spacing="2">
+                <TextBlock Text="{Binding DoneText}" TextWrapping="Wrap" />
+                <TextBlock Classes="mono-small" Foreground="{DynamicResource primary}" Text="{Binding ZipPath}" TextTrimming="LeadingCharacterEllipsis"
+                           ToolTip.Tip="{Binding ZipPath}" />
+              </StackPanel>
+            </Grid>
+          </Border>
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <c:GsButton Classes="sm" Icon="copy" Content="Copy path" Command="{Binding CopyPathCommand}" />
+            <c:GsButton Classes="sm" Icon="folder" Content="Show in folder" Command="{Binding ShowInFolderCommand}" />
+          </StackPanel>
+          <ItemsControl ItemsSource="{Binding Notes}" IsVisible="{Binding HasNotes}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="sys:String">
+                <c:GsNote Icon="alert" Classes="warn" Text="{Binding}" Margin="0,0,0,6" />
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+
+        <c:GsNote Icon="alert" Classes="warn" Text="{Binding Error}" IsVisible="{Binding HasError}" />
+      </StackPanel>
+    </DockPanel>
+  </Border>
+</UserControl>

@@ -181,7 +181,7 @@ public class SettingsTests
 
         Assert.Equal("Checked 12 games; nothing new to upload.", Daily.Summary(new DailyRun(DateTime.UtcNow, 12, 0, 0)));
         Assert.Equal("Checked 1 game and uploaded 1 new save.", Daily.Summary(new DailyRun(DateTime.UtcNow, 1, 1, 0)));
-        Assert.Equal("Checked 12 games and uploaded 3 new saves. 2 games need you: open GameSync to see them.", Daily.Summary(new DailyRun(DateTime.UtcNow, 12, 3, 2)));
+        Assert.Equal("Checked 12 games and uploaded 3 new saves. 2 conflicts: open GameSync to see them.", Daily.Summary(new DailyRun(DateTime.UtcNow, 12, 3, 2)));
     }
 
     [Fact]
@@ -244,7 +244,7 @@ public class SettingsTests
         appearance.PureBlack = true;
         appearance.Mode = Look.Light;
         Assert.False(appearance.CanPureBlack);
-        Assert.Contains("light mode stays Solid", appearance.SurfaceDescription);
+        Assert.Contains("frosted dark or light", appearance.SurfaceDescription);
 
         appearance.ResetCommand.Execute(null);
         Assert.Equal(new Look(Surface: Look.Solid), saved[^1]);

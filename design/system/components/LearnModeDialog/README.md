@@ -1,0 +1,12 @@
+Dialog listing where a game saved during one play session learn mode watched, so the person picks what to sync (design system version 43; FIND-04).
+
+It opens from a game's saves page (See what it found), after learn mode watched the game played. Learn mode is GameSync's last way to find saves, after the save list, the engine rules and the name search: while the game runs, it notes the files written in the usual save folders (Documents, Saved Games, AppData, ProgramData, Public Documents and any save folders added in Settings), the game's own folder and Steam's `userdata`, with no admin and without touching the game (R10). When the game closes, what was written is grouped into places.
+
+Provide `game`, `session` ("4 Oct, 21:04 to 21:52"), `finds` (`{id, path, here, files, bytes, newest, examples, tags, file, refused}`), `picked` and `onPick`, and `onSync`, `onAgain`, `onNotThese`, `onAddPlace`, `onClose`; `stage: "adding"` while the picked places are added; `overflowed` when Windows reported more changes than GameSync could keep up with.
+
+- **A place** is a folder the game wrote to, as every PC reads it (`<localLow>/Landfall Games/ROUNDS`), with how many files were written, their size, the newest time and a few names; or one file, when it sat loose in a folder GameSync never takes whole (the game's own folder, a whole Windows folder): `<installDir>/settings.cfg`. Tags say what makes it likely: Looks like saves (names such as save, slot, profile, progress, .sav, .sl2), In its own folder, Steam's cloud folder.
+- **The likeliest is ticked**: the place with save-like names and the most written, the others left for the person. A folder the safety guard blocks (R5) is never offered; one Add a place would refuse when the person picks it (another game's folder now, say) shows with a lock and the reason, and can't be ticked.
+- **Left out, and said so**: logs, caches, crash dumps, shader caches, temporary files and program files (R1) written then, and GameSync's own folders.
+- **The foot**: Nothing syncs until you choose. **Sync these saves** (or Sync these N places) adds each ticked place as Add a place does, so the game starts syncing with them, and closes; **Watch again** keeps learn mode on for the next session, adding what it finds then; **Not these** forgets what it found and stops watching the game (Add a place… still works).
+- **Nothing found** (`#none`): it says so, keeps watching next time, and offers Add a place… and Done.
+- Keyboard: Tab through the ticks, then the buttons; Esc closes and keeps what was found for later.

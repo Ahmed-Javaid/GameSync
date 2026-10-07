@@ -1,0 +1,435 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="using:GameSync.UI.Controls"
+             xmlns:vm="using:GameSync.UI.ViewModels"
+             x:Class="GameSync.UI.Views.TrophyRoomPage"
+             x:DataType="vm:TrophyRoomViewModel">
+  <!-- The Achievements page, from the rail's trophy (design system → TrophyRoomScreen): every game's achievements together.
+       The band (the average, unlocks, Zeniths, tiers and the rarest you have) with trophies rising from its right edge, the
+       Zeniths shelf with the Zenith's diamond, Closest to a Zenith, Recent unlocks, Within reach and Every game; a game
+       opens its achievements here, with Back to this page (design system version 35). -->
+  <UserControl.Resources>
+    <!-- A shelf's or a list's item: the whole of it opens its game, lit under the pointer -->
+    <ControlTheme x:Key="PlainItem" TargetType="Button">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="ClipToBounds" Value="False" />
+      <Setter Property="Padding" Value="8,6" />
+      <Setter Property="CornerRadius" Value="10" />
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="FocusAdorner" Value="{DynamicResource InsetFocus}" />
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Border Background="{TemplateBinding Background}" CornerRadius="{TemplateBinding CornerRadius}" Padding="{TemplateBinding Padding}">
+            <ContentPresenter Content="{TemplateBinding Content}" ContentTemplate="{TemplateBinding ContentTemplate}" HorizontalContentAlignment="Stretch" />
+          </Border>
+        </ControlTemplate>
+      </Setter>
+      <Style Selector="^:pointerover">
+        <Setter Property="Background" Value="{DynamicResource bg-300}" />
+      </Style>
+    </ControlTheme>
+
+    <!-- Every game's headings: the overline's look, ink under the pointer, an arrow on the one that sorts -->
+    <ControlTheme x:Key="TrophyHeading" TargetType="Button">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Foreground" Value="{DynamicResource ink-faint}" />
+      <Setter Property="Padding" Value="12,8" />
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="HorizontalContentAlignment" Value="Left" />
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="FocusAdorner" Value="{DynamicResource InsetFocus}" />
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Border Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}">
+            <ContentPresenter Content="{TemplateBinding Content}" HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" />
+          </Border>
+        </ControlTemplate>
+      </Setter>
+      <Style Selector="^:pointerover">
+        <Setter Property="Foreground" Value="{DynamicResource ink}" />
+      </Style>
+    </ControlTheme>
+
+    <!-- Every game's rows: a hairline between, bg-300 under the pointer, secondary-soft when picked -->
+    <ControlTheme x:Key="TrophyRow" TargetType="ListBoxItem">
+      <Setter Property="Padding" Value="0,8" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderBrush" Value="{DynamicResource line-100}" />
+      <Setter Property="BorderThickness" Value="0,0,0,1" />
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+      <Setter Property="FocusAdorner" Value="{DynamicResource InsetFocus}" />
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}"
+                  Padding="{TemplateBinding Padding}">
+            <ContentPresenter Content="{TemplateBinding Content}" ContentTemplate="{TemplateBinding ContentTemplate}" HorizontalContentAlignment="Stretch"
+                              VerticalAlignment="Center" />
+          </Border>
+        </ControlTemplate>
+      </Setter>
+      <Style Selector="^:pointerover">
+        <Setter Property="Background" Value="{DynamicResource bg-300}" />
+      </Style>
+      <Style Selector="^:selected">
+        <Setter Property="Background" Value="{DynamicResource secondary-soft}" />
+      </Style>
+      <Style Selector="^:nth-last-child(1)">
+        <Setter Property="BorderThickness" Value="0" />
+      </Style>
+    </ControlTheme>
+  </UserControl.Resources>
+  <UserControl.Styles>
+    <Style Selector="TextBlock#ZenithNumber">
+      <Setter Property="Foreground" Value="{DynamicResource ink-faint}" />
+    </Style>
+    <Style Selector="TextBlock#ZenithNumber.earned">
+      <Setter Property="Foreground" Value="{DynamicResource zenith-ink-text}" />
+    </Style>
+    <Style Selector="TextBlock.stat-value">
+      <Setter Property="FontFamily" Value="{DynamicResource font-mono}" />
+      <Setter Property="FontSize" Value="{DynamicResource fs-28}" />
+      <Setter Property="LineHeight" Value="{DynamicResource lh-32}" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="LetterSpacing" Value="-0.5" />
+    </Style>
+    <Style Selector="TextBlock.item-name">
+      <Setter Property="FontSize" Value="{DynamicResource fs-13}" />
+      <Setter Property="LineHeight" Value="{DynamicResource lh-18}" />
+      <Setter Property="FontWeight" Value="Medium" />
+      <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+    </Style>
+  </UserControl.Styles>
+
+  <Panel Margin="24,20">
+    <!-- A game's achievements, opened here: Back returns to this page -->
+    <ContentControl Content="{Binding Game}" IsVisible="{Binding !ShowsRoom}" />
+
+    <ScrollViewer Classes="page" HorizontalScrollBarVisibility="Disabled" IsVisible="{Binding ShowsRoom}">
+      <StackPanel Spacing="16" Margin="0,0,0,8">
+        <Grid ColumnDefinitions="*,Auto" MinHeight="40">
+          <StackPanel VerticalAlignment="Center">
+            <TextBlock Text="{Binding Title}" FontSize="{DynamicResource fs-15}" LineHeight="{DynamicResource lh-20}" FontWeight="SemiBold" />
+            <TextBlock Classes="caption faint" Text="Every game's: from Steam on this PC, and your other copies' own records" TextTrimming="CharacterEllipsis" />
+          </StackPanel>
+          <c:GsButton Grid.Column="1" Classes="ghost sm" Icon="sync" Content="Refresh rarity" Command="{Binding RefreshRarityCommand}" IsVisible="{Binding CanRefresh}"
+                      IsBusy="{Binding Refreshing}" BusyText="Asking Steam" VerticalAlignment="Center"
+                      ToolTip.Tip="Asks Steam again how rare each achievement is, for every game. It's asked once a week by itself." />
+        </Grid>
+
+        <c:GsCard Title="No achievements here yet" IsVisible="{Binding NoGames}">
+          <c:GsNote Icon="trophy" MaxWidth="640" HorizontalAlignment="Left"
+                    Text="Achievements show here for the Steam games you play on this PC: what you've unlocked, your Zeniths and what's closest to one. Steam keeps them once a game has run here." />
+        </c:GsCard>
+
+        <!-- The band: how far you are in all, with trophies rising from its right edge (KAN-105), which narrow windows leave out -->
+        <c:GsCard Name="Band" Padding="0" ClipToBounds="True" IsVisible="{Binding HasGames}" AutomationProperties.Name="Your achievements in all">
+          <Panel>
+            <!-- On a canvas, so the light spills from the top right without making the band any taller -->
+            <Canvas IsHitTestVisible="False">
+              <Ellipse Width="520" Height="520" Canvas.Right="-120" Canvas.Top="-160" Fill="{StaticResource glow-platinum}" />
+            </Canvas>
+            <c:GsTrophyRise Name="Trophies" HorizontalAlignment="Right" VerticalAlignment="Stretch" />
+            <Grid Name="BandStats" ColumnDefinitions="Auto,*" ColumnSpacing="32" Margin="28,24,276,24">
+              <c:GsProgressRing Width="132" Height="132" Value="{Binding Average}" Label="{Binding AverageLabel}" Sub="average"
+                                AutomationProperties.Name="{Binding AverageSpoken}" VerticalAlignment="Center" />
+              <Grid Grid.Column="1" ColumnDefinitions="0.9*,2.2*,0.9*,1.5*" ColumnSpacing="20" VerticalAlignment="Center">
+                <StackPanel Spacing="6">
+                  <TextBlock Classes="overline faint" Text="UNLOCKED" />
+                  <TextBlock Classes="stat-value" Text="{Binding UnlockedText}" />
+                  <TextBlock Classes="caption muted" Text="{Binding UnlockedSub}" TextTrimming="CharacterEllipsis" />
+                </StackPanel>
+                <!-- KAN-128 (the owner: "I want it to be bigger, take more space. It needs to look mighty, something thats
+                     monumental"): the Zeniths monument, the Zenith's mark large with light fanning up behind its summit, and the
+                     count in big numerals in the Zenith's own colour; its light spills past the band's padding, not its edge -->
+                <Grid Grid.Column="1" ColumnDefinitions="Auto,*" ColumnSpacing="16" AutomationProperties.Name="{Binding ZenithSpoken}">
+                  <c:GsZenithMonument Width="132" Height="116" IsEarned="{Binding HasZenith}" Margin="-6,-18,0,-14" VerticalAlignment="Center" />
+                  <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                    <TextBlock Classes="overline faint" Text="ZENITHS" />
+                    <TextBlock Name="ZenithNumber" Text="{Binding ZenithCount}" FontFamily="{DynamicResource font-mono}" FontWeight="SemiBold" FontSize="{DynamicResource fs-56}" LineHeight="{DynamicResource lh-62}"
+                               LetterSpacing="-1.5" Classes.earned="{Binding HasZenith}" />
+                    <TextBlock Classes="caption muted" Text="{Binding ZenithSubLines}" TextWrapping="Wrap" MaxLines="3" TextTrimming="CharacterEllipsis" />
+                  </StackPanel>
+                </Grid>
+                <StackPanel Grid.Column="2" Spacing="6">
+                  <TextBlock Classes="overline faint" Text="TIERS" />
+                  <StackPanel Spacing="4" Margin="0,2,0,0">
+                    <c:GsTierChip Tier="gold" Count="{Binding Gold}" />
+                    <c:GsTierChip Tier="silver" Count="{Binding Silver}" />
+                    <c:GsTierChip Tier="bronze" Count="{Binding Bronze}" />
+                  </StackPanel>
+                </StackPanel>
+                <StackPanel Grid.Column="3" Spacing="6">
+                  <TextBlock Classes="overline faint" Text="RAREST YOU HAVE" />
+                  <Button Theme="{StaticResource PlainItem}" Padding="6" Margin="-6,0" Command="{Binding OpenUnlockCommand}" CommandParameter="{Binding Rarest}"
+                          IsVisible="{Binding HasRarest}" AutomationProperties.Name="{Binding Rarest.Achievement.Tip, FallbackValue={x:Null}}"
+                          ToolTip.Tip="{Binding Rarest.Achievement.Tip, FallbackValue={x:Null}}">
+                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                      <c:GsAchievementBadge Size="sm" Icon="{Binding Rarest.Achievement.Icon, FallbackValue={x:Null}}" Tier="{Binding Rarest.Achievement.Tier, FallbackValue={x:Null}}"
+                                            VerticalAlignment="Center" />
+                      <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding Rarest.Achievement.Name, FallbackValue={x:Null}}" FontSize="{DynamicResource fs-13}" LineHeight="{DynamicResource lh-18}"
+                                   FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Classes="caption muted" Text="{Binding Rarest.Sub, FallbackValue={x:Null}}" TextTrimming="CharacterEllipsis" />
+                      </StackPanel>
+                    </Grid>
+                  </Button>
+                  <TextBlock Classes="caption muted" Text="Shows once Steam has said how rare each is." TextWrapping="Wrap" IsVisible="{Binding !HasRarest}" />
+                </StackPanel>
+              </Grid>
+            </Grid>
+          </Panel>
+        </c:GsCard>
+
+        <!-- Two rows the columns share, each card filling its cell, so the cards beside each other start and end together
+             (KAN-119, the owner: "I really dont like this weird gap left by close to a Zenith and within reach") -->
+        <Grid ColumnSpacing="16" RowSpacing="16" RowDefinitions="Auto,Auto" IsVisible="{Binding HasGames}">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="1.35*" />
+            <ColumnDefinition Width="*" />
+          </Grid.ColumnDefinitions>
+            <!-- Zeniths: each game finished, its cover with the medal and the day it was earned, newest first; the Zenith badge
+                 with its title (KAN-105, KAN-117; the badge since version 45), and behind it all the Zenith's scene rising faint
+                 from its bottom corner, as the owner drew it (version 47) -->
+            <Panel>
+            <c:GsCard Title="Zeniths" Subtitle="Every achievement of a game unlocked">
+              <c:GsCard.Lead>
+                <c:GsTierBanner Tier="zenith" Width="22" Height="34" />
+              </c:GsCard.Lead>
+              <c:GsCard.Backdrop>
+                <c:GsZenithScene Width="300" Height="340" Ink="{DynamicResource ink}" HorizontalAlignment="Right" VerticalAlignment="Bottom" />
+              </c:GsCard.Backdrop>
+              <Panel>
+                <TextBlock Classes="muted" Text="{Binding ZenithNote}" FontSize="{DynamicResource fs-13}" LineHeight="{DynamicResource lh-19}" TextWrapping="Wrap"
+                           IsVisible="{Binding !HasZeniths}" />
+                <ItemsControl ItemsSource="{Binding Zeniths}" IsVisible="{Binding HasZeniths}" ClipToBounds="False">
+                  <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                      <WrapPanel ItemSpacing="8" LineSpacing="12" />
+                    </ItemsPanelTemplate>
+                  </ItemsControl.ItemsPanel>
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:TrophyGame">
+                      <Button Theme="{StaticResource PlainItem}" Padding="6,6,6,8" Command="{Binding $parent[UserControl].((vm:TrophyRoomViewModel)DataContext).OpenGameCommand}"
+                              CommandParameter="{Binding Id}" AutomationProperties.Name="{Binding}" ToolTip.Tip="{Binding}">
+                        <StackPanel Width="118" Spacing="6">
+                          <Panel Width="118" Height="177" Margin="0,0,0,4">
+                            <Border CornerRadius="14" ClipToBounds="True" Background="{DynamicResource bg-300}"
+                                    BoxShadow="0 0 0 1 #59EEF7FF, 0 10 30 -12 #B39BB6CD">
+                              <Panel>
+                                <TextBlock Text="{Binding Initial}" FontSize="{DynamicResource fs-28}" FontWeight="SemiBold" Foreground="{DynamicResource ink-muted}"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                <c:GsCoverImage Source="{Binding Cover}" />
+                              </Panel>
+                            </Border>
+                            <c:GsZenithMedal Width="34" Height="34" IsEarned="True" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,-8,-8" />
+                          </Panel>
+                          <TextBlock Classes="item-name" Text="{Binding Title}" FontSize="{DynamicResource fs-12}" LineHeight="{DynamicResource lh-16}" />
+                          <TextBlock Classes="faint" Text="{Binding ZenithText}" FontSize="{DynamicResource fs-11}" LineHeight="{DynamicResource lh-14}"
+                                     TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+                      </Button>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </Panel>
+            </c:GsCard>
+            </Panel>
+
+            <!-- Closest to a Zenith: the games started and not finished, by how far you are -->
+            <c:GsCard Grid.Row="1" Title="Closest to a Zenith" Subtitle="The games you've started, by how far you are" IsVisible="{Binding HasClosest}">
+              <ItemsControl ItemsSource="{Binding Closest}" Margin="-8,-6">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:TrophyGame">
+                    <Button Theme="{StaticResource PlainItem}" Command="{Binding $parent[UserControl].((vm:TrophyRoomViewModel)DataContext).OpenGameCommand}"
+                            CommandParameter="{Binding Id}" AutomationProperties.Name="{Binding}" ToolTip.Tip="Its achievements, every one">
+                      <Grid ColumnDefinitions="36,*,Auto" ColumnSpacing="12">
+                        <Border Width="36" Height="54" CornerRadius="7" ClipToBounds="True" Background="{DynamicResource bg-300}" BorderBrush="{DynamicResource edge-art}"
+                                BorderThickness="1">
+                          <Panel>
+                            <TextBlock Text="{Binding Initial}" FontSize="{DynamicResource fs-13}" FontWeight="SemiBold" Foreground="{DynamicResource ink-muted}"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            <c:GsCoverImage Source="{Binding Cover}" />
+                          </Panel>
+                        </Border>
+                        <StackPanel Grid.Column="1" Spacing="6" VerticalAlignment="Center">
+                          <TextBlock Classes="item-name" Text="{Binding Title}" />
+                          <ProgressBar Minimum="0" Maximum="100" Value="{Binding Progress.Percent}" />
+                        </StackPanel>
+                        <TextBlock Grid.Column="2" Text="{Binding ToGoText}" FontFamily="{DynamicResource font-mono}" FontSize="{DynamicResource fs-12}"
+                                   LineHeight="{DynamicResource lh-16}" FontWeight="Medium" Foreground="{DynamicResource ink-muted}" VerticalAlignment="Center" />
+                      </Grid>
+                    </Button>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </c:GsCard>
+
+          <!-- Recent unlocks: the last ones of every game, newest first; one opens its game's achievements with it picked -->
+          <c:GsCard Grid.Column="1" Title="Recent unlocks">
+            <Panel>
+              <TextBlock Classes="caption muted" Text="Unlock one and it shows here." IsVisible="{Binding !HasRecent}" />
+              <ItemsControl ItemsSource="{Binding Recent}" Margin="-8,-6" IsVisible="{Binding HasRecent}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:TrophyUnlock">
+                    <Button Theme="{StaticResource PlainItem}" Command="{Binding $parent[UserControl].((vm:TrophyRoomViewModel)DataContext).OpenUnlockCommand}"
+                            CommandParameter="{Binding}" AutomationProperties.Name="{Binding}" ToolTip.Tip="{Binding Achievement.Tip}">
+                      <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                        <c:GsAchievementBadge Size="sm" Icon="{Binding Achievement.Icon}" Tier="{Binding Achievement.Tier}" VerticalAlignment="Center" />
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                          <TextBlock Classes="item-name" Text="{Binding Achievement.Name}" />
+                          <TextBlock Classes="caption faint" Text="{Binding Sub}" TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+                        <TextBlock Grid.Column="2" Classes="caption faint" Text="{Binding Achievement.When}" VerticalAlignment="Center" />
+                      </Grid>
+                    </Button>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </Panel>
+          </c:GsCard>
+
+          <!-- Within reach (KAN-105, the owner: "the weird blank space ahead of closest to platinum needs to be filled"): the
+               locked achievements most players have, in the games you've started, never a hidden one; one opens its game's
+               achievements with it picked -->
+          <c:GsCard Grid.Row="1" Grid.Column="1" Title="Within reach" Subtitle="Locked ones most players have, in games you've started" IsVisible="{Binding HasReach}">
+            <ItemsControl ItemsSource="{Binding Reach}" Margin="-8,-6">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:TrophyUnlock">
+                  <Button Theme="{StaticResource PlainItem}" Command="{Binding $parent[UserControl].((vm:TrophyRoomViewModel)DataContext).OpenUnlockCommand}"
+                          CommandParameter="{Binding}" AutomationProperties.Name="{Binding ReachSpoken}" ToolTip.Tip="{Binding Achievement.Tip}">
+                    <!-- As tall as a row of Closest to a Zenith beside it, so the two lists end together -->
+                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12" MinHeight="54">
+                      <c:GsAchievementBadge Size="sm" Icon="{Binding Achievement.Icon}" State="{Binding Achievement.State}" VerticalAlignment="Center" />
+                      <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                        <TextBlock Classes="item-name" Text="{Binding Achievement.Name}" />
+                        <TextBlock Classes="caption faint" Text="{Binding GameTitle}" TextTrimming="CharacterEllipsis" />
+                      </StackPanel>
+                      <TextBlock Grid.Column="2" Text="{Binding Achievement.PercentText}" FontFamily="{DynamicResource font-mono}" FontSize="{DynamicResource fs-12}"
+                                 LineHeight="{DynamicResource lh-16}" FontWeight="Medium" Foreground="{DynamicResource ink-muted}" VerticalAlignment="Center" />
+                    </Grid>
+                  </Button>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </c:GsCard>
+        </Grid>
+
+        <!-- Every game: one Tab stop, Up and Down move through it, Enter or a click opens a game's achievements -->
+        <c:GsCard Title="Every game" Subtitle="{Binding GamesSubtitle}" IsVisible="{Binding HasGames}">
+          <StackPanel>
+            <Border BorderBrush="{DynamicResource line-100}" BorderThickness="0,0,0,1">
+              <Grid>
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="*" MinWidth="200" />
+                  <ColumnDefinition Width="200" />
+                  <ColumnDefinition Width="{DynamicResource cw-104}" />
+                  <ColumnDefinition Width="{DynamicResource cw-148}" />
+                  <ColumnDefinition Width="{DynamicResource cw-148}" />
+                </Grid.ColumnDefinitions>
+                <Button Theme="{StaticResource TrophyHeading}" Command="{Binding SortCommand}" CommandParameter="Game" ToolTip.Tip="Sort by name; again reverses it">
+                  <StackPanel Orientation="Horizontal" Spacing="6">
+                    <TextBlock Classes="overline" Text="GAME" Foreground="{Binding $parent[Button].Foreground}" />
+                    <c:GsIcon Icon="sort" Size="12" StrokeWidth="2" VerticalAlignment="Center" IsVisible="{Binding GameIdle}" Foreground="{Binding $parent[Button].Foreground}" />
+                    <c:GsIcon Icon="chevronDown" Size="12" StrokeWidth="2" VerticalAlignment="Center" IsVisible="{Binding ByGame}" Foreground="{DynamicResource ink}">
+                      <c:GsIcon.RenderTransform>
+                        <RotateTransform Angle="{Binding Arrow}" />
+                      </c:GsIcon.RenderTransform>
+                    </c:GsIcon>
+                  </StackPanel>
+                </Button>
+                <Button Grid.Column="1" Theme="{StaticResource TrophyHeading}" Command="{Binding SortCommand}" CommandParameter="Progress"
+                        ToolTip.Tip="Sort by how far you are; again reverses it">
+                  <StackPanel Orientation="Horizontal" Spacing="6">
+                    <TextBlock Classes="overline" Text="PROGRESS" Foreground="{Binding $parent[Button].Foreground}" />
+                    <c:GsIcon Icon="sort" Size="12" StrokeWidth="2" VerticalAlignment="Center" IsVisible="{Binding ProgressIdle}" Foreground="{Binding $parent[Button].Foreground}" />
+                    <c:GsIcon Icon="chevronDown" Size="12" StrokeWidth="2" VerticalAlignment="Center" IsVisible="{Binding ByProgress}" Foreground="{DynamicResource ink}">
+                      <c:GsIcon.RenderTransform>
+                        <RotateTransform Angle="{Binding Arrow}" />
+                      </c:GsIcon.RenderTransform>
+                    </c:GsIcon>
+                  </StackPanel>
+                </Button>
+                <Button Grid.Column="2" Theme="{StaticResource TrophyHeading}" Command="{Binding SortCommand}" CommandParameter="Unlocked"
+                        ToolTip.Tip="Sort by how many are unlocked; again reverses it">
+                  <StackPanel Orientation="Horizontal" Spacing="6">
+                    <TextBlock Classes="overline" Text="UNLOCKED" Foreground="{Binding $parent[Button].Foreground}" />
+                    <c:GsIcon Icon="sort" Size="12" StrokeWidth="2" VerticalAlignment="Center" IsVisible="{Binding UnlockedIdle}" Foreground="{Binding $parent[Button].Foreground}" />
+                    <c:GsIcon Icon="chevronDown" Size="12" StrokeWidth="2" VerticalAlignment="Center" IsVisible="{Binding ByUnlocked}" Foreground="{DynamicResource ink}">
+                      <c:GsIcon.RenderTransform>
+                        <RotateTransform Angle="{Binding Arrow}" />
+                      </c:GsIcon.RenderTransform>
+                    </c:GsIcon>
+                  </StackPanel>
+                </Button>
+                <TextBlock Grid.Column="3" Classes="overline faint" Text="TIERS" Margin="12,8" VerticalAlignment="Center" />
+                <Button Grid.Column="4" Theme="{StaticResource TrophyHeading}" Command="{Binding SortCommand}" CommandParameter="Last"
+                        ToolTip.Tip="Sort by the last unlock, newest first; again reverses it">
+                  <StackPanel Orientation="Horizontal" Spacing="6">
+                    <TextBlock Classes="overline" Text="LAST UNLOCKED" Foreground="{Binding $parent[Button].Foreground}" />
+                    <c:GsIcon Icon="sort" Size="12" StrokeWidth="2" VerticalAlignment="Center" IsVisible="{Binding LastIdle}" Foreground="{Binding $parent[Button].Foreground}" />
+                    <c:GsIcon Icon="chevronDown" Size="12" StrokeWidth="2" VerticalAlignment="Center" IsVisible="{Binding ByLast}" Foreground="{DynamicResource ink}">
+                      <c:GsIcon.RenderTransform>
+                        <RotateTransform Angle="{Binding Arrow}" />
+                      </c:GsIcon.RenderTransform>
+                    </c:GsIcon>
+                  </StackPanel>
+                </Button>
+              </Grid>
+            </Border>
+            <ListBox Name="GameRows" ItemsSource="{Binding Rows}" ItemContainerTheme="{StaticResource TrophyRow}" Background="Transparent"
+                     ScrollViewer.VerticalScrollBarVisibility="Disabled" AutomationProperties.Name="Every game with achievements">
+              <ListBox.ItemsPanel>
+                <ItemsPanelTemplate>
+                  <StackPanel />
+                </ItemsPanelTemplate>
+              </ListBox.ItemsPanel>
+              <ListBox.ItemTemplate>
+                <DataTemplate x:DataType="vm:TrophyGame">
+                  <Grid Background="Transparent" AutomationProperties.Name="{Binding}">
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="*" MinWidth="200" />
+                      <ColumnDefinition Width="200" />
+                      <ColumnDefinition Width="{DynamicResource cw-104}" />
+                      <ColumnDefinition Width="{DynamicResource cw-148}" />
+                      <ColumnDefinition Width="{DynamicResource cw-148}" />
+                    </Grid.ColumnDefinitions>
+                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12" Margin="12,0">
+                      <Border Width="28" Height="42" CornerRadius="6" ClipToBounds="True" Background="{DynamicResource bg-300}" BorderBrush="{DynamicResource edge-art}"
+                              BorderThickness="1" VerticalAlignment="Center">
+                        <Panel>
+                          <TextBlock Text="{Binding Initial}" FontSize="{DynamicResource fs-11}" FontWeight="SemiBold" Foreground="{DynamicResource ink-muted}"
+                                     HorizontalAlignment="Center" VerticalAlignment="Center" />
+                          <c:GsCoverImage Source="{Binding Cover}" />
+                        </Panel>
+                      </Border>
+                      <TextBlock Grid.Column="1" Text="{Binding Title}" FontSize="{DynamicResource fs-13}" LineHeight="{DynamicResource lh-18}" TextTrimming="CharacterEllipsis"
+                                 VerticalAlignment="Center" />
+                      <c:GsZenithMedal Grid.Column="2" Width="22" Height="22" IsEarned="True" IsVisible="{Binding IsZenith}" VerticalAlignment="Center"
+                                         ToolTip.Tip="Zenith: every achievement unlocked" />
+                    </Grid>
+                    <Grid Grid.Column="1" ColumnDefinitions="*,Auto" ColumnSpacing="10" Margin="12,0" VerticalAlignment="Center">
+                      <ProgressBar Minimum="0" Maximum="100" Value="{Binding Progress.Percent}" VerticalAlignment="Center" />
+                      <TextBlock Grid.Column="1" Text="{Binding Progress.PercentText}" FontFamily="{DynamicResource font-mono}" FontSize="{DynamicResource fs-13}"
+                                 MinWidth="36" TextAlignment="Right" VerticalAlignment="Center" />
+                    </Grid>
+                    <TextBlock Grid.Column="2" Text="{Binding CountText}" FontFamily="{DynamicResource font-mono}" FontSize="{DynamicResource fs-13}" Margin="12,0"
+                               VerticalAlignment="Center" />
+                    <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="12" Margin="12,0" VerticalAlignment="Center">
+                      <c:GsTierChip Classes="bare" Tier="gold" Count="{Binding GoldText}" />
+                      <c:GsTierChip Classes="bare" Tier="silver" Count="{Binding SilverText}" />
+                      <c:GsTierChip Classes="bare" Tier="bronze" Count="{Binding BronzeText}" />
+                    </StackPanel>
+                    <TextBlock Grid.Column="4" Text="{Binding Last}" FontSize="{DynamicResource fs-13}" Margin="12,0" VerticalAlignment="Center" />
+                  </Grid>
+                </DataTemplate>
+              </ListBox.ItemTemplate>
+            </ListBox>
+          </StackPanel>
+        </c:GsCard>
+      </StackPanel>
+    </ScrollViewer>
+  </Panel>
+</UserControl>

@@ -18,6 +18,16 @@ html,body{margin:0;background:var(--bg-100);} .pv{padding:24px;}
 .sm-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:start}
 .sm-log .gs-log-line{grid-template-columns:92px 72px 1fr}
 .sm-hist .gs-ctable td{height:34px}
+/* Each table's heading (version 35; the owner: "it should be more clear what the top table is and what the bottom table is") */
+.sm-tables{display:flex;flex-direction:column;gap:12px}
+.sm-head{display:flex;align-items:flex-start;gap:12px;margin-top:10px}
+.sm-head:first-child{margin-top:0}
+.sm-head-icon{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;flex-shrink:0;background:var(--ok-soft);color:var(--ok)}
+.sm-head-icon.is-all{background:var(--bg-300);color:var(--ink-muted)}
+.sm-head-text{display:flex;flex-direction:column;gap:2px;min-width:0}
+.sm-head-title{display:flex;align-items:center;gap:8px;margin:0;font:600 16px/22px var(--font-sans);color:var(--ink)}
+.sm-head-count{font:600 12px/16px var(--font-mono);padding:1px 8px;border-radius:var(--radius-pill);background:var(--bg-300);color:var(--ink-muted)}
+.sm-head-sub{margin:0;font:400 12px/17px var(--font-sans);color:var(--ink-muted)}
 </style>
 </head>
 <body class="gs-root">
@@ -38,6 +48,17 @@ var GAMES = [
   {id:'ds3', name:'Dark Souls III', art:COVERS[5], status:'backup-only', play:'96 h', last:'2 Sep', path:'%APPDATA%\\DarkSoulsIII\\0110000', size:6815744, versions:31, backup:'2 Sep'},
   {id:'gtav', name:'GTA V Enhanced', art:COVERS[6], status:'synced', play:'40 h', last:'29 Aug', path:'Documents\\Rockstar Games\\GTAV Enhanced\\Profiles', size:12582912, versions:11, backup:'29 Aug', blocked:'Ships an anti-cheat and has an online mode, so it can\u2019t be shared.'}
 ];
+// The games found but not syncing yet: in Every game, below the ones that sync.
+var FOUND = [
+  {id:'ror2', name:'Risk of Rain 2', status:'not-syncing', path:'Steam\\userdata\\281062582\\632360\\remote', size:1209000, versions:'', backup:''},
+  {id:'valheim', name:'Valheim', status:'not-syncing', path:'LocalLow\\IronGate\\Valheim', size:20971520, versions:'', backup:''},
+  {id:'core', name:'Core Keeper', status:'not-syncing', path:'LocalLow\\Pugstorm\\Core Keeper\\Steam\\281062582', size:5242880, versions:'', backup:''},
+  {id:'apex', name:'Apex Legends', status:'not-syncing', path:'Saved Games\\Respawn\\Apex\\local', size:65536, versions:'', backup:''}
+];
+// A table's heading: what it holds, how many, and a line on what it's for.
+function TableHead(p){ return h('div',{className:'sm-head'},
+  h('span',{className:'sm-head-icon'+(p.all?' is-all':''),'aria-hidden':'true'},h(G.Icon,{name:p.icon,size:20,strokeWidth:2})),
+  h('div',{className:'sm-head-text'},h('h2',{className:'sm-head-title'},p.title,h('span',{className:'sm-head-count','aria-label':p.count+' games'},p.count)),h('p',{className:'sm-head-sub'},p.sub))); }
 function shareGames(){ return GAMES.map(function(g){var vs=[{id:'latest',label:'Latest',when:g.backup,pc:'DESKTOP',size:g.size},{id:'prev',label:'Previous',when:'1 day earlier',pc:'LAPTOP',size:Math.round(g.size*0.97)}];if(g.id==='sekiro')vs.push({id:'pin',label:'Before update 1.06',when:'12 Sep',pc:'DESKTOP',size:2097152,pinned:true});return {id:g.id,name:g.name,art:g.art,size:g.size,totalSize:Math.round(g.size*Math.min(g.versions,10)*0.35),versionCount:Math.min(g.versions,10),versions:vs,blocked:g.blocked};}); }
 var IMPORT_ITEMS = [
   {id:'terraria', name:'Terraria', art:COVERS[1], match:'matched', versions:1, size:338000000},
@@ -51,7 +72,8 @@ function rail(cur){return h(G.SideRail,{current:cur,items:[
   {id:'search',icon:'search',label:'Search'},
   {id:'home',icon:'home',label:'Home',sep:true},
   {id:'library',icon:'library',label:'Game library',dot:'play',dotLabel:'Slay the Spire 2 is running'},
-  {id:'saves',icon:'saves',label:'Save manager',sep:true,dot:'warn',dotLabel:'2 games need you'},
+  {id:'achievements',icon:'trophy',label:'Achievements'},
+  {id:'saves',icon:'saves',label:'Save manager',sep:true,dot:'warn',dotLabel:'2 conflicts'},
   {id:'log',icon:'terminal',label:'Console'},
   {id:'settings',icon:'settings',label:'Settings',bottom:true}]})}
 function topbar(title,sub,tabs,right){return h('header',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',gap:16}},h('div',null,h('div',{style:{font:'600 15px/20px var(--font-sans)'}},title),h('div',{className:'gs-faint',style:{fontSize:12}},sub)),tabs,h('div',{className:'gs-row',style:{flexWrap:'nowrap'}},right));}
@@ -127,6 +149,9 @@ function GameSaves(p){
 
 function App(){
  var s=React.useState(['sekiro','cuphead']), d=React.useState(null);
+ var COLUMNS=[
+   {key:'name',label:'Game',render:function(r){return h('button',{type:'button',className:'sm-open',onClick:function(e){e.stopPropagation();open[1](r.id)}},r.name)}},
+   {key:'status',label:'Status'},{key:'path',label:'Save path',path:true},{key:'versions',label:'Ver',align:'right'},{key:'size',label:'Size',align:'right',render:function(r){return r.size?G.formatBytes(r.size):''}},{key:'backup',label:'Last backup',align:'right'}];
  var open=React.useState((location.hash||'').slice(1)||INITIAL);
  var game=open[0]?GAMES.filter(function(g){return g.id===open[0]})[0]:null;
  React.useEffect(function(){
@@ -138,16 +163,19 @@ function App(){
   h('main',{className:'sm-main'},
    game ? h(GameSaves,{key:game.id,game:game,onBack:function(){open[1](null)}}) : [
    h(React.Fragment,{key:'top'},topbar('Save manager','DESKTOP \u00b7 daily backup 20:00',
-     h(G.PillTabs,{label:'Save manager view',items:[{id:'saves',label:'Saves',icon:'saves'},{id:'plan',label:'Plan',icon:'chevronsRight'},{id:'versions',label:'Versions',icon:'clock'},{id:'log',label:'Log',icon:'terminal'}]}),
-     [h(G.Button,{key:1,variant:'secondary',icon:'share',disabled:!s[0].length,onClick:function(){d[1]('pick')}},s[0].length?'Share '+s[0].length+' selected':'Share selected'),
-      h(G.Button,{key:2,variant:'secondary',icon:'zip',onClick:function(){d[1]('all')}},'Share all'),
-      h(G.IconButton,{key:4,icon:'download',label:'Import saves',onClick:function(){d[1]('import')}}),
+     h(G.PillTabs,{label:'Save manager view',items:[{id:'saves',label:'Saves',icon:'saves'},{id:'needs',label:'Conflicts',icon:'alert',count:2},{id:'plan',label:'Plan',icon:'chevronsRight'},{id:'versions',label:'Versions',icon:'clock'},{id:'log',label:'Log',icon:'terminal'}]}),
+     [h(G.IconButton,{key:4,icon:'download',label:'Import saves',onClick:function(){d[1]('import')}}),
       h(G.Button,{key:3,variant:'primary',icon:'sync'},'Sync now')])),
-   h('div',{key:'stats',style:{display:'flex',gap:48,padding:'4px 4px 0'}},h(Stat,{k:'Games',v:'12'}),h(Stat,{k:'Backups on this PC',v:'1.04 GB',sub:'E: \u00b7 312 GB free'}),h(Stat,{k:'Versions',v:'214'}),h(Stat,{k:'Last backup',v:'20:00'}),h(Stat,{k:'Needs you',v:'2'})),
-   h(G.ConsoleTable,{key:'table',command:'saves --pc DESKTOP --sort last-played',toolbar:h('span',null,s[0].length+' of '+GAMES.length+' selected \u00b7 a game\u2019s name opens its saves'),selected:s[0],onSelect:s[1],rows:GAMES,columns:[
-     {key:'name',label:'Game',render:function(r){return h('button',{type:'button',className:'sm-open',onClick:function(e){e.stopPropagation();open[1](r.id)}},r.name)}},
-     {key:'status',label:'Status'},{key:'path',label:'Save path',path:true},{key:'versions',label:'Ver',align:'right'},{key:'size',label:'Size',align:'right',render:function(r){return G.formatBytes(r.size)}},{key:'backup',label:'Last backup',align:'right'}]}),
-   h(G.ConsoleLog,{key:'log',live:true,grow:true,lines:[
+   h('div',{key:'stats',style:{display:'flex',gap:48,padding:'4px 4px 0'}},h(Stat,{k:'Games',v:'12'}),h(Stat,{k:'Backups on this PC',v:'1.04 GB',sub:'E: \u00b7 312 GB free'}),h(Stat,{k:'Versions',v:'214'}),h(Stat,{k:'Last backup',v:'20:00'}),h(Stat,{k:'Conflicts',v:'2'})),
+   h('div',{key:'tables',className:'sm-tables'},
+     h(TableHead,{icon:'cloudCheck',title:'Syncing between your PCs',count:GAMES.length,sub:'Backed up here and in your cloud, the newest save brought down to your other PCs. Tick games to share them.'}),
+     h(G.ConsoleTable,{command:'saves --syncing --sort last-played',toolbar:h('span',{className:'gs-row',style:{flexWrap:'nowrap'}},
+         h(G.Button,{size:'sm',variant:'secondary',icon:'share',disabled:!s[0].length,onClick:function(){d[1]('pick')}},s[0].length?'Share '+s[0].length+' selected':'Share selected'),
+         h(G.Button,{size:'sm',variant:'secondary',icon:'zip',onClick:function(){d[1]('all')}},'Share all')),
+       selected:s[0],onSelect:s[1],rows:GAMES,columns:COLUMNS}),
+     h(TableHead,{icon:'saves',all:true,title:'Every game with saves on this PC',count:GAMES.length+FOUND.length,sub:'Everything the scan found, syncing or not. A game\u2019s row opens its saves, where Sync these saves starts one syncing.'}),
+     h(G.ConsoleTable,{command:'saves --all --sort last-played',toolbar:h('span',null,'a game\u2019s row opens its saves'),rows:GAMES.concat(FOUND),columns:COLUMNS,onRowClick:function(r){open[1](r.id)}})),
+   h(G.ConsoleLog,{key:'log',live:true,lines:[
     {time:'20:00:02',level:'info',tag:'backup',msg:'daily backup started \u00b7 12 games'},
     {time:'20:00:09',level:'ok',tag:'upload',msg:'Terraria  v52  326.0 MB  (3 files changed)'},
     {time:'20:00:11',level:'warn',tag:'held',msg:'Black Myth: Wukong changed while the game was not running. Held for review.'},

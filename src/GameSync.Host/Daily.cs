@@ -23,7 +23,9 @@ internal static class Daily
 
     private const string LastKey = "daily.last";
 
-    public static async Task<DailyRun> RunAsync(string dataDir, IAgentOutput output, Func<GameId, bool>? isRunning, CancellationToken ct)
+    /// <param name="deferUploads">KAN-88: the app's agent runs it: its uploads follow beside the rounds.</param>
+    public static async Task<DailyRun> RunAsync(string dataDir, IAgentOutput output, Func<GameId, bool>? isRunning, CancellationToken ct,
+        bool deferUploads = false)
     {
         using var engineLock = await EngineLock.AcquireAsync(dataDir, null, ct);
         using var engine = Engine.Open(dataDir);
@@ -34,7 +36,7 @@ internal static class Daily
         }
 
         var running = isRunning ?? new RunningGames(engine).IsRunning;
-        var (service, recovered) = await engine.OpenServiceAsync(new SyncOptions { IsRunning = running, UploadLabel = VersionNote }, ct);
+        var (service, recovered) = await engine.OpenServiceAsync(new SyncOptions { IsRunning = running, UploadLabel = VersionNote, DeferUploads = deferUploads }, ct);
         await Builds.KeepAsync(engine, service, Builds.Changed(engine), output, ct);
         var results = recovered.Concat(await service.SyncAsync(null, ct)).ToList();
 
@@ -47,7 +49,7 @@ internal static class Daily
         var run = new DailyRun(DateTime.UtcNow, results.Count, results.Count(r => r.NewVersion is not null),
             results.Count(r => r.Status is GameStatus.Conflict or GameStatus.SavesMissing or GameStatus.Blocked or GameStatus.HeldForReview));
         engine.State.SetSetting(LastKey, JsonSerializer.Serialize(run, Json.Options));
-        output.Say($"Daily run: {run.Games} games checked, {run.Uploads} uploaded{(run.NeedYou > 0 ? $", {run.NeedYou} need you" : "")}.");
+        output.Say($"Daily run: {run.Games} games checked, {run.Uploads} uploaded{(run.NeedYou > 0 ? $", {run.NeedYou} conflict{(run.NeedYou == 1 ? "" : "s")}" : "")}.");
 
         // BG-05: the optional daily summary, one line the person asked for in Settings → Notifications.
         if (engine.State.GetSetting(SettingsData.DailyNoteKey) == "1")
@@ -71,8 +73,8 @@ internal static class Daily
         return run.NeedYou switch
         {
             0 => changed,
-            1 => $"{changed} 1 game needs you: open GameSync to see it.",
-            _ => $"{changed} {run.NeedYou} games need you: open GameSync to see them.",
+            1 => $"{changed} 1 conflict: open GameSync to see it.",
+            _ => $"{changed} {run.NeedYou} conflicts: open GameSync to see them.",
         };
     }
 

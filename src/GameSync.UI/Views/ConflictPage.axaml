@@ -18,7 +18,7 @@
           <c:GsIcon Icon="chevronRight" Size="14" Foreground="{DynamicResource ink-muted}" VerticalAlignment="Center" />
           <Button Theme="{StaticResource CrumbButton}" Content="{Binding Title}" Command="{Binding OpenSavesCommand}" />
           <c:GsIcon Icon="chevronRight" Size="14" Foreground="{DynamicResource ink-muted}" VerticalAlignment="Center" />
-          <TextBlock Text="Conflict" FontSize="13" FontWeight="Medium" VerticalAlignment="Center" />
+          <TextBlock Text="Conflict" FontSize="{DynamicResource fs-13}" FontWeight="Medium" VerticalAlignment="Center" />
         </StackPanel>
       </StackPanel>
     </Grid>
@@ -36,8 +36,8 @@
         <StackPanel Spacing="8">
           <c:GsStatusBadge Status="{x:Static s:GameStatus.Conflict}" Label="{Binding StatusLabel}" HorizontalAlignment="Left"
                            IsVisible="{Binding !ShowsNothing}" />
-          <TextBlock Text="{Binding Headline}" FontSize="24" LineHeight="30" FontWeight="SemiBold" TextWrapping="Wrap" />
-          <TextBlock Classes="muted" Text="{Binding Sentence}" FontSize="14" LineHeight="21" TextWrapping="Wrap" MaxWidth="780" HorizontalAlignment="Left" />
+          <TextBlock Text="{Binding Headline}" FontSize="{DynamicResource fs-24}" LineHeight="{DynamicResource lh-30}" FontWeight="SemiBold" TextWrapping="Wrap" />
+          <TextBlock Classes="muted" Text="{Binding Sentence}" FontSize="{DynamicResource fs-14}" LineHeight="{DynamicResource lh-21}" TextWrapping="Wrap" MaxWidth="780" HorizontalAlignment="Left" />
         </StackPanel>
 
         <c:GsNote Icon="sync" Text="{Binding Busy}" IsVisible="{Binding !NotBusy}" />
@@ -48,7 +48,7 @@
                 IsVisible="{Binding !ShowsNothing}">
           <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
             <c:GsIcon Icon="info" Size="16" Foreground="{DynamicResource ink-muted}" VerticalAlignment="Center" />
-            <TextBlock Grid.Column="1" FontSize="13" LineHeight="19" TextWrapping="Wrap" VerticalAlignment="Center">
+            <TextBlock Grid.Column="1" FontSize="{DynamicResource fs-13}" LineHeight="{DynamicResource lh-19}" TextWrapping="Wrap" VerticalAlignment="Center">
               <Run Text="{Binding Suggestion}" FontWeight="SemiBold" /><Run Text=" " /><Run Text="{Binding SuggestionWhy}" />
             </TextBlock>
             <c:GsButton Grid.Column="2" Classes="ghost sm" Icon="settings" Content="Change for this game" Command="{Binding ChangeForGameCommand}"
@@ -82,7 +82,7 @@
                   <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,16">
                     <StackPanel Spacing="2">
                       <TextBlock Classes="overline" Text="{Binding Where}" />
-                      <TextBlock Classes="mono" Text="{Binding Pc}" FontSize="20" LineHeight="26" FontWeight="Bold" TextTrimming="CharacterEllipsis" />
+                      <TextBlock Text="{Binding Pc}" FontFamily="{DynamicResource font-mono}" FontSize="{DynamicResource fs-20}" LineHeight="{DynamicResource lh-26}" FontWeight="Bold" TextTrimming="CharacterEllipsis" />
                     </StackPanel>
                     <c:GsTag Grid.Column="1" Text="Newest" Background="{DynamicResource secondary-soft}" Foreground="{DynamicResource ink}"
                              IsVisible="{Binding Newest}" VerticalAlignment="Top" />

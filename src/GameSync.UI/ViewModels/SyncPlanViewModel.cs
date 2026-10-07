@@ -259,7 +259,7 @@ public sealed partial class SyncPlanViewModel : ObservableObject
         Stats =
         [
             new SaveStat("Will run", Ticked.ToString(CultureInfo.InvariantCulture)),
-            new SaveStat("Needs you", needYou.ToString(CultureInfo.InvariantCulture)),
+            new SaveStat("Conflicts", needYou.ToString(CultureInfo.InvariantCulture)),
             new SaveStat("Waiting", (Waits.Count - needYou).ToString(CultureInfo.InvariantCulture)),
             new SaveStat("In sync", InSync.Count.ToString(CultureInfo.InvariantCulture)),
             new SaveStat("To move", Cli.FormatSize(Changes.Where(c => c.IsChecked).Sum(c => c.Change.Bytes))),

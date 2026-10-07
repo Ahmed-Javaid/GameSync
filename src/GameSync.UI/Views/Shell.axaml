@@ -13,7 +13,9 @@
              the strip, whose lower part is the page's own clear margin, so that drags too. -->
         <Border VerticalAlignment="Top" Height="{Binding $parent[v:Shell].TitleBarHeight}" Background="Transparent"
                 WindowDecorationProperties.ElementRole="TitleBar" />
-        <ContentControl Content="{Binding Page}" Margin="{Binding $parent[v:Shell].PageMargin}" IsEnabled="{Binding !HasDialog}" />
+        <!-- PERF-03: the library stays made once opened, in a place of its own; every other page is made as it's shown -->
+        <ContentControl Content="{Binding KeptLibrary}" IsVisible="{Binding ShowsLibrary}" Margin="{Binding $parent[v:Shell].PageMargin}" IsEnabled="{Binding !HasDialog}" />
+        <ContentControl Content="{Binding OtherPage}" IsVisible="{Binding !ShowsLibrary}" Margin="{Binding $parent[v:Shell].PageMargin}" IsEnabled="{Binding !HasDialog}" />
       </Panel>
     </DockPanel>
 

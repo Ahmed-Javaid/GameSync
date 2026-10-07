@@ -15,6 +15,9 @@ namespace GameSync.UI.ViewModels;
 /// </summary>
 public sealed record KeptItem(string Name, string Meta, string Size, string? Same)
 {
+    /// <summary>Its size in bytes, for a sum of what's kept (KAN-61).</summary>
+    public long Bytes { get; init; }
+
     public bool HasSame => Same is not null;
 
     /// <summary>It becomes a named save: a copy of its own, or one already in the history, which only gets the name.</summary>
@@ -38,7 +41,8 @@ public sealed partial class ImportKeptViewModel : ObservableObject
 
     /// <summary>pick, looking, review, importing or done.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(Picking), nameof(Reviewing), nameof(Busy), nameof(Done), nameof(CanImport), nameof(ShowsFolder), nameof(ImportLabel))]
+    [NotifyPropertyChangedFor(nameof(Picking), nameof(Reviewing), nameof(Busy), nameof(Looking), nameof(Importing), nameof(Done), nameof(CanImport), nameof(ShowsFolder),
+        nameof(ImportLabel))]
     private string _stage = "pick";
 
     [ObservableProperty]
@@ -114,6 +118,12 @@ public sealed partial class ImportKeptViewModel : ObservableObject
     public bool Reviewing => Stage == "review";
 
     public bool Busy => Stage is "looking" or "importing";
+
+    /// <summary>KAN-80: the folder's copies are being read.</summary>
+    public bool Looking => Stage == "looking";
+
+    /// <summary>KAN-80: the copies are coming in: Import says Importing….</summary>
+    public bool Importing => Stage == "importing";
 
     public bool Done => Stage == "done";
 

@@ -6,7 +6,7 @@
   <ControlTheme x:Key="{x:Type c:GsConsole}" TargetType="c:GsConsole">
     <Setter Property="Background" Value="{DynamicResource bg-000}" />
     <Setter Property="FontFamily" Value="{DynamicResource font-mono}" />
-    <Setter Property="FontSize" Value="13" />
+    <Setter Property="FontSize" Value="{DynamicResource fs-13}" />
     <Setter Property="Template">
       <ControlTemplate>
         <Border Background="{TemplateBinding Background}" BorderBrush="{DynamicResource edge-console}" BorderThickness="1" BackgroundSizing="OuterBorderEdge"
@@ -14,12 +14,13 @@
           <DockPanel>
             <Border Name="PART_Bar" DockPanel.Dock="Top" BorderBrush="{DynamicResource line-100}" BorderThickness="0,0,0,1" Padding="16,12" IsVisible="False">
               <Grid ColumnDefinitions="*,Auto">
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                  <TextBlock Text="&gt; " FontSize="12" Foreground="{DynamicResource primary}" />
-                  <TextBlock Text="{TemplateBinding Command}" FontSize="12" Foreground="{DynamicResource ink-muted}" TextTrimming="CharacterEllipsis" />
-                </StackPanel>
+                <!-- A dock, not a stack, so a long command shortens before the toolbar instead of running under it (A11Y-04) -->
+                <DockPanel VerticalAlignment="Center">
+                  <TextBlock DockPanel.Dock="Left" Text="&gt; " FontSize="{DynamicResource fs-12}" Foreground="{DynamicResource primary}" />
+                  <TextBlock Text="{TemplateBinding Command}" FontSize="{DynamicResource fs-12}" Foreground="{DynamicResource ink-muted}" TextTrimming="CharacterEllipsis" />
+                </DockPanel>
                 <ContentPresenter Grid.Column="1" Content="{TemplateBinding Toolbar}" VerticalAlignment="Center" Margin="12,0,0,0"
-                                  Foreground="{DynamicResource ink-muted}" FontSize="12" />
+                                  Foreground="{DynamicResource ink-muted}" FontSize="{DynamicResource fs-12}" />
               </Grid>
             </Border>
             <ContentPresenter Content="{TemplateBinding Content}" ContentTemplate="{TemplateBinding ContentTemplate}" />
@@ -107,7 +108,7 @@
   <ControlTheme x:Key="{x:Type c:GsConsoleLog}" TargetType="c:GsConsoleLog">
     <Setter Property="Background" Value="{DynamicResource bg-000}" />
     <Setter Property="FontFamily" Value="{DynamicResource font-mono}" />
-    <Setter Property="FontSize" Value="12" />
+    <Setter Property="FontSize" Value="{DynamicResource fs-12}" />
     <Setter Property="Template">
       <ControlTemplate>
         <Border Background="{TemplateBinding Background}" BorderBrush="{DynamicResource edge-console}" BorderThickness="1" BackgroundSizing="OuterBorderEdge"

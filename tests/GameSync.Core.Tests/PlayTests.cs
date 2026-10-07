@@ -4,13 +4,13 @@ using GameSync.Core.Sync;
 
 namespace GameSync.Core.Tests;
 
-/// <summary>While a game runs, and around it: BAK-10, BG-08, PLAY-03, PLAY-07 and BAK-06.</summary>
+/// <summary>While a game runs, and around it: BAK-10, BG-08, PLAY-03, PLAY-07 and BAK-06; KAN-91's restores while it runs.</summary>
 public class PlayTests
 {
     private static readonly GameId Game = GameId.Parse("game");
 
     [Fact]
-    public async Task BAK_10_while_the_game_runs_nothing_downloads_or_restores_and_it_says_why()
+    public async Task BAK_10_while_the_game_runs_nothing_downloads_by_itself_but_a_restore_asked_for_goes_ahead()
     {
         using var world = new TestWorld();
         using var desktop = world.Pc("DESKTOP");
@@ -21,16 +21,18 @@ public class PlayTests
         await desktop.SyncAsync();
         laptop.Running.Add(Game);
 
+        // The agent's sync leaves a running game alone (BG-08)...
         var playing = Assert.Single(await laptop.SyncAsync());
-        var desktops = Assert.Single(await Cloud.VersionsAsync(world, "game"));
-        var restore = await Assert.ThrowsAsync<InvalidOperationException>(() => laptop.Service().RestoreAsync(Game, desktops.Id, CancellationToken.None));
-
         Assert.Equal((SyncAction.Playing, GameStatus.Playing), (playing.Action, playing.Status));
-        Assert.Contains("is running", restore.Message, StringComparison.Ordinal);
         Assert.Empty(laptop.Tree("game"));
 
+        // ...but a restore the person asks for goes ahead (KAN-91, the owner, 2 Oct 2026, replacing the wait until it closes).
+        var desktops = Assert.Single(await Cloud.VersionsAsync(world, "game"));
+        await laptop.Service().RestoreAsync(Game, desktops.Id, CancellationToken.None);
+        Assert.Equal("desktop's", laptop.Read("game", "slot.sav"));
+
         laptop.Running.Clear();
-        Assert.Equal(SyncAction.Download, Assert.Single(await laptop.SyncAsync()).Action);
+        Assert.NotEqual(GameStatus.Conflict, Assert.Single(await laptop.SyncAsync()).Status);
         Assert.Equal("desktop's", laptop.Read("game", "slot.sav"));
     }
 

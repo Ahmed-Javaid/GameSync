@@ -7,6 +7,11 @@
     <Deterministic>true</Deterministic>
     <!-- R20: dependency versions are pinned in packages.lock.json. -->
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <!-- Release zips are published for 64-bit Windows (tools/release/pack.ps1); every restore resolves for it too, so the
+         lock files pin its native packages and don't change between a build and a release. -->
+    <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
     <Product>GameSync</Product>
+    <!-- Milestone 5's builds are 0.5; v1.0 is the signed release (Milestone 6). Release zips add the date (tools/release/pack.ps1). -->
+    <VersionPrefix>0.5.0</VersionPrefix>
   </PropertyGroup>
 </Project>

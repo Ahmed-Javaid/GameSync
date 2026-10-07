@@ -6,6 +6,7 @@ A theme is four choices: a **mode** (Dark, Light or Match Windows), **pure black
 
 - Status colours: `ok`, `warn`, `danger`, `play`, `neutral` and their `-soft` grounds have one value per mode and ignore the preset. A Conflict is amber with its warning icon in every theme.
 - Cover-art colours: `on-art`, `glass`, `glass-edge` and `art-scrim` are the same in every mode, because they sit on game art, not on the theme. A status badge on art takes its `-art` tint (`ok-art` and the rest): the same in every dark theme and both surfaces, and the opaque `-soft` in light mode.
+- Achievements' metals: `bronze`, `silver`, `gold`, `platinum`, their `-deep` edges and `on-metal` are the same in every theme. Zenith's word on a page is the one metal that minds the mode (version 36): `zenith-ink` to `zenith-ink-deep`, the platinum metal across it in dark themes and a deep steel in light (`#5a7896` to `#3b5670`, 4.5:1 or better on light cards), where the metal's pale blue wouldn't show. The popup is always dark glass, so its word stays in the metal.
 - Shapes, type, spacing and radii. A theme only recolours.
 
 ## Presets
@@ -32,6 +33,7 @@ Primary and secondary can each be swapped for one of eleven swatches: Cyan, Aqua
 - **Light mode**: the seed's saturation is capped at 72% and it is darkened until it reaches 4.6:1 on `bg-300`; near-white seeds jump straight to a dark slate. `on-primary` and `on-secondary` are white.
 - **Soft grounds**: `primary-soft` and `secondary-soft` take the colour's hue at low saturation, dark in dark mode and pale in light mode; the colour itself stays 4.5:1 on its soft ground.
 - **Surfaces**: `bg-000` to `bg-400` and `line-100` are fixed lightness steps in the preset's tint hue at 0 to 16% saturation. Pure black sets `bg-100` to `#000000` and lifts cards slightly so they stay visible.
+- **Light mode's surfaces** (redone in version 35; the owner, 3 Oct 2026: light mode "barely has any separation between background, foreground and the elements on screen. It just looks white"): the page (`bg-100`) a clear cool grey at 91% lightness; cards (`bg-200`) white, with a hairline `edge-card` and a soft `lift-card` shadow in the theme's deep ink; console panes (`bg-000`) a near-white step between them; controls inside a card (`bg-300`) a light grey on the white. Before, the page and the cards were 96% and 100%, with no edge: a white screen.
 - **Text and borders**: `ink-muted`, `ink-faint` and `line-200` are moved until they pass 6:1, 4.6:1 and 3:1 on every ground they sit on, selection included.
 - Every preset in every mode, and every swatch in either role, passes these checks; the automated contrast test covers them all.
 
@@ -45,8 +47,8 @@ Primary and secondary can each be swapped for one of eleven swatches: Cyan, Aqua
 
 Picked under Appearance → Surface, saved per PC; a fresh install starts in **Glossy**.
 
-- **Solid** is the plain look: every surface is opaque and cards sit apart by surface alone. The edge tokens (`edge-card`, `edge-control`, `edge-console`, `edge-well`, `edge-dialog`, `edge-art`) are clear and `lift-card` is none, so Solid looks exactly as it did before Glossy existed.
-- **Glossy** puts each page on a blurred, darkened copy of a game's art: the page's own game on game detail and conflict, otherwise the last one played. The art is blurred 64px and saturated 1.3, reaching 140px past each edge of the window, then a scrim darkens it from top to bottom. `GameSync.theme.glass(choice, strength)` gives what changes: the surfaces become see-through, the edges appear (white at 4 to 9%), cards get a lit top edge, dialogs stay nearly opaque.
+- **Solid** is the plain look: every surface is opaque. In dark mode cards sit apart by surface alone: the edge tokens (`edge-card`, `edge-control`, `edge-console`, `edge-well`, `edge-dialog`, `edge-art`) are clear and `lift-card` is none, so dark Solid looks exactly as it did before Glossy existed. In light mode white cards need more on a light page: cards, consoles, wells, dialogs and art get a hairline in the theme's deep ink (6 to 12%) and cards a soft shadow, `0 1px 3px` at 8% (version 35). A control's edge stays clear in both, so a hovered control shows no ring.
+- **Glossy** puts each page on a blurred copy of a game's art, darkened in dark mode and lightened in light mode: the page's own game on game detail and conflict, otherwise the last one played. The art is blurred 64px and saturated 1.3, reaching 140px past each edge of the window, then a scrim darkens it from top to bottom. `GameSync.theme.glass(choice, strength)` gives what changes: the surfaces become see-through, the edges appear (white at 4 to 9%), cards get a lit top edge, dialogs stay nearly opaque.
 - Three **strengths**, by screen:
 
 | Strength | Screens | Page ground | Cards | Rail | Scrim from top to bottom |
@@ -55,14 +57,23 @@ Picked under Appearance → Surface, saved per PC; a fresh install starts in **G
 | `home` | none since 1 Oct 2026 (Home and the library, until the owner found their cards grey over the art); kept for a page that wants a step more solid | `bg-000` | the card colour at 60% | `bg-100` at 25% | 48%, 77% at 40%, 86% at 68%, 88% |
 | `glow` | first run, settings | `bg-100` | `bg-200` at 82% | `bg-100` at 50% | 56%, 84% at 36%, 93% at 60%, 95% |
 
+- **Light mode's Glossy** (version 35; the owner: "there isn't even any difference in glossy/solid in light mode"): frosted white over the art. The scrim is a light tint of the page (lightness 94%) laid over the art from top to bottom, so the art shows soft and pale; cards are white at 60% with a bright edge (white at 65%) and a soft shadow; controls inside them are the deep ink at 5 to 10%; dialogs stay nearly opaque. Text stays dark. Status chips keep their opaque light grounds (`ok-soft` and the rest): see-through, Needs you's amber couldn't keep 4.5:1 over every art (as built, version 36).
+
+| Strength, light | Cards | Page ground | Scrim from top to bottom |
+| --- | --- | --- | --- |
+| `glass` | white at 60% | white at 12% | 46%, 68% at 40%, 82% |
+| `home` | white at 72% | `bg-100` at 35% | 52%, 74% at 40%, 84% at 68%, 88% |
+| `glow` | `bg-200` at 86% | `bg-100` at 55% | 60%, 86% at 36%, 94% at 60%, 96% |
+
 - **A backdrop's colour is capped** (LOOK-22, 1 Oct 2026): above an OKLab chroma of 0.10 the art's colour eases towards 0.15, keeping its lightness and hue, so one vivid colour filling the art (Counter-Strike 2's orange) doesn't flood the app, while muted art keeps its colour. The app does it as it makes the backdrop; these previews show the plain saturate(1.3).
-- **Contrast holds over any art** (LOOK-18). The scrim's stops are the least darkening; the app measures each picture and darkens a row further wherever the art is bright, just enough that every text colour keeps 4.5:1, and controls and borders 3:1, on every surface over every pixel. Dark art keeps the design's gradient exactly. Its test runs every dark theme and strength over white, black, saturated colours, a bright sky, hard stripes and noise. These previews show the design's stops over dark sample art.
-- **When Glossy goes Solid**: in light mode (a light Glossy isn't designed yet), with pure black, when Windows' transparency effects are off, and on a page with no art. The Surface choice stays; the page follows it again when those change.
+- **Contrast holds over any art** (LOOK-18). The scrim's stops are the least darkening; the app measures each picture and darkens a row further wherever the art is bright, just enough that every text colour keeps 4.5:1, and controls and borders 3:1, on every surface over every pixel. Dark art keeps the design's gradient exactly. In light mode it's the other way round: a row is lightened further wherever the art is dark, until the dark text keeps 4.5:1. Its test runs every theme, dark and light, and strength over white, black, saturated colours, a bright sky, hard stripes and noise. These previews show the design's stops over sample art.
+- **When Glossy goes Solid**: with pure black, when Windows' transparency effects are off, and on a page with no art. Light mode has its own Glossy since version 35. The Surface choice stays; the page follows it again when those change.
 - In the previews, `ThemeScope` with `art` and `strength` draws a page in the Surface picked on the Settings screen, which every screen follows; `surface` fixes it for one scope.
 
 ## In the app
 
 - Build the colour resources from the four choices at start-up and whenever one changes; nothing restarts. In Glossy, a page's strength lays its see-through surfaces over those resources for the window's frame and page, and the backdrop is made once per game, strength and theme, off the UI thread, as a small blurred picture (no live blur), so it runs on Windows 10 and 11 alike.
 - Match Windows follows the Windows light or dark setting and changes live when Windows does; the Windows accent preset reads the accent colour the same way.
+- A change of look isn't a jump (KAN-76, the owner, 1 Oct 2026): the window as it looked stays over the new look as a picture, and the new look comes through it from where the person clicked, a circle with a soft edge that grows over 0.6s, clear inside so no text shows twice for long, as a new game's backdrop lights up. Glossy and Solid alone turn into each other evenly, all of the window at once, over 0.5s (the owner: not a circle). When Windows makes the change (Match Windows), the old look fades out over 0.4s. With Windows' animation effects off, the look changes at once.
 - Save the choices per PC, not in the cloud: each PC keeps its own look.
 - Windows notifications and the tray menu belong to Windows and follow its theme, not GameSync's.

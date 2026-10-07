@@ -177,7 +177,7 @@ public static class SteamArt
             : [];
 
     /// <summary>Text from Steam, fit to show: no control characters, runs of white space made one, and at most <paramref name="max"/> characters.</summary>
-    private static string? Clean(string? text, int max)
+    public static string? Clean(string? text, int max)
     {
         if (string.IsNullOrWhiteSpace(text))
         {

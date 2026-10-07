@@ -23,6 +23,8 @@ public partial class SettingsPage : UserControl
         MoveBackupCommand = new RelayCommand(PickBackupFolder);
         AddGameFolderCommand = new RelayCommand(PickGameFolder);
         AddSaveFolderCommand = new RelayCommand(PickSaveFolder);
+        AddRecordFolderCommand = new RelayCommand(PickRecordFolder);
+        PickShareFolderCommand = new RelayCommand(PickShareFolder);
         InitializeComponent();
     }
 
@@ -34,6 +36,12 @@ public partial class SettingsPage : UserControl
 
     /// <summary>Add folder in Extra save folders (FOLD-08).</summary>
     public ICommand AddSaveFolderCommand { get; }
+
+    /// <summary>Change… on where shared zips go (FOLD-09).</summary>
+    public ICommand PickShareFolderCommand { get; }
+
+    /// <summary>Add a folder in Copies Steam doesn't run (KAN-123).</summary>
+    public ICommand AddRecordFolderCommand { get; }
 
     protected override void OnAttachedToVisualTree(Avalonia.VisualTreeAttachmentEventArgs e)
     {
@@ -102,6 +110,22 @@ public partial class SettingsPage : UserControl
         if (_model is { } model && await PickFolder("A folder with saves in it") is { } picked)
         {
             await model.Storage.AddSaveFolder(picked);
+        }
+    }
+
+    private async void PickRecordFolder()
+    {
+        if (_model is { } model && await PickFolder("The folder where your other copies keep their achievements, one folder per game") is { } picked)
+        {
+            await model.Achievements.AddRecordFolder(picked);
+        }
+    }
+
+    private async void PickShareFolder()
+    {
+        if (_model is { } model && await PickFolder("Where shared zips go") is { } picked)
+        {
+            await model.Storage.SetShareFolder(picked);
         }
     }
 

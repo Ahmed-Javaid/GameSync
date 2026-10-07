@@ -132,6 +132,29 @@ public class LocalGamesTests
     }
 
     [Fact]
+    public void PERF_03_the_library_stays_made_while_other_pages_show_and_shows_again_at_once()
+    {
+        var library = new LibraryViewModel();
+        var home = new object();
+
+        // A window opened on the library shows it in its own place from the start.
+        var shell = new ShellViewModel(id => id == "library" ? library : home, "library");
+        Assert.Same(library, shell.KeptLibrary);
+        Assert.True(shell.ShowsLibrary);
+        Assert.Null(shell.OtherPage);
+
+        // Home shows in the other place; the library stays made, hidden.
+        shell.NavigateCommand.Execute("home");
+        Assert.Same(home, shell.OtherPage);
+        Assert.False(shell.ShowsLibrary);
+        Assert.Same(library, shell.KeptLibrary);
+
+        shell.NavigateCommand.Execute("library");
+        Assert.True(shell.ShowsLibrary);
+        Assert.Null(shell.OtherPage);
+    }
+
+    [Fact]
     public void LIB_24_a_programs_game_folder_is_above_the_folders_engines_keep_programs_in()
     {
         using var world = new TestWorld();

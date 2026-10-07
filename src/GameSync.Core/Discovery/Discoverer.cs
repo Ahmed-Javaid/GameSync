@@ -99,7 +99,7 @@ public sealed partial class Discoverer(SaveList? saveList, IReadOnlyDictionary<s
 
     /// <summary>Folders and files that change all the time but never hold saves.</summary>
     [GeneratedRegex(@"(^|/)(Temp|tmp|Cache|Caches|cache2|GPUCache|ShaderCache|DXCache|GLCache|D3DSCache|CrashDumps|Crashes|CrashReportClient|Logs?|INetCache|WebCache|Code Cache|htmlcache|Service Worker|IndexedDB|Local Storage|Session Storage|blob_storage|Packages|Microsoft|Google|Mozilla|BraveSoftware|NVIDIA|NVIDIA Corporation|AMD|discord|Spotify|JetBrains|Code|npm-cache|pip)(/|$)", RegexOptions.IgnoreCase)]
-    private static partial Regex NoisePath();
+    internal static partial Regex NoisePath();
 
     /// <summary>Directory listings, so each folder is read once per scan however many paths pass through it.</summary>
     private readonly ConcurrentDictionary<string, (string Name, bool IsFolder, bool IsLink)[]> _listings = new(StringComparer.OrdinalIgnoreCase);

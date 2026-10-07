@@ -29,7 +29,7 @@
           <Border Name="PART_Message" CornerRadius="{DynamicResource radius-md}" Padding="12,8" IsVisible="False">
             <StackPanel Orientation="Horizontal" Spacing="6">
               <c:GsIcon Name="PART_MessageIcon" Icon="unplug" Size="16" VerticalAlignment="Center" />
-              <TextBlock Text="{TemplateBinding Message}" FontSize="12" LineHeight="16" FontWeight="Medium" TextWrapping="Wrap" VerticalAlignment="Center" />
+              <TextBlock Text="{TemplateBinding Message}" FontSize="{DynamicResource fs-12}" LineHeight="{DynamicResource lh-16}" FontWeight="Medium" TextWrapping="Wrap" VerticalAlignment="Center" />
             </StackPanel>
           </Border>
         </StackPanel>
@@ -92,7 +92,7 @@
               </DataTemplate>
             </ItemsControl.ItemTemplate>
           </ItemsControl>
-          <TextBlock Name="PART_Empty" Text="{TemplateBinding Empty}" FontSize="13" Foreground="{DynamicResource ink-faint}" Margin="0,6" TextWrapping="Wrap" IsVisible="False" />
+          <TextBlock Name="PART_Empty" Text="{TemplateBinding Empty}" FontSize="{DynamicResource fs-13}" Foreground="{DynamicResource ink-faint}" Margin="0,6" TextWrapping="Wrap" IsVisible="False" />
           <c:GsButton Classes="ghost sm" Icon="plus" Content="{TemplateBinding AddLabel}" Command="{TemplateBinding AddCommand}"
                       IsVisible="{Binding $parent[c:GsFolderList].AddCommand, Converter={x:Static ObjectConverters.IsNotNull}}" />
         </StackPanel>
@@ -154,13 +154,13 @@
             <c:GsThemeMini Tokens="{Binding Tokens}" />
             <Border Classes="theme-ring" Margin="-4" BorderThickness="2" CornerRadius="13" BorderBrush="Transparent" />
           </Panel>
-          <StackPanel Orientation="Horizontal" Spacing="6">
-            <Border Width="16" Height="16" CornerRadius="999" Background="{DynamicResource primary}" VerticalAlignment="Center"
+          <DockPanel ToolTip.Tip="{Binding Name}">
+            <Border DockPanel.Dock="Left" Width="16" Height="16" CornerRadius="999" Background="{DynamicResource primary}" VerticalAlignment="Center" Margin="0,0,6,0"
                     IsVisible="{Binding $parent[ListBoxItem].IsSelected}">
               <c:GsIcon Icon="check" Size="11" StrokeWidth="3" Foreground="{DynamicResource on-primary}" HorizontalAlignment="Center" VerticalAlignment="Center" />
             </Border>
-            <TextBlock Text="{Binding Name}" FontSize="13" LineHeight="18" FontWeight="Medium" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-          </StackPanel>
+            <TextBlock Text="{Binding Name}" FontSize="{DynamicResource fs-13}" LineHeight="{DynamicResource lh-18}" FontWeight="Medium" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+          </DockPanel>
         </StackPanel>
       </DataTemplate>
     </Setter>

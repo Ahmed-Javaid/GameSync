@@ -22,6 +22,13 @@ internal static class Program
             return Background.RunAsync(args, Toasts.Show).GetAwaiter().GetResult();
         }
 
+        // R17: the app never runs as an administrator: started that way, it says so and closes.
+        if (GameSync.Windows.Elevation.IsElevated())
+        {
+            GameSync.Windows.Elevation.Tell("GameSync", GameSync.Windows.Elevation.Refusal);
+            return 1;
+        }
+
         using var claim = AppPipe.TryClaim(start.DataDir);
         if (claim is null)
         {

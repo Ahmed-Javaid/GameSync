@@ -104,6 +104,35 @@ public class AgentTests
     }
 
     [Fact]
+    public async Task KAN_88_the_apps_agent_syncs_a_game_here_then_uploads_it_beside_its_rounds()
+    {
+        using var world = new TestWorld();
+        var desktop = Pc(world, "DESKTOP", installDir: null);
+        File.WriteAllText(Path.Combine(desktop.Saves, "slot.sav"), "a save");
+        var said = new TestOutput();
+        using var agent = new Agent(desktop.Data, said) { UploadsInBackground = true };
+
+        await agent.TickAsync(DateTime.UtcNow, CancellationToken.None);
+        await agent.UploadsUnderWay.WaitAsync(TimeSpan.FromSeconds(30));
+        Assert.Single(await Versions(world));
+        using (var state = new StateStore(desktop.Data))
+        {
+            Assert.Equal(GameStatus.Synced, state.GetState(Fake).Status);
+        }
+
+        // The tray icon saw the round's work and the upload's, each started and finished.
+        Assert.Equal(said.Working.Count(w => w), said.Working.Count(w => !w));
+        Assert.DoesNotContain(said.Lines, l => l.StartsWith("! ", StringComparison.Ordinal));
+
+        // KAN-80: the window heard the upload as it went, the game's name with it, and that it was done.
+        Assert.Equal(TransferState.Running, said.Transfers[0].State);
+        Assert.Equal("Fake Game", said.Transfers[0].Title);
+        Assert.True(said.Transfers.Last(t => t.State == TransferState.Running).Progress.Finished);
+        Assert.Equal(TransferState.Done, said.Transfers[^1].State);
+        Assert.Matches(@"^\d+ B in ", said.Transfers[^1].Note);
+    }
+
+    [Fact]
     public async Task BG_01_the_apps_agent_waits_while_a_terminal_agent_runs_and_takes_over_when_it_stops()
     {
         using var world = new TestWorld();
@@ -125,6 +154,57 @@ public class AgentTests
         stop.Cancel();
         await running.WaitAsync(TimeSpan.FromSeconds(30));
         Assert.False(agent.IsRunning);
+    }
+
+    [Fact]
+    public async Task PLAY_06_done_playing_ends_a_session_an_emulator_still_closing_keeps_open_and_the_game_syncs()
+    {
+        // The owner's Bloodborne on shadPS4, 2 Oct 2026: its window closed, the emulator ran on for minutes, and the game
+        // read Playing all the while. The stand-in game runs on long after writing its save, as the emulator did.
+        using var world = new TestWorld();
+        var install = Path.Combine(world.Root, "installs", "Fake Game");
+        var exe = FakeGames.Install(install, "FakeGame");
+        var desktop = Pc(world, "DESKTOP", install);
+        var save = Path.Combine(desktop.Saves, "slot.sav");
+        File.WriteAllText(save, "before playing");
+        File.SetLastWriteTimeUtc(save, DateTime.UtcNow.AddHours(-1));
+        var said = new TestOutput();
+        using var agent = new Agent(desktop.Data, said);
+        await agent.TickAsync(DateTime.UtcNow, CancellationToken.None);
+        Assert.Single(await Versions(world));
+
+        using var game = FakeGames.Run(exe, "--save", save, "--write-at", "1", "--text", "played", "--run", "120");
+        using var stop = new Stopper(game);
+        var deadline = DateTime.UtcNow.AddSeconds(60);
+        while (DateTime.UtcNow < deadline && (said.Plays.Count == 0 || !File.ReadAllText(save).StartsWith("played", StringComparison.Ordinal)))
+        {
+            await agent.TickAsync(DateTime.UtcNow, CancellationToken.None);
+            await Task.Delay(200);
+        }
+
+        Assert.Equal([(Fake, "Fake Game", true)], said.Plays);
+        using (var state = new StateStore(desktop.Data))
+        {
+            // What `gamesync done fake` does with the agent running.
+            state.SetSetting(Agent.DoneKey(Fake), DateTime.UtcNow.ToString("O", System.Globalization.CultureInfo.InvariantCulture));
+        }
+
+        await agent.TickAsync(DateTime.UtcNow, CancellationToken.None);
+
+        // The session is over and the game synced, though its program still runs; the app's own actions don't take it
+        // for the game either, so nothing reads Playing until it's started again.
+        Assert.Equal([(Fake, "Fake Game", true), (Fake, "Fake Game", false)], said.Plays);
+        Assert.Contains(said.Lines, l => l == "Fake Game: session over after 1 min, ended by hand.");
+        Assert.Equal(2, (await Versions(world)).Count);
+        using (var state = new StateStore(desktop.Data))
+        {
+            Assert.Equal(GameStatus.Synced, state.GetState(Fake).Status);
+        }
+
+        using var engine = Engine.Open(desktop.Data);
+        Assert.False(new RunningGames(engine).IsRunning(Fake));
+        await agent.TickAsync(DateTime.UtcNow, CancellationToken.None);
+        Assert.Equal(2, said.Plays.Count);
     }
 
     private static async Task<bool> Eventually(Func<bool> done)
@@ -159,6 +239,19 @@ public class AgentTests
         return (data, saves);
     }
 
+    /// <summary>Ends the stand-in game when the test does, however it ends.</summary>
+    private sealed class Stopper(System.Diagnostics.Process process) : IDisposable
+    {
+        public void Dispose()
+        {
+            if (!process.HasExited)
+            {
+                process.Kill();
+                process.WaitForExit(5000);
+            }
+        }
+    }
+
     private sealed class TestOutput : IAgentOutput
     {
         public List<string> Lines { get; } = [];
@@ -168,6 +261,8 @@ public class AgentTests
         public List<IReadOnlyList<Core.Sync.GameResult>> Syncs { get; } = [];
 
         public List<(GameId Game, string Title, bool Playing)> Plays { get; } = [];
+
+        public List<TransferUpdate> Transfers { get; } = [];
 
         public void Say(string line)
         {
@@ -184,5 +279,13 @@ public class AgentTests
         void IAgentOutput.Synced(IReadOnlyList<Core.Sync.GameResult> results) => Syncs.Add(results);
 
         void IAgentOutput.Played(GameId game, string title, bool playing) => Plays.Add((game, title, playing));
+
+        void IAgentOutput.Transfer(TransferUpdate update)
+        {
+            lock (Transfers)
+            {
+                Transfers.Add(update);
+            }
+        }
     }
 }

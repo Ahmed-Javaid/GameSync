@@ -160,7 +160,7 @@ public class GamePropertiesTests
         Assert.Equal(("9", "47 KB"), (saves.Rows[0].Versions, saves.Rows[0].Size));
         Assert.Equal("", saves.Rows[2].Versions);
         // MGR-03: the backups' real space on the drive, counted apart from the versions' own sizes.
-        Assert.Equal(["Games", "Backups on this PC", "Versions", "Last backup", "Needs you"], saves.Stats.Select(s => s.Label));
+        Assert.Equal(["Games", "Backups on this PC", "Versions", "Last backup", "Conflicts"], saves.Stats.Select(s => s.Label));
         Assert.Equal(("2", "61", "1"), (saves.Stats[0].Value, saves.Stats[2].Value, saves.Stats[4].Value));
 
         // A game's saves from its page: Back returns to the page; from the table, Back returns to the table.

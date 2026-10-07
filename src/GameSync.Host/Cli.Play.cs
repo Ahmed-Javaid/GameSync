@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using System.Globalization;
-using System.Security.Principal;
 using GameSync.Core.Discovery;
 using GameSync.Core.Model;
 using GameSync.Core.Sessions;
@@ -49,7 +48,7 @@ public static partial class Cli
                 Console.WriteLine($"Daily backup:    {time}");
                 Console.WriteLine($"GameSync app:    {(SignInStart.ForThisUser().IsOn || Schedule.Exists(Schedule.BackgroundTask) ? "starts at sign-in" : "doesn't start at sign-in")}{(EngineLock.AgentRunning(dataDir) ? ", running now" : "")}");
                 Console.WriteLine(Daily.Last(state) is { } last
-                    ? $"Last daily run:  {last.AtUtc.ToLocalTime():yyyy-MM-dd HH:mm}: {last.Games} games checked, {last.Uploads} uploaded{(last.NeedYou > 0 ? $", {last.NeedYou} need you" : "")}"
+                    ? $"Last daily run:  {last.AtUtc.ToLocalTime():yyyy-MM-dd HH:mm}: {last.Games} games checked, {last.Uploads} uploaded{(last.NeedYou > 0 ? $", {last.NeedYou} conflict{(last.NeedYou == 1 ? "" : "s")}" : "")}"
                     : "Last daily run:  none yet");
                 return 0;
 
@@ -236,35 +235,41 @@ public static partial class Cli
         if (checkFirst)
         {
             await CheckAsync(dataDir, game, title, output, ct);
+
+            // KAN-90: the check can wait (a sync under way); the game may have been started another way meanwhile.
+            if (command.Count == 0 && programs is not null && new ProcessWatcher().Find([programs]).Count > 0)
+            {
+                throw new UsageException($"{title} is already running.");
+            }
         }
 
-        // A store link hands the launch to the store's own process, so there may be no new process to hold.
-        Process? launched;
+        // A store link hands the launch to the store's own process, so there may be no new process to hold. R13: starting a
+        // process gives a handle with full access, so only its ID is kept and the handle is closed at once; watching it
+        // afterwards opens it with query-limited access only.
+        int? launchedId;
         try
         {
-            launched = Process.Start(start);
+            using var launched = Process.Start(start);
+            if (launched is null && !start.UseShellExecute)
+            {
+                throw new InvalidOperationException($"{title} didn't start.");
+            }
+
+            launchedId = start.UseShellExecute ? null : launched?.Id;
         }
         catch (System.ComponentModel.Win32Exception e)
         {
             throw new UsageException($"{title} didn't start: {e.Message}");
         }
 
-        using (launched)
+        if (!checkFirst || EngineLock.AgentRunning(dataDir))
         {
-            if (launched is null && !start.UseShellExecute)
-            {
-                throw new InvalidOperationException($"{title} didn't start.");
-            }
-
-            if (!checkFirst || EngineLock.AgentRunning(dataDir))
-            {
-                output.Say(checkFirst ? $"Launched {title}. GameSync syncs it after you play." : $"Launched {title}.");
-                return 0;
-            }
-
-            output.Say($"Launched {title}. GameSync isn't running in the background, so this waits and syncs {title} once you've played.");
-            return await WatchAndSyncAsync(dataDir, game, title, programs, start.UseShellExecute ? null : launched, output, ct);
+            output.Say(checkFirst ? $"Launched {title}. GameSync syncs it after you play." : $"Launched {title}.");
+            return 0;
         }
+
+        output.Say($"Launched {title}. GameSync isn't running in the background, so this waits and syncs {title} once you've played.");
+        return await WatchAndSyncAsync(dataDir, game, title, programs, launchedId, output, ct);
     }
 
     /// <summary>
@@ -279,7 +284,7 @@ public static partial class Cli
         {
             using var engineLock = await EngineLock.AcquireAsync(dataDir, () => output.Say("GameSync is syncing in the background; the check waits for it..."), patience.Token);
             using var engine = Engine.Open(dataDir);
-            var (service, _) = await engine.OpenServiceAsync(new SyncOptions { IsRunning = new RunningGames(engine).IsRunning }, ct);
+            var (service, _) = await engine.OpenServiceAsync(new SyncOptions { IsRunning = new RunningGames(engine).IsRunning, DeferUploads = true }, ct);
             var check = await service.PrepareLaunchAsync(game, ct);
             if (check.Download is { } download)
             {
@@ -313,7 +318,8 @@ public static partial class Cli
     /// Without the agent: watches this one game until its session ends (PLAY-04), with the program it started counting
     /// too, then records the session and syncs the game.
     /// </summary>
-    private static async Task<int> WatchAndSyncAsync(string dataDir, GameId game, string title, GamePrograms? programs, Process? started, IAgentOutput output,
+    /// <param name="startedId">The process GameSync started, by its ID only (R13); null when a store or the shell started it.</param>
+    private static async Task<int> WatchAndSyncAsync(string dataDir, GameId game, string title, GamePrograms? programs, int? startedId, IAgentOutput output,
         CancellationToken ct)
     {
         var tracker = new SessionTracker();
@@ -321,15 +327,16 @@ public static partial class Cli
         SaveActivity? activity = null;
         SessionInfo? session = null;
         var deadline = DateTime.UtcNow.AddMinutes(3);
+        var startedUtc = startedId is { } id ? ProcessWatcher.StartedUtc(id) : null;
         try
         {
             while (session is null)
             {
                 var now = DateTime.UtcNow;
                 var running = programs is null ? new List<GameProcess>() : watcher.Find([programs]).ToList();
-                if (started is { HasExited: false })
+                if (startedId is { } pid && startedUtc is { } at && ProcessWatcher.IsRunning(pid, at) && running.All(p => p.ProcessId != pid))
                 {
-                    running.Add(new GameProcess(game, started.Id, started.StartTime.ToUniversalTime()));
+                    running.Add(new GameProcess(game, pid, at));
                 }
 
                 if (tracker.Playing.Count == 0 && now > deadline)
@@ -404,13 +411,30 @@ public static partial class Cli
 
     /// <summary>
     /// PLAY-02: the store's own link for store games, so their DRM and anti-cheat start normally; a game in its own folder
-    /// from its program, the one picked for it on this PC or else its main one, with its launch options (PLAY-11).
+    /// from its program, the one picked for it on this PC or else its main one, with its launch options (PLAY-11). A game
+    /// with an anti-cheat no store starts goes through its anti-cheat's own launcher, never its program (R15); with none,
+    /// it's started from its launcher, not from GameSync.
     /// </summary>
-    private static ProcessStartInfo Route(string title, LibraryEntry? entry, string? folder, string? program, string? options)
+    internal static ProcessStartInfo Route(string title, LibraryEntry? entry, string? folder, string? program, string? options)
     {
         if (GameLaunch.StoreLink(entry) is { } link)
         {
             return new ProcessStartInfo(link) { UseShellExecute = true };
+        }
+
+        if (entry is { HasAntiCheat: true })
+        {
+            var launcher = (program is { } picked && GameLaunch.IsAntiCheatLauncher(picked) && File.Exists(picked) ? picked : GameLaunch.AntiCheatLauncher(folder))
+                ?? throw new UsageException($"{title} has an anti-cheat, so GameSync doesn't start its program itself. Start it from its launcher; GameSync still backs up its saves when you've played.");
+
+            // Through the shell, as the anti-cheat's launcher may ask Windows for permission to start its service.
+            var protectedStart = new ProcessStartInfo(launcher) { UseShellExecute = true, WorkingDirectory = Path.GetDirectoryName(launcher)! };
+            if (options is { Length: > 0 })
+            {
+                protectedStart.Arguments = options;
+            }
+
+            return protectedStart;
         }
 
         if (program is null && (folder is null || !Directory.Exists(folder)))
@@ -458,9 +482,5 @@ public static partial class Cli
         return $"   {time} played, last on {sessions.Max(s => s.EndUtc).ToLocalTime():yyyy-MM-dd}";
     }
 
-    private static bool IsElevated()
-    {
-        using var identity = WindowsIdentity.GetCurrent();
-        return new WindowsPrincipal(identity).IsInRole(WindowsBuiltInRole.Administrator);
-    }
+    private static bool IsElevated() => Elevation.IsElevated();
 }

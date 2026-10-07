@@ -68,7 +68,18 @@ public sealed partial class GameViewModel : ObservableObject, IPageSurface
     private string? _primaryTip;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(PrimaryBusy), nameof(PrimaryBusyText))]
     private ICommand? _primaryCommand;
+
+    /// <summary>KAN-80: Play was pressed and the game isn't running yet.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(PrimaryBusy))]
+    private bool _starting;
+
+    /// <summary>KAN-80: the primary's job is under way: Play starting the game, or Back up now keeping the save.</summary>
+    public bool PrimaryBusy => (PrimaryCommand == PlayCommand && Starting) || (PrimaryCommand == BackUpNowCommand && BackUpNowCommand.IsRunning);
+
+    public string PrimaryBusyText => PrimaryCommand == PlayCommand ? "Starting" : "Backing up";
 
     /// <summary>Play as a round button beside the status's own action, when the game needs you.</summary>
     [ObservableProperty]
@@ -146,15 +157,25 @@ public sealed partial class GameViewModel : ObservableObject, IPageSurface
     [ObservableProperty]
     private string? _gameFolder;
 
-    /// <summary>The name Save as… is typing.</summary>
-    [ObservableProperty]
-    private string _saveName = "";
-
     public GameViewModel(LauncherGame game, TileItem tile, LauncherActions? actions)
     {
         _actions = actions;
         _game = game;
-        PlayCommand = new RelayCommand(() => _actions?.Play(Id), () => _actions is not null);
+        PlayCommand = new AsyncRelayCommand(async () =>
+        {
+            // KAN-80: Play says Starting… from the press until the game runs, or the check says why it can't.
+            Starting = true;
+            if (_actions?.Start is { } start)
+            {
+                await start(Id);
+            }
+            else
+            {
+                _actions?.Play(Id);
+            }
+
+            Starting = _actions?.IsStarting?.Invoke(Id) == true;
+        }, () => _actions is not null);
         ToggleFavouriteCommand = new RelayCommand(() => _actions?.SetFavourite?.Invoke(Id, !IsFavourite), () => _actions?.SetFavourite is not null);
         ToggleHiddenCommand = new RelayCommand(() => _actions?.SetHidden(Id, !IsHidden), () => _actions is not null);
         OpenPropertiesCommand = new RelayCommand<string>(section => _actions?.OpenProperties?.Invoke(Id, section), _ => _actions?.OpenProperties is not null);
@@ -181,17 +202,43 @@ public sealed partial class GameViewModel : ObservableObject, IPageSurface
                 _actions?.OpenFolder?.Invoke(folder);
             }
         }, () => _actions?.OpenFolder is not null);
-        BackUpNowCommand = new RelayCommand(() => _actions?.BackUpNow?.Invoke(Id), () => _actions?.BackUpNow is not null);
-        SaveAsCommand = new RelayCommand(() =>
+        BackUpNowCommand = new AsyncRelayCommand(async () =>
         {
-            var name = SaveName.Trim();
-            if (name.Length > 0)
+            if (_actions?.BackUpNow is { } backUp)
             {
-                _actions?.SaveAs?.Invoke(Id, name);
-                SaveName = "";
+                await backUp(Id);
             }
-        }, () => _actions?.SaveAs is not null);
-        SyncGameCommand = new RelayCommand(() => _actions?.SyncGame?.Invoke(Id), () => _actions?.SyncGame is not null);
+        }, () => _actions?.BackUpNow is not null);
+        BackUpNowCommand.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(IAsyncRelayCommand.IsRunning))
+            {
+                OnPropertyChanged(nameof(PrimaryBusy));
+            }
+        };
+        OpenNamedSaveCommand = new RelayCommand(() =>
+        {
+            if (!Syncs && _detail?.Kept is not null)
+            {
+                _actions?.OpenKeptCopies?.Invoke(new KeptCopiesStart(Id, Title, Backup: true));
+                return;
+            }
+
+            _actions?.OpenNamedSave?.Invoke(NamedSaveStart.For(Id, Title,
+                _detail?.Places.Select(p => (p.Folder, p.Tag, p.Evidence)) ?? [], _detail?.NamedSaves.Select(n => n.Name) ?? [], Syncs ? null : KeepLine));
+        }, () => _actions?.OpenNamedSave is not null);
+        SyncGameCommand = new AsyncRelayCommand(async () =>
+        {
+            // KAN-61: only the live save, the copies beside it as named saves, in its dialog.
+            if (!Syncs && _detail?.Kept is not null)
+            {
+                _actions?.OpenKeptCopies?.Invoke(new KeptCopiesStart(Id, Title, Backup: false));
+            }
+            else if (_actions?.SyncGame is { } sync)
+            {
+                await sync(Id);
+            }
+        }, () => _actions?.SyncGame is not null);
         ToggleAboutCommand = new RelayCommand(() => AboutExpanded = !AboutExpanded);
         Update(game, tile);
     }
@@ -227,6 +274,17 @@ public sealed partial class GameViewModel : ObservableObject, IPageSurface
 
     public bool SavesNotSyncing => !Syncs;
 
+    /// <summary>Not syncing yet, and its saves were found: Sync these saves, New named save… and Choose files… have something to work on.</summary>
+    [ObservableProperty]
+    private bool _savesHavePlaces;
+
+    /// <summary>FIND-04: learn mode found where it saves, so the Saves card offers See what it found.</summary>
+    [ObservableProperty]
+    private bool _savesLearnFound;
+
+    [RelayCommand]
+    private void SeeLearnFinds() => _actions?.OpenLearnFinds?.Invoke(Id);
+
     public bool CanOpenGameFolder => GameFolder is not null;
 
     public ICommand PlayCommand { get; }
@@ -257,13 +315,13 @@ public sealed partial class GameViewModel : ObservableObject, IPageSurface
     public ICommand OpenSaveFolderCommand { get; }
 
     /// <summary>Back up now (BAK-16); not while the game runs, since quitting backs it up.</summary>
-    public ICommand BackUpNowCommand { get; }
+    public IAsyncRelayCommand BackUpNowCommand { get; }
 
-    /// <summary>Save as…: keeps this PC's save under the name typed (BAK-18).</summary>
-    public ICommand SaveAsCommand { get; }
+    /// <summary>New named save… (BAK-18): this PC's save kept under a name, in its dialog (KAN-77).</summary>
+    public ICommand OpenNamedSaveCommand { get; }
 
     /// <summary>Sync these saves: confirms what the scan found (FIND-06).</summary>
-    public ICommand SyncGameCommand { get; }
+    public IAsyncRelayCommand SyncGameCommand { get; }
 
     public ICommand ToggleAboutCommand { get; }
 
@@ -303,10 +361,20 @@ public sealed partial class GameViewModel : ObservableObject, IPageSurface
     [ObservableProperty]
     private string _keepLine = GameSavesViewModel.KeepNote;
 
+    /// <summary>KAN-61: a game not syncing yet whose live save sits beside copies kept by hand says so on its Saves card.</summary>
+    private string? KeptSentence() => !Syncs && _detail?.Kept is { } kept
+        ? $"GameSync found its live save and {(kept.Copies == 1 ? "1 copy" : $"{kept.Copies.ToString(CultureInfo.InvariantCulture)} copies")} of it you kept by hand beside it. Nothing is backed up yet."
+        : null;
+
     /// <summary>The page's content, from what this PC knows of the game.</summary>
     public void Show(GameDetail detail, DateTime nowLocal)
     {
         _detail = detail;
+        SavesSentence = KeptSentence() ?? (detail.Syncs ? null : GameSavesViewModel.LearnLine(Title, detail.Learn, detail.Places.Count == 0)) ?? SavesSentence;
+        SavesHavePlaces = !detail.Syncs && detail.Places.Count > 0;
+        SavesLearnFound = !detail.Syncs && detail.Learn.State == LearnState.Found;
+        Stats = StatsOf(_game, nowLocal, detail.Current?.NewestUtc, detail.AchievementsLeftOut ? null : detail.Achievements);
+        ShowAchievements(detail.Achievements, detail.AchievementsLeftOut, nowLocal, detail.ZenithSeen);
         KeepLine = GameSavesViewModel.KeepNoteFor(detail.FoundFiles, detail.FoundBytes);
         var about = detail.About;
         About = about.Description;
@@ -329,7 +397,14 @@ public sealed partial class GameViewModel : ObservableObject, IPageSurface
                     : $"{(detail.Versions.Count == 1 ? "1 version" : $"{detail.Versions.Count.ToString(CultureInfo.InvariantCulture)} versions")} · {Cli.FormatSize(detail.HistoryBytes)}"),
                 new Fact("Named", detail.NamedSaves.Count switch { 0 => "None yet", 1 => "1 save", var n => $"{n.ToString(CultureInfo.InvariantCulture)} saves" }))
             : Fact.Known(
-                new Fact("Found", detail.Places.Count == 0 ? "No saves yet"
+                new Fact("Found", detail.Places.Count == 0 ? detail.Learn.State switch
+                    {
+                        LearnState.Waiting => "Not yet: learn mode watches next time",
+                        LearnState.Watching => "Learn mode is watching",
+                        LearnState.Found => $"Learn mode found {(detail.Learn.Finds?.Places.Count == 1 ? "1 place" : $"{(detail.Learn.Finds?.Places.Count ?? 0).ToString(CultureInfo.InvariantCulture)} places")}",
+                        LearnState.NothingFound => "Not yet: learn mode watches again",
+                        _ => "No saves yet",
+                    }
                     : detail.Places.Count == 1 ? detail.Places[0].Evidence
                     : $"{detail.Places.Count.ToString(CultureInfo.InvariantCulture)} places · {detail.Places[0].Evidence}"));
         SaveFolder = detail.Places.Select(p => p.Folder).FirstOrDefault(f => f is not null);
@@ -364,11 +439,17 @@ public sealed partial class GameViewModel : ObservableObject, IPageSurface
         IsHidden = game.IsHidden;
         Installed = game.Installed;
         Syncs = game.Syncs;
+        if (_actions?.IsStarting is { } starting)
+        {
+            // KAN-80: Starting… lasts until the game runs, or the app gives up on it.
+            Starting = !game.IsRunning && starting(game.Id);
+        }
+
         SavesStatus = game.Syncs ? game.Status ?? GameStatus.Synced : null;
         SavesStatusLabel = StatusWord(game);
-        SavesSentence = SentenceOf(game);
+        SavesSentence = KeptSentence() ?? SentenceOf(game);
         (NeedAction, NeedIcon) = game.NeedsYou ? ActionFor(game.Status) : (null, "alert");
-        Stats = StatsOf(game, DateTime.Now);
+        Stats = StatsOf(game, DateTime.Now, _detail?.Current?.NewestUtc, _detail is { AchievementsLeftOut: false } ? _detail.Achievements : null);
 
         // The one recommended action: Play; the status's own when the game needs you; when it isn't here, Install through
         // Steam for a Steam game, and Locate the game… for one no store installs.
@@ -419,14 +500,139 @@ public sealed partial class GameViewModel : ObservableObject, IPageSurface
         OnPropertyChanged(nameof(NeedCommand));
     }
 
-    /// <summary>Last played, Play time and Saves, as the play bar shows them; Achievements join once they're read (after v1).</summary>
-    public static IReadOnlyList<PlayStat> StatsOf(LauncherGame game, DateTime nowLocal)
+    /// <summary>
+    /// ACH-01 to ACH-03, the Achievements card under About (design system version 33 → GameDetailScreen): the game's
+    /// overview (its ring, the tiers unlocked and its Zenith), the latest five unlocked, and the rarest in its own light;
+    /// View all opens every one. Every game's page has it since version 35 (KAN-111, the owner: "it should still have
+    /// achievements on its game page. Let it say 0"): Steam's list at 0 for a copy that isn't Steam's or a game not run
+    /// here, a line when there's none to read, and a game left out of the achievements says so (KAN-110).
+    /// </summary>
+    private void ShowAchievements(GameAchievementsView? view, bool leftOut, DateTime nowLocal, bool zenithSeen = true)
+    {
+        // Version 49: the first time this game's 100% is seen on this PC, its moment plays, once.
+        CelebratesZenith = !leftOut && view is { IsComplete: true } && !zenithSeen && !_zenithSeenHere;
+        AchievementsView = leftOut ? null : view;
+        HasAchievements = !_game.IsFolder;
+        AchievementsLeftOut = leftOut;
+        ShowsAchievementsOverview = !leftOut && view is { Total: > 0 };
+        string Count(int n) => n.ToString(CultureInfo.InvariantCulture);
+        AchievementsSubtitle = leftOut ? "Left out of your achievements" : view switch
+        {
+            null => null,
+            { From: AchievementsFrom.ListNotSteamCopy } => $"0 of {Count(view.Total)} · Steam's list",
+            { From: AchievementsFrom.ListNotPlayedHere } => $"0 of {Count(view.Total)} · none unlocked on this PC",
+            { From: AchievementsFrom.NoneOnSteam } => "0 achievements on Steam",
+            { From: AchievementsFrom.CopyRecord, IsComplete: true } => "Every achievement unlocked · this copy's record",
+            { From: AchievementsFrom.CopyRecord } => $"{Count(view.Unlocked)} of {Count(view.Total)} unlocked · this copy's record",
+            { IsComplete: true } => "Every achievement unlocked on Steam",
+            _ => $"{Count(view.Unlocked)} of {Count(view.Total)} unlocked on Steam",
+        };
+        AchievementsNote = leftOut ? null : view?.From switch
+        {
+            AchievementsFrom.ListNotSteamCopy => "This copy isn't Steam's, so what you unlock in it doesn't show here: if it keeps its own record, add the folder in Settings, Achievements. The list is Steam's, with how rare each one is.",
+            AchievementsFrom.CopyRecord => "This copy isn't Steam's, so what you've unlocked comes from its own record, in a folder added in Settings, Achievements. Each one's name, icon and how rare it is are Steam's.",
+            AchievementsFrom.ListNotPlayedHere => "Steam on this PC hasn't seen you play it, so nothing shows as unlocked yet; once you play it here, what you unlock does.",
+            AchievementsFrom.NoneOnSteam => _game.Store == StoreKind.Steam
+                ? "Steam lists no achievements for this game."
+                : "Steam lists no achievements for this game. A game with its own launcher, such as Ubisoft Connect, may keep them there; GameSync reads Steam's for now.",
+            AchievementsFrom.Steam => null,
+            _ => _game.SteamAppId is not null
+                ? "Its list of achievements comes from Steam the next time GameSync can ask."
+                : "GameSync can't read this game's achievements yet: it reads Steam's for now.",
+        };
+        AchievementsProgress = view is null || leftOut ? AchievementsProgress.None : AchievementsProgress.Of(view, nowLocal);
+        LatestAchievements = leftOut ? [] : view?.Latest(5).Select(a => AchievementItem.Of(a, nowLocal)).ToList() ?? [];
+        RarestAchievement = !leftOut && view?.Rarest is { } rarest ? AchievementItem.Of(rarest, nowLocal) : null;
+        NoneUnlocked = !leftOut && view is { IsTracked: true, Unlocked: 0 };
+        OnPropertyChanged(nameof(CanViewAllAchievements));
+    }
+
+    /// <summary>
+    /// Version 49 (the owner, 5 Oct 2026: "I really want players to feel awarded when they hit 100%"): this game's 100% is
+    /// seen here for the first time, so its card's ring plays its moment and the Zenith's banner unfurls; once.
+    /// </summary>
+    [ObservableProperty]
+    private bool _celebratesZenith;
+
+    private bool _zenithSeenHere;
+
+    /// <summary>The moment played: remembered on this PC, so it doesn't again.</summary>
+    public ICommand SeeZenithCommand => new RelayCommand(() =>
+    {
+        _zenithSeenHere = true;
+        CelebratesZenith = false;
+        _actions?.SeeZenith?.Invoke(Id);
+    });
+
+    /// <summary>The game's achievements as last read, for View all.</summary>
+    public GameAchievementsView? AchievementsView { get; private set; }
+
+    /// <summary>Every game's page has the card but a folder of the person's own (LIB-13), which isn't played.</summary>
+    [ObservableProperty]
+    private bool _hasAchievements;
+
+    /// <summary>Left out of the achievements in Settings (KAN-110): the card says so, with Count it again.</summary>
+    [ObservableProperty]
+    private bool _achievementsLeftOut;
+
+    /// <summary>Its ring, tiers and Zenith: a game with a list to show, not left out.</summary>
+    [ObservableProperty]
+    private bool _showsAchievementsOverview;
+
+    /// <summary>The card's line on where its achievements come from, or why there are none to show.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasAchievementsNote), nameof(AchievementsNoteIcon))]
+    private string? _achievementsNote;
+
+    public bool HasAchievementsNote => AchievementsNote is not null;
+
+    /// <summary>Where the list comes from is information; none to read is the trophy's own line.</summary>
+    public string AchievementsNoteIcon => AchievementsView is null or { Total: 0 } ? "trophy" : "info";
+
+    /// <summary>Counts a game left out back in (KAN-110): its popups and its place on the Achievements page and Home.</summary>
+    public ICommand CountAchievementsAgainCommand => new RelayCommand(() => _actions?.SetAchievementsLeftOut?.Invoke(Id, false));
+
+    [ObservableProperty]
+    private string? _achievementsSubtitle;
+
+    [ObservableProperty]
+    private AchievementsProgress _achievementsProgress = AchievementsProgress.None;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasLatestAchievements))]
+    private IReadOnlyList<AchievementItem> _latestAchievements = [];
+
+    public bool HasLatestAchievements => LatestAchievements.Count > 0;
+
+    /// <summary>The rarest unlocked, in the spotlight; null until Steam's percentages are kept.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasRarest))]
+    private AchievementItem? _rarestAchievement;
+
+    public bool HasRarest => RarestAchievement is not null;
+
+    /// <summary>None unlocked yet: the card says so instead of an empty row.</summary>
+    [ObservableProperty]
+    private bool _noneUnlocked;
+
+    /// <summary>View all: every one of its achievements, beside the library's list.</summary>
+    public ICommand ViewAllAchievementsCommand => new RelayCommand(() => _actions?.OpenAchievements?.Invoke(Id, null));
+
+    public bool CanViewAllAchievements => _actions?.OpenAchievements is not null && AchievementsView is { Total: > 0 };
+
+    /// <summary>Last played, Play time, Achievements (a game whose store keeps them, ACH-01) and Saves, as the play bar shows them.</summary>
+    /// <param name="newestFile">
+    /// KAN-43: when its newest save file was written, for a folder of the person's own GameSync hasn't seen change yet.
+    /// </param>
+    /// <param name="achievements">Its achievements on this PC, once its page has read them.</param>
+    public static IReadOnlyList<PlayStat> StatsOf(LauncherGame game, DateTime nowLocal, DateTime? newestFile = null, GameAchievementsView? achievements = null)
     {
         var saves = new PlayStat("Saves", StatusWord(game), IsStatus: true, Status: game.Syncs ? game.Status ?? GameStatus.Synced : null);
         if (game.IsFolder)
         {
             // LIB-13: a folder of the person's own isn't played: when it last changed, and its saves.
-            return [new PlayStat("Last changed", game.LastPlayedUtc is { } changed ? Launcher.WhenText(changed, nowLocal) ?? "Not yet" : "Not yet"), saves];
+            var changed = game.LastPlayedUtc ?? newestFile;
+            return [new PlayStat("Last changed", changed is { } when ? Launcher.WhenText(when, nowLocal) ?? "Not yet" : "Not yet"), saves];
         }
 
         return
@@ -435,6 +641,8 @@ public sealed partial class GameViewModel : ObservableObject, IPageSurface
             new PlayStat("Play time", game.Playtime <= TimeSpan.Zero ? "None yet"
                 : game.Playtime.TotalHours >= 1 ? Math.Round(game.Playtime.TotalHours) is var hours && hours == 1 ? "1 hour" : $"{hours.ToString(CultureInfo.InvariantCulture)} hours"
                 : Math.Max(1, (int)Math.Round(game.Playtime.TotalMinutes)) is var minutes && minutes == 1 ? "1 minute" : $"{minutes} minutes"),
+            .. achievements is null ? Array.Empty<PlayStat>()
+                : [new PlayStat("Achievements", $"{achievements.Unlocked.ToString(CultureInfo.InvariantCulture)} of {achievements.Total.ToString(CultureInfo.InvariantCulture)}")],
             saves,
         ];
     }

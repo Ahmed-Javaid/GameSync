@@ -1,0 +1,44 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="using:GameSync.UI.Controls"
+             x:Class="GameSync.Snapshots.BusyGallery">
+  <!-- KAN-80, as the design system draws it (Button, JobProgress): busy buttons beside their idle selves, the job
+       progress row in each state, and a busy note. -->
+  <DockPanel>
+    <c:GsSideRail Name="Rail" DockPanel.Dock="Left" Current="saves" />
+    <StackPanel Margin="32,24" Spacing="16" MaxWidth="980" HorizontalAlignment="Left">
+      <StackPanel>
+        <TextBlock Classes="page-title" Text="Every wait moves" />
+        <TextBlock Classes="muted" Text="Busy buttons keep their colour; jobs show how far, how fast and how long." Margin="0,4,0,0" />
+      </StackPanel>
+      <c:GsCard Title="Buttons">
+        <StackPanel Spacing="12">
+          <StackPanel Orientation="Horizontal" Spacing="12">
+            <c:GsButton Classes="primary" Icon="sync" Content="Sync and keep 36 named saves" />
+            <c:GsButton Icon="upload" Content="Back up now" />
+            <c:GsButton Classes="ghost sm" Icon="reset" Content="Restore" />
+            <c:GsButton Classes="primary sm" Icon="play" Content="Play" />
+            <c:GsIconButton Icon="sync" Label="Sync now" />
+          </StackPanel>
+          <StackPanel Orientation="Horizontal" Spacing="12">
+            <c:GsButton Classes="primary" Icon="sync" Content="Sync and keep 36 named saves" IsBusy="True" BusyText="Syncing" />
+            <c:GsButton Icon="upload" Content="Back up now" IsBusy="True" BusyText="Backing up" />
+            <c:GsButton Classes="ghost sm" Icon="reset" Content="Restore" IsBusy="True" BusyText="Restoring" />
+            <c:GsButton Classes="primary sm" Icon="play" Content="Play" IsBusy="True" BusyText="Starting" />
+            <c:GsIconButton Icon="sync" Label="Sync now" IsBusy="True" BusyLabel="Syncing" />
+            <c:GsButton Classes="primary" Icon="pin" Content="Keep this save" IsBusy="True" BusyText="Keeping" IsEnabled="False" />
+          </StackPanel>
+          <c:GsNote Icon="sync" Text="Bringing back “befo ludwig”" IsBusy="True" />
+        </StackPanel>
+      </c:GsCard>
+      <c:GsJobProgress Classes="boxed" Title="Uploading to your Google Drive" Value="37" Detail="42.1 of 113 MB · 412 of 1,108 files" Speed="6.1 MB/s" Left="about 12 s left" />
+      <Grid ColumnDefinitions="*,*" ColumnSpacing="16" RowDefinitions="Auto,Auto" RowSpacing="16">
+        <c:GsJobProgress Classes="boxed" Title="Looking at the copies beside the live save" />
+        <c:GsJobProgress Grid.Column="1" Classes="boxed" Title="Upload paused" Value="37" State="paused" Note="Paused while you play Bloodborne GOTY; it goes on once you quit." />
+        <c:GsJobProgress Grid.Row="1" Classes="boxed" Title="Uploaded to your Google Drive" Value="100" State="done" Note="113 MB in 19 s" />
+        <c:GsJobProgress Grid.Row="1" Grid.Column="1" Classes="boxed" Title="The upload waits" Value="37" State="failed"
+                         Note="Google Drive can't be reached. It tries again at 21:14; your saves are safe on this PC." />
+      </Grid>
+    </StackPanel>
+  </DockPanel>
+</UserControl>

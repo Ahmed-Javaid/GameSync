@@ -1,10 +1,12 @@
-param([int]$ProcessId, [string]$Title = "", [string]$Name, [ValidateSet('invoke', 'select', 'toggle', 'list', 'value', 'windows')][string]$Action = 'invoke', [string]$Value = "")
+param([int]$ProcessId, [string]$Title = "", [string]$Name, [ValidateSet('invoke', 'select', 'toggle', 'list', 'value', 'windows')][string]$Action = 'invoke', [string]$Value = "", [string]$Type = "")
 
 # Drives GameSync's own windows through UI Automation, the way a screen reader would: picks a window of the process by
 # part of its title (-Title GameSync; a dialog Windows opens for it, such as its folder picker, is one of them), then
 # invokes an element by its name, selects one (a pill tab), ticks or unticks one (toggle, a check box), or types into
 # it (value). list prints the named elements;
 # windows, the windows.
+# -Type keeps to one kind of element when several share a name, such as -Type MenuItem for a menu's Properties beside
+# the Properties button.
 #   powershell -File tools\window\uia.ps1 -ProcessId 1234 -Title GameSync -Name "Save manager" -Action invoke
 Add-Type -AssemblyName UIAutomationClient
 Add-Type -AssemblyName UIAutomationTypes
@@ -32,6 +34,7 @@ if ($Action -eq 'list') {
 $byName = New-Object System.Windows.Automation.PropertyCondition($A::NameProperty, $Name)
 $element = $null
 foreach ($e in $target.FindAll([System.Windows.Automation.TreeScope]::Descendants, $byName)) {
+    if ($Type -and $e.Current.ControlType.ProgrammaticName -ne "ControlType.$Type") { continue }
     $want = switch ($Action) {
         'value' { [System.Windows.Automation.ValuePattern]::Pattern }
         'select' { [System.Windows.Automation.SelectionItemPattern]::Pattern }

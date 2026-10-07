@@ -1,0 +1,70 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="using:GameSync.UI.Controls"
+             xmlns:vm="using:GameSync.UI.ViewModels"
+             x:Class="GameSync.UI.Views.NamedSaveDialog"
+             x:DataType="vm:NamedSaveViewModel"
+             Width="{DynamicResource dw-640}">
+  <!-- New named save (design system → NamedSaveDialog; BAK-18, KAN-77): the game's save as it is now, where it is and
+       what's there, a name for it, and Keep this save. A name the game has already is turned away; a game not syncing
+       yet says first that GameSync starts keeping its saves (KAN-63). -->
+  <Border Background="{DynamicResource surface-dialog}" BorderBrush="{DynamicResource edge-dialog}" BorderThickness="1" BackgroundSizing="OuterBorderEdge"
+          CornerRadius="16" BoxShadow="{DynamicResource shadow-dialog}" ClipToBounds="True">
+    <DockPanel>
+      <Border DockPanel.Dock="Top" Padding="24,20,24,8">
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
+          <StackPanel>
+            <TextBlock Classes="card-title" Text="New named save" />
+            <TextBlock Classes="muted" Text="{Binding Subtitle}" TextTrimming="CharacterEllipsis" />
+          </StackPanel>
+          <c:GsIconButton Grid.Column="1" Classes="sm" Icon="x" Label="Close New named save" Command="{Binding CancelCommand}" VerticalAlignment="Center" />
+        </Grid>
+      </Border>
+
+      <Border DockPanel.Dock="Bottom" BorderBrush="{DynamicResource line-100}" BorderThickness="0,1,0,0" Padding="24,14">
+        <StackPanel Spacing="12">
+          <c:GsNote Icon="info" Text="It's kept on every PC and never thinned. Restoring it later keeps your files now as a version first." />
+          <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+            <c:GsButton Classes="ghost" Content="Cancel" Command="{Binding CancelCommand}" />
+            <c:GsButton Classes="primary" Icon="pin" Content="{Binding KeepLabel}" Command="{Binding KeepCommand}" IsEnabled="{Binding CanKeep}"
+                        IsBusy="{Binding Keeping}" BusyText="Keeping"
+                        ToolTip.Tip="{Binding KeepTip}" ToolTip.ShowOnDisabled="True" />
+          </StackPanel>
+        </StackPanel>
+      </Border>
+
+      <StackPanel Margin="24,12,24,20" Spacing="16">
+        <!-- What's kept: the save's place on this PC and what's there, with Open in Explorer -->
+        <Border Background="{DynamicResource surface-well}" BorderBrush="{DynamicResource edge-well}" BorderThickness="1" BackgroundSizing="OuterBorderEdge"
+                CornerRadius="{DynamicResource radius-md}" Padding="12,10,8,10" IsVisible="{Binding HasSave}">
+          <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+            <Border Width="40" Height="40" CornerRadius="{DynamicResource radius-md}" Background="{DynamicResource bg-300}">
+              <c:GsIcon Icon="saves" Size="18" Foreground="{DynamicResource ink-muted}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Border>
+            <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+              <TextBlock Classes="mono" Text="{Binding Folder}" TextTrimming="LeadingCharacterEllipsis" ToolTip.Tip="{Binding Folder}" />
+              <TextBlock Classes="caption muted" Text="{Binding Meta}" TextTrimming="CharacterEllipsis" />
+            </StackPanel>
+            <c:GsIconButton Grid.Column="2" Classes="sm" Icon="folder" Label="Open in Explorer" Command="{Binding OpenCommand}" VerticalAlignment="Center" />
+          </Grid>
+        </Border>
+
+        <!-- The name: for the moment it's from; Enter keeps it -->
+        <StackPanel Spacing="8">
+          <TextBlock Classes="field-label" Text="Name" />
+          <TextBlock Classes="caption muted" TextWrapping="Wrap" Text="Name it for the moment it's from, so you'll know it later: before a boss, or a big choice." />
+          <TextBox x:Name="NameBox" Text="{Binding Name}" PlaceholderText="Before Lady Maria" MaxLength="100" IsEnabled="{Binding CanEdit}"
+                   AutomationProperties.Name="Name for this save">
+            <TextBox.KeyBindings>
+              <KeyBinding Gesture="Enter" Command="{Binding KeepCommand}" />
+            </TextBox.KeyBindings>
+          </TextBox>
+          <c:GsNote Icon="alert" Classes="warn" Text="{Binding Taken}" IsVisible="{Binding HasTaken}" />
+        </StackPanel>
+
+        <c:GsNote Icon="shield" Text="{Binding KeepLine}" IsVisible="{Binding HasKeepLine}" />
+        <c:GsNote Icon="alert" Foreground="{DynamicResource danger}" Text="{Binding Error}" IsVisible="{Binding HasError}" />
+      </StackPanel>
+    </DockPanel>
+  </Border>
+</UserControl>

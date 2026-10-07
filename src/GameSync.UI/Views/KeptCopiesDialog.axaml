@@ -1,0 +1,130 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="using:GameSync.UI.Controls"
+             xmlns:vm="using:GameSync.UI.ViewModels"
+             xmlns:sys="using:System"
+             x:Class="GameSync.UI.Views.KeptCopiesDialog"
+             x:DataType="vm:KeptCopiesViewModel"
+             Width="{DynamicResource dw-720}">
+  <!-- A live save beside copies kept by hand (design system → KeptCopiesDialog; KAN-61): only the live save syncs (or is
+       backed up), and each copy comes in as a named save in the same step; Sync all of it instead keeps the whole folder
+       as one save. The folders are never changed. -->
+  <Border Background="{DynamicResource surface-dialog}" BorderBrush="{DynamicResource edge-dialog}" BorderThickness="1" BackgroundSizing="OuterBorderEdge"
+          CornerRadius="16" BoxShadow="{DynamicResource shadow-dialog}" ClipToBounds="True">
+    <DockPanel>
+      <Border DockPanel.Dock="Top" Padding="24,20,24,8">
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
+          <StackPanel>
+            <TextBlock Classes="card-title" Text="{Binding Heading}" />
+            <TextBlock Classes="muted" Text="{Binding Subtitle}" TextWrapping="Wrap" />
+          </StackPanel>
+          <c:GsIconButton Grid.Column="1" Classes="sm" Icon="x" Label="Close" Command="{Binding CloseCommand}" VerticalAlignment="Top" />
+        </Grid>
+      </Border>
+
+      <!-- Foot: what's kept and its size, the promise, Sync all of it instead, Cancel and the primary; done, Done -->
+      <Border DockPanel.Dock="Bottom" BorderBrush="{DynamicResource line-100}" BorderThickness="0,1,0,0" Padding="24,14">
+        <Panel>
+          <StackPanel Spacing="12" IsVisible="{Binding ShowsChoice}">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+              <TextBlock Classes="mono-small muted" Text="{Binding Summary}" TextTrimming="CharacterEllipsis" />
+              <TextBlock Grid.Column="1" Classes="mono-small muted" Text="{Binding SizeText}" />
+            </Grid>
+            <c:GsNote Icon="shield" Text="Your folders stay as they are. Copies you make there later aren't synced: New named save… keeps one in a step."
+                      IsVisible="{Binding ShowsPromise}" />
+            <!-- KAN-80: the copies coming in, how far and how fast; closing the dialog doesn't stop it -->
+            <c:GsJobProgress Title="{Binding KeepTitle}" Value="{Binding KeepValue}" Detail="{Binding KeepDetail}" Speed="{Binding KeepSpeed}" Left="{Binding KeepLeft}"
+                             IsVisible="{Binding Keeping}" />
+            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+              <c:GsButton Classes="ghost" Content="{Binding WholeLabel}" Command="{Binding WholeCommand}" IsEnabled="{Binding CanKeep}"
+                          ToolTip.Tip="{Binding WholeTip}" ToolTip.ShowOnDisabled="True" />
+              <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8">
+                <c:GsButton Classes="ghost" Content="{Binding CloseLabel}" Command="{Binding CloseCommand}" ToolTip.Tip="{Binding CloseTip}" />
+                <c:GsButton Classes="primary" Icon="{Binding KeepIcon}" Content="{Binding KeepLabel}" Command="{Binding KeepCommand}" IsEnabled="{Binding CanKeep}"
+                            ToolTip.Tip="{Binding KeepTip}"
+                            IsBusy="{Binding Keeping}" BusyText="{Binding BusyLabel}" />
+              </StackPanel>
+            </Grid>
+          </StackPanel>
+          <c:GsButton Classes="ghost" Content="Cancel" Command="{Binding CloseCommand}" HorizontalAlignment="Right" IsVisible="{Binding Looking}" />
+          <c:GsButton Classes="primary" Content="Done" Command="{Binding CloseCommand}" HorizontalAlignment="Right" IsVisible="{Binding Done}" />
+        </Panel>
+      </Border>
+
+      <StackPanel Margin="24,12,24,20" Spacing="12">
+        <!-- KAN-80: each copy is read as the dialog opens; it says how far it is -->
+        <c:GsJobProgress Title="Looking at the copies beside the live save" Value="{Binding LookValue}" Detail="{Binding LookDetail}" IsVisible="{Binding Looking}" />
+
+        <!-- KAN-79: what syncing (or backing up) is, said first -->
+        <c:GsNote Icon="info" Text="{Binding Explain}" IsVisible="{Binding ShowsChoice}" />
+
+        <!-- The live save, under how it's kept -->
+        <StackPanel Spacing="8" IsVisible="{Binding ShowsChoice}">
+          <TextBlock Classes="overline faint" Text="{Binding LiveHead, Converter={x:Static c:UpperConverter.Instance}}" />
+          <Border Background="{DynamicResource surface-well}" BorderBrush="{DynamicResource edge-well}" BorderThickness="1" BackgroundSizing="OuterBorderEdge"
+                  CornerRadius="{DynamicResource radius-md}" Padding="12,8,8,8">
+            <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="12">
+              <c:GsIcon Icon="saves" Size="16" Foreground="{DynamicResource ink-muted}" VerticalAlignment="Center" />
+              <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                <TextBlock Classes="mono" Text="{Binding LivePath}" TextTrimming="LeadingCharacterEllipsis" ToolTip.Tip="{Binding LivePath}" />
+                <TextBlock Classes="mono-small muted" Text="{Binding LiveMeta}" />
+              </StackPanel>
+              <TextBlock Grid.Column="2" Classes="mono-small muted" Text="{Binding LiveSize}" VerticalAlignment="Center" />
+              <c:GsIconButton Grid.Column="3" Classes="sm" Icon="folder" Label="Open in Explorer" Command="{Binding OpenCommand}" VerticalAlignment="Center" />
+            </Grid>
+          </Border>
+        </StackPanel>
+
+        <!-- Bring the copies in as named saves: each by name, oldest first; one the same as another says so -->
+        <CheckBox IsChecked="{Binding Bring}" Content="{Binding BringLabel}" IsVisible="{Binding ShowsChoice}" IsEnabled="{Binding CanKeep}" />
+        <ScrollViewer MaxHeight="260" HorizontalScrollBarVisibility="Disabled" IsVisible="{Binding Bring}">
+          <ItemsControl ItemsSource="{Binding Items}" IsVisible="{Binding ShowsChoice}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate>
+                <StackPanel Spacing="2" />
+              </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:KeptItem">
+                <Border Padding="12,6" CornerRadius="{DynamicResource radius-md}" AutomationProperties.Name="{Binding}">
+                  <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                    <c:GsIcon Icon="copy" Size="16" Foreground="{DynamicResource ink-muted}" VerticalAlignment="Center" />
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                      <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Name}" />
+                      <TextBlock Classes="mono-small muted" Text="{Binding Meta}" />
+                    </StackPanel>
+                    <c:GsTag Grid.Column="2" Text="{Binding SameText}" Background="{DynamicResource bg-400}" IsVisible="{Binding HasSame}" VerticalAlignment="Center"
+                             ToolTip.Tip="{Binding Same, StringFormat='Its files are the same as {0}, so it is not named again'}" />
+                    <TextBlock Grid.Column="2" Classes="mono-small muted" Text="{Binding Size}" IsVisible="{Binding !HasSame}" VerticalAlignment="Center" />
+                  </Grid>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </ScrollViewer>
+        <c:GsNote Icon="info" Text="{Binding LeftNote}" IsVisible="{Binding !Bring}" />
+
+        <!-- Done: what's kept now, and where the named saves are -->
+        <Border Background="{DynamicResource primary-soft}" CornerRadius="{DynamicResource radius-md}" Padding="16,12" IsVisible="{Binding Done}">
+          <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+            <c:GsIcon Icon="check" Size="20" Foreground="{DynamicResource primary}" VerticalAlignment="Center" />
+            <StackPanel Grid.Column="1" Spacing="2">
+              <TextBlock Text="{Binding DoneText}" TextWrapping="Wrap" />
+              <TextBlock Classes="caption muted" Text="{Binding DoneNote}" TextWrapping="Wrap" />
+            </StackPanel>
+          </Grid>
+        </Border>
+        <c:GsNote Icon="upload" Text="{Binding UploadNote}" IsVisible="{Binding HasUploadNote}" />
+
+        <ItemsControl ItemsSource="{Binding Skipped}" IsVisible="{Binding HasSkipped}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="sys:String">
+              <c:GsNote Icon="alert" Foreground="{DynamicResource warn}" Text="{Binding}" Margin="0,0,0,6" />
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <c:GsNote Icon="alert" Foreground="{DynamicResource danger}" Text="{Binding Error}" IsVisible="{Binding HasError}" />
+      </StackPanel>
+    </DockPanel>
+  </Border>
+</UserControl>

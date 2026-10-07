@@ -1,0 +1,84 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="using:GameSync.UI.Controls"
+             xmlns:vm="using:GameSync.UI.ViewModels"
+             x:Class="GameSync.UI.Views.LearnFindsDialog"
+             x:DataType="vm:LearnFindsViewModel"
+             Width="{DynamicResource dw-720}">
+  <!-- Where a game saves (FIND-04; design system version 43 → LearnModeDialog): the places learn mode saw it write to while
+       it was watched, the likeliest ticked; Sync these saves, Watch again, Not these. Nothing syncs until the person picks. -->
+  <Border Background="{DynamicResource surface-dialog}" BorderBrush="{DynamicResource edge-dialog}" BorderThickness="1" BackgroundSizing="OuterBorderEdge"
+          CornerRadius="16" BoxShadow="{DynamicResource shadow-dialog}" ClipToBounds="True">
+    <DockPanel>
+      <Grid DockPanel.Dock="Top" Margin="24,20,24,8" ColumnDefinitions="*,Auto" ColumnSpacing="16">
+        <StackPanel>
+          <TextBlock Classes="card-title" Text="{Binding Title}" />
+          <TextBlock Classes="muted" Text="{Binding Subtitle}" TextWrapping="Wrap" />
+        </StackPanel>
+        <c:GsIconButton Grid.Column="1" Classes="sm" Icon="x" Label="{Binding CloseName}" Command="{Binding CloseCommand}" VerticalAlignment="Top" />
+      </Grid>
+
+      <Border DockPanel.Dock="Bottom" BorderBrush="{DynamicResource line-100}" BorderThickness="0,1,0,0" Padding="24,14">
+        <StackPanel Spacing="12">
+          <c:GsNote Icon="shield" IsVisible="{Binding HasItems}"
+                    Text="Nothing syncs until you choose. Sync these saves backs up the ticked places and keeps them in step on your PCs; the rest stay as they are." />
+          <c:GsNote Icon="alert" Text="{Binding Error}" IsVisible="{Binding HasError}" />
+          <Grid ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="8">
+            <c:GsButton Classes="ghost" Content="{Binding NotTheseLabel}" Command="{Binding NotTheseCommand}" IsEnabled="{Binding !Adding}" ToolTip.Tip="{Binding NotTheseTip}" />
+            <c:GsButton Grid.Column="1" Classes="ghost" Icon="search" Content="Watch again" Command="{Binding AgainCommand}" IsEnabled="{Binding !Adding}"
+                        ToolTip.Tip="Watches the next time you play, and adds what it finds then" />
+            <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="8" IsVisible="{Binding IsEmpty}">
+              <c:GsButton Icon="plus" Content="Add a place…" Command="{Binding AddPlaceCommand}" ToolTip.Tip="A folder or file where it keeps saves, if you know it" />
+              <c:GsButton Classes="primary" Content="Done" Command="{Binding CloseCommand}" />
+            </StackPanel>
+            <c:GsButton Grid.Column="3" Classes="primary" Icon="sync" Content="{Binding SyncLabel}" Command="{Binding SyncCommand}" IsEnabled="{Binding CanSync}"
+                        IsVisible="{Binding HasItems}" IsBusy="{Binding Adding}" BusyText="Syncing" ToolTip.Tip="{Binding SyncTip}" ToolTip.ShowOnDisabled="True" />
+          </Grid>
+        </StackPanel>
+      </Border>
+
+      <StackPanel Margin="24,8,24,16" Spacing="12">
+        <c:GsNote Icon="search" IsVisible="{Binding IsEmpty}"
+                  Text="It watches again the next time you play, in case it saves later in a game. If you know where its saves are, Add a place… sets them." />
+        <ScrollViewer MaxHeight="300" HorizontalScrollBarVisibility="Disabled" IsVisible="{Binding HasItems}">
+          <ItemsControl ItemsSource="{Binding Items}" AutomationProperties.Name="Places it wrote to">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate>
+                <StackPanel Spacing="2" />
+              </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:LearnFindItem">
+                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12" Margin="0,0,12,0" Background="Transparent" ToolTip.Tip="{Binding Path}">
+                  <CheckBox MinWidth="0" IsChecked="{Binding Picked}" IsVisible="{Binding CanPick}" VerticalAlignment="Top" Margin="0,4,0,0"
+                            AutomationProperties.Name="{Binding PickName}" />
+                  <c:GsIcon Icon="lock" Size="16" Foreground="{DynamicResource ink-muted}" IsVisible="{Binding IsRefused}" VerticalAlignment="Top" Margin="2,6,6,0" />
+                  <StackPanel Grid.Column="1" Spacing="2" Margin="0,4">
+                    <TextBlock Classes="mono" Text="{Binding Portable}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Classes="caption muted" Text="{Binding Meta}" TextWrapping="Wrap" FontFamily="{DynamicResource font-mono}" />
+                  </StackPanel>
+                  <ItemsControl Grid.Column="2" ItemsSource="{Binding Tags}" VerticalAlignment="Top" Margin="0,4,0,0">
+                    <ItemsControl.ItemsPanel>
+                      <ItemsPanelTemplate>
+                        <StackPanel Orientation="Horizontal" Spacing="6" />
+                      </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="x:String">
+                        <c:GsTag Text="{Binding}" Background="{DynamicResource bg-400}" />
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </Grid>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </ScrollViewer>
+        <c:GsNote Icon="info" IsVisible="{Binding HasItems}"
+                  Text="Left out: logs, caches, crash dumps and program files written then, and folders GameSync never takes. A place can be one file when it sits loose in a bigger folder." />
+        <c:GsNote Icon="alert" IsVisible="{Binding Overflowed}"
+                  Text="Windows wrote faster than GameSync could keep up for a moment, so this list may miss a place. Watch again to be sure." />
+      </StackPanel>
+    </DockPanel>
+  </Border>
+</UserControl>

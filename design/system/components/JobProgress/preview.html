@@ -1,0 +1,20 @@
+<!-- @dsCard group="Status" height=570 subtitle="A job under way where its result shows: what it's doing, a bar, how far, how fast, how long (KAN-80)" -->
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>preview</title>
+<style>html,body{margin:0;background:var(--bg-100);} .pv{padding:24px;}</style>
+</head>
+<body class="gs-root">
+<div id="root" class="pv"></div>
+<script>
+var G = window.GameSync, h = React.createElement;
+ReactDOM.createRoot(document.getElementById('root')).render(h('div',{className:'gs-stack',style:{maxWidth:560}},
+  h(G.JobProgress,{boxed:true,title:'Uploading to Google Drive',value:37,detail:'42.1 of 113 MB \u00b7 412 of 1,108 files',speed:'6.1 MB/s',left:'about 12 s left'}),
+  h(G.JobProgress,{boxed:true,title:'Looking at the copies beside the live save'}),
+  h(G.JobProgress,{boxed:true,title:'Upload paused',value:37,state:'paused',note:'Paused while you play Bloodborne GOTY \u00b7 42.1 of 113 MB sent'}),
+  h(G.JobProgress,{boxed:true,title:'Uploaded to Google Drive',state:'done',note:'113 MB in 19 s'}),
+  h(G.JobProgress,{boxed:true,title:'The upload waits',value:37,state:'failed',note:'Google Drive can\u2019t be reached. It tries again at 21:14; your saves are safe on this PC.'}),
+  h(G.BusyLine,{text:'Bringing back \u201cbefo ludwig\u201d'})));
+</script>
+</body>
+</html>

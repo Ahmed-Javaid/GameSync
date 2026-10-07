@@ -260,6 +260,68 @@ public class HistoryTests
     }
 
     [Fact]
+    public async Task KAN_40_a_syncs_log_line_says_what_moved_and_KAN_41_the_history_lists_saves_by_the_time_shown()
+    {
+        using var world = new TestWorld();
+        var data = Path.Combine(world.Root, "data");
+        var saves = Path.Combine(world.Root, "Saves");
+        var slot = Path.Combine(saves, "Lantern Keep", "slot.sav");
+        var game = GameId.Parse("lantern-keep");
+        Write(slot, "at the lighthouse door");
+        File.SetLastWriteTimeUtc(slot, DateTime.UtcNow.AddHours(-1));
+        new AppConfig { Remote = world.Cloud, Games = [Game("lantern-keep", "Lantern Keep", saves)] }.Save(data);
+        var output = new Quiet();
+        await SyncPlans.RunAsync(data, (await SyncPlans.CheckAsync(data, output, Ct)).Changes, output, Ct);
+        Played(data, slot, "past the lighthouse", game, DateTime.UtcNow.AddMinutes(-5), minutes: 190);
+        await SyncPlans.RunAsync(data, (await SyncPlans.CheckAsync(data, output, Ct)).Changes, output, Ct);
+
+        var log = (await GameDetails.ReadAsync(data, game, Ct))!.Log;
+        Assert.Contains(log, l => l.Message.EndsWith("Kept 1 KB (1 file), after 3 h 11 min of play.", StringComparison.Ordinal));
+
+        // A save kept later whose file is older (put back by hand) sits below the newer-looking one, as the Versions tab has it.
+        File.WriteAllText(slot, "an older copy put back by hand");
+        File.SetLastWriteTimeUtc(slot, DateTime.UtcNow.AddHours(-3));
+        await AppActions.BackUpNowAsync(data, game, output, Ct);
+        var versions = (await GameDetails.ReadAsync(data, game, Ct))!.Versions;
+        Assert.Equal(3, versions.Count);
+        Assert.Equal(versions.Select(v => v.SavedUtc).OrderDescending(), versions.Select(v => v.SavedUtc));
+    }
+
+    [Fact]
+    public async Task A_named_save_played_on_from_is_not_in_place_any_more_and_restores_again()
+    {
+        // The owner, 2 Oct 2026: restored "Before Orphan", went around a little, and wanted it back; In place blocked it,
+        // as nothing is backed up while the game runs and the history still said the save was "Before Orphan".
+        using var world = new TestWorld();
+        var data = Path.Combine(world.Root, "data");
+        var saves = Path.Combine(world.Root, "Saves");
+        var slot = Path.Combine(saves, "Lantern Keep", "slot.sav");
+        var game = GameId.Parse("lantern-keep");
+        Write(slot, "at the lighthouse door");
+        new AppConfig { Remote = world.Cloud, Games = [Game("lantern-keep", "Lantern Keep", saves)] }.Save(data);
+        var output = new Quiet();
+        await SyncPlans.RunAsync(data, (await SyncPlans.CheckAsync(data, output, Ct)).Changes, output, Ct);
+        await AppActions.SaveAsAsync(data, game, "Before the lighthouse", output, Ct);
+        Played(data, slot, "past the lighthouse", game, DateTime.UtcNow, minutes: 30);
+        await SyncPlans.RunAsync(data, (await SyncPlans.CheckAsync(data, output, Ct)).Changes, output, Ct);
+        var named = Assert.Single((await GameDetails.ReadAsync(data, game, Ct))!.NamedSaves);
+        Assert.Null(await AppActions.RestoreAsync(data, game, named.Version, named.Name, output, Ct));
+        Assert.True(Assert.Single((await GameDetails.ReadAsync(data, game, Ct))!.NamedSaves).InPlace);
+
+        // Played on from it: the game wrote its save, and nothing synced yet.
+        File.WriteAllText(slot, "a few steps on");
+        var page = (await GameDetails.ReadAsync(data, game, Ct))!;
+        Assert.False(Assert.Single(page.NamedSaves).InPlace);
+        Assert.Null(page.Current!.SameAs);
+
+        Assert.Null(await AppActions.RestoreAsync(data, game, named.Version, named.Name, output, Ct));
+        Assert.Equal("at the lighthouse door", File.ReadAllText(slot));
+        page = (await GameDetails.ReadAsync(data, game, Ct))!;
+        Assert.True(Assert.Single(page.NamedSaves).InPlace);
+        Assert.Equal("Before the lighthouse", page.Current!.SameAs);
+    }
+
+    [Fact]
     public async Task KAN_51_restoring_a_named_save_is_one_question_then_the_page_says_it_is_in_place()
     {
         using var world = new TestWorld();
@@ -303,11 +365,15 @@ public class HistoryTests
         page.RestoreCommand.Execute(item);
         Assert.Equal([(game, named.Version, "Before the lighthouse")], asked);
         Assert.True(page.Restoring);
-        Assert.Equal("Bringing back “Before the lighthouse”…", page.RestoreNote);
+
+        // KAN-80: the line under the status and the row's Restore both say it's under way, with dots that count up.
+        Assert.Equal("Bringing back “Before the lighthouse”", page.RestoreNote);
+        Assert.True(item.IsRestoring);
         page.RestoreCommand.Execute(item);
         Assert.Single(asked);
         done.SetResult(null);
         Assert.True(page.RestoreDone);
+        Assert.False(item.IsRestoring);
         Assert.StartsWith("“Before the lighthouse” is back in place.", page.RestoreNote);
         page.Show(detail, DateTime.Now);
         Assert.False(Assert.Single(page.NamedSaves).CanRestore);

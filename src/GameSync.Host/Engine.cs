@@ -131,7 +131,14 @@ internal sealed class Engine : IDisposable
             amsi,
             Device,
             DataDir,
-            options with { AppVersion = Cli.AppVersion, HistoryLimits = Cli.KeepLimits(State), Registry = Here.Registry });
+            options with
+            {
+                AppVersion = Cli.AppVersion,
+                HistoryLimits = Cli.KeepLimits(State),
+                Registry = Here.Registry,
+                UploadGate = options.UploadGate ?? (async token => await EngineLock.AcquireUploadAsync(DataDir, null, token)),
+                StaysWithAccount = options.StaysWithAccount ?? (game => Sharing.StaysWithAccount(Library.All().FirstOrDefault(e => e.Id == game && e.MergedInto is null))),
+            });
         return (Service, recover ? await Service.RecoverAsync(ct) : []);
     }
 

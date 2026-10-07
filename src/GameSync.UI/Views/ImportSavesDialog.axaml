@@ -1,0 +1,97 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="using:GameSync.UI.Controls"
+             xmlns:vm="using:GameSync.UI.ViewModels"
+             x:Class="GameSync.UI.Views.ImportSavesDialog"
+             x:DataType="vm:ImportSavesViewModel"
+             Width="{DynamicResource dw-640}">
+  <UserControl.Styles>
+    <Style Selector="Border.import-row.ticked">
+      <Setter Property="Background" Value="{DynamicResource bg-300}" />
+    </Style>
+  </UserControl.Styles>
+  <!-- Import saves (design system → ImportSavesDialog; SHARE-10 to SHARE-13): a shared zip's games, each matched to this
+       PC's library; Add puts their saves in the games' histories, pinned, never current. -->
+  <Border Background="{DynamicResource surface-dialog}" BorderBrush="{DynamicResource edge-dialog}" BorderThickness="1" BackgroundSizing="OuterBorderEdge"
+          CornerRadius="16" BoxShadow="{DynamicResource shadow-dialog}" ClipToBounds="True">
+    <DockPanel>
+      <Border DockPanel.Dock="Top" Padding="24,20,24,8">
+        <Grid ColumnDefinitions="*,Auto">
+          <StackPanel>
+            <TextBlock Classes="card-title" Text="Import saves" />
+            <TextBlock Classes="muted" Text="{Binding From}" TextTrimming="CharacterEllipsis" />
+          </StackPanel>
+          <c:GsIconButton Grid.Column="1" Classes="sm" Icon="x" Label="Close Import saves" Command="{Binding CloseCommand}" VerticalAlignment="Center" />
+        </Grid>
+      </Border>
+
+      <!-- Foot: what's ticked, the promise, Cancel and Add; done, what happened and Done -->
+      <Border DockPanel.Dock="Bottom" BorderBrush="{DynamicResource line-100}" BorderThickness="0,1,0,0" Padding="24,14">
+        <Panel>
+          <StackPanel Spacing="12" IsVisible="{Binding !Done}">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12" IsVisible="{Binding Reviewing}">
+              <TextBlock Classes="mono-small muted" Text="{Binding Summary}" TextTrimming="CharacterEllipsis" />
+              <TextBlock Grid.Column="1" Classes="mono-small muted" Text="{Binding SizeText}" />
+            </Grid>
+            <c:GsNote Icon="shield" Text="Every file is checked like a restore: only into the game's own folders, scanned by your antivirus, no program files. Nothing replaces your current saves." />
+            <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+              <c:GsButton Classes="ghost" Content="Cancel" Command="{Binding CloseCommand}" IsEnabled="{Binding !Importing}" />
+              <c:GsButton Classes="primary" Icon="download" Content="{Binding AddLabel}" Command="{Binding AddCommand}" IsEnabled="{Binding CanImport}"
+                          IsBusy="{Binding Importing}" BusyText="Adding" />
+            </StackPanel>
+          </StackPanel>
+          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16" IsVisible="{Binding Done}">
+            <Border Background="{DynamicResource primary-soft}" CornerRadius="{DynamicResource radius-md}" Padding="16,12">
+              <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                <c:GsIcon Icon="check" Size="20" Foreground="{DynamicResource primary}" VerticalAlignment="Center" />
+                <TextBlock Grid.Column="1" Text="{Binding DoneText}" TextWrapping="Wrap" />
+              </Grid>
+            </Border>
+            <c:GsButton Grid.Column="1" Classes="primary" Content="Done" Command="{Binding CloseCommand}" VerticalAlignment="Center" />
+          </Grid>
+        </Panel>
+      </Border>
+
+      <StackPanel Margin="24,8,24,16" Spacing="12">
+        <c:GsNote Icon="zip" Text="Reading the zip" IsBusy="True" IsVisible="{Binding Reading}" />
+        <TextBlock Classes="muted" Text="Checking each file and adding the saves…" IsVisible="{Binding Importing}" />
+        <ScrollViewer MaxHeight="360" HorizontalScrollBarVisibility="Disabled" IsVisible="{Binding Reviewing}">
+          <ItemsControl ItemsSource="{Binding Rows}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate>
+                <StackPanel Spacing="4" />
+              </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:ImportRow">
+                <Border Classes="import-row" Classes.ticked="{Binding Ticked}" CornerRadius="{DynamicResource radius-md}" Padding="12,8" AutomationProperties.Name="{Binding}">
+                  <Grid ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="12">
+                    <CheckBox MinWidth="0" IsChecked="{Binding Ticked}" IsEnabled="{Binding CanTick}" VerticalAlignment="Center"
+                              AutomationProperties.Name="{Binding Title, StringFormat='Import {0}'}" />
+                    <Border Grid.Column="1" Width="28" Height="36" CornerRadius="6" ClipToBounds="True" Background="{DynamicResource bg-300}">
+                      <Panel>
+                        <TextBlock Text="{Binding Initial}" FontWeight="SemiBold" FontSize="{DynamicResource fs-11}" Foreground="{DynamicResource ink-muted}"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        <c:GsCoverImage Source="{Binding Cover}" />
+                      </Panel>
+                    </Border>
+                    <StackPanel Grid.Column="2" Spacing="2" VerticalAlignment="Center">
+                      <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                      <TextBlock Classes="mono-small muted" Text="{Binding Meta}" TextWrapping="Wrap" />
+                      <c:GsNote Icon="alert" Classes="warn" Text="{Binding Warn}" IsVisible="{Binding HasWarn}" />
+                      <c:GsNote Icon="block" Foreground="{DynamicResource danger}" Text="{Binding Removed}" IsVisible="{Binding HasRemoved}" />
+                      <!-- R16 (version 51): a game whose saves stay with the account that made them can't be imported -->
+                      <c:GsNote Icon="shield" Foreground="{DynamicResource danger}" Text="{Binding StaysWith}" IsVisible="{Binding HasStaysWith}" />
+                    </StackPanel>
+                    <TextBlock Grid.Column="3" Classes="mono-small muted" Text="{Binding Size}" VerticalAlignment="Center" />
+                  </Grid>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </ScrollViewer>
+        <c:GsNote Icon="alert" Classes="warn" Text="{Binding Error}" IsVisible="{Binding HasError}" />
+      </StackPanel>
+    </DockPanel>
+  </Border>
+</UserControl>

@@ -25,16 +25,29 @@
                 <Panel Name="PART_TitleCover">
                   <TextBlock Text="{TemplateBinding Initial}" FontSize="128" LineHeight="128" FontWeight="Bold" Foreground="{DynamicResource bg-400}"
                              HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,-4,-18" />
-                  <TextBlock Text="{TemplateBinding Title}" Margin="10" FontSize="15" LineHeight="19" FontWeight="SemiBold" TextWrapping="Wrap"
+                  <TextBlock Text="{TemplateBinding Title}" Margin="10" FontSize="{DynamicResource fs-15}" LineHeight="{DynamicResource lh-19}" FontWeight="SemiBold" TextWrapping="Wrap"
                              MaxLines="4" TextTrimming="CharacterEllipsis" Foreground="{DynamicResource ink}" />
                 </Panel>
                 <c:GsStatusBadge Classes="art" Status="{TemplateBinding Status}" Label="{TemplateBinding StatusLabel}" IsVisible="{TemplateBinding ShowsStatus}"
                                  HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="8" />
-                <!-- Saves fine: a check in the ok colour on the art's deep tint, its words in the tooltip -->
-                <Border Name="PART_Mark" Width="22" Height="22" CornerRadius="11" Background="{DynamicResource ok-art}" IsVisible="{TemplateBinding ShowsMark}"
-                        HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="8" ToolTip.Tip="{TemplateBinding MarkLabel}">
-                  <c:GsIcon Icon="check" Size="14" StrokeWidth="2.5" Foreground="{DynamicResource ok}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                <!-- Saves fine (KAN-48; design system version 35): a cloud with a check for Synced, a shield with a check for
+                     backed up, in the ok colour on the art's deep tint, its words in the tooltip; never a bare tick -->
+                <Border Name="PART_Mark" Width="26" Height="26" CornerRadius="13" Background="{DynamicResource ok-art}" IsVisible="{TemplateBinding ShowsMark}"
+                        BorderBrush="#24FFFFFF" BorderThickness="1" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="8" ToolTip.Tip="{TemplateBinding MarkLabel}">
+                  <c:GsIcon Icon="{TemplateBinding MarkIcon}" Size="15" StrokeWidth="2" Foreground="{DynamicResource ok}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Border>
+                <!-- ACH-02 (design system version 39): how far its achievements are, opposite the save mark: a ring that fills
+                     with the share unlocked round a small trophy, once one is; the Zenith medal once every one is -->
+                <Border Name="PART_Achievements" Width="26" Height="26" CornerRadius="13" Background="#A6050608" BorderBrush="#24FFFFFF" BorderThickness="1"
+                        HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="8" IsVisible="{TemplateBinding ShowsAchievementsRing}"
+                        ToolTip.Tip="{TemplateBinding AchievementsWords}">
+                  <Panel>
+                    <c:GsRingArc Value="{TemplateBinding AchievementsPercent}" Thickness="2.5" Track="#38FFFFFF" Arc="{DynamicResource primary}" Margin="1.5" />
+                    <c:GsIcon Icon="trophy" Size="11" StrokeWidth="2" Foreground="{DynamicResource on-art}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                  </Panel>
+                </Border>
+                <c:GsZenithMedal Width="26" Height="26" IsEarned="True" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="8"
+                                 IsVisible="{TemplateBinding ShowsAchievementsMedal}" ToolTip.Tip="{TemplateBinding AchievementsWords}" />
               </Panel>
             </Border>
             <!-- Glossy's 1px ring just outside the art (clear in Solid), and the hover outline 2px further out, as in the design system -->
@@ -42,8 +55,8 @@
             <Border Name="PART_Hover" CornerRadius="20" Margin="-4" BorderThickness="2" BorderBrush="Transparent" IsHitTestVisible="False" />
             </Panel>
           </c:AspectPanel>
-          <TextBlock Name="PART_Name" Text="{TemplateBinding Title}" FontSize="13" LineHeight="18" FontWeight="Medium" TextTrimming="CharacterEllipsis" />
-          <TextBlock Name="PART_Meta" Text="{TemplateBinding Meta}" FontSize="12" LineHeight="16" Foreground="{DynamicResource ink-faint}" Margin="0,-4,0,0"
+          <TextBlock Name="PART_Name" Text="{TemplateBinding Title}" FontSize="{DynamicResource fs-13}" LineHeight="{DynamicResource lh-18}" FontWeight="Medium" TextTrimming="CharacterEllipsis" />
+          <TextBlock Name="PART_Meta" Text="{TemplateBinding Meta}" FontSize="{DynamicResource fs-12}" LineHeight="{DynamicResource lh-16}" Foreground="{DynamicResource ink-faint}" Margin="0,-4,0,0"
                      IsVisible="{Binding $parent[c:GsGameTile].Meta, Converter={x:Static ObjectConverters.IsNotNull}}" />
         </StackPanel>
       </ControlTemplate>
@@ -52,8 +65,8 @@
       <Setter Property="IsVisible" Value="False" />
     </Style>
     <Style Selector="^.compact /template/ TextBlock#PART_Name">
-      <Setter Property="FontSize" Value="12" />
-      <Setter Property="LineHeight" Value="16" />
+      <Setter Property="FontSize" Value="{DynamicResource fs-12}" />
+      <Setter Property="LineHeight" Value="{DynamicResource lh-16}" />
     </Style>
     <Style Selector="^:pointerover /template/ Border#PART_Hover">
       <Setter Property="BorderBrush" Value="{DynamicResource bg-400}" />
@@ -62,7 +75,7 @@
 
   <!-- Rows packed tight (the game list) draw the focus ring just inside themselves (A11Y-02) -->
   <FocusAdornerTemplate x:Key="InsetFocus">
-    <Border BorderBrush="{DynamicResource primary}" BorderThickness="2" CornerRadius="10" />
+    <Border AdornerLayer.IsClipEnabled="False" BorderBrush="{DynamicResource primary}" BorderThickness="2" CornerRadius="10" />
   </FocusAdornerTemplate>
 
   <!-- GameList row: the small cover, the name, the status under it when it needs you or runs; dimmed when not installed -->
@@ -72,7 +85,7 @@
     <Setter Property="Background" Value="Transparent" />
     <Setter Property="Foreground" Value="{DynamicResource ink}" />
     <Setter Property="HorizontalAlignment" Value="Stretch" />
-    <Setter Property="FontSize" Value="13" />
+    <Setter Property="FontSize" Value="{DynamicResource fs-13}" />
     <Setter Property="FontWeight" Value="Medium" />
     <Setter Property="Cursor" Value="Hand" />
     <Setter Property="FocusAdorner" Value="{StaticResource InsetFocus}" />
@@ -83,19 +96,19 @@
             <Border Name="PART_Cover" Width="20" Height="30" CornerRadius="{DynamicResource radius-sm}" ClipToBounds="True" Background="{DynamicResource bg-300}"
                     VerticalAlignment="Center">
               <Panel>
-                <TextBlock Text="{TemplateBinding Initial}" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource ink-muted}"
+                <TextBlock Text="{TemplateBinding Initial}" FontSize="{DynamicResource fs-11}" FontWeight="SemiBold" Foreground="{DynamicResource ink-muted}"
                            HorizontalAlignment="Center" VerticalAlignment="Center" />
                 <c:GsCoverImage Source="{TemplateBinding Art}" />
               </Panel>
             </Border>
             <StackPanel Grid.Column="1" VerticalAlignment="Center">
-              <TextBlock Name="PART_Name" Text="{TemplateBinding Title}" LineHeight="18" TextTrimming="CharacterEllipsis" />
-              <c:GsStatusBadge Status="{TemplateBinding Status}" Label="{TemplateBinding StatusLabel}" Plain="True" FontSize="11"
+              <TextBlock Name="PART_Name" Text="{TemplateBinding Title}" LineHeight="{DynamicResource lh-18}" TextTrimming="CharacterEllipsis" />
+              <c:GsStatusBadge Status="{TemplateBinding Status}" Label="{TemplateBinding StatusLabel}" Plain="True" FontSize="{DynamicResource fs-11}"
                                IsVisible="{TemplateBinding ShowsStatus}" />
             </StackPanel>
-            <!-- Saves fine (KAN-48): the same check as the covers', small at the row's end -->
-            <c:GsIcon Grid.Column="2" Name="PART_Mark" Icon="check" Size="14" StrokeWidth="2.5" Foreground="{DynamicResource ok}" VerticalAlignment="Center"
-                      Margin="0,0,2,0" IsVisible="{TemplateBinding ShowsMark}" />
+            <!-- Saves fine (KAN-48): the covers' mark, small at the row's end: a cloud with a check, or a shield with a check -->
+            <c:GsIcon Grid.Column="2" Name="PART_Mark" Icon="{TemplateBinding MarkIcon}" Size="15" StrokeWidth="2" Foreground="{DynamicResource ok}" VerticalAlignment="Center"
+                      Margin="0,0,2,0" IsVisible="{TemplateBinding ShowsMark}" ToolTip.Tip="{TemplateBinding MarkLabel}" />
           </Grid>
         </Border>
       </ControlTemplate>
@@ -128,9 +141,9 @@
         <Border Background="{TemplateBinding Background}" CornerRadius="{DynamicResource radius-sm}" Padding="{TemplateBinding Padding}">
           <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
             <c:GsIcon Name="PART_Chevron" Icon="chevronDown" Size="14" StrokeWidth="2" VerticalAlignment="Center" />
-            <TextBlock Text="{TemplateBinding Label, Converter={x:Static c:UpperConverter.Instance}}" FontSize="11" LineHeight="14" FontWeight="SemiBold"
+            <TextBlock Text="{TemplateBinding Label, Converter={x:Static c:UpperConverter.Instance}}" FontSize="{DynamicResource fs-11}" LineHeight="{DynamicResource lh-14}" FontWeight="SemiBold"
                        LetterSpacing="1.32" VerticalAlignment="Center" />
-            <TextBlock Text="{TemplateBinding Count}" FontFamily="{DynamicResource font-mono}" FontSize="11" LineHeight="14" FontWeight="Medium" VerticalAlignment="Center" />
+            <TextBlock Text="{TemplateBinding Count}" FontFamily="{DynamicResource font-mono}" FontSize="{DynamicResource fs-11}" LineHeight="{DynamicResource lh-14}" FontWeight="Medium" VerticalAlignment="Center" />
           </StackPanel>
         </Border>
       </ControlTemplate>
@@ -154,7 +167,7 @@
           <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
             <c:GsIcon Icon="{TemplateBinding Icon}" Size="14" VerticalAlignment="Center"
                       IsVisible="{Binding $parent[c:GsChip].Icon, Converter={x:Static ObjectConverters.IsNotNull}}" />
-            <TextBlock Text="{TemplateBinding Text}" FontSize="12" LineHeight="16" FontWeight="Medium" VerticalAlignment="Center" />
+            <TextBlock Text="{TemplateBinding Text}" FontSize="{DynamicResource fs-12}" LineHeight="{DynamicResource lh-16}" FontWeight="Medium" VerticalAlignment="Center" />
           </StackPanel>
         </Border>
       </ControlTemplate>
@@ -197,8 +210,11 @@
               </Border>
             </Grid>
             <DockPanel Margin="20">
-              <!-- Where it's installed: a store's mark (or a folder) with its words under the pointer, then the eyebrow (KAN-55) -->
+              <!-- Where it's installed: a store's mark (or a folder) with its words under the pointer, then the eyebrow (KAN-55);
+                   at the right, Home's pager between the games it can show (KAN-125) -->
               <DockPanel DockPanel.Dock="Top">
+                <ContentPresenter DockPanel.Dock="Right" Content="{TemplateBinding Pager}" VerticalAlignment="Top" Margin="12,-6,-6,0"
+                                  IsVisible="{Binding $parent[c:GsHeroBanner].Pager, Converter={x:Static ObjectConverters.IsNotNull}}" />
                 <Border DockPanel.Dock="Left" Background="Transparent" Margin="0,0,8,0" VerticalAlignment="Center"
                         IsVisible="{Binding $parent[c:GsHeroBanner].EyebrowIcon, Converter={x:Static ObjectConverters.IsNotNull}}"
                         ToolTip.Tip="{TemplateBinding EyebrowTip}" AutomationProperties.Name="{TemplateBinding EyebrowTip}">
@@ -219,7 +235,7 @@
                   <Image Name="PART_Logo" Source="{TemplateBinding Logo}" MaxWidth="380" MaxHeight="112" Stretch="Uniform" HorizontalAlignment="Left" IsVisible="False" />
                   <TextBlock Name="PART_Title" Classes="hero-title" Text="{TemplateBinding Title}" TextWrapping="Wrap" />
                   <c:GsStatusBadge Classes="art" Status="{TemplateBinding Status}" Label="{TemplateBinding StatusLabel}" IsVisible="{TemplateBinding ShowsStatus}" />
-                  <TextBlock Text="{TemplateBinding Blurb}" FontSize="13" LineHeight="19" Opacity="0.88" TextWrapping="Wrap">
+                  <TextBlock Text="{TemplateBinding Blurb}" FontSize="{DynamicResource fs-13}" LineHeight="{DynamicResource lh-19}" Opacity="0.88" TextWrapping="Wrap">
                     <TextBlock.IsVisible>
                       <MultiBinding Converter="{x:Static BoolConverters.And}">
                         <Binding Path="$parent[c:GsHeroBanner].Blurb" Converter="{x:Static ObjectConverters.IsNotNull}" />
@@ -237,7 +253,7 @@
                   <c:GsIconButton Classes="glass" Icon="settings" Label="Properties" Command="{TemplateBinding SettingsCommand}"
                                   IsVisible="{Binding $parent[c:GsHeroBanner].Actions, Converter={x:Static ObjectConverters.IsNull}}" />
                   <c:GsButton Classes="primary" Icon="{TemplateBinding PlayIcon}" Content="{TemplateBinding PlayLabel}" Command="{TemplateBinding PlayCommand}"
-                              IsVisible="{TemplateBinding ShowsPlay}" />
+                              IsVisible="{TemplateBinding ShowsPlay}" IsBusy="{TemplateBinding IsStarting}" BusyText="Starting" />
                 </StackPanel>
               </Grid>
             </DockPanel>
@@ -260,6 +276,15 @@
     <Style Selector="^:logo /template/ TextBlock#PART_Title">
       <Setter Property="IsVisible" Value="False" />
     </Style>
+    <!-- KAN-126: a banner that opens its game's page shows the hand, and takes focus with the rounded ring -->
+    <Style Selector="^:openable">
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="FocusAdorner">
+        <FocusAdornerTemplate>
+          <Border AdornerLayer.IsClipEnabled="False" BorderBrush="{DynamicResource primary}" BorderThickness="2" CornerRadius="20" Margin="-4" />
+        </FocusAdornerTemplate>
+      </Setter>
+    </Style>
   </ControlTheme>
   <!-- PlayBar: a card under a game's hero; Play, the facts in a row that wraps, the game's buttons -->
   <ControlTheme x:Key="{x:Type c:GsPlayBar}" TargetType="c:GsPlayBar">
@@ -281,8 +306,8 @@
                 <DataTemplate x:DataType="c:PlayStat">
                   <StackPanel Spacing="2" AutomationProperties.Name="{Binding}">
                     <TextBlock Classes="overline faint" Text="{Binding Label, Converter={x:Static c:UpperConverter.Instance}}" />
-                    <TextBlock Text="{Binding Value}" FontSize="14" LineHeight="20" FontWeight="Medium" IsVisible="{Binding IsText}" />
-                    <c:GsStatusBadge Plain="True" Status="{Binding Status}" Label="{Binding Value}" FontSize="14" IsVisible="{Binding IsStatus}" />
+                    <TextBlock Text="{Binding Value}" FontSize="{DynamicResource fs-14}" LineHeight="{DynamicResource lh-20}" FontWeight="Medium" IsVisible="{Binding IsText}" />
+                    <c:GsStatusBadge Plain="True" Status="{Binding Status}" Label="{Binding Value}" FontSize="{DynamicResource fs-14}" IsVisible="{Binding IsStatus}" />
                   </StackPanel>
                 </DataTemplate>
               </ItemsControl.ItemTemplate>
@@ -313,9 +338,9 @@
             <ColumnDefinition Width="Auto" SharedSizeGroup="FactLabel" />
             <ColumnDefinition Width="*" />
           </Grid.ColumnDefinitions>
-          <TextBlock Classes="overline faint" Text="{Binding Label, Converter={x:Static c:UpperConverter.Instance}}" LineHeight="20" VerticalAlignment="Top" />
-          <TextBlock Grid.Column="1" Text="{Binding Value}" FontSize="13" LineHeight="20" TextWrapping="Wrap" IsVisible="{Binding IsPlain}" />
-          <TextBlock Grid.Column="1" Classes="mono-fact" Text="{Binding Value}" LineHeight="20" TextTrimming="LeadingCharacterEllipsis"
+          <TextBlock Classes="overline faint fact-label" Text="{Binding Label, Converter={x:Static c:UpperConverter.Instance}}" VerticalAlignment="Top" />
+          <TextBlock Grid.Column="1" Text="{Binding Value}" FontSize="{DynamicResource fs-13}" LineHeight="{DynamicResource lh-20}" TextWrapping="Wrap" IsVisible="{Binding IsPlain}" />
+          <TextBlock Grid.Column="1" Classes="mono-fact" Text="{Binding Value}" LineHeight="{DynamicResource lh-20}" TextTrimming="LeadingCharacterEllipsis"
                      ToolTip.Tip="{Binding Value}" IsVisible="{Binding IsMono}" />
           <ItemsControl Grid.Column="1" ItemsSource="{Binding Tags}" IsVisible="{Binding HasTags}" VerticalAlignment="Center">
             <ItemsControl.ItemsPanel>
@@ -334,20 +359,20 @@
     </Setter>
   </ControlTheme>
 
-  <!-- ActivityGrid: the legend, a cell a day, and the weekday names -->
+  <!-- ActivityGrid: the legend, a cell a day, and the weekday names; the cells take keyboard focus as one, with the app's ring -->
   <ControlTheme x:Key="{x:Type c:GsActivity}" TargetType="c:GsActivity">
     <Setter Property="Template">
       <ControlTemplate>
         <StackPanel Spacing="12">
-          <StackPanel Orientation="Horizontal" Spacing="16" TextElement.Foreground="{DynamicResource ink-muted}" TextElement.FontSize="12">
+          <StackPanel Orientation="Horizontal" Spacing="16" TextElement.Foreground="{DynamicResource ink-muted}" TextElement.FontSize="{DynamicResource fs-12}">
             <StackPanel Orientation="Horizontal" Spacing="6"><c:GsLevelDot Level="0" VerticalAlignment="Center" /><TextBlock Text="0h" /></StackPanel>
             <StackPanel Orientation="Horizontal" Spacing="6"><c:GsLevelDot Level="1" VerticalAlignment="Center" /><TextBlock Text="&lt; 2h" /></StackPanel>
             <StackPanel Orientation="Horizontal" Spacing="6"><c:GsLevelDot Level="2" VerticalAlignment="Center" /><TextBlock Text="2–4h" /></StackPanel>
             <StackPanel Orientation="Horizontal" Spacing="6"><c:GsLevelDot Level="3" VerticalAlignment="Center" /><TextBlock Text="&gt; 4h" /></StackPanel>
           </StackPanel>
           <c:GsActivityGrid Days="{TemplateBinding Days}" StartWeekday="{TemplateBinding StartWeekday}" Tips="{TemplateBinding Tips}"
-                            DayCommand="{TemplateBinding DayCommand}" />
-          <UniformGrid Columns="7" TextElement.Foreground="{DynamicResource ink-faint}" TextElement.FontSize="11">
+                            DayCommand="{TemplateBinding DayCommand}" FocusAdorner="{DynamicResource RoundedFocus}" />
+          <UniformGrid Columns="7" TextElement.Foreground="{DynamicResource ink-faint}" TextElement.FontSize="{DynamicResource fs-11}">
             <TextBlock Text="Mon" HorizontalAlignment="Center" />
             <TextBlock Text="Tue" HorizontalAlignment="Center" />
             <TextBlock Text="Wed" HorizontalAlignment="Center" />

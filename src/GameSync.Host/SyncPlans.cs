@@ -87,7 +87,7 @@ public static class SyncPlans
         using var engineLock = await EngineLock.AcquireAsync(dataDir, () => output.Say("Waiting for the sync in the background to finish first."), ct);
         using var engine = Engine.Open(dataDir);
         var running = new RunningGames(engine);
-        var (service, _) = await engine.OpenServiceAsync(new SyncOptions { IsRunning = running.IsRunning }, ct, recover: false);
+        var (service, _) = await engine.OpenServiceAsync(new SyncOptions { IsRunning = running.IsRunning, DeferUploads = true }, ct, recover: false);
         var fresh = await service.PlanAsync(chosen.Select(c => c.Id).ToList(), ct);
         var same = fresh.Where(p => chosen.Any(c => c.Id == p.Stream.Id && c.Fingerprint == p.Fingerprint && Step(p) == c.Step)).ToList();
         var changed = chosen.Where(c => same.All(p => p.Stream.Id != c.Id)).Select(c => c.Title).ToList();

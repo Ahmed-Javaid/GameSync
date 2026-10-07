@@ -1,0 +1,208 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="using:GameSync.UI.Controls"
+             xmlns:vm="using:GameSync.UI.ViewModels"
+             x:Class="GameSync.UI.Views.AchievementsPage"
+             x:DataType="vm:AchievementsViewModel">
+  <!-- Every achievement of a game (design system → AchievementsScreen): Back and the breadcrumb; the header with the game's
+       art faint behind it and its overview; the list with its tabs, a search and a sort; what the one picked is. A hidden
+       one still locked keeps its secret everywhere here. -->
+  <UserControl.Styles>
+    <Style Selector="TextBlock.row-name">
+      <Setter Property="FontSize" Value="{DynamicResource fs-14}" />
+      <Setter Property="LineHeight" Value="{DynamicResource lh-20}" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+    </Style>
+    <Style Selector="TextBlock.row-name.dim">
+      <Setter Property="Foreground" Value="{DynamicResource ink-muted}" />
+    </Style>
+    <Style Selector="TextBlock.row-desc">
+      <Setter Property="FontSize" Value="{DynamicResource fs-12}" />
+      <Setter Property="LineHeight" Value="{DynamicResource lh-18}" />
+      <Setter Property="Foreground" Value="{DynamicResource ink-muted}" />
+      <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+    </Style>
+    <Style Selector="TextBlock.row-desc.secret">
+      <Setter Property="FontStyle" Value="Italic" />
+      <Setter Property="Foreground" Value="{DynamicResource ink-faint}" />
+    </Style>
+    <Style Selector="TextBlock.fact-value">
+      <Setter Property="FontSize" Value="{DynamicResource fs-13}" />
+      <Setter Property="LineHeight" Value="{DynamicResource lh-18}" />
+      <Setter Property="FontWeight" Value="Medium" />
+      <Setter Property="HorizontalAlignment" Value="Right" />
+      <Setter Property="TextAlignment" Value="Right" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+  </UserControl.Styles>
+
+  <DockPanel>
+    <!-- Back and the breadcrumb: My games › the game › Achievements, or Achievements › the game on the Achievements page -->
+    <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="12" MinHeight="40" Margin="0,0,0,16">
+      <c:GsButton Classes="sm" Icon="arrowLeft" Content="Back" ToolTip.Tip="Back (Esc)" Command="{Binding BackCommand}" />
+      <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+        <ItemsControl ItemsSource="{Binding Crumbs}" VerticalAlignment="Center">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate>
+              <StackPanel Orientation="Horizontal" Spacing="6" />
+            </ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:Crumb">
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <Button Theme="{StaticResource CrumbButton}" Content="{Binding Label}" Command="{Binding Command}" AutomationProperties.Name="{Binding Spoken}" />
+                <c:GsIcon Icon="chevronRight" Size="14" Foreground="{DynamicResource ink-muted}" VerticalAlignment="Center" />
+              </StackPanel>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <TextBlock Text="{Binding Here}" FontSize="{DynamicResource fs-13}" FontWeight="Medium" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+      </StackPanel>
+    </StackPanel>
+
+    <!-- The header: the game's art, soft and faint from the right; its name, where these come from, and its overview -->
+    <c:GsCard DockPanel.Dock="Top" Padding="0" Margin="0,0,0,16" ClipToBounds="True">
+      <Panel>
+        <!-- A brush, not an image, so the art never sets the header's height -->
+        <Border Opacity="0.3" IsHitTestVisible="False" RenderOptions.BitmapInterpolationMode="HighQuality">
+          <Border.Background>
+            <ImageBrush Source="{Binding HeadArt}" Stretch="UniformToFill" />
+          </Border.Background>
+          <Border.OpacityMask>
+            <LinearGradientBrush StartPoint="0%,50%" EndPoint="100%,50%">
+              <GradientStop Color="#00000000" Offset="0.18" />
+              <GradientStop Color="#FF000000" Offset="0.7" />
+            </LinearGradientBrush>
+          </Border.OpacityMask>
+        </Border>
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="24" Margin="24,20">
+          <StackPanel VerticalAlignment="Center">
+            <TextBlock Classes="page-title" Text="{Binding Title}" TextWrapping="Wrap" />
+            <TextBlock Classes="muted" Text="{Binding Subtitle}" FontSize="{DynamicResource fs-13}" LineHeight="{DynamicResource lh-19}" TextWrapping="Wrap" Margin="0,4,0,0" />
+          </StackPanel>
+          <c:GsAchievementsOverview Grid.Column="1" Done="{Binding Progress.Done}" Total="{Binding Progress.Total}" Gold="{Binding Progress.Gold}"
+                                    Silver="{Binding Progress.Silver}" Bronze="{Binding Progress.Bronze}" CompletedOn="{Binding Progress.CompletedOn}"
+                                    VerticalAlignment="Center" MaxWidth="420" />
+        </Grid>
+      </Panel>
+    </c:GsCard>
+
+    <!-- The details keep about a third, and the tabs wrap when Windows' text is large (A11Y-04) -->
+    <Grid ColumnSpacing="16">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*" />
+        <ColumnDefinition Width="0.62*" MinWidth="280" MaxWidth="420" />
+      </Grid.ColumnDefinitions>
+      <!-- The list: All, Unlocked, Locked and Hidden with their counts; a search and a sort; one Tab stop, Up and Down move through it -->
+      <c:GsCard Padding="16" AutomationProperties.Name="Every achievement">
+        <DockPanel>
+          <c:GsPillTabs DockPanel.Dock="Top" ItemsSource="{Binding Tabs}" SelectedId="{Binding Tab, Mode=TwoWay}" AutomationProperties.Name="Which achievements"
+                        HorizontalAlignment="Left">
+            <c:GsPillTabs.ItemsPanel>
+              <ItemsPanelTemplate>
+                <WrapPanel ItemSpacing="8" LineSpacing="8" />
+              </ItemsPanelTemplate>
+            </c:GsPillTabs.ItemsPanel>
+          </c:GsPillTabs>
+          <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" ColumnSpacing="8" Margin="0,12">
+            <TextBox Name="FindBox" Classes="search clearButton" PlaceholderText="Find an achievement" Text="{Binding Search}"
+                     AutomationProperties.Name="Find an achievement">
+              <TextBox.InnerLeftContent>
+                <c:GsIcon Icon="search" Size="16" Margin="12,0,0,0" Foreground="{DynamicResource ink-faint}" VerticalAlignment="Center" />
+              </TextBox.InnerLeftContent>
+            </TextBox>
+            <c:GsButton Grid.Column="1" Classes="ghost sm" IconAfter="chevronDown" Content="{Binding SortLabel}" AutomationProperties.Name="{Binding SortName}"
+                        VerticalAlignment="Center">
+              <c:GsButton.Flyout>
+                <MenuFlyout Placement="BottomEdgeAlignedRight">
+                  <c:GsMenuItem Header="Recently unlocked" ToggleType="CheckBox" IsChecked="{Binding SortsRecent, Mode=OneWay}"
+                                Command="{Binding SortByCommand}" CommandParameter="recent" />
+                  <c:GsMenuItem Header="Rarest first" ToggleType="CheckBox" IsChecked="{Binding SortsRarest, Mode=OneWay}" IsEnabled="{Binding HasRarity}"
+                                Command="{Binding SortByCommand}" CommandParameter="rarest" />
+                  <c:GsMenuItem Header="Most players first" ToggleType="CheckBox" IsChecked="{Binding SortsPlayers, Mode=OneWay}" IsEnabled="{Binding HasRarity}"
+                                Command="{Binding SortByCommand}" CommandParameter="players" />
+                  <c:GsMenuItem Header="Name" ToggleType="CheckBox" IsChecked="{Binding SortsName, Mode=OneWay}"
+                                Command="{Binding SortByCommand}" CommandParameter="name" />
+                </MenuFlyout>
+              </c:GsButton.Flyout>
+            </c:GsButton>
+          </Grid>
+          <Panel>
+            <TextBlock Classes="caption faint" Text="{Binding Nothing}" TextWrapping="Wrap" TextAlignment="Center" Margin="8,24" IsVisible="{Binding HasNothing}" />
+            <ListBox Name="Rows" ItemsSource="{Binding Shown}" SelectedItem="{Binding Picked, Mode=OneWay}" ItemContainerTheme="{StaticResource AchievementRow}"
+                     Background="Transparent" Margin="-8,0" Padding="8,0" SelectionChanged="Picked" AutomationProperties.Name="Achievements">
+              <ListBox.ItemTemplate>
+                <DataTemplate x:DataType="vm:AchievementItem">
+                  <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="14" ToolTip.Tip="{Binding Tip}" AutomationProperties.Name="{Binding Tip}">
+                    <c:GsAchievementBadge Size="sm" Icon="{Binding Icon}" State="{Binding State}" Tier="{Binding Tier}" VerticalAlignment="Center" />
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                      <TextBlock Classes="row-name" Classes.dim="{Binding !IsUnlocked}" Text="{Binding Name}" />
+                      <TextBlock Classes="row-desc" Classes.secret="{Binding IsSecret}" Text="{Binding Description}" IsVisible="{Binding HasDescription}" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2" Spacing="2" VerticalAlignment="Center" HorizontalAlignment="Right">
+                      <TextBlock Text="{Binding When}" FontSize="{DynamicResource fs-12}" LineHeight="{DynamicResource lh-16}" FontWeight="Medium"
+                                 Foreground="{DynamicResource ink-muted}" HorizontalAlignment="Right" IsVisible="{Binding HasWhen}" />
+                      <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Right" IsVisible="{Binding HasPercent}">
+                        <Border Theme="{StaticResource TierDot}" Classes.gold="{Binding IsGoldDot}" Classes.silver="{Binding IsSilverDot}"
+                                Classes.bronze="{Binding IsBronzeDot}" IsVisible="{Binding HasDot}" />
+                        <TextBlock Text="{Binding PercentText}" FontFamily="{DynamicResource font-mono}" FontSize="{DynamicResource fs-12}" LineHeight="{DynamicResource lh-16}"
+                                   FontWeight="Medium" Foreground="{DynamicResource ink-faint}" />
+                      </StackPanel>
+                    </StackPanel>
+                  </Grid>
+                </DataTemplate>
+              </ListBox.ItemTemplate>
+            </ListBox>
+          </Panel>
+        </DockPanel>
+      </c:GsCard>
+
+      <!-- The one picked: its badge large in its light, what it is, when, how many players have it, its rarity and its place among yours -->
+      <c:GsCard Grid.Column="1" Padding="24,28" AutomationProperties.Name="Achievement details">
+        <Panel>
+          <TextBlock Classes="caption faint" Text="Pick an achievement to see what it is." TextWrapping="Wrap" TextAlignment="Center" IsVisible="{Binding !HasPicked}" />
+          <ScrollViewer HorizontalScrollBarVisibility="Disabled" IsVisible="{Binding HasPicked}" Margin="0,0,-12,0" Padding="0,0,12,0">
+            <StackPanel Spacing="14">
+              <Panel HorizontalAlignment="Center" Margin="0,8,0,0">
+                <Ellipse Theme="{StaticResource TierGlow}" Width="190" Height="190" Margin="-43" Classes.gold="{Binding PickedGold}" Classes.silver="{Binding PickedSilver}"
+                         Classes.bronze="{Binding PickedBronze}" />
+                <c:GsAchievementBadge Size="lg" Icon="{Binding Picked.Icon, FallbackValue={x:Null}}" State="{Binding Picked.State, FallbackValue=unlocked}"
+                                      Tier="{Binding Picked.Tier, FallbackValue={x:Null}}" />
+              </Panel>
+              <TextBlock Text="{Binding Picked.Name, FallbackValue={x:Null}}" FontSize="{DynamicResource fs-20}" LineHeight="{DynamicResource lh-26}" FontWeight="SemiBold"
+                         TextWrapping="Wrap" TextAlignment="Center" Margin="0,6,0,0" />
+              <TextBlock Classes="muted" Text="{Binding PickedText}" FontSize="{DynamicResource fs-13}" LineHeight="{DynamicResource lh-20}" TextWrapping="Wrap"
+                         TextAlignment="Center" />
+              <c:GsTierChip Tier="{Binding PickedTier, FallbackValue=bronze}" IsVisible="{Binding HasPickedTier}" HorizontalAlignment="Center" />
+              <Border BorderBrush="{DynamicResource line-100}" BorderThickness="0,1,0,0" Padding="0,18,0,0" Margin="0,8,0,0">
+                <StackPanel Spacing="14">
+                  <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                    <TextBlock Classes="overline faint" Text="UNLOCKED" VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="1" Classes="fact-value" Text="{Binding PickedWhen}" />
+                  </Grid>
+                  <StackPanel Spacing="6">
+                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                      <TextBlock Classes="overline faint" Text="PLAYERS WHO HAVE IT" VerticalAlignment="Center" />
+                      <TextBlock Grid.Column="1" Classes="fact-value" FontFamily="{DynamicResource font-mono}" Text="{Binding PickedPlayers}" />
+                    </Grid>
+                    <ProgressBar Minimum="0" Maximum="100" Value="{Binding PickedBar}" IsVisible="{Binding Picked.HasPercent, FallbackValue=False}"
+                                 AutomationProperties.Name="{Binding PickedPlayers}" />
+                  </StackPanel>
+                  <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                    <TextBlock Classes="overline faint" Text="RARITY" VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="1" Classes="fact-value" Text="{Binding PickedRarity}" />
+                  </Grid>
+                  <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12" IsVisible="{Binding HasPickedRank}">
+                    <TextBlock Classes="overline faint" Text="AMONG YOURS" VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="1" Classes="fact-value" Text="{Binding PickedRank}" />
+                  </Grid>
+                </StackPanel>
+              </Border>
+            </StackPanel>
+          </ScrollViewer>
+        </Panel>
+      </c:GsCard>
+    </Grid>
+  </DockPanel>
+</UserControl>

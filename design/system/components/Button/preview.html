@@ -1,4 +1,4 @@
-<!-- @dsCard group="Actions" height=120 -->
+<!-- @dsCard group="Actions" height=170 -->
 <!doctype html>
 <html lang="en">
 <head><meta charset="utf-8"><title>preview</title>
@@ -28,7 +28,7 @@ var IMPORT_ITEMS = [
   {id:'mystery', name:'Unknown game (a friend’s custom entry)', art:null, match:'unknown', versions:1, size:524288}
 ];
 
-ReactDOM.createRoot(document.getElementById('root')).render(h('div',{className:'gs-stack'},h('div',{className:'gs-row'},h(G.Button,{variant:'primary',icon:'play'},'Continue playing'),h(G.Button,{variant:'secondary',icon:'share'},'Share saves'),h(G.Button,{variant:'ghost'},'Cancel'),h(G.Button,{variant:'danger',icon:'x'},'Delete version'),h(G.Button,{variant:'primary',disabled:true},'Create zip')),h('div',{className:'gs-row'},h(G.Button,{variant:'primary',size:'sm',icon:'sync'},'Sync now'),h(G.Button,{variant:'secondary',size:'sm',icon:'folder'},'Open folder'),h(G.Button,{variant:'secondary',size:'sm',icon:'plus'},'Add folder'))));
+ReactDOM.createRoot(document.getElementById('root')).render(h('div',{className:'gs-stack'},h('div',{className:'gs-row'},h(G.Button,{variant:'primary',icon:'play'},'Continue playing'),h(G.Button,{variant:'secondary',icon:'share'},'Share saves'),h(G.Button,{variant:'ghost'},'Cancel'),h(G.Button,{variant:'danger',icon:'x'},'Delete version'),h(G.Button,{variant:'primary',disabled:true},'Create zip')),h('div',{className:'gs-row'},h(G.Button,{variant:'primary',size:'sm',icon:'sync'},'Sync now'),h(G.Button,{variant:'secondary',size:'sm',icon:'folder'},'Open folder'),h(G.Button,{variant:'secondary',size:'sm',icon:'plus'},'Add folder')),h('div',{className:'gs-row'},h(G.Button,{variant:'primary',icon:'sync',busy:true,busyLabel:'Syncing'},'Sync and keep 36 named saves'),h(G.Button,{variant:'secondary',icon:'upload',busy:true,busyLabel:'Backing up'},'Back up now'),h(G.Button,{variant:'ghost',size:'sm',icon:'reset',busy:true,busyLabel:'Restoring'},'Restore'),h(G.Button,{variant:'primary',size:'sm',icon:'play',busy:true,busyLabel:'Starting'},'Play'))));
 </script>
 </body>
 </html>

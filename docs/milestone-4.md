@@ -113,7 +113,7 @@ The owner records Pass, Fail or Blocked in the live requirements doc. Automated 
 
 - **No tray icon or window yet** (Milestone 5). Notifications and the log are how the background app talks; `gamesync games` shows the rest.
 - **A warning before a launch doesn't stop it.** With no window to ask in, it's shown in the terminal or as a notification, and the game starts. Milestone 5 asks first.
-- **The command line waits for the agent rather than handing it the work** (BG-09). The daily run and "done" are handed over. `sync`, `restore` and the rest run in the command's own process, one engine at a time.
+- **The command line waits for the agent rather than handing it the work** (BG-09). The daily run and "done" are handed over. `sync`, `restore` and the rest run in the command's own process, one engine at a time. (Since Milestone 5, 1 Oct 2026, `sync`, `plan`, `restore` and `launch` hand their job to the open app.)
 - **Store links hand the launch to the store.** With the agent off, if the game doesn't show up running within 3 minutes, `launch` says so and stops waiting.
 - **Builds are read for Steam, Epic and loose games**; EA games have no build check yet.
 - **"Saves may have moved"** is checked for games from the library (found by a scan), not for games added by hand to games.json.

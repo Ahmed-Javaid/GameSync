@@ -89,6 +89,9 @@ public sealed class SessionTracker
         return new SessionEnded(game, new SessionInfo(open.StartUtc, Later(nowUtc, open.LastWriteUtc)), ByHand: true);
     }
 
+    /// <summary>A process of a session ended by hand, still running (an emulator still closing): it no longer counts as playing.</summary>
+    public bool Ignores(int processId) => _dismissed.Contains(processId);
+
     private static DateTime Later(DateTime a, DateTime b) => a > b ? a : b;
 
     private sealed record Open(DateTime StartUtc, DateTime LastSeenUtc, DateTime LastWriteUtc);

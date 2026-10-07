@@ -95,6 +95,49 @@ public partial class LibraryPage : UserControl
         {
             e.Handled = MoveInList(null, 1);
         }
+        else if (e.Key is Key.Left or Key.Right or Key.Up or Key.Down && e.KeyModifiers == KeyModifiers.None && e.Source is GsGameTile tile)
+        {
+            e.Handled = MoveInCovers(tile, e.Key);
+        }
+    }
+
+    /// <summary>
+    /// A11Y-02: the covers as one grid, favourites first: Left and Right to the cover beside, Up and Down to the one
+    /// above or below in the same column, from the favourites' last row to the other games' first.
+    /// </summary>
+    private bool MoveInCovers(GsGameTile from, Key key)
+    {
+        var lists = new[] { FavouriteCovers, OtherCovers }.Where(l => l.IsEffectivelyVisible).ToList();
+        var grids = lists.Select(l => l.GetRealizedContainers().Select(c => c.GetVisualDescendants().OfType<GsGameTile>().FirstOrDefault()).OfType<GsGameTile>().ToList()).ToList();
+        var list = grids.FindIndex(g => g.Contains(from));
+        if (list < 0)
+        {
+            return false;
+        }
+
+        var tiles = grids[list];
+        var at = tiles.IndexOf(from);
+        var columns = TilesPanel.Columns(lists[list].Bounds.Width, 150, 16);
+        GsGameTile? to = key switch
+        {
+            Key.Left => tiles.ElementAtOrDefault(at - 1),
+            Key.Right => tiles.ElementAtOrDefault(at + 1),
+            Key.Down when at + columns < tiles.Count => tiles[at + columns],
+            Key.Down when (at / columns) < ((tiles.Count - 1) / columns) => tiles[^1],
+            Key.Down when grids.ElementAtOrDefault(list + 1) is { Count: > 0 } below => below[Math.Min(at % columns, below.Count - 1)],
+            Key.Up when at - columns >= 0 => tiles[at - columns],
+            Key.Up when list > 0 && grids[list - 1] is { Count: > 0 } above => above[Math.Min((((above.Count - 1) / columns) * columns) + (at % columns), above.Count - 1)],
+            _ => null,
+        };
+
+        if (to is null)
+        {
+            return false;
+        }
+
+        to.Focus(NavigationMethod.Directional);
+        to.BringIntoView();
+        return true;
     }
 
     /// <summary>Scan a folder for games…: the folder, picked in Windows' own folder picker (LIB-23).</summary>

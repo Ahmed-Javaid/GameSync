@@ -42,6 +42,10 @@
 .gs-tab[aria-selected="true"] { background: var(--secondary-soft); border-color: var(--secondary-soft); color: var(--ink); }
 .gs-tab[aria-selected="true"] .gs-icon { color: var(--secondary); }
 .gs-tab-count { font: 500 11px/16px var(--font-mono); padding: 0 6px; border-radius: var(--radius-pill); background: var(--secondary); color: var(--on-secondary); }
+.gs-tab--warn, .gs-tab--warn:hover, .gs-tab--warn[aria-selected="true"] { background: var(--warn-soft); border-color: var(--warn-soft); color: var(--warn); }
+.gs-tab--warn .gs-icon, .gs-tab--warn[aria-selected="true"] .gs-icon { color: var(--warn); }
+.gs-tab--warn .gs-tab-count { background: var(--bg-100); color: var(--warn); }
+.gs-tab--warn[aria-selected="true"] { box-shadow: inset 0 0 0 1px var(--warn); }
 
 /* ---------- SideRail ---------- */
 .gs-rail { width: var(--rail-width); background: var(--bg-100); border-right: 1px solid var(--line-100); display: flex; flex-direction: column; align-items: center; gap: var(--space-2); padding: var(--space-4) 0; height: 100%; flex-shrink: 0; }
@@ -51,6 +55,14 @@
 .gs-rail-btn:hover { color: var(--ink); background: var(--bg-300); }
 .gs-rail-btn[aria-current="page"] { color: var(--secondary); background: var(--secondary-soft); }
 .gs-rail-btn .gs-dot { position: absolute; top: 7px; right: 7px; width: 8px; height: 8px; border-radius: 50%; border: 2px solid var(--dot-ring); box-sizing: content-box; }
+.gs-rail-btn--warn, .gs-rail-btn--warn:hover, .gs-rail-btn--warn[aria-current="page"] { color: var(--warn); }
+.gs-rail-caution { position: absolute; top: 2px; right: 1px; width: 17px; height: 17px; border-radius: 50%; background: var(--dot-ring); color: var(--warn); display: grid; place-items: center; }
+/* Achievements: icons in a row with their names and when (a game's page, and Home's card for the game last played) */
+.gs-ach-row { display: flex; gap: 12px; }
+.gs-ach { width: 76px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.gs-ach-icon { width: 56px; height: 56px; border-radius: var(--radius-md); background-size: cover; background-position: center; box-shadow: 0 0 0 1px var(--edge-art); }
+.gs-ach-name { font: 500 12px/16px var(--font-sans); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gs-ach-when { font: 400 11px/14px var(--font-sans); color: var(--ink-faint); }
 .gs-rail-spacer { flex: 1; }
 .gs-tip { position: absolute; left: 52px; top: 50%; transform: translateY(-50%); background: var(--ink); color: var(--bg-100); font: 500 12px/16px var(--font-sans); padding: 6px 10px; border-radius: var(--radius-sm); white-space: nowrap; box-shadow: var(--shadow-dialog); pointer-events: none; z-index: 5; display: flex; flex-direction: column; text-align: left; }
 .gs-tip-sub { font-weight: 400; opacity: .8; }
@@ -67,7 +79,18 @@
 .gs-hero::after { content: ""; position: absolute; inset: 35% 0 0 0; background: linear-gradient(to top, var(--art-scrim), rgba(5, 6, 8, 0)); pointer-events: none; }
 .gs-hero-empty { background-color: var(--glass); }
 .gs-hero > * { position: relative; z-index: 1; }
-.gs-hero-top { font: 400 14px/20px var(--font-sans); color: var(--on-art); }
+.gs-hero-top { font: 400 14px/20px var(--font-sans); color: var(--on-art); display: flex; align-items: flex-start; gap: 12px; }
+.gs-hero-eyebrow { flex: 1; min-width: 0; padding-top: 2px; }
+/* Version 37 (KAN-125, KAN-126): Home's banner opens its game's page on a click, and its pager moves between the games played last. */
+.gs-hero--openable { cursor: pointer; }
+.gs-hero--openable:focus-visible { outline: 2px solid var(--primary); outline-offset: 4px; }
+.gs-hero-pager { display: inline-flex; align-items: center; gap: 2px; padding: 4px; margin: -6px -6px 0 0; border-radius: 999px; background: var(--glass); box-shadow: 0 0 0 1px var(--glass-edge); cursor: default; }
+.gs-hero-dots { display: inline-flex; align-items: center; gap: 2px; margin: 0 4px; }
+.gs-hero-dot { width: 18px; height: 18px; padding: 0; border: 0; border-radius: 50%; background: transparent; cursor: pointer; display: inline-grid; place-items: center; }
+.gs-hero-dot::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--on-art); opacity: .45; }
+.gs-hero-dot:hover::before { opacity: .8; }
+.gs-hero-dot.is-current::before { opacity: 1; }
+.gs-hero-dot:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
 .gs-hero-bottom { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--space-5); }
 .gs-hero-text { max-width: 560px; display: flex; flex-direction: column; gap: var(--space-2); }
 .gs-hero-title { margin: 0; font: 600 32px/38px var(--font-sans); letter-spacing: -0.01em; color: var(--on-art); }
@@ -151,6 +174,49 @@
 .gs-progress-track { height: 6px; border-radius: var(--radius-pill); background: var(--bg-400); overflow: hidden; }
 .gs-progress-fill { height: 100%; border-radius: var(--radius-pill); background: var(--primary); transition: width .2s; }
 .gs-progress-label { display: flex; justify-content: space-between; gap: var(--space-3); font: 400 12px/16px var(--font-mono); color: var(--ink-muted); }
+/* A size not known yet: a short stripe slides along the track. A job under way: a light sweeps along the fill, so it
+   moves even while the bytes wait (KAN-80). */
+.gs-progress-fill.is-indeterminate { width: 32%; animation: gs-indeterminate 1.4s ease-in-out infinite; }
+@keyframes gs-indeterminate { from { transform: translateX(-105%); } to { transform: translateX(320%); } }
+.gs-progress-fill.is-moving { background-image: linear-gradient(90deg, transparent 0, rgba(255, 255, 255, .3) 50%, transparent 100%); background-size: 40% 100%; background-repeat: no-repeat; animation: gs-sheen 1.6s linear infinite; }
+@keyframes gs-sheen { from { background-position: -70% 0; } to { background-position: 170% 0; } }
+.gs-tone-ok .gs-progress-fill { background-color: var(--ok); }
+.gs-tone-warn .gs-progress-fill { background-color: var(--warn); }
+.gs-tone-neutral .gs-progress-fill { background-color: var(--neutral); }
+
+/* ---------- Busy: every wait shows movement (KAN-80) ---------- */
+.gs-spinner { flex: none; animation: gs-spin 1s linear infinite; }
+@keyframes gs-spin { to { transform: rotate(360deg); } }
+.gs-dots { display: inline-block; width: 1.05em; text-align: left; }
+.gs-dots span { opacity: 0; animation: 1.6s steps(1, end) infinite; }
+.gs-dots span:nth-child(1) { animation-name: gs-dot-1; }
+.gs-dots span:nth-child(2) { animation-name: gs-dot-2; }
+.gs-dots span:nth-child(3) { animation-name: gs-dot-3; }
+@keyframes gs-dot-1 { 0% { opacity: 0; } 25% { opacity: 1; } }
+@keyframes gs-dot-2 { 0% { opacity: 0; } 50% { opacity: 1; } }
+@keyframes gs-dot-3 { 0% { opacity: 0; } 75% { opacity: 1; } }
+.gs-btn.is-busy, .gs-iconbtn.is-busy { cursor: progress; }
+.gs-busy-words { display: inline-flex; align-items: baseline; }
+.gs-iconbtn.is-busy .gs-icon { animation: gs-spin 1s linear infinite; }
+.gs-busyline { align-items: center; }
+.gs-job { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.gs-job.is-boxed { background: var(--bg-200); border: 1px solid var(--edge-card); border-radius: var(--radius-lg); box-shadow: var(--lift-card); padding: 14px 20px; }
+.gs-job-head { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
+.gs-job-icon { display: inline-flex; flex: none; color: var(--primary); }
+.gs-job-title { flex: 1; min-width: 0; font: 600 13px/18px var(--font-sans); color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gs-job-speed { flex: none; font: 500 12px/16px var(--font-mono); color: var(--ink); font-variant-numeric: tabular-nums; }
+.gs-job-foot { display: flex; justify-content: space-between; gap: var(--space-3); font: 400 12px/16px var(--font-mono); color: var(--ink-muted); font-variant-numeric: tabular-nums; }
+.gs-job-foot span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gs-job-foot span + span { flex: none; }
+.gs-job-foot .is-note { white-space: normal; font-family: var(--font-sans); }
+.gs-tone-ok .gs-job-icon { color: var(--ok); }
+.gs-tone-warn .gs-job-icon { color: var(--warn); }
+.gs-tone-neutral .gs-job-icon { color: var(--neutral); }
+@media (prefers-reduced-motion: reduce) {
+  .gs-spinner, .gs-iconbtn.is-busy .gs-icon, .gs-progress-fill.is-moving { animation: none; }
+  .gs-dots span { animation: none; opacity: 1; }
+  .gs-progress-fill.is-indeterminate { animation: none; width: 100%; opacity: .4; }
+}
 
 /* ---------- ActivityGrid ---------- */
 .gs-activity { display: flex; flex-direction: column; gap: var(--space-3); }
@@ -216,6 +282,8 @@
 /* ---------- Dialogs: share and import ---------- */
 .gs-scrim { background: var(--scrim); padding: var(--space-6); display: grid; place-items: center; }
 .gs-dialog { width: 640px; max-width: 100%; background: var(--surface-dialog); border: 1px solid var(--edge-dialog); border-radius: var(--radius-lg); box-shadow: var(--shadow-dialog); display: flex; flex-direction: column; overflow: hidden; }
+/* A dialog whose buttons say what they keep (KeptCopiesDialog, KAN-79) needs the room. */
+.gs-dialog.gs-dialog-wide { width: 720px; }
 .gs-dialog-head { padding: var(--space-6) var(--space-6) var(--space-4); display: flex; flex-direction: column; gap: var(--space-4); }
 .gs-dialog-title { margin: 0; font: 500 18px/24px var(--font-sans); }
 .gs-dialog-sub { margin: 4px 0 0; color: var(--ink-muted); }
@@ -415,3 +483,270 @@ button.gs-ftree-twisty:hover { color: var(--ink); background: var(--bg-400); }
 .gs-kept-live, .gs-kept-live:hover { background: var(--surface-well); border: 1px solid var(--edge-well); }
 .gs-kept-path { font: 400 12px/18px var(--font-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left; }
 .gs-kept-list.is-long { max-height: 248px; overflow: auto; }
+/* Achievements (design system version 33): the ring, badges in their metals, tier chips, the Zenith, the overview,
+   the spotlight and the rows of every achievement. The metals are fixed in every theme; their words always show. */
+.gs-ring { position: relative; display: inline-grid; place-items: center; flex-shrink: 0; }
+.gs-ring svg { position: absolute; inset: 0; }
+.gs-ring-arc { transition: stroke-dashoffset .9s cubic-bezier(.2, .8, .2, 1); }
+.gs-ring-label { position: relative; display: flex; flex-direction: column; align-items: center; line-height: 1; }
+.gs-ring-value { font-family: var(--font-mono); font-weight: 600; color: var(--ink); letter-spacing: -.02em; }
+.gs-ring-sub { margin-top: 4px; font-family: var(--font-mono); color: var(--ink-faint); }
+
+.gs-badge { position: relative; display: inline-block; flex-shrink: 0; padding: 2px; border-radius: 16px; background: var(--line-200); box-sizing: border-box; }
+.gs-badge--sm { border-radius: 11px; padding: 2px; }
+.gs-badge--lg { border-radius: 22px; padding: 3px; }
+.gs-badge--bronze { background: linear-gradient(135deg, var(--bronze) 0%, var(--bronze-deep) 100%); }
+.gs-badge--silver { background: linear-gradient(135deg, var(--silver) 0%, var(--silver-deep) 100%); }
+.gs-badge--gold { background: linear-gradient(135deg, var(--gold) 0%, var(--gold-deep) 100%); box-shadow: 0 0 22px -4px rgba(255, 215, 110, .55); }
+.gs-badge-face { display: grid; place-items: center; width: 100%; height: 100%; border-radius: 14px; background: var(--bg-300) center / cover no-repeat; color: var(--ink-faint); overflow: hidden; box-sizing: border-box; }
+.gs-badge--sm .gs-badge-face { border-radius: 9px; }
+.gs-badge--lg .gs-badge-face { border-radius: 19px; }
+.gs-badge--locked .gs-badge-face { opacity: .5; filter: saturate(0); }
+.gs-badge--hidden { background: var(--line-100); }
+.gs-badge--hidden .gs-badge-face { background: repeating-linear-gradient(135deg, var(--bg-300) 0 6px, var(--bg-200) 6px 12px); }
+.gs-badge-q { font: 700 18px/1 var(--font-sans); color: var(--ink-faint); }
+.gs-badge--md .gs-badge-q { font-size: 24px; }
+.gs-badge--lg .gs-badge-q { font-size: 40px; }
+.gs-badge-lock { position: absolute; right: -4px; bottom: -4px; width: 20px; height: 20px; border-radius: 50%; background: var(--bg-100); color: var(--ink-muted); display: grid; place-items: center; box-shadow: 0 0 0 1px var(--line-200); }
+.gs-badge--sm .gs-badge-lock { width: 16px; height: 16px; right: -3px; bottom: -3px; }
+
+.gs-tier { display: inline-flex; align-items: center; gap: 6px; font: 500 12px/16px var(--font-sans); color: var(--ink-muted); white-space: nowrap; }
+.gs-tier-count { font: 600 13px/16px var(--font-mono); color: var(--ink); }
+.gs-tier-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; background: var(--line-200); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .15); }
+.gs-tier--bronze .gs-tier-dot, .gs-tier-dot.gs-tier--bronze { background: linear-gradient(135deg, var(--bronze), var(--bronze-deep)); }
+.gs-tier--silver .gs-tier-dot, .gs-tier-dot.gs-tier--silver { background: linear-gradient(135deg, var(--silver), var(--silver-deep)); }
+.gs-tier--gold .gs-tier-dot, .gs-tier-dot.gs-tier--gold { background: linear-gradient(135deg, var(--gold), var(--gold-deep)); box-shadow: 0 0 8px rgba(255, 215, 110, .6); }
+/* The Zenith's dot (version 52; the owner, 7 Oct 2026: "have dot version for zenith, not the flag. Use a red orange
+   gradient, similar to the text color right now"): orange running to red, as Zenith's word does, with a warm glow; fixed
+   in every theme, like the metals. Home's Zenith beside the tiers' dots. Not yet, an empty ring. Version 49's was gold
+   with red in the middle. */
+.gs-tier--zenith .gs-tier-dot, .gs-tier-dot.gs-tier--zenith { background: linear-gradient(135deg, #ffb54b, #e0483a); box-shadow: 0 0 8px rgba(239, 106, 90, .55); }
+.gs-tier-dot.gs-tier--zenith.is-not-yet { background: none; box-shadow: inset 0 0 0 1.5px var(--line-200); }
+
+/* The Zenith medal (version 49): the Zenith's banner in its box, a warm glow under it; not yet, the banner's outline,
+   dashed, round the zenith icon. It unfurls from its bar for the moment and the popup. */
+.gs-zenith { position: relative; display: inline-grid; place-items: center; flex-shrink: 0; color: var(--ink-faint); }
+.gs-zenith > * { grid-area: 1 / 1; }
+.gs-zenith-outline { display: block; overflow: visible; }
+.gs-zenith.is-earned { filter: drop-shadow(0 3px 10px rgba(240, 195, 90, .35)); }
+.gs-zenith-art { display: block; }
+.gs-zenith.is-unfurling .gs-banner { transform-origin: 50% 7%; animation: gs-unfurl .7s cubic-bezier(.2, .9, .3, 1.15) both; }
+.gs-achov .gs-zenith.is-unfurling .gs-banner { animation-delay: 1.15s; }
+@keyframes gs-unfurl { 0% { transform: scaleY(0); opacity: 0; } 15% { opacity: 1; } 70% { transform: scaleY(1.05); } 100% { transform: scaleY(1); opacity: 1; } }
+
+.gs-achov { display: flex; align-items: center; gap: 24px; }
+.gs-achov--sm { gap: 16px; }
+.gs-achov-side { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.gs-achov--sm .gs-achov-side { gap: 10px; }
+.gs-achov-tiers { display: flex; flex-wrap: wrap; gap: 8px 18px; }
+.gs-achov--sm .gs-achov-tiers { flex-direction: column; gap: 6px; }
+.gs-achov-zenith { display: flex; align-items: center; gap: 12px; min-width: 0; }
+/* Home's Zenith line (version 52): the Zenith's dot in the tiers' column, its words where their counts start; its moment
+   pops the dot in where a game's page unfurls the banner */
+.gs-achov--sm .gs-achov-zenith { gap: 6px; }
+.gs-achov-zenith.is-moment .gs-tier-dot { animation: gs-dot-pop .6s cubic-bezier(.2, .9, .3, 1.15) 1.15s both; }
+@keyframes gs-dot-pop { 0% { transform: scale(0); opacity: 0; } 20% { opacity: 1; } 60% { transform: scale(1.6); } 100% { transform: scale(1); opacity: 1; } }
+.gs-achov-zenith-text { display: flex; flex-direction: column; min-width: 0; }
+.gs-achov-zenith-title { font: 600 14px/20px var(--font-sans); color: var(--ink); }
+.gs-achov-zenith.is-earned .gs-achov-zenith-title { background: linear-gradient(90deg, var(--zenith-ink), var(--zenith-ink-deep)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.gs-achov--sm .gs-achov-zenith-title { font-size: 12px; line-height: 16px; }
+.gs-achov-zenith-sub { font: 400 12px/16px var(--font-sans); color: var(--ink-faint); }
+/* Home (version 46, as before version 41): the subtitle of the small Zenith line is left out. */
+.gs-achov--sm .gs-achov-zenith-sub { display: none; }
+
+.gs-spot { position: relative; display: flex; align-items: center; gap: 18px; padding: 16px; border-radius: var(--radius-lg); background: var(--bg-300); overflow: hidden; }
+.gs-spot::before { content: ""; position: absolute; left: -40px; top: -40px; width: 200px; height: 200px; border-radius: 50%; pointer-events: none; opacity: .5; background: radial-gradient(circle, var(--line-200), transparent 70%); }
+.gs-spot--gold::before { background: radial-gradient(circle, rgba(255, 215, 110, .35), transparent 70%); }
+.gs-spot--silver::before { background: radial-gradient(circle, rgba(227, 232, 238, .22), transparent 70%); }
+.gs-spot--bronze::before { background: radial-gradient(circle, rgba(215, 149, 92, .28), transparent 70%); }
+.gs-spot > * { position: relative; }
+.gs-spot-text { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.gs-spot-eyebrow { font: 600 11px/14px var(--font-sans); letter-spacing: .12em; text-transform: uppercase; color: var(--ink-faint); }
+.gs-spot-name { font: 600 17px/22px var(--font-sans); color: var(--ink); }
+.gs-spot-desc { font: 400 13px/19px var(--font-sans); color: var(--ink-muted); }
+.gs-spot-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; margin-top: 4px; font: 400 12px/16px var(--font-sans); color: var(--ink-muted); }
+
+.gs-achrow { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 14px; width: 100%; padding: 10px 12px; border: 0; border-radius: var(--radius-md); background: transparent; color: var(--ink); text-align: left; cursor: pointer; font: inherit; }
+.gs-achrow:hover { background: var(--bg-300); }
+.gs-achrow.is-selected { background: var(--secondary-soft); }
+.gs-achrow:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+.gs-achrow-text { display: flex; flex-direction: column; min-width: 0; }
+.gs-achrow-name { font: 600 14px/20px var(--font-sans); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gs-achrow-desc { font: 400 12px/17px var(--font-sans); color: var(--ink-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gs-achrow.is-locked .gs-achrow-name, .gs-achrow.is-hidden .gs-achrow-name { color: var(--ink-muted); }
+.gs-achrow.is-hidden .gs-achrow-desc { font-style: italic; color: var(--ink-faint); }
+.gs-achrow-side { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+.gs-achrow-when { font: 500 12px/16px var(--font-sans); color: var(--ink-muted); white-space: nowrap; }
+.gs-achrow-pct { display: inline-flex; align-items: center; gap: 6px; font: 500 12px/16px var(--font-mono); color: var(--ink-faint); white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { .gs-ring-arc { transition: none; } .gs-zenith.is-unfurling .gs-banner { animation: none; } .gs-achov-zenith.is-moment .gs-tier-dot { animation: none; } }
+
+/* ---------- Version 35 (the owner, 3 Oct 2026) ---------- */
+/* A card's leading emblem, before its title (the Zenith's diamond) */
+.gs-card-lead { display: flex; align-items: center; gap: 12px; min-width: 0; }
+
+/* The mark a game whose saves are fine gets instead of a badge: a cloud with a check (Synced) or a shield with a check
+   (Backed up, or synced by its store), its words in its tooltip and for screen readers */
+.gs-tile-mark { position: absolute; left: 8px; bottom: 8px; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--ok-art); color: var(--ok); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .14); }
+.gs-grow-mark { flex-shrink: 0; display: grid; place-items: center; color: var(--ok); }
+/* Version 39 (ACH-02): how far a game's achievements are, at its cover's bottom right, opposite the save mark */
+.gs-tile-ach { position: absolute; right: 8px; bottom: 8px; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center;
+  background: rgba(5, 6, 8, .65); color: var(--on-art); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .14); }
+.gs-tile-ach-ring { position: absolute; inset: 0; }
+.gs-tile-ach.is-zenith { background: none; box-shadow: none; }
+
+/* A small ring's count under it, outside the ring, where it has room */
+.gs-ring-wrap { display: inline-flex; flex-direction: column; align-items: center; gap: 6px; flex-shrink: 0; }
+.gs-ring-under { font: 500 11px/14px var(--font-mono); color: var(--ink-faint); white-space: nowrap; }
+
+/* AchievementPopup (ACH-09): dark glass in every theme, as it sits on a game; its metal lights it from behind the badge */
+.gs-pop { position: relative; display: flex; align-items: center; gap: 16px; width: 440px; max-width: 100%; box-sizing: border-box; padding: 14px 18px 14px 14px;
+  border-radius: 20px; overflow: hidden; background: rgba(14, 16, 20, .94); color: #f5f7f9; font-family: var(--font-sans);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, .1), inset 0 1px 0 rgba(255, 255, 255, .08), 0 18px 48px rgba(0, 0, 0, .55); }
+.gs-pop > * { position: relative; }
+.gs-pop > .gs-pop-glow { position: absolute; left: -64px; top: 50%; width: 220px; height: 220px; margin-top: -110px; border-radius: 50%; pointer-events: none;
+  background: radial-gradient(circle, rgba(255, 255, 255, .14), transparent 65%); }
+.gs-pop--bronze > .gs-pop-glow { background: radial-gradient(circle, rgba(215, 149, 92, .4), transparent 65%); }
+.gs-pop--silver > .gs-pop-glow { background: radial-gradient(circle, rgba(227, 232, 238, .3), transparent 65%); }
+.gs-pop--gold > .gs-pop-glow { background: radial-gradient(circle, rgba(255, 215, 110, .45), transparent 65%); }
+.gs-pop--zenith > .gs-pop-glow { left: -80px; width: 300px; height: 300px; margin-top: -150px; background: radial-gradient(circle, rgba(240, 195, 90, .42), rgba(165, 29, 50, .16) 45%, transparent 65%); }
+.gs-pop .gs-badge-face { background-color: #20252b; color: rgba(245, 247, 249, .6); }
+.gs-pop-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.gs-pop-eyebrow { font: 700 11px/14px var(--font-sans); letter-spacing: .12em; text-transform: uppercase; color: rgba(245, 247, 249, .72); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gs-pop--bronze .gs-pop-eyebrow { color: var(--bronze); }
+.gs-pop--silver .gs-pop-eyebrow { color: var(--silver); }
+.gs-pop--gold .gs-pop-eyebrow { color: var(--gold); }
+.gs-pop--zenith .gs-pop-eyebrow { background: linear-gradient(90deg, #ffe39a, #f0c35a 40%, #ef6a5a); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.gs-pop-name { font: 600 16px/21px var(--font-sans); color: #f5f7f9; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gs-pop-meta { font: 400 12px/16px var(--font-sans); color: rgba(245, 247, 249, .7); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gs-pop-progress { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex-shrink: 0; }
+.gs-pop-count { font: 600 12px/14px var(--font-mono); color: rgba(245, 247, 249, .8); white-space: nowrap; }
+.gs-pop-bar { width: 56px; height: 4px; border-radius: 2px; background: rgba(255, 255, 255, .14); overflow: hidden; }
+.gs-pop-bar i { display: block; height: 100%; border-radius: 2px; background: #f5f7f9; }
+.gs-pop--bronze .gs-pop-bar i { background: linear-gradient(90deg, var(--bronze), var(--bronze-deep)); }
+.gs-pop--silver .gs-pop-bar i { background: linear-gradient(90deg, var(--silver), var(--silver-deep)); }
+.gs-pop--gold .gs-pop-bar i { background: linear-gradient(90deg, var(--gold), var(--gold-deep)); }
+.gs-pop--zenith { width: 480px; gap: 18px; padding: 18px 22px 18px 18px; }
+.gs-pop--zenith .gs-pop-name { font-size: 18px; line-height: 24px; }
+/* Its motion: in from its corner's side over .28s, out over .22s; with Windows' animation effects off it simply shows and goes */
+.gs-pop.is-in { animation: gs-pop-in .28s cubic-bezier(.2, .8, .2, 1) both; }
+.gs-pop.is-out { animation: gs-pop-out .22s ease-in both; }
+.gs-pop--top-left.is-in, .gs-pop--bottom-left.is-in { animation-name: gs-pop-in-left; }
+.gs-pop--top-left.is-out, .gs-pop--bottom-left.is-out { animation-name: gs-pop-out-left; }
+@keyframes gs-pop-in { from { transform: translateX(28px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes gs-pop-out { from { transform: none; opacity: 1; } to { transform: translateX(28px); opacity: 0; } }
+@keyframes gs-pop-in-left { from { transform: translateX(-28px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes gs-pop-out-left { from { transform: none; opacity: 1; } to { transform: translateX(-28px); opacity: 0; } }
+
+/* The band's banners (version 49), rising at its right: the Zenith's tallest at the back, Gold and Silver either side,
+   Bronze in front, in a light of their own */
+.gs-trophies { position: absolute; right: 0; bottom: 0; width: 280px; height: 100%; pointer-events: none; }
+.gs-trophies-light { position: absolute; right: -10px; bottom: -150px; width: 340px; height: 340px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 215, 110, .16), rgba(165, 29, 50, .07) 42%, transparent 68%); }
+.gs-trophies .gs-banner { position: absolute; filter: drop-shadow(0 10px 16px rgba(0, 0, 0, .32)); animation: gs-rise .7s cubic-bezier(.2, .8, .2, 1) both; }
+.gs-trophies .gs-trophies-zenith { right: 96px; bottom: 6px; animation-delay: .05s; }
+.gs-trophies .gs-trophies-gold { right: 8px; bottom: 12px; animation-delay: .15s; }
+.gs-trophies .gs-trophies-silver { right: 196px; bottom: 22px; animation-delay: .25s; }
+.gs-trophies .gs-trophies-bronze { right: 168px; bottom: -4px; animation-delay: .35s; }
+@keyframes gs-rise { from { transform: translateY(48px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+/* The Zenith badge's art on its own (version 45): beside the Zeniths card's title, faint in its corner, and as the monument */
+.gs-zbadge { display: block; flex-shrink: 0; }
+/* The Zenith's scene (version 47): its peaks in the page's ink; the page sets how faint it is */
+.gs-zenith-scene { display: block; color: var(--ink); }
+/* Version 40: the Zeniths monument, its light in the metal (its deeper blue in light mode, so it shows on a pale page) */
+.gs-monument { position: relative; display: inline-block; flex-shrink: 0; --monument-light: #ffd76e; }
+[data-theme="light"] .gs-monument { --monument-light: #c08a2a; }
+.gs-monument-light { position: absolute; inset: 0; overflow: visible; }
+.gs-monument-badge { position: absolute; }
+/* Version 50 (the owner, 7 Oct 2026: "Animate the light rays"): its light moves; the rays turn, a finer set the other way, and the glow breathes */
+.gs-monument-rays { animation: gs-monument-turn 60s linear infinite; }
+.gs-monument-rays.is-fine { animation-duration: 90s; animation-direction: reverse; }
+.gs-monument-glow { animation: gs-monument-breathe 4s ease-in-out infinite alternate; }
+@keyframes gs-monument-turn { to { transform: rotate(360deg); } }
+@keyframes gs-monument-breathe { from { opacity: .8; transform: scale(.97); } to { opacity: 1; transform: scale(1.03); } }
+@media (prefers-reduced-motion: reduce) { .gs-monument-rays, .gs-monument-glow { animation: none; } }
+
+@media (prefers-reduced-motion: reduce) { .gs-pop.is-in, .gs-pop.is-out, .gs-trophies .gs-banner { animation: none; } }
+
+/* ---------- Version 41 (the owner, 4 Oct 2026): Achievements by game ---------- */
+.gs-achgames .gs-dialog-body { max-height: 420px; gap: 0; }
+.gs-achgames-tools { display: flex; align-items: center; gap: var(--space-4); }
+.gs-achgames-sum { font: 400 12px/16px var(--font-sans); color: var(--ink-faint); white-space: nowrap; }
+.gs-achgames-head, .gs-achgames-row { display: grid; grid-template-columns: minmax(0, 1fr) 72px 120px; align-items: center; gap: var(--space-3); justify-items: center; }
+.gs-achgames-head { padding: 0 var(--space-6) 8px; font: 600 11px/14px var(--font-sans); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-faint); border-bottom: 1px solid var(--line-100); }
+.gs-achgames-head > :first-child, .gs-achgames-row > :first-child { justify-self: stretch; }
+.gs-achgames-row { padding: 8px 0; border-bottom: 1px solid var(--line-100); }
+.gs-achgames-row:last-child { border-bottom: 0; }
+.gs-achgames-game { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.gs-achgames-cover { width: 28px; height: 42px; border-radius: 4px; flex-shrink: 0; background: var(--bg-400) center / cover no-repeat; box-shadow: 0 0 0 1px var(--line-100); }
+.gs-achgames-text { display: flex; flex-direction: column; min-width: 0; }
+.gs-achgames-name { display: inline-flex; align-items: center; gap: 6px; font: 600 14px/20px var(--font-sans); color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gs-achgames-line { font: 400 12px/16px var(--font-sans); color: var(--ink-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gs-achgames-row.is-off .gs-achgames-name, .gs-achgames-row.is-off .gs-achgames-line { color: var(--ink-faint); }
+.gs-achgames-row.is-off .gs-achgames-cover { opacity: .5; filter: saturate(0); }
+
+/* ---------- Version 43: learn mode's finds (LearnModeDialog) ---------- */
+.gs-learn-row { grid-template-columns: auto minmax(0, 1fr) auto; align-items: start; }
+.gs-learn-row > :first-child { margin-top: 2px; }
+.gs-learn-meta { white-space: normal; }
+/* A portable path starts with its root (<localLow>), so it reads left to right and is cut at its end. */
+.gs-learn-row .gs-kept-path { direction: ltr; }
+.gs-learn-tags { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; max-width: 200px; }
+.gs-learn-row.is-refused { color: var(--ink-muted); }
+.gs-learn-row.is-refused .gs-kept-path { color: var(--ink-muted); }
+
+/* ---------- Version 49 (the owner, 5 Oct 2026): the tiers as banners; the Zenith's 100% in gold and red ---------- */
+/* A tier's banner (TierBanner): its own drawing, hanging from its bar */
+.gs-banner { position: relative; display: inline-block; flex-shrink: 0; line-height: 0; }
+.gs-banner svg { display: block; overflow: visible; }
+
+/* A game's 100% (ZenithRing): gold at the top to deep red at the bottom and back, a warm glow breathing round it, a
+   glint every six seconds, faint rays turning once a minute; the moment the first time it's seen */
+@property --gs-zring-p { syntax: "<percentage>"; inherits: false; initial-value: 100%; }
+.gs-ring--zenith { --zring-glow: 255, 214, 120; }
+[data-theme="light"] .gs-ring--zenith { --zring-glow: 214, 160, 40; }
+.gs-ring--zenith > span, .gs-ring--zenith > i { position: absolute; border-radius: 50%; pointer-events: none; }
+.gs-zring-light { inset: 0; }
+.gs-zring-rays { position: absolute; inset: -18%; border-radius: 50%;
+  background: repeating-conic-gradient(from 6deg, rgba(var(--zring-glow), .34) 0 4deg, transparent 4deg 22.5deg);
+  -webkit-mask: radial-gradient(closest-side, transparent 56%, #000 64%, transparent 100%); mask: radial-gradient(closest-side, transparent 56%, #000 64%, transparent 100%);
+  animation: gs-zring-turn 60s linear infinite; }
+.gs-zring-halo { position: absolute; inset: -20%; border-radius: 50%;
+  background: radial-gradient(closest-side, transparent 58%, rgba(var(--zring-glow), .62) 66%, rgba(var(--zring-glow), .2) 75%, transparent 90%);
+  animation: gs-zring-breathe 4s ease-in-out infinite alternate; }
+.gs-zring-track { inset: 0; box-shadow: inset 0 0 0 var(--zstroke) var(--bg-400); }
+/* A small ring (Home's) keeps its glow a little closer, so it stays inside its card */
+.gs-ring--zenith.is-small .gs-zring-halo { inset: -16%; }
+.gs-zring-arc, .gs-zring-glint, .gs-zring-flash { inset: 0;
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - var(--zstroke)), #000 calc(100% - var(--zstroke) + .5px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - var(--zstroke)), #000 calc(100% - var(--zstroke) + .5px)); }
+.gs-zring-arc { background: conic-gradient(from 0deg, #ffe7a3, #f0c35a 14%, #d4553f 32%, #a51d32 46%, #7e1023 54%, #a51d32 62%, #d4553f 76%, #f0c35a 90%, #ffe7a3); }
+.gs-zring-glint { background: conic-gradient(from 0deg, transparent 0deg, rgba(255, 255, 255, .95) 16deg, rgba(255, 227, 154, .9) 24deg, transparent 32deg); opacity: 0;
+  animation: gs-zring-glint 6s cubic-bezier(.45, 0, .25, 1) infinite; }
+.gs-ring--zenith .gs-ring-label { position: relative; }
+@keyframes gs-zring-turn { to { transform: rotate(360deg); } }
+@keyframes gs-zring-breathe { from { opacity: .55; transform: scale(.96); } to { opacity: .95; transform: scale(1.04); } }
+@keyframes gs-zring-glint { 0% { transform: rotate(-30deg); opacity: 0; } 4% { opacity: 1; } 22% { transform: rotate(330deg); opacity: 1; } 25%, 100% { transform: rotate(330deg); opacity: 0; } }
+/* The moment: the last stretch fills, a flash, a burst of light and gold sparks, then the light comes up */
+.gs-ring--zenith.is-moment { animation: gs-zring-pop .5s ease-out .9s both; }
+.gs-ring--zenith.is-moment .gs-zring-arc {
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - var(--zstroke)), #000 calc(100% - var(--zstroke) + .5px)), conic-gradient(#000 var(--gs-zring-p), transparent 0);
+  -webkit-mask-composite: source-in;
+  mask: radial-gradient(farthest-side, transparent calc(100% - var(--zstroke)), #000 calc(100% - var(--zstroke) + .5px)), conic-gradient(#000 var(--gs-zring-p), transparent 0);
+  mask-composite: intersect; animation: gs-zring-fill .9s cubic-bezier(.2, .8, .2, 1) both; }
+.gs-ring--zenith.is-moment .gs-zring-light { animation: gs-zring-in .9s ease-out 1.2s both; }
+.gs-zring-flash { background: #fff; opacity: 0; animation: gs-zring-flash .5s ease-out .9s both; }
+.gs-zring-burst { inset: -4%; border: 4px solid #ffe39a; box-sizing: border-box; opacity: 0; animation: gs-zring-burst .8s ease-out .9s both; }
+.gs-zring-spark { left: 50%; top: 50%; width: 5px; height: 5px; margin: -2.5px 0 0 -2.5px; background: #ffe39a; box-shadow: 0 0 6px #f0c35a; opacity: 0;
+  animation: gs-zring-spark 1.2s ease-out .9s both; }
+@keyframes gs-zring-fill { from { --gs-zring-p: 97%; } to { --gs-zring-p: 100%; } }
+@keyframes gs-zring-pop { 0% { transform: none; } 35% { transform: scale(1.07); } 100% { transform: none; } }
+@keyframes gs-zring-flash { 0% { opacity: 0; } 30% { opacity: .9; } 100% { opacity: 0; } }
+@keyframes gs-zring-burst { from { transform: scale(.92); opacity: .9; } to { transform: scale(1.75); opacity: 0; } }
+@keyframes gs-zring-spark { 0% { transform: rotate(var(--a)) translateX(var(--r0)) scale(1); opacity: 0; } 12% { opacity: 1; } 100% { transform: rotate(var(--a)) translateX(var(--d)) scale(.4); opacity: 0; } }
+@keyframes gs-zring-in { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .gs-zring-rays, .gs-zring-halo, .gs-zring-glint, .gs-ring--zenith.is-moment, .gs-ring--zenith.is-moment .gs-zring-arc, .gs-ring--zenith.is-moment .gs-zring-light { animation: none; }
+  .gs-zring-glint, .gs-zring-flash, .gs-zring-burst, .gs-zring-spark { display: none; }
+}

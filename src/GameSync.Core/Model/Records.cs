@@ -98,6 +98,13 @@ public sealed record VersionRecord
     /// </summary>
     public Games.PortableRules? Rules { get; init; }
 
+    /// <summary>
+    /// R16: brought in from a shared zip (SHARE-10), someone else's save, made on the PC named here; never restored for a
+    /// game whose saves stay with the account that made them. Null for every other version; GameSync before 7 Oct 2026
+    /// reads past it.
+    /// </summary>
+    public string? SharedFrom { get; init; }
+
     public required IReadOnlyList<FileEntry> Files { get; init; }
 }
 

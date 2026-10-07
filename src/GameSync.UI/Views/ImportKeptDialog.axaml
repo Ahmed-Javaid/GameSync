@@ -5,7 +5,7 @@
              xmlns:sys="using:System"
              x:Class="GameSync.UI.Views.ImportKeptDialog"
              x:DataType="vm:ImportKeptViewModel"
-             Width="640">
+             Width="{DynamicResource dw-640}">
   <!-- Import kept saves (design system → ImportKeptSavesDialog, BAK-19): the folder holding copies of a game's saves kept
        by hand, each copy by name, Import. Each becomes a named save on every PC, never current by itself; the folders are
        never changed. -->
@@ -26,14 +26,15 @@
       <Border DockPanel.Dock="Bottom" BorderBrush="{DynamicResource line-100}" BorderThickness="0,1,0,0" Padding="24,14">
         <Panel>
           <StackPanel Spacing="12" IsVisible="{Binding !Done}">
-            <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding CanImport}">
-              <TextBlock Classes="mono-small muted" Text="{Binding Summary}" />
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12" IsVisible="{Binding CanImport}">
+              <TextBlock Classes="mono-small muted" Text="{Binding Summary}" TextWrapping="Wrap" />
               <TextBlock Grid.Column="1" Classes="mono-small muted" Text="{Binding SizeText}" />
             </Grid>
             <c:GsNote Icon="shield" Text="Your folders are never changed. Each copy becomes a named save on every PC, kept aside: never current by itself." />
             <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
               <c:GsButton Classes="ghost" Content="Cancel" Command="{Binding CloseCommand}" />
-              <c:GsButton Classes="primary" Icon="download" Content="{Binding ImportLabel}" Command="{Binding ImportCommand}" IsEnabled="{Binding CanImport}" />
+              <c:GsButton Classes="primary" Icon="download" Content="{Binding ImportLabel}" Command="{Binding ImportCommand}" IsEnabled="{Binding CanImport}"
+                          IsBusy="{Binding Importing}" BusyText="Importing" />
             </StackPanel>
           </StackPanel>
           <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16" IsVisible="{Binding Done}">
@@ -68,7 +69,7 @@
             <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
               <TextBlock Classes="mono" Text="{Binding Folder}" TextTrimming="LeadingCharacterEllipsis" ToolTip.Tip="{Binding Folder}" />
               <TextBlock Classes="caption muted" Text="{Binding FoundText}" IsVisible="{Binding Reviewing}" />
-              <TextBlock Classes="caption muted" Text="Looking at the copies in it…" IsVisible="{Binding Busy}" />
+              <c:GsNote Icon="search" Text="Looking at the copies in it" IsBusy="True" IsVisible="{Binding Looking}" />
             </StackPanel>
             <c:GsButton Grid.Column="2" Classes="sm" Content="Change…" Click="PickFolder" IsEnabled="{Binding !Busy}" VerticalAlignment="Center" />
             <c:GsIconButton Grid.Column="3" Classes="sm" Icon="folder" Label="Open in Explorer" Command="{Binding OpenCommand}" VerticalAlignment="Center" />

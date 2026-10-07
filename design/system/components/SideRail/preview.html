@@ -33,11 +33,12 @@ function rail(cur){return h(G.SideRail,{current:cur,items:[
   {id:'search',icon:'search',label:'Search'},
   {id:'home',icon:'home',label:'Home',sep:true},
   {id:'library',icon:'library',label:'Game library',dot:'play',dotLabel:'Slay the Spire 2 is running'},
-  {id:'saves',icon:'saves',label:'Save manager',sep:true,dot:'warn',dotLabel:'2 games need you'},
+  {id:'achievements',icon:'trophy',label:'Achievements'},
+  {id:'saves',icon:'saves',label:'Save manager',sep:true,dot:'warn',dotLabel:'2 conflicts'},
   {id:'log',icon:'terminal',label:'Console'},
   {id:'settings',icon:'settings',label:'Settings',bottom:true}]})}
 function topbar(title,sub,tabs,right){return h('header',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',gap:16}},h('div',null,h('div',{style:{font:'600 15px/20px var(--font-sans)'}},title),h('div',{className:'gs-faint',style:{fontSize:12}},sub)),tabs,h('div',{className:'gs-row',style:{flexWrap:'nowrap'}},right));}
-ReactDOM.createRoot(document.getElementById('root')).render(h('div',{style:{height:500,display:'flex'}},rail('library'),h('div',{style:{flex:1,padding:24,color:'var(--ink-muted)',fontSize:12,maxWidth:420}},'Hover or focus a button for its tooltip. A dot always has words too: the tooltip and the screen-reader name say what it means (a game running, games that need you).')));
+ReactDOM.createRoot(document.getElementById('root')).render(h('div',{style:{height:500,display:'flex'}},rail('library'),h('div',{style:{flex:1,padding:24,color:'var(--ink-muted)',fontSize:12,maxWidth:420}},'Hover or focus a button for its tooltip. A dot always has words too: the tooltip and the screen-reader name say what it means (a game running, conflicts).')));
 </script>
 </body>
 </html>

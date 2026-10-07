@@ -7,21 +7,22 @@
              x:DataType="vm:TileItem" ClipToBounds="False">
   <!-- A cover in the library: a click opens the game's page beside the list; a right-click offers Play, favourite and hide. -->
   <c:GsGameTile Width="NaN" Title="{Binding Title}" Art="{Binding Art}" Status="{Binding Status}" StatusLabel="{Binding StatusLabel}" MarkLabel="{Binding MarkLabel}" Meta="{Binding Meta}"
+                    AchievementsDone="{Binding AchievementsDone}" AchievementsTotal="{Binding AchievementsTotal}"
                 Command="{Binding $parent[v:LibraryPage].((vm:LibraryViewModel)DataContext).OpenCommand}" CommandParameter="{Binding Id}">
     <c:GsGameTile.ContextMenu>
       <ContextMenu IsVisible="{Binding HasMenu}">
-        <MenuItem Header="Play" Command="{Binding PlayCommand}" IsVisible="{Binding PlayCommand, Converter={x:Static ObjectConverters.IsNotNull}}">
-          <MenuItem.Icon><c:GsIcon Icon="play" Size="16" /></MenuItem.Icon>
-        </MenuItem>
+        <c:GsMenuItem Header="Play" Command="{Binding PlayCommand}" IsVisible="{Binding PlayCommand, Converter={x:Static ObjectConverters.IsNotNull}}">
+          <c:GsMenuItem.Icon><c:GsIcon Icon="play" Size="16" /></c:GsMenuItem.Icon>
+        </c:GsMenuItem>
         <Separator IsVisible="{Binding PlayCommand, Converter={x:Static ObjectConverters.IsNotNull}}" />
-        <MenuItem Header="{Binding FavouriteLabel}" Command="{Binding ToggleFavourite}">
-          <MenuItem.Icon><c:GsIcon Icon="star" Size="16" Filled="{Binding IsFavourite}" /></MenuItem.Icon>
-        </MenuItem>
-        <MenuItem Header="{Binding HideLabel}" Command="{Binding ToggleHidden}" />
+        <c:GsMenuItem Header="{Binding FavouriteLabel}" Command="{Binding ToggleFavourite}">
+          <c:GsMenuItem.Icon><c:GsIcon Icon="star" Size="16" Filled="{Binding IsFavourite}" /></c:GsMenuItem.Icon>
+        </c:GsMenuItem>
+        <c:GsMenuItem Header="{Binding HideLabel}" Command="{Binding ToggleHidden}" />
         <Separator IsVisible="{Binding HasProperties}" />
-        <MenuItem Header="Properties" Command="{Binding PropertiesCommand}" IsVisible="{Binding HasProperties}">
-          <MenuItem.Icon><c:GsIcon Icon="settings" Size="16" /></MenuItem.Icon>
-        </MenuItem>
+        <c:GsMenuItem Header="Properties" Command="{Binding PropertiesCommand}" IsVisible="{Binding HasProperties}">
+          <c:GsMenuItem.Icon><c:GsIcon Icon="settings" Size="16" /></c:GsMenuItem.Icon>
+        </c:GsMenuItem>
       </ContextMenu>
     </c:GsGameTile.ContextMenu>
   </c:GsGameTile>

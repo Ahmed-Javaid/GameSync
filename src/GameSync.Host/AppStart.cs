@@ -3,7 +3,8 @@ namespace GameSync.Host;
 /// <summary>
 /// How <c>GameSync.Tray.exe</c> was started. With no command it's the app, with its window; with <c>--background</c>,
 /// as the Run key starts it at sign-in, the app in the tray with its window closed. Any command, such as <c>daily</c>
-/// from Task Scheduler or <c>launch &lt;game&gt; -- %command%</c> from Steam, is a job with no window.
+/// from Task Scheduler, <c>launch &lt;game&gt; -- %command%</c> from Steam or <c>--link gamesync://…</c> from a link
+/// (R12), is a job with no window.
 /// </summary>
 public sealed record AppStart(string DataDir, bool IsApp, bool ShowWindow)
 {

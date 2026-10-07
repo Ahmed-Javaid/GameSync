@@ -96,8 +96,16 @@ public sealed partial class LibraryViewModel : ObservableObject, IRailPage, IPag
     private GameId? _selected;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowsCovers), nameof(Strength), nameof(BackdropArt))]
+    [NotifyPropertyChangedFor(nameof(ShowsCovers), nameof(Strength), nameof(BackdropArt), nameof(Shown))]
     private GameViewModel? _page;
+
+    /// <summary>A game's achievements, every one, open beside the list over its page (design system → AchievementsScreen).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(Shown))]
+    private AchievementsViewModel? _achievements;
+
+    /// <summary>The page Back from a game's achievements returns to when another page opened them (Home's card); null: the game's page.</summary>
+    private string? _achievementsReturn;
 
     [ObservableProperty]
     private IReadOnlyList<NavItem> _tabs = [];
@@ -208,6 +216,9 @@ public sealed partial class LibraryViewModel : ObservableObject, IRailPage, IPag
 
     public bool ShowsCovers => Page is null;
 
+    /// <summary>What's beside the list: a game's achievements, its page, or nothing while the covers show.</summary>
+    public object? Shown => (object?)Achievements ?? Page;
+
     public bool HasFavouriteTiles => FavouriteTiles.Count > 0;
 
     public bool HasNothing => Nothing is not null;
@@ -267,12 +278,15 @@ public sealed partial class LibraryViewModel : ObservableObject, IRailPage, IPag
     /// The tiles for every game, each picture decoded once whichever views show it: the cover for the covers and a small
     /// one for the list. Made off the UI thread, since decoding takes a while.
     /// </summary>
-    public static IReadOnlyDictionary<GameId, TileItem> Tiles(IReadOnlyList<LauncherGame> games, DateTime nowLocal, LauncherActions? actions)
+    /// <param name="progress">ACH-02: how far each game's achievements are, for the ring on its cover (design system version 39).</param>
+    public static IReadOnlyDictionary<GameId, TileItem> Tiles(IReadOnlyList<LauncherGame> games, DateTime nowLocal, LauncherActions? actions,
+        IReadOnlyDictionary<GameId, (int Done, int Total)>? progress = null)
     {
         var tiles = new Dictionary<GameId, TileItem>();
         foreach (var game in games)
         {
-            tiles.TryAdd(game.Id, HomeViewModel.Tile(game, nowLocal, actions: actions, smallWidth: 48));
+            tiles.TryAdd(game.Id, HomeViewModel.Tile(game, nowLocal, actions: actions, smallWidth: 48,
+                achievements: progress is not null && progress.TryGetValue(game.Id, out var done) ? done : null));
         }
 
         return tiles;
@@ -281,10 +295,10 @@ public sealed partial class LibraryViewModel : ObservableObject, IRailPage, IPag
     /// <summary>A library from a data folder's games, as the snapshot tool and the tests make it.</summary>
     /// <param name="tab"><c>all</c> for the games, <c>local</c> for those in their own folders, <c>software</c> for Steam's software, <c>hidden</c> for games hidden from the launcher.</param>
     public static LibraryViewModel From(IReadOnlyList<LauncherGame> all, DateTime nowLocal, string tab = "all", LauncherActions? actions = null,
-        LibrarySort sort = LibrarySort.RecentlyPlayed, bool installedOnly = false)
+        LibrarySort sort = LibrarySort.RecentlyPlayed, bool installedOnly = false, IReadOnlyDictionary<GameId, (int Done, int Total)>? progress = null)
     {
         var library = new LibraryViewModel(actions, sort, installedOnly: installedOnly);
-        library.Update(all, Tiles(all, nowLocal, actions));
+        library.Update(all, Tiles(all, nowLocal, actions, progress));
         library.SelectedTab = library.Tabs.Any(t => t.Id == tab) ? tab : "all";
         return library;
     }
@@ -325,10 +339,50 @@ public sealed partial class LibraryViewModel : ObservableObject, IRailPage, IPag
     {
         ReturnTo = returnTo;
         Selected = game;
+        Achievements = null;
+    }
+
+    /// <summary>
+    /// A game's achievements, every one, over its page: from its page's View all (Back returns to its page), or from
+    /// another page such as Home's card (<paramref name="returnTo"/>: Back returns there).
+    /// </summary>
+    /// <param name="known">The game's achievements when the page that opened them has them read already.</param>
+    public void ShowAchievements(GameId game, string? returnTo = null, GameAchievementsView? known = null)
+    {
+        if (Selected != game || returnTo is not null)
+        {
+            ReturnTo = returnTo;
+            Selected = game;
+        }
+
+        var shown = _games.FirstOrDefault(g => g.Id == game);
+        var title = shown?.Title ?? Page?.Title ?? game.Value;
+        var achievements = new AchievementsViewModel(game, title, Actions, Back,
+        [
+            new Crumb("My games", CoversCommand, "My games: every game's cover"),
+            new Crumb(title, new RelayCommand(() => Achievements = null), $"{title}: its page"),
+        ])
+        {
+            // Decoded small and drawn large: soft, as the design blurs it, for nothing.
+            HeadArt = ArtImages.Load(shown?.HeroPath ?? shown?.CoverPath, 160),
+        };
+        _achievementsReturn = returnTo;
+        Achievements = achievements;
+        achievements.Load(known ?? (Page?.Id == game ? Page.AchievementsView : null));
     }
 
     private void Back()
     {
+        // From a game's achievements: its page, unless another page opened them, which Back returns to.
+        if (Achievements is not null)
+        {
+            Achievements = null;
+            if (_achievementsReturn is null)
+            {
+                return;
+            }
+        }
+
         var returnTo = ReturnTo;
         ReturnTo = null;
         Selected = null;
@@ -412,7 +466,11 @@ public sealed partial class LibraryViewModel : ObservableObject, IRailPage, IPag
         Rebuild();
     }
 
-    partial void OnSelectedChanged(GameId? value) => RefreshPage();
+    partial void OnSelectedChanged(GameId? value)
+    {
+        Achievements = null;
+        RefreshPage();
+    }
 
     /// <summary>The open game's page, made again from what's known now, or none; a game that's gone closes it.</summary>
     private void RefreshPage()

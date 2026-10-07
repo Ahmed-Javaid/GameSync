@@ -18,5 +18,7 @@
     <!-- The backdrop; a new game's colours glow in on it like a light behind frosted glass (KAN-54) -->
     <c:GsBackdrop x:Name="Art" IsHitTestVisible="False" />
     <v:Shell x:Name="Frame" />
+    <!-- A change of look comes through the window as it looked, from where the person clicked (KAN-76) -->
+    <c:GsLookCurtain x:Name="Curtain" />
   </Panel>
 </Window>

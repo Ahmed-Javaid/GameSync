@@ -30,7 +30,7 @@ public sealed partial class SyncService
     {
         var stream = Main(game);
         name = CheckName(name);
-        await TryPullAsync(stream, ct);
+        await TryPullForActionAsync(stream, ct);
         var snapshot = ScanOrThrowIfUnavailable(stream);
         if (snapshot.Files.Count == 0)
         {
@@ -90,7 +90,7 @@ public sealed partial class SyncService
     public async Task<IReadOnlyList<NamedSave>> NamedSavesAsync(GameId game, CancellationToken ct)
     {
         var stream = Main(game);
-        await TryPullAsync(stream, ct);
+        await TryPullForActionAsync(stream, ct);
         var (versions, _) = await LoadVersionsAsync(stream, ct);
         var thinned = await _log.ListThinnedAsync(stream.Id, ct);
         var byId = versions.Where(v => !thinned.Contains(v.Id)).ToDictionary(v => v.Id);
@@ -111,7 +111,7 @@ public sealed partial class SyncService
     public async Task<GameResult> RestoreNamedAsync(GameId game, string name, CancellationToken ct)
     {
         var save = await FindNamedAsync(Main(game), name, ct);
-        return await RestoreAsync(save.Version.Game, save.Version.Id, ct, save.Name);
+        return await RestoreAsync(save.Version.Game, save.Version.Id, ct, save.Name, pulled: true);
     }
 
     public async Task RenameSaveAsync(GameId game, string name, string newName, CancellationToken ct)
@@ -120,17 +120,21 @@ public sealed partial class SyncService
         var save = await FindNamedAsync(stream, name, ct);
         newName = CheckName(newName);
         await _log.SetPinAsync(stream.Id, new PinRecord(save.Version.Id, newName, DateTime.UtcNow, Device, Named: true), ct);
-        await TryPushAsync(stream, ct);
         _state.Log(stream.Id, "info", $"Renamed the named save '{save.Name}' to '{newName}'.", EventTags.Named);
+        await UploadUnlessDeferredAsync(stream, ct);
     }
 
-    /// <summary>Removes a save's name. The version stays in history; unnamed, it can be thinned like any other. Needs the cloud.</summary>
+    /// <summary>
+    /// Removes a save's name. The version stays in history; unnamed, it can be thinned like any other. Gone on this PC at
+    /// once, and from the cloud with the next upload (KAN-88).
+    /// </summary>
     public async Task ForgetSaveAsync(GameId game, string name, CancellationToken ct)
     {
         var stream = Main(game);
         var save = await FindNamedAsync(stream, name, ct);
         await _log.RemovePinAsync(stream.Id, save.Version.Id, ct);
         _state.Log(stream.Id, "info", $"Took the name '{save.Name}' away; the save stays in its history.", EventTags.Named);
+        await UploadUnlessDeferredAsync(stream, ct);
     }
 
     /// <summary>
@@ -139,7 +143,9 @@ public sealed partial class SyncService
     /// </summary>
     /// <param name="folder">Where the kept folders are, such as Bloodborne's CUSA00207.</param>
     /// <param name="rootKey">Which of the game's save folders they're copies of, when it has more than one.</param>
-    public async Task<ImportReport> ImportSavesAsync(GameId game, string folder, bool apply, string? rootKey, CancellationToken ct)
+    /// <param name="progress">How far it is (KAN-80): each copy read, then each one kept.</param>
+    public async Task<ImportReport> ImportSavesAsync(GameId game, string folder, bool apply, string? rootKey, CancellationToken ct,
+        IProgress<WorkProgress>? progress = null)
     {
         var stream = Main(game);
         var definition = stream.Definition;
@@ -162,7 +168,7 @@ public sealed partial class SyncService
             throw new InvalidOperationException($"{folder} doesn't exist.");
         }
 
-        await TryPullAsync(stream, ct);
+        await TryPullForActionAsync(stream, ct);
         var (versions, _) = await LoadVersionsAsync(stream, ct);
         var thinned = await _log.ListThinnedAsync(stream.Id, ct);
         var stored = versions.Where(v => !thinned.Contains(v.Id)).ToList();
@@ -173,14 +179,20 @@ public sealed partial class SyncService
             var (found, skippedByFinder) = NamedSaveFinder.Find(folder, liveFolder, temp);
             var skipped = skippedByFinder.ToList();
             var candidates = new List<(FoundSave Save, IReadOnlyList<FileEntry> Files, VersionRecord? Existing, string? SameAs)>();
+            var read = 0;
+            long readBytes = 0;
+            progress?.Report(new WorkProgress("reading", 0, found.Count));
             foreach (var save in found)
             {
+                ct.ThrowIfCancellationRequested();
                 var copy = definition with
                 {
                     Roots = new Dictionary<string, string> { [key] = save.Folder },
                     Rules = definition.Rules.Where(r => r.Root == key).ToList(),
                 };
                 var snapshot = _scanner.Scan(copy, stream.Includes);
+                readBytes += FileSet.TotalSize(snapshot.Files);
+                progress?.Report(new WorkProgress("reading", ++read, found.Count, readBytes));
                 skipped.AddRange(snapshot.Warnings.Select(w => $"{save.Name}: {w}"));
                 if (snapshot.Files.Count == 0)
                 {
@@ -206,6 +218,10 @@ public sealed partial class SyncService
 
             // Oldest first, so history reads in the order the saves were made.
             var added = 0;
+            var toKeep = candidates.Where(c => c.Existing is null && c.SameAs is null).ToList();
+            var keepBytes = toKeep.Sum(c => FileSet.TotalSize(c.Files));
+            long keptBytes = 0;
+            progress?.Report(new WorkProgress("keeping", 0, toKeep.Count, 0, keepBytes));
             foreach (var (save, files, existing, sameAs) in candidates.OrderBy(c => NewestChange(c.Files)))
             {
                 if (existing is not null)
@@ -234,6 +250,8 @@ public sealed partial class SyncService
                 pins[version.Id] = record;
                 stored.Add(version);
                 added++;
+                keptBytes += FileSet.TotalSize(files);
+                progress?.Report(new WorkProgress("keeping", added, toKeep.Count, keptBytes, keepBytes));
             }
 
             _state.Log(stream.Id, "info", $"Imported {added} named saves from {folder}.", EventTags.Named);

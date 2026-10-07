@@ -87,9 +87,11 @@ public class SessionTests
         Assert.Equal(T.AddHours(2), ended.Session.EndUtc);
         Assert.Empty(tracker.Tick(T.AddHours(2).AddSeconds(2), [launcher]));
         Assert.Empty(tracker.Playing);
+        Assert.True(tracker.Ignores(100));
 
         // Once it exits, the next start is a new session.
         Assert.Empty(tracker.Tick(T.AddHours(3), []));
+        Assert.False(tracker.Ignores(100));
         Assert.Single(tracker.Tick(T.AddHours(4), [new GameProcess(Sekiro, 300, T.AddHours(4))]));
         Assert.Null(tracker.EndByHand(Terraria, T.AddHours(4), []));
     }

@@ -141,7 +141,7 @@ public class LauncherTests
         LauncherGame Game(StoreKind? store, GameStatus? status) => new() { Id = GameId.Parse("cyberpunk-2077"), Title = "Cyberpunk 2077", Store = store, Status = status, Syncs = status is not null, StoreSyncs = true };
         UI.ViewModels.TileItem Tile(StoreKind? store, GameStatus? status) => UI.ViewModels.HomeViewModel.Tile(Game(store, status), Now);
 
-        Assert.Equal("Synced", Tile(StoreKind.Steam, GameStatus.Synced).MarkLabel);
+        Assert.Equal("Synced between your PCs", Tile(StoreKind.Steam, GameStatus.Synced).MarkLabel);
         Assert.Equal("Backed up; Steam syncs it", Tile(StoreKind.Steam, GameStatus.BackupOnly).MarkLabel);
         Assert.Equal("Backed up; its store syncs it", Tile(null, GameStatus.BackupOnly).MarkLabel);
         Assert.Null(Tile(StoreKind.Steam, GameStatus.Conflict).MarkLabel);
@@ -150,7 +150,13 @@ public class LauncherTests
 
         // A screen reader hears the mark's words on the list's row and the cover (A11Y-01, A11Y-03).
         Assert.Equal("Cyberpunk 2077, Backed up; Steam syncs it", Tile(StoreKind.Steam, GameStatus.BackupOnly).SpokenName);
-        Assert.Equal("Cyberpunk 2077, Synced", Tile(StoreKind.Steam, GameStatus.Synced).SpokenName);
+        Assert.Equal("Cyberpunk 2077, Synced between your PCs", Tile(StoreKind.Steam, GameStatus.Synced).SpokenName);
+
+        // KAN-115: a cloud with a check for Synced, a shield with a check for backed up; never a bare tick.
+        Assert.Equal("cloudCheck", UI.Controls.GsGameTile.MarkIconOf(GameStatus.Synced));
+        Assert.Equal("shield", UI.Controls.GsGameTile.MarkIconOf(GameStatus.BackupOnly));
+        Assert.Equal("cloudCheck", UI.Controls.GsStatusBadge.Describe(GameStatus.Synced).Icon);
+        Assert.Equal("shield", UI.Controls.GsStatusBadge.Describe(GameStatus.BackupOnly).Icon);
 
         var tile = new UI.Controls.GsGameTile { Title = "Cyberpunk 2077", Status = GameStatus.BackupOnly, StatusLabel = "Synced by Steam", MarkLabel = "Backed up; Steam syncs it" };
         Assert.True(tile.ShowsMark);

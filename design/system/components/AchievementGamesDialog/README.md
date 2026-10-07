@@ -1,0 +1,12 @@
+Dialog listing every game GameSync reads achievements for, each counted or left out and with GameSync's popup on or off (version 41; the owner, 4 Oct 2026: "Game in your achievements makes no sense. Also it needs to be either a popup or a new window that shows all the games in the achievement system").
+
+It opens from Settings, Achievements: the Games card's **Achievements by game** row, **Choose games…**. It replaced version 35's Games in your achievements card, a long list of switches whose meaning wasn't clear.
+
+Provide `games` (`{id, name, art, count, zenith?, launcher?, antiCheat?, counted, popup}`), `onCount(id, on)`, `onPopup(id, on)` and `onClose`.
+
+- **The top**: its title and what it's for in a sentence; **Find a game** (a `SearchField`, Esc clears it) and a summary: how many games, how many counted, how many with GameSync's popup.
+- **Each game** is a row: its small cover, its name (with the Zenith medal when it has one), and a line: how far it is and, for a game a launcher runs, "Steam shows its own popup". Two columns of switches under their headings: **Counts** (on the Achievements page and Home) and **GameSync's popup**. A game left out is dimmed, says so, and its popup switch is off and disabled.
+- **The popup's default**: a game a launcher runs that shows its own popup (Steam, Epic, Ubisoft Connect, the EA app, GOG Galaxy, Xbox) starts with GameSync's popup **off** (the owner: "games on steam/epic/official external launchers have their own achievement popups, so those games will have their popups turned off by default on gamesync"); any other copy (one in its own folder, an emulator's) starts with it on. Turning one on is remembered for that game on this PC. Everything counts unless left out.
+- **The foot** says why the popups start off and to turn the launcher's own off when turning GameSync's on, so there aren't two; Done closes it. Every change applies at once.
+- **A game with an anti-cheat** (version 51, R13): GameSync draws nothing over it, so its popup is off and can't be turned on, and its line says "Has an anti-cheat: GameSync draws nothing over it" in place of the launcher. Its unlocks still count, and the chime still plays. A window on top of a game, however harmless, is what some anti-cheats look for.
+- Keyboard: Tab moves through the search, then each switch; Esc closes. Each switch is named for its game ("Count Valheim in your achievements", "GameSync's popup for Valheim").

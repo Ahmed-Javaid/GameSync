@@ -3,6 +3,7 @@ using GameSync.Core.Art;
 using GameSync.Core.Discovery;
 using GameSync.Core.Games;
 using GameSync.Core.Model;
+using GameSync.Core.Scanning;
 using GameSync.Core.Storage;
 using GameSync.Core.Sync;
 using GameSync.Windows;
@@ -14,7 +15,11 @@ namespace GameSync.Host;
 /// on this PC, a tag for settings, screenshots or the registry, and what's there ("3 files · 0.5 MB · newest 23 Sep 21:09").
 /// </summary>
 /// <param name="Folder">The folder on this PC; null when this PC can't place it (the game isn't installed here) or it's a registry key.</param>
-public sealed record GamePlace(string Portable, string? Folder, string? Tag, string Evidence);
+public sealed record GamePlace(string Portable, string? Folder, string? Tag, string Evidence)
+{
+    /// <summary>R2 (design system version 51): the program files found in this place, by their full paths; never backed up (R1).</summary>
+    public IReadOnlyList<string> Programs { get; init; } = [];
+}
 
 /// <summary>A version of a game's save, from any PC, as its history lists it.</summary>
 /// <param name="Note">What sets it apart: a named save's name, "Before update to build …", a conflict's other side.</param>
@@ -24,6 +29,19 @@ public sealed record GameVersion(VersionId Id, DateTime SavedUtc, string Pc, str
 /// <summary>A named save (BAK-18): a pinned version with a name, on every PC.</summary>
 /// <param name="InPlace">Its files are the game's current save: the one restored last, or saved and not played since (KAN-51).</param>
 public sealed record GameNamedSave(string Name, VersionId Version, DateTime SavedUtc, string Pc, bool Uploaded, bool InPlace = false);
+
+/// <summary>
+/// KAN-92: the live save as the game has it now, on this PC: its files, size and newest change; the newest version holding
+/// exactly it (when it was backed up, and whether that's uploaded yet); and the named save it's the same as, if any, with
+/// when it was restored when it came back that way. <see cref="InUse"/> names a file the game holds, so it couldn't be read.
+/// </summary>
+public sealed record CurrentSave(int Files, long Bytes, DateTime? NewestUtc, DateTime? BackedUpUtc, bool Uploaded, string? SameAs, DateTime? RestoredUtc)
+{
+    public string? InUse { get; init; }
+
+    /// <summary>Every version holding exactly the live save, so a named save is In place only while the game still has it.</summary>
+    public IReadOnlySet<VersionId> SameVersions { get; init; } = new HashSet<VersionId>();
+}
 
 /// <summary>A line of the game's own log.</summary>
 /// <param name="Tag">What it was about (<see cref="Core.State.EventTags"/>); null in lines logged before tags were kept.</param>
@@ -134,6 +152,33 @@ public sealed record GameDetail
 
     /// <summary>A conflict waiting for the person, or the last one GameSync settled while its winner is current (SYNC-04, SYNC-10).</summary>
     public ConflictDetail? Conflict { get; init; }
+
+    /// <summary>
+    /// KAN-61: for a game not syncing yet, its live save found beside copies kept by hand in a folder the scan proposed
+    /// whole; then Places shows the live save alone, and FoundFiles and FoundBytes are the live save's with the rest.
+    /// </summary>
+    public GameKept? Kept { get; init; }
+
+    /// <summary>KAN-92: the live save as it is now; null for a game not syncing, or whose saves aren't here.</summary>
+    public CurrentSave? Current { get; init; }
+
+    /// <summary>ACH-01: its achievements on this PC, from Steam's own files; null for a game no store here keeps them for.</summary>
+    public GameAchievementsView? Achievements { get; init; }
+
+    /// <summary>Left out of the achievements on this PC (KAN-110): its page says so, with Count it again.</summary>
+    public bool AchievementsLeftOut { get; init; }
+
+    /// <summary>Its Zenith has been seen on this PC (version 49), so its moment doesn't play again.</summary>
+    public bool ZenithSeen { get; init; }
+
+    /// <summary>FIND-04: learn mode for it: waiting for its next session, watching, or what it found.</summary>
+    public LearnView Learn { get; init; } = LearnView.None;
+
+    /// <summary>KAN-87: where this PC keeps the game's history (its named saves' files, stored by content).</summary>
+    public string? BackupFolder { get; init; }
+
+    /// <summary>KAN-82: how its named saves are listed on this PC: <c>newest</c> or <c>name</c>.</summary>
+    public string NamedSort { get; init; } = "newest";
 }
 
 /// <summary>Reads a game's page from a data folder.</summary>
@@ -154,7 +199,8 @@ public static class GameDetails
             return null;
         }
 
-        var history = new LocalHistory(Cli.HistoryFolder(engine.State, dataDir));
+        var historyFolder = Cli.HistoryFolder(engine.State, dataDir);
+        var history = new LocalHistory(historyFolder);
         var thinned = await history.Log.ListThinnedAsync(game, ct);
         var versions = (await history.Log.ListAsync(game, ct)).Where(v => !thinned.Contains(v.Id)).ToList();
         var allPins = await history.Log.ListPinsAsync(game, ct);
@@ -162,11 +208,90 @@ public static class GameDetails
         var pending = history.PendingVersions(game).ToHashSet();
         var pcs = history.LoadDevices().ToDictionary(d => d.Id, d => d.Name);
         var events = engine.State.GetEvents(game, LogLines);
-        var detail = Describe(game, entry, definition, versions, pins, pending, pcs, events, engine.Here.Resolver);
+        var programs = engine.State.GetSetting(SyncService.ProgramsKey(game)) is { Length: > 0 } found ? found.Split('\n') : [];
+        var detail = Describe(game, entry, definition, versions, pins, pending, pcs, events, engine.Here.Resolver, programs);
+        if (definition is null && entry is not null && KeptSaves.Find(entry, engine.Here.Resolver) is { } kept)
+        {
+            detail = WithKept(detail, entry, kept);
+        }
+
         var folder = engine.InstallDirs.GetValueOrDefault(game) ?? (entry?.Installed == true ? entry.InstallDir : null);
         var conflict = definition is null ? null
             : ConflictDetails.Describe(definition, versions, allPins, engine.State.GetState(game), engine.State.GetSessions(game), engine.Device, pcs);
-        return detail with { About = About(dataDir, game, entry, engine.State, folder, steamAppId), Conflict = conflict };
+        var gameHistory = Path.Combine(historyFolder, "games", game.Value);
+        var live = definition is null ? null : Current(new SnapshotScanner(engine.Here.Guard, engine.State), definition, versions, pins, pending);
+        return detail with
+        {
+            // A named save is In place while the game's files are still it: once the game saves over it (played on after
+            // a restore), it can be restored again, though nothing is backed up until the game closes. When the live
+            // save can't be read, the newest version stands for it.
+            NamedSaves = live is { InUse: null } ? detail.NamedSaves.Select(n => n with { InPlace = live.SameVersions.Contains(n.Version) }).ToList() : detail.NamedSaves,
+            About = About(dataDir, game, entry, engine.State, folder, steamAppId),
+            Conflict = conflict,
+            Current = live,
+            BackupFolder = Directory.Exists(gameHistory) ? gameHistory : historyFolder,
+            Achievements = entry is null ? null : Host.Achievements.For(dataDir, game, entry.DisplayTitle, entry.Store, steamAppId),
+            AchievementsLeftOut = Host.Achievements.IsLeftOut(engine.State, game),
+            ZenithSeen = Host.Achievements.ZenithSeen(engine.State, game),
+            Learn = LearnMode.View(dataDir, engine.State, entry, definition is not null),
+            NamedSort = engine.State.GetSetting(LauncherData.NamedSortKey) == "name" ? "name" : "newest",
+        };
+    }
+
+    /// <summary>
+    /// KAN-92: the live save as the game has it now, read as a sync would read it (the saves, and the settings files when
+    /// they sync), and the versions holding exactly it. The registry's exports are left out of the comparison: they're
+    /// written at each sync, not by the game. Null when its saves aren't on this PC.
+    /// </summary>
+    internal static CurrentSave? Current(SnapshotScanner scanner, GameDefinition definition, IReadOnlyList<VersionRecord> versions,
+        IReadOnlyDictionary<VersionId, PinRecord> pins, IReadOnlySet<VersionId> pending)
+    {
+        Snapshot snapshot;
+        try
+        {
+            snapshot = scanner.Scan(definition, c => c == SaveCategory.Save || (c == SaveCategory.Config && definition.SyncConfig));
+        }
+        catch (FileInUseException e)
+        {
+            return new CurrentSave(0, 0, null, null, false, null, null) { InUse = Path.GetFileName(e.FilePath) };
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidGameDefinitionException)
+        {
+            return null;
+        }
+
+        var files = snapshot.Files;
+        if (files.Count == 0)
+        {
+            return null;
+        }
+
+        static List<FileEntry> Saves(IEnumerable<FileEntry> all) => all.Where(f => !f.Path.StartsWith(GameDefinition.RegistryRoot + "/", StringComparison.Ordinal)).ToList();
+        var same = versions.Where(v => FileSet.SameContent(Saves(v.Files), files)).OrderByDescending(v => v.CreatedUtc).ToList();
+        var newest = same.FirstOrDefault();
+        var named = same.Select(v => pins.GetValueOrDefault(v.Id)).FirstOrDefault(p => p is { Named: true });
+        return new CurrentSave(files.Count, FileSet.TotalSize(files), files.Max(f => f.ModifiedUtc), newest?.CreatedUtc, newest is not null && !pending.Contains(newest.Id),
+            named?.Label, newest is { Origin: VersionOrigin.Restore } restored ? restored.CreatedUtc : null)
+        {
+            SameVersions = same.Select(v => v.Id).ToHashSet(),
+        };
+    }
+
+    /// <summary>
+    /// KAN-61: a game not syncing yet whose folder holds its live save beside copies kept by hand: the live save stands
+    /// where the whole folder did, and what keeping it starts with counts the live save, not the copies.
+    /// </summary>
+    internal static GameDetail WithKept(GameDetail detail, LibraryEntry entry, GameKept kept)
+    {
+        var others = entry.Proposals.Where(p => !(p.Root.Equals(kept.Root, StringComparison.OrdinalIgnoreCase) && p.Include == "**")).ToList();
+        var live = new GamePlace(Shown($"{kept.Root.TrimEnd('/')}/{kept.Live}"), kept.LiveFolder, null, Evidence(kept.LiveFiles, kept.LiveBytes, kept.LiveNewestUtc));
+        return detail with
+        {
+            Kept = kept,
+            Places = [live, .. detail.Places.Where(p => p.Portable != Shown(kept.Root))],
+            FoundFiles = kept.LiveFiles + others.Sum(p => p.Files),
+            FoundBytes = kept.LiveBytes + others.Sum(p => p.Bytes),
+        };
     }
 
     /// <summary>The game itself (LIB-19, ART-09, PLAY-11): what its Steam store page said when GameSync asked for its art, and how it starts here.</summary>
@@ -200,7 +325,10 @@ public static class GameDetails
             AntiCheat = entry?.HasAntiCheat == true ? entry.AntiCheat ?? "an anti-cheat" : null,
             InstallBytes = entry is { Store: StoreKind.Steam, StoreId: { Length: > 0 } id } && folder is not null ? SteamSize(folder, id) : null,
             StoreLink = storeLink,
-            Program = storeLink is null ? GameLaunch.Program(folder, picked) : null,
+            // R15: a game with an anti-cheat starts only through its anti-cheat's own launcher.
+            Program = storeLink is not null ? null
+                : entry?.HasAntiCheat == true ? (picked is not null && GameLaunch.IsAntiCheatLauncher(picked) && File.Exists(picked) ? picked : GameLaunch.AntiCheatLauncher(folder))
+                : GameLaunch.Program(folder, picked),
             ProgramPicked = storeLink is null && picked is not null && File.Exists(picked),
             StoreLaunchOptions = steamRoot is not null && long.TryParse(entry!.StoreId, NumberStyles.None, CultureInfo.InvariantCulture, out var steamId)
                 ? SteamActivity.LaunchOptions(steamRoot, steamId) : null,
@@ -225,16 +353,17 @@ public static class GameDetails
     }
 
     /// <summary>The page from what's known of the game, apart from where it's read, so every line of it is tested.</summary>
+    /// <param name="programs">R2: the program files the last scan found in its save folders, by their full paths.</param>
     internal static GameDetail Describe(GameId game, LibraryEntry? entry, GameDefinition? definition, IReadOnlyList<VersionRecord> versions,
         IReadOnlyDictionary<VersionId, PinRecord> pins, IReadOnlySet<VersionId> pending, IReadOnlyDictionary<DeviceId, string> pcs,
-        IReadOnlyList<Core.State.EventRow> events, RootResolver resolver)
+        IReadOnlyList<Core.State.EventRow> events, RootResolver resolver, IReadOnlyList<string>? programs = null)
     {
         var heads = VersionGraph.Heads(versions).Select(v => v.Id).ToHashSet();
         var current = versions.Where(v => heads.Contains(v.Id)).MaxBy(v => v.CreatedUtc);
         string Pc(VersionRecord v) => pcs.GetValueOrDefault(v.Device.Id, v.Device.Name);
 
         var syncs = definition is not null;
-        var places = syncs ? Places(definition!, current, entry) : Found(entry, resolver);
+        var places = syncs ? Places(definition!, current, entry, programs ?? []) : Found(entry, resolver);
         var suggestions = syncs && entry is not null
             ? Found(entry with { Proposals = entry.Suggestions, RegistryProposals = entry.RegistrySuggestions }, resolver)
             : [];
@@ -261,8 +390,11 @@ public static class GameDetails
                 .OfType<GameNamedSave>()
                 .OrderByDescending(s => s.SavedUtc)
                 .ToList(),
+            // KAN-41 (the owner, 3 Oct 2026): by the time each shows, when its save was made, as the Versions tab lists them,
+            // so a save named later doesn't sit above an older-looking time.
             Versions = versions
-                .OrderByDescending(v => v.CreatedUtc)
+                .OrderByDescending(SavedAt)
+                .ThenByDescending(v => v.CreatedUtc)
                 .ThenByDescending(v => v.Id)
                 .Select(v => new GameVersion(v.Id, SavedAt(v), Pc(v), Note(v, pins.GetValueOrDefault(v.Id), waiting: v.CreatedUtc > current?.CreatedUtc), v.Id == current?.Id,
                     v.Pinned || pins.ContainsKey(v.Id), FileSet.TotalSize(v.Files), !pending.Contains(v.Id)))
@@ -342,8 +474,11 @@ public static class GameDetails
             newestUtc is { } n ? $"newest {Day(n)} {n.ToLocalTime():HH:mm}" : null,
         }.OfType<string>());
 
-    /// <summary>A confirmed game's folders, each with what its current version holds there; the registry keys after them.</summary>
-    private static List<GamePlace> Places(GameDefinition definition, VersionRecord? current, LibraryEntry? entry)
+    /// <summary>
+    /// A confirmed game's folders, each with what its current version holds there and the programs found in it (R2); the
+    /// registry keys after them.
+    /// </summary>
+    private static List<GamePlace> Places(GameDefinition definition, VersionRecord? current, LibraryEntry? entry, IReadOnlyList<string> programs)
     {
         var portableRoots = definition.PortableRoots ?? definition.Roots;
         var places = new List<GamePlace>();
@@ -360,7 +495,10 @@ public static class GameDetails
                 : found is not null ? Evidence(found.Files, found.Bytes, found.NewestUtc)
                 : "Nothing backed up from here yet";
             var include = rules.FirstOrDefault(r => r.Category == SaveCategory.Save)?.Include ?? rules.First().Include;
-            places.Add(new GamePlace(shown, folder is null || RootResolver.IsUnresolved(folder) ? null : Directory.Exists(folder) ? Deepest(folder, include) : folder, tag, evidence));
+            places.Add(new GamePlace(shown, folder is null || RootResolver.IsUnresolved(folder) ? null : Directory.Exists(folder) ? Deepest(folder, include) : folder, tag, evidence)
+            {
+                Programs = folder is null ? [] : programs.Where(p => IsUnder(p, folder)).ToList(),
+            });
         }
 
         foreach (var key in definition.Registry)
@@ -443,4 +581,8 @@ public static class GameDetails
 
     private static bool SameFolder(string a, string b) =>
         string.Equals(a.Replace('\\', '/').TrimEnd('/'), b.Replace('\\', '/').TrimEnd('/'), StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Whether <paramref name="path"/> is somewhere inside <paramref name="folder"/>.</summary>
+    private static bool IsUnder(string path, string folder) =>
+        path.Replace('\\', '/').StartsWith(folder.Replace('\\', '/').TrimEnd('/') + "/", StringComparison.OrdinalIgnoreCase);
 }

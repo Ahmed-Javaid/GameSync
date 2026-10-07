@@ -35,7 +35,7 @@ public class AppTests
 
         var twoNeedYou = TrayStatus.From(true, new SyncCounts(44, 41, 2, 1), working: true, CloudErrorKind.Offline, "Elden Ring");
         Assert.Equal(TrayMood.NeedsYou, twoNeedYou.Mood);
-        Assert.Equal("GameSync: 2 games need you\n41 of 44 synced · 2 need you · 1 waiting", twoNeedYou.Tooltip);
+        Assert.Equal("GameSync: 2 conflicts\n41 of 44 synced · 2 conflicts · 1 waiting", twoNeedYou.Tooltip);
 
         var offline = TrayStatus.From(true, new SyncCounts(44, 43, 0, 1), working: true, CloudErrorKind.Offline, "Elden Ring");
         Assert.Equal(TrayMood.Offline, offline.Mood);
@@ -152,7 +152,7 @@ public class AppTests
         using var world = new TestWorld();
         using var stop = new CancellationTokenSource();
         var heard = new List<string>();
-        var serving = AppPipe.ServeAsync(world.Root, message =>
+        var serving = AppPipe.ServeAsync(world.Root, (message, _) =>
         {
             heard.Add(message);
             return Task.FromResult(message == "show" ? "ok" : "unknown");
@@ -168,6 +168,129 @@ public class AppTests
 
         // With no app running, a start doesn't wait long.
         Assert.Null(await AppPipe.SendAsync(Path.Combine(world.Root, "nobody"), "show", TimeSpan.FromMilliseconds(300)));
+    }
+
+    [Fact]
+    public async Task BG_09_a_command_line_job_runs_in_the_app_and_prints_there_while_a_second_start_is_answered_beside_it()
+    {
+        using var world = new TestWorld();
+        using var stop = new CancellationTokenSource();
+        var release = new TaskCompletionSource();
+        var serving = AppPipe.ServeAsync(world.Root, async (message, lines) =>
+        {
+            if (message.StartsWith("run ", StringComparison.Ordinal))
+            {
+                lines.WriteLine($"got {message[4..]}");
+                lines.Write("half a line, ");
+                lines.WriteLine("then the rest");
+                await release.Task;
+                return "exit 3";
+            }
+
+            return message == "show" ? "ok" : "unknown";
+        }, e => throw e, stop.Token);
+
+        var output = new StringWriter();
+        var job = AppPipe.RunAsync(world.Root, ["sync", "--all"], output);
+
+        // A long job doesn't hold a second start back.
+        Assert.Equal("ok", await AppPipe.SendAsync(world.Root, "show", TimeSpan.FromSeconds(10)));
+        release.SetResult();
+        Assert.Equal(3, await job.WaitAsync(TimeSpan.FromSeconds(10)));
+        Assert.Equal(["got [\"sync\",\"--all\"]", "half a line, then the rest"], output.ToString().Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries));
+        stop.Cancel();
+        await serving.WaitAsync(TimeSpan.FromSeconds(10));
+
+        // An app from before jobs came this way, and no app at all: the command runs here.
+        using var stopOld = new CancellationTokenSource();
+        var old = Path.Combine(world.Root, "old");
+        var servingOld = AppPipe.ServeAsync(old, (_, _) => Task.FromResult("unknown"), e => throw e, stopOld.Token);
+        Assert.Null(await AppPipe.RunAsync(old, ["plan"], TextWriter.Null));
+        stopOld.Cancel();
+        await servingOld.WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.Null(await AppPipe.RunAsync(Path.Combine(world.Root, "nobody"), ["plan"], TextWriter.Null));
+    }
+
+    [Fact]
+    public async Task BG_09_a_job_whose_command_line_went_away_finishes_in_the_app()
+    {
+        using var world = new TestWorld();
+        using var stop = new CancellationTokenSource();
+        var printed = new TaskCompletionSource();
+        var release = new TaskCompletionSource();
+        var finished = new TaskCompletionSource<Exception?>();
+        var jobs = 0;
+        var serving = AppPipe.ServeAsync(world.Root, async (_, lines) =>
+        {
+            if (Interlocked.Increment(ref jobs) > 1)
+            {
+                return "exit 0";
+            }
+
+            try
+            {
+                lines.WriteLine("1 of 3 games synced");
+                printed.SetResult();
+                await release.Task;
+                lines.WriteLine("2 of 3 games synced");
+                lines.WriteLine("3 of 3 games synced");
+                finished.SetResult(null);
+            }
+            catch (Exception e)
+            {
+                finished.SetResult(e);
+            }
+
+            return "exit 0";
+        }, e => throw e, stop.Token);
+
+        // The terminal is closed (Ctrl+C) after the job's first line.
+        using (var gone = new CancellationTokenSource())
+        {
+            var job = AppPipe.RunAsync(world.Root, ["sync", "--all"], TextWriter.Null, gone.Token);
+            await printed.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            await gone.CancelAsync();
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => job.WaitAsync(TimeSpan.FromSeconds(10)));
+        }
+
+        release.SetResult();
+        Assert.Null(await finished.Task.WaitAsync(TimeSpan.FromSeconds(10)));
+
+        // The app serves the next one as ever.
+        Assert.Equal(0, await AppPipe.RunAsync(world.Root, ["plan"], TextWriter.Null).WaitAsync(TimeSpan.FromSeconds(10)));
+        stop.Cancel();
+        await serving.WaitAsync(TimeSpan.FromSeconds(10));
+    }
+
+    [Fact]
+    public async Task BG_09_what_a_job_prints_goes_back_to_its_own_command_line_only()
+    {
+        var first = new StringWriter();
+        var second = new StringWriter();
+        var help = CliRelay.RunAsync(["help"], first);
+        var wrong = CliRelay.RunAsync(["no-such-command", "--data", Path.Combine(Path.GetTempPath(), "GameSync-relay-test")], second);
+        Assert.Equal(0, await help);
+        Assert.NotEqual(0, await wrong);
+        // Help prints the commands; the other, on a data folder never set up, says so. Neither sees the other's lines.
+        Assert.Contains("gamesync", first.ToString(), StringComparison.Ordinal);
+        Assert.DoesNotContain("No games.json in", first.ToString(), StringComparison.Ordinal);
+        Assert.Contains("No games.json in", second.ToString(), StringComparison.Ordinal);
+        Assert.DoesNotContain("By hand", second.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void BG_09_the_app_takes_sync_plan_restore_and_a_launch_of_a_game_it_knows_only()
+    {
+        Assert.True(CliRelay.Takes(["sync", "--all"]));
+        Assert.True(CliRelay.Takes(["plan"]));
+        Assert.True(CliRelay.Takes(["restore", "hades", "Before the boss"]));
+        Assert.True(CliRelay.Takes(["launch", "hades"]));
+
+        // Steam's route, with a command of its own, runs where it was started; so does anything for another data folder.
+        Assert.False(CliRelay.Takes(["launch", "hades", "--", @"C:\Games\Hades\Hades.exe"]));
+        Assert.False(CliRelay.Takes(["sync", "--all", "--data", @"D:\Other"]));
+        Assert.False(CliRelay.Takes(["confirm", "hades"]));
+        Assert.False(CliRelay.Takes([]));
     }
 
     [Fact]
@@ -315,6 +438,16 @@ public class AppTests
         home.OpenSavesCommand.Execute(null);
         Assert.Equal([("saves", "needs"), ("library", "all"), ("saves", "needs")], shown);
         Assert.Equal([GameId.Parse("hades")], played);
+
+        // Design system version 32 (the owner, 3 Oct 2026): while something needs the person, Needs you is in warn with
+        // its count, and the rail's Save manager has a caution mark; with nothing, both are plain.
+        var needs = home.Tabs.Single(t => t.Id == HomeViewModel.NeedsYouTab);
+        Assert.Equal((games.Count(g => g.NeedsYou) > 0, games.Count(g => g.NeedsYou) > 0 ? "warn" : null), (needs.IsWarn, needs.Tone));
+        var fine = HomeViewModel.From(Launcher.Home([Game("hades")], pc.State, DateTime.Now), [Game("hades")], DateTime.Now, actions).Tabs.Single(t => t.Id == HomeViewModel.NeedsYouTab);
+        Assert.Equal((false, null), (fine.IsWarn, fine.Count));
+        Assert.True(ShellViewModel.DefaultRail(null, 2).Single(r => r.Id == "saves").IsCaution);
+        Assert.Null(ShellViewModel.DefaultRail(null, 2).Single(r => r.Id == "saves").PlainDot);
+        Assert.False(ShellViewModel.DefaultRail(null, 0).Single(r => r.Id == "saves").IsCaution);
         Assert.Equal(1, synced);
     }
 
@@ -346,7 +479,7 @@ public class AppTests
         saves.ShowTab(SaveManagerViewModel.NeedsTab);
         Assert.True(saves.ShowsNeeds);
         Assert.False(saves.ShowsTable);
-        Assert.Equal("2 games need you", saves.TopSubtitle);
+        Assert.Equal("2 conflicts", saves.TopSubtitle);
         Assert.Equal(["celeste", "rounds"], saves.NeedsRows.Select(r => r.Title).Order());
         Assert.Equal("Resolve", saves.NeedsRows.Single(r => r.Title == "celeste").Action);
         Assert.Equal("Review rounds", saves.NeedsRows.Single(r => r.Title == "rounds").ActionName);
@@ -366,7 +499,7 @@ public class AppTests
         saves.Update([Game("hades")]);
         Assert.True(saves.NoNeeds);
         Assert.Null(saves.Tabs.Single(t => t.Id == "needs").Count);
-        Assert.Equal("Nothing needs you", saves.TopSubtitle);
+        Assert.Equal("No conflicts", saves.TopSubtitle);
     }
 
     [Fact]

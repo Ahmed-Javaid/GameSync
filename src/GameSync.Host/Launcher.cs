@@ -87,6 +87,9 @@ public sealed record LauncherGame
     /// </summary>
     public DateTime? RunningSinceUtc { get; init; }
 
+    /// <summary>FIND-04: learn mode is watching this session, as GameSync hasn't found where it saves.</summary>
+    public bool Learning { get; init; }
+
     /// <summary>It's being played now.</summary>
     public bool IsRunning => RunningSinceUtc is not null || Status == GameStatus.Playing;
 
@@ -168,6 +171,7 @@ public static class Launcher
             {
                 AddedUtc = entry.FirstSeenUtc == default ? null : entry.FirstSeenUtc,
                 RunningSinceUtc = running?.GetValueOrDefault(entry.Id) is { } since && since != default ? since : null,
+                Learning = state.GetSetting(LearnMode.WatchingKey(entry.Id)) is { Length: > 0 },
                 IsOwn = entry.IsOwn,
                 IsFolder = entry.IsOwnFolder,
                 StoreSyncs = entry.StoreCloud,

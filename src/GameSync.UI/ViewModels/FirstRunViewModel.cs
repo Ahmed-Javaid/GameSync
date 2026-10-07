@@ -198,6 +198,9 @@ public sealed partial class SetupGameRow : ObservableObject
 
     public string SavePath => Game.SavePath ?? "";
 
+    /// <summary>The path in full, and for a live save beside copies kept by hand, what becomes of them (KAN-61).</summary>
+    public string SavePathTip => Game.Kept is { } kept ? $"{SavePath}\n{kept}" : SavePath;
+
     public string FoundBy => Game.FoundBy ?? "";
 
     /// <summary>It has a box: every group but No saves found yet, whose games are watched instead.</summary>
@@ -369,6 +372,17 @@ public sealed partial class FirstRunViewModel : ObservableObject, IPageSurface, 
 
     [ObservableProperty]
     private string _scanRight = "";
+
+    /// <summary>KAN-80: the scan as a job: running (the stripe slides until there's a count), done, or failed.</summary>
+    [ObservableProperty]
+    private string _scanState = "running";
+
+    [ObservableProperty]
+    private string _scanTitle = "Scanning this PC";
+
+    /// <summary>The bar: null while there's nothing to count yet.</summary>
+    [ObservableProperty]
+    private double? _scanBar;
 
     [ObservableProperty]
     private IReadOnlyList<StoreRow> _stores = [];
@@ -575,6 +589,7 @@ public sealed partial class FirstRunViewModel : ObservableObject, IPageSurface, 
         ScanError = null;
         ScanValue = 2;
         ScanRight = "";
+        (ScanState, ScanTitle, ScanBar) = ("running", "Scanning this PC", null);
         var progress = new Progress<ScanProgress>(p =>
         {
             if (!IsScanning)
@@ -585,6 +600,7 @@ public sealed partial class FirstRunViewModel : ObservableObject, IPageSurface, 
 
             ScanLabel = p.Total == 0 ? p.Stage : $"{p.Stage}: {p.Done.ToString(CultureInfo.InvariantCulture)} of {p.Total.ToString(CultureInfo.InvariantCulture)}";
             ScanValue = p.Total == 0 ? 2 : Math.Max(2, 100.0 * p.Done / p.Total);
+            ScanBar = p.Total == 0 ? null : ScanValue;
             ScanRight = p.Total == 0 ? "" : $"{Math.Round(ScanValue).ToString(CultureInfo.InvariantCulture)}%";
             if (p.Folders is { } folders)
             {
@@ -606,6 +622,7 @@ public sealed partial class FirstRunViewModel : ObservableObject, IPageSurface, 
             ScanLabel = $"Scan finished in {Seconds(scan.Took)}: {Count(scan.Games)}, saves found for {scan.WithSaves.ToString(CultureInfo.InvariantCulture)}";
             ScanValue = 100;
             ScanRight = "100%";
+            (ScanState, ScanTitle, ScanBar) = ("done", "Scan finished", 100);
             ChooseSubtitle = $"{Count(scan.Games)} found. Ticked games are backed up now and synced from then on; you can change this any time.";
             AntiCheatNote = AntiCheat(groups);
             Recount();
@@ -615,6 +632,7 @@ public sealed partial class FirstRunViewModel : ObservableObject, IPageSurface, 
             ScanError = $"The scan stopped before it finished: {e.Message}";
             ScanValue = 0;
             ScanRight = "";
+            (ScanState, ScanTitle, ScanLabel) = ("failed", "The scan stopped", "Nothing was changed. Scan again tries once more.");
         }
         finally
         {

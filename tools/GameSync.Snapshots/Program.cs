@@ -1,6 +1,8 @@
 // Renders pages of GameSync's UI to PNG files, in the themes asked for, with Avalonia's headless platform and Skia:
-//   dotnet run --project tools/GameSync.Snapshots -- <output folder> [--data <data folder>] [--game <id>] [--size 1920x1128] [--hover x,y] [--click x,y] [--bench N] [page ...]
-// Pages: gallery, gallery2, gallery3, and with --data, home, home-playing (the hero game running), library, library-installed,
+//   dotnet run --project tools/GameSync.Snapshots -- <output folder> [--data <data folder>] [--game <id>] [--size 1920x1128] [--hover x,y] [--click x,y] [--bench N] [--many N] [--tab N] [--text-scale 1.5] [page ...]
+// Pages: gallery, gallery2, gallery3, busy (KAN-80's busy buttons and job progress), zenith (the Zenith medal at every
+// size, earned and not, the badge alone and the monument, earned and not), and with --data, home, home-playing (the hero game running),
+// home-second (the banner moved on to the next game played, KAN-125), library, library-installed,
 // library-marks (every game given a made-up status: the marks of games that are fine, KAN-48, and the badges),
 // saves-needs (the save manager's Needs you tab, KAN-46), library-installed (Installed only ticked, KAN-47),
 // saves-by-name and saves-by-status (the Saves tab's tables sorted by a heading, each on its own: Every game by name; Syncing
@@ -15,13 +17,16 @@
 // under way), setup, setup-choose, setup-cloud, setup-cloud-folder, setup-daily and setup-daily-time; home-nocloud and
 // connect-cloud (Home after Skip for now, and its Connect the cloud dialog); add-game, add-game-program and setup-add-game
 // (Add a game or folder over the library and over first run, made up); settings, settings-storage, settings-backup,
-// settings-cloud, settings-devices, settings-notifications and settings-safety (Settings from that data folder's own
+// settings-cloud, settings-devices, settings-notifications, settings-achievements and settings-safety (Settings from that data folder's own
 // settings, SET-01), settings-cloud-drive (signed in to a made-up Drive) and settings-backup-apply (a default changed,
-// offering to apply it); and the
+// offering to apply it); settings-updates, -latest, -downloading and -refused (Updates as GameSync 1.0.0 installed, with a
+// made-up 1.0.1, PKG-03); and the
 // Glossy window (LOOK-17) over the last-played game's art: glossy-home, glossy-library, glossy-game, glossy-saves,
 // glossy-game-saves, glossy-conflict, glossy-properties, glossy-console, glossy-settings, glossy-setup, glossy-setup-choose.
-// Themes: every page in Arcade dark, Arcade light and Sakura dark; Glossy goes Solid in light mode, as the app does.
+// Themes: every page in Arcade dark, Arcade light and Sakura dark; Glossy in light mode is light glass (design system version 35).
 // "icons" writes gamesync.ico (copy it to src/GameSync.Tray/Assets) and a sheet of the tray icon in every state.
+// Timings (KAN-124): "backdrop-timing" with --art <folder> says how long each picture's backdrop takes in each mode and
+// strength; "look-timing" with --data how long a change between Dark and Light takes in Glossy for the window's own work.
 
 using Avalonia;
 using Avalonia.Controls;
@@ -51,6 +56,24 @@ var click = TakeOption(list, "--click")?.Split(',') is [var cx, var cy] ? new Po
 // KAN-58: --bench N scrolls the page's biggest scroller N times, rendering a whole frame each time, and prints how long
 // the frames took (Skia on the CPU, as the app draws), in place of saving a picture.
 var bench = TakeOption(list, "--bench") is { } benchFrames ? int.Parse(benchFrames) : 0;
+// PERF-03: --many N makes the data folder's games up to N (copies of them, every other one syncing, each with a backup
+// made up) and the save manager's log 10,000 lines, for --bench to time a big library: its first frame and its scrolling.
+var many = TakeOption(list, "--many") is { } manyGames ? int.Parse(manyGames) : 0;
+// A11Y-04: --text-scale 1.5 renders with Windows' text size at 150%, to see nothing is clipped.
+var textScale = TakeOption(list, "--text-scale") is { } scaleText ? double.Parse(scaleText, System.Globalization.CultureInfo.InvariantCulture) : 1;
+// --revisit with --bench: after the first frame, goes to Home and back to the same page, as the app keeps its pages, and
+// times coming back (the library stays made, PERF-03).
+var revisit = list.Remove("--revisit");
+// A11Y-02: --tab N presses Tab N times, from the page's first save manager row when it has one, printing what a screen
+// reader would say has focus each time, as a keyboard user goes through it; then saves a sheet of every stop, the focused
+// control cut out with its focus ring and named, to check each ring at a glance (design system: 2px primary, offset 2px).
+var tabs = TakeOption(list, "--tab") is { } tabPresses ? int.Parse(tabPresses) : 0;
+// --keys "Tab*3,Down*2,Space" presses those keys instead (Avalonia's key names, each optionally *N times), the same way.
+var keys = (TakeOption(list, "--keys") is { } keyList ? keyList : tabs > 0 ? $"Tab*{tabs}" : "")
+    .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+    .SelectMany(k => k.Split('*') is [var key, var times] ? Enumerable.Repeat(key, int.Parse(times)) : [k])
+    .Select(Enum.Parse<Avalonia.Input.Key>)
+    .ToList();
 // "backdrops" with --art <folder>: each picture's Glossy backdrop before and after its colour is tamed, with its chroma.
 var artFolder = TakeOption(list, "--art");
 var caps = (TakeOption(list, "--caps") ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries)
@@ -74,10 +97,49 @@ if (wanted.Remove("icons"))
     }
 }
 
+// Each render is one still frame: what moves as a page opens (the Achievements page's trophies, the Zenith medal's sheen) is
+// drawn where it comes to rest.
+GameSync.UI.Controls.Motion.Still = true;
 AppBuilder.Configure<GsApp>()
     .UseSkia()
     .UseHeadless(new AvaloniaHeadlessPlatformOptions { UseHeadlessDrawing = false })
     .SetupWithoutStarting();
+GameSync.UI.Theming.TextScale.Apply(Application.Current!.Resources, textScale);
+
+// KAN-124: how long a backdrop takes to make, for each picture in --art, in each mode and strength.
+if (wanted.Remove("backdrop-timing") && artFolder is not null)
+{
+    foreach (var file in Directory.EnumerateFiles(artFolder).Order(StringComparer.OrdinalIgnoreCase))
+    {
+        foreach (var mode in new[] { ThemeMode.Dark, ThemeMode.Light })
+        {
+            var choice = new ThemeChoice(Mode: mode);
+            var theme = ThemeEngine.Build(choice);
+            foreach (var strength in Enum.GetValues<GlassStrength>())
+            {
+                if (ThemeEngine.Glass(choice, strength) is not { } glass || Backdrop.Pixels(file) is null)
+                {
+                    continue;
+                }
+
+                var watch = System.Diagnostics.Stopwatch.StartNew();
+                var art = Backdrop.Pixels(file)!.Value;
+                var read = watch.Elapsed.TotalMilliseconds;
+                var rgb = Backdrop.Tame(Backdrop.Soften(art.Pixels, art.Width, art.Height));
+                var soft = watch.Elapsed.TotalMilliseconds;
+                var alphas = Backdrop.ScrimAlphas(rgb, glass, theme);
+                var scrim = watch.Elapsed.TotalMilliseconds;
+                Backdrop.Bake(rgb, glass, alphas);
+                Console.WriteLine($"{Path.GetFileName(file)} {mode} {strength}: read {read:F0} ms, soften {soft - read:F0} ms, scrim {scrim - soft:F0} ms, in all {watch.Elapsed.TotalMilliseconds:F0} ms");
+            }
+        }
+    }
+
+    if (wanted.Count == 0)
+    {
+        return;
+    }
+}
 
 if (wanted.Remove("backdrops") && artFolder is not null)
 {
@@ -94,26 +156,50 @@ var pages = new Dictionary<string, (Func<Control> Make, int Width, int Height)>(
     ["gallery"] = (() => new Gallery(), 1280, 1100),
     ["gallery2"] = (() => new Gallery2(), 1280, 1180),
     ["gallery3"] = (() => new Gallery3(), 1280, 800),
+    ["busy"] = (() => new BusyGallery(), 1280, 800),
+    ["zenith"] = (ZenithSheet, 1280, 820),
 };
 
 if (dataDir is not null)
 {
     var now = DateTime.Now;
     var (games, home) = LauncherData.Read(dataDir, now);
+    if (many > games.Count && games.Count > 0)
+    {
+        var real = games;
+        games = Enumerable.Range(0, many).Select(i => i < real.Count ? real[i] : real[i % real.Count] with
+        {
+            Id = GameId.Parse($"{real[i % real.Count].Id.Value}-{i / real.Count + 1}"),
+            Title = $"{real[i % real.Count].Title} {i / real.Count + 1}",
+            Syncs = i % 2 == 0,
+            Status = i % 2 == 0 ? GameStatus.Synced : null,
+            RunningSinceUtc = null,
+        }).ToList();
+    }
+
     var rail = ShellViewModel.DefaultRail(games.FirstOrDefault(g => g.IsRunning)?.Title, games.Count(g => g.NeedsYou));
+
+    // ACH-02: how far each game's achievements are, from Steam's own files on this PC, for the ring on its cover.
+    var progress = GameSync.Host.Achievements.ForAll(dataDir, games).ToDictionary(v => v.Game, v => (v.Unlocked, v.Total));
     // The library as it opens, on its Hidden view, with a search typed, and with a game's page open beside the list: the
     // one --game names, or the hero game, its places, saves and history read from the data folder as the app reads them.
     var shown = gameId is not null ? games.FirstOrDefault(g => g.Id.Value == gameId) : home.Hero ?? games.FirstOrDefault();
 
+    // KAN-80: every game's upload or download, as the app keeps them; game-saves-busy makes one up.
+    var transfers = new TransferBoard { Cloud = "your Google Drive" };
+
     // Actions that do nothing, so buttons look as the app's do; pages read their content here, not through them.
     var actions = new LauncherActions(_ => { }, () => { }, (_, _) => { }, (_, _) => { })
     {
+        TransferOf = transfers.For,
         SetFavourite = (_, _) => { },
         OpenGame = _ => { },
+        OpenAchievements = (_, _) => { },
         OpenFolder = _ => { },
-        SyncGame = _ => { },
-        BackUpNow = _ => { },
-        SaveAs = (_, _) => { },
+        SyncGame = _ => Task.CompletedTask,
+        BackUpNow = _ => Task.CompletedTask,
+        OpenNamedSave = _ => { },
+        KeepNamed = (_, _) => Task.FromResult<string?>(null),
         Restore = (_, _, _) => Task.FromResult<string?>(null),
         OpenSaves = _ => { },
         OpenProperties = (_, _) => { },
@@ -145,7 +231,7 @@ if (dataDir is not null)
 
     LibraryViewModel Library(string tab = "all", string search = "", bool open = false, bool installedOnly = false)
     {
-        var library = LibraryViewModel.From(games, now, tab, actions, installedOnly: installedOnly);
+        var library = LibraryViewModel.From(games, now, tab, actions, installedOnly: installedOnly, progress: progress);
         library.Search = search;
         if (open && shown is not null)
         {
@@ -164,7 +250,10 @@ if (dataDir is not null)
     {
         var saves = new SaveManagerViewModel(actions);
         saves.Update(games);
-        saves.Show(Off(() => SaveOverview.ReadAsync(dataDir, CancellationToken.None)), now);
+        saves.Show(many > 0
+            ? games.Select((g, i) => new GameSaveSummary(g.Id, $@"C:\Users\Player\Saved Games\{g.Title}", 3 + i % 40, 1_000_000L * (1 + i % 300),
+                now.AddHours(-i).ToUniversalTime(), i % 3 == 0 ? "LAPTOP" : "DESKTOP")).ToList()
+            : Off(() => SaveOverview.ReadAsync(dataDir, CancellationToken.None)), now);
         saves.ShowSpace(SaveOverview.Space(dataDir), now);
         if (open && shown is not null)
         {
@@ -288,6 +377,13 @@ if (dataDir is not null)
             }
         }
 
+        // PERF-03: a 10,000-line log, the daily backup's lines over the months before.
+        for (var i = 0; many > 0 && entries.Count < 10_000; i++)
+        {
+            var (id, title) = quiet[i % quiet.Length];
+            entries.Add(L(At(12 + i / quiet.Length, 20, 0, 4), id, title, "info", EventTags.Daily, "Daily backup: In sync."));
+        }
+
         saves.LogTab.Show(entries, now);
         if (state == "needs")
         {
@@ -368,13 +464,52 @@ if (dataDir is not null)
         return properties;
     }
 
+    // Home's Achievements card, from Steam's own files on this PC for the data folder's games (design system version 33); each
+    // game the banner can show brings its own (KAN-125).
+    HomeViewModel HomeOf() => HomeViewModel.From(home, games, now,
+        achievements: dataDir is null ? default : GameSync.Host.Achievements.ForHome(dataDir, home.Hero, games),
+        achievementsOf: dataDir is null ? null : game => GameSync.Host.Achievements.ForHome(dataDir, game, games), progress: progress);
+
+    // The Achievements page (design system version 33): every game's achievements from Steam's own files on this PC, as
+    // kept in the data folder (icons and rarity fetched by the app or gamesync achievements --fetch).
+    TrophyRoomViewModel Trophies()
+    {
+        var room = new TrophyRoomViewModel(actions);
+        room.Update(games);
+        room.Show(GameSync.Host.Achievements.ForAll(dataDir, games), now);
+        return room;
+    }
+
+    // Every achievement of the game --game names, beside the library's list, on the tab given.
+    LibraryViewModel GameAchievements(string tab)
+    {
+        var library = Library(open: true);
+        if (shown is not null)
+        {
+            library.ShowAchievements(shown.Id, known: GameSync.Host.Achievements.For(dataDir, shown));
+            if (library.Achievements is { } achievements)
+            {
+                achievements.Tab = tab;
+            }
+        }
+
+        return library;
+    }
+
     Dictionary<string, Func<object?>> Makers() => new()
     {
-        ["home"] = () => HomeViewModel.From(home, games, now),
+        ["home"] = HomeOf,
+        ["home-second"] = () =>
+        {
+            // KAN-125: the banner moved on to the next game played.
+            var second = HomeOf();
+            second.NextHeroCommand.Execute(null);
+            return second;
+        },
         ["home-last-month"] = () =>
         {
             // KAN-66: the Activity card's arrow, a month back.
-            var page = HomeViewModel.From(home, games, now);
+            var page = HomeOf();
             page.EarlierMonthCommand.Execute(null);
             return page;
         },
@@ -396,6 +531,17 @@ if (dataDir is not null)
             saves.AllSort.SortCommand.Execute("Status");
             return saves;
         },
+        ["saves-selected"] = () =>
+        {
+            // SHARE-01: a game ticked in Syncing, for Share selected.
+            var saves = Saves();
+            if (saves.SyncingRows.FirstOrDefault() is { } first)
+            {
+                saves.SelectCommand.Execute(first.Id);
+            }
+
+            return saves;
+        },
         ["saves-needs"] = () =>
         {
             var saves = Saves();
@@ -406,8 +552,82 @@ if (dataDir is not null)
         ["hidden"] = () => Library("hidden"),
         ["searched"] = () => Library(search: "re"),
         ["game"] = () => Library(open: true),
+        ["achievements"] = Trophies,
+        ["achievements-game"] = () =>
+        {
+            var room = Trophies();
+            room.OpenGame(shown?.Id);
+            return room;
+        },
+        ["game-achievements"] = () => GameAchievements(AchievementsViewModel.AllTab),
+        ["game-achievements-locked"] = () => GameAchievements(AchievementsViewModel.LockedTab),
+        ["game-achievements-hidden"] = () => GameAchievements(AchievementsViewModel.HiddenTab),
         ["saves"] = () => Saves(),
         ["game-saves"] = () => Saves(open: true),
+        ["game-saves-playing"] = () =>
+        {
+            // KAN-91: the shown game running now (made up): Back up now works, and Restore's ask says what to expect.
+            var saves = Saves(open: true);
+            if (shown is not null)
+            {
+                saves.Game?.Update(shown with { RunningSinceUtc = now.ToUniversalTime().AddMinutes(-42) });
+            }
+
+            return saves;
+        },
+        ["game-saves-busy"] = () =>
+        {
+            // KAN-80: its upload under way, beside a named save being restored (made up).
+            if (shown is not null)
+            {
+                var t0 = now.ToUniversalTime();
+                var id = shown.Id;
+                transfers.Apply(new TransferUpdate(new GameSync.Core.Storage.TransferProgress(id, 0, 1108, 0, 118_489_088), TransferState.Running), t0.AddSeconds(-7));
+                transfers.Apply(new TransferUpdate(new GameSync.Core.Storage.TransferProgress(id, 412, 1108, 44_145_049, 118_489_088), TransferState.Running), t0);
+            }
+
+            var saves = Saves(open: true);
+            if (saves.Game is { } game)
+            {
+                if (game.NamedSaves.FirstOrDefault() is { } named)
+                {
+                    named.IsRestoring = true;
+                    (game.Restoring, game.RestoreNote) = (true, $"Bringing back “{named.Name}”");
+                }
+                else
+                {
+                    (game.Restoring, game.RestoreNote) = (true, "Bringing back the save from 23 Sep 21:02");
+                }
+            }
+
+            return saves;
+        },
+        // FIND-04: the shown game as if nothing were found for it, learn mode waiting, watching, or with what it found (made up).
+        ["game-saves-learn"] = () => LearnSaves(GameSync.Host.LearnState.Waiting),
+        ["game-saves-learning"] = () => LearnSaves(GameSync.Host.LearnState.Watching),
+        ["game-saves-learned"] = () => LearnSaves(GameSync.Host.LearnState.Found),
+        ["game-saves-kept"] = () =>
+        {
+            // KAN-61: the shown game as if not syncing yet, its live save beside copies kept by hand (made up).
+            var saves = Saves(open: true);
+            if (saves.Game is { } game && Off(() => GameDetails.ReadAsync(dataDir, game.Id, CancellationToken.None)) is { } detail)
+            {
+                var kept = KeptMadeUp();
+                game.Show(detail with
+                {
+                    Syncs = false,
+                    Kept = kept,
+                    FoundBy = "Found by name search at the last scan, 29 Sep.",
+                    Places = [new GamePlace(@"<installDir>\Shadlix\user\savedata\1\CUSA00207\SPRJ0005", kept.LiveFolder, null, "34 files · 33.6 MB · newest 17 Sep 02:14")],
+                    Versions = [],
+                    NamedSaves = [],
+                    FoundFiles = kept.LiveFiles,
+                    FoundBytes = kept.LiveBytes,
+                }, now);
+            }
+
+            return saves;
+        },
         ["conflict"] = () => Conflict(settled: false),
         ["conflict-settled"] = () => Conflict(settled: true),
         ["plan"] = PlanTab,
@@ -435,12 +655,54 @@ if (dataDir is not null)
         ["settings-devices"] = () => SettingsPage(SettingsViewModel.DevicesId),
         ["settings-notifications"] = () => SettingsPage(SettingsViewModel.NotificationsId),
         ["settings-safety"] = () => SettingsPage(SettingsViewModel.SafetyId),
+        ["settings-achievements"] = () => SettingsPage(SettingsViewModel.AchievementsId),
+        ["settings-updates"] = () => SettingsPage(SettingsViewModel.UpdatesId, updates: "ready"),
+        ["settings-updates-latest"] = () => SettingsPage(SettingsViewModel.UpdatesId, updates: "latest"),
+        ["settings-updates-downloading"] = () => SettingsPage(SettingsViewModel.UpdatesId, updates: "downloading"),
+        ["settings-updates-refused"] = () => SettingsPage(SettingsViewModel.UpdatesId, updates: "refused"),
     };
+
+    // FIND-04: what learn mode found for the shown game (made up), for its saves page and the finds dialog.
+    GameSync.Core.Discovery.LearnFinds LearnMadeUp()
+    {
+        var t = now.ToUniversalTime();
+        var title = shown?.Title ?? "ROUNDS";
+        var local = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData) + "Low";
+        var documents = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+        return new GameSync.Core.Discovery.LearnFinds(t.AddMinutes(-48), t.AddMinutes(-2),
+        [
+            new(Path.Combine(local, "Landfall Games", title), $"<localLow>/Landfall Games/{title}", false, 3, 49_152, t.AddMinutes(-3), ["Player.sav", "Unlocks.sav", "Settings.json"],
+                [GameSync.Core.Discovery.LearnPlaces.SaveLikeTag]),
+            new(Path.Combine(documents, "My Games", title, "Replays"), $"<documents>/My Games/{title}/Replays", false, 12, 2_306_867, t.AddMinutes(-6), ["replay-0412.rpl", "replay-0413.rpl"], []),
+            new(@"E:\Games\" + title + @"\settings.cfg", "<installDir>/settings.cfg", true, 1, 812, t.AddMinutes(-2), ["settings.cfg"], [GameSync.Core.Discovery.LearnPlaces.OwnFolderTag]),
+        ]);
+    }
+
+    SaveManagerViewModel LearnSaves(GameSync.Host.LearnState learn)
+    {
+        var saves = Saves(open: true);
+        if (saves.Game is { } game && Off(() => GameDetails.ReadAsync(dataDir, game.Id, CancellationToken.None)) is { } detail)
+        {
+            game.Show(detail with
+            {
+                Syncs = false,
+                Places = [],
+                FoundBy = null,
+                Versions = [],
+                NamedSaves = [],
+                Kept = null,
+                Learn = new GameSync.Host.LearnView(learn, learn == GameSync.Host.LearnState.Watching ? now.ToUniversalTime().AddMinutes(-21) : null,
+                    learn == GameSync.Host.LearnState.Found ? LearnMadeUp() : null),
+            }, now);
+        }
+
+        return saves;
+    }
 
     // Settings (SET-01) from this data folder's own settings, on a section; the actions only answer, so nothing is
     // written. With drive, the cloud is a made-up Google Drive, signed in and 81% full (CLOUD-05); with apply, the
     // settings files default was just changed, so What to back up offers to apply it to games that differ (SET-06).
-    SettingsViewModel SettingsPage(string section, bool drive = false, bool apply = false)
+    SettingsViewModel SettingsPage(string section, bool drive = false, bool apply = false, string? updates = null)
     {
         var view = SettingsData.Read(dataDir);
         if (drive)
@@ -463,14 +725,36 @@ if (dataDir is not null)
             Figures = _ => Task.FromResult(figures),
             Cloud = _ => Task.FromResult(details),
             Diagnostics = _ => Task.FromResult(""),
+            AchievementGames = _ => Task.FromResult(GameSync.Host.Achievements.SettingsRows(dataDir, games)),
         }, new Look(), section);
         settings.Apply(view);
         settings.Storage.LoadFigures();
         settings.Cloud.LoadDetails();
+        settings.Achievements.LoadGames();
         if (apply)
         {
             // Touched: a change made on the page, which the page then reads back.
             settings.Backup.SettingsFiles = GameSync.Core.Games.GameDefaults.ThisPc;
+        }
+
+        // PKG-03 (design system version 53): Updates as GameSync 1.0.0 installed, with 1.0.1 made up: ready, already the
+        // latest, coming down, or refused by GameSync's own check.
+        if (updates is not null)
+        {
+            var utc = now.ToUniversalTime();
+            var next = new Version(1, 0, 1);
+            var made = new UpdatesView(new Version(1, 0, 0), Installed: true, Daily: true, utc.AddHours(-2),
+                updates == "ready"
+                    ? new ReadyUpdate(next, "", "", "https://github.com/Ahmed-Javaid/GameSync/releases/tag/v1.0.1",
+                        ["Restoring a named save says which file a running game still holds.", "Achievements of copies Steam doesn't run count from their own record.", "Home's Zenith is a dot, orange to red."])
+                    : null,
+                updates == "refused" ? new UpdateRefusal(next, "it isn't the installer its signature describes, so it may have been changed on the way", utc) : null,
+                null);
+            settings.Updates.Show(made, now);
+            if (updates == "downloading")
+            {
+                settings.Updates.ShowDownloading(next, 24L * 1048576, 58L * 1048576, "1.2 MB/s, about 30 s left");
+            }
         }
 
         return settings;
@@ -553,6 +837,55 @@ if (dataDir is not null)
     }
 
     // Add a place over a game's saves, with a folder picked (made up, in the game --game names): as the design draws it.
+    // New named save (BAK-18, KAN-77) over the shown game's saves, from what this data folder knows of it: just opened,
+    // with a name its named saves have already, or as for a game not syncing yet. The actions only answer.
+    // KAN-61: Bloodborne's live save beside its copies kept by hand, as the owner's folder holds them (made up, as drawn).
+    GameKept KeptMadeUp() => new("<installDir>/Shadlix/user/savedata", "1/CUSA00207/SPRJ0005", @"G:\Bloodborne GOTY\Shadlix\user\savedata\1\CUSA00207\SPRJ0005",
+        @"G:\Bloodborne GOTY\Shadlix\user\savedata\1\CUSA00207", 18, 1_036_000_000, 34, 35_232_153, now.ToUniversalTime().AddDays(-14), ["Before Orphan", "After maria"]);
+
+    KeptCopiesViewModel KeptCopiesDialogFor(bool backup, bool done, string? busy = null)
+    {
+        const long MB = 1_048_576;
+        var at = now.ToUniversalTime().AddDays(-37);
+        var names = new[] { "Witch ded", "After Abandoned Workshop Before Amelia", "Before Iosefka clinic and FF boss", "Before Iosefka clinic and FF boss / anoter",
+            "After ROM at chapel", "Before Crow", "Before Crow (zip)", "After crow", "SPRJ0005 - Copy", "BEFORE church dog lady", "Mensis Fog", "Near Bloody Bride",
+            "befo ludwig", "After Failure", "Befo living failure", "after ludwig", "After maria", "Before Orphan" };
+        var items = names.Select((name, i) => new GameSync.Core.Sync.ImportItem(name, name, i < 2 ? 15 : 34, (i < 2 ? 14 : 33) * MB + i * 1000, at.AddDays(i * 1.3),
+            name == "Before Crow (zip)" ? "'Before Crow'" : name == "Befo living failure" ? "'After Failure'" : null)).ToList();
+        var dialog = new KeptCopiesViewModel(new KeptCopiesStart(shown?.Id ?? GameId.Parse("bloodborne"), "Bloodborne GOTY", backup), actions);
+        dialog.Show(new KeptLook(KeptMadeUp(), items, [], 1_071_872_663), now);
+        if (done)
+        {
+            dialog.DoneText = "Bloodborne GOTY syncs its live save now.";
+            dialog.DoneNote = "16 named saves are under Named saves, on every PC. Restore brings one back, keeping the save there now first.";
+            dialog.UploadNote = "It uploads to the cloud now, beside whatever you do next: the game's saves show how far it is.";
+            dialog.Stage = "done";
+        }
+        else if (busy == "looking")
+        {
+            // KAN-80: as it opens, each copy is read (made up: 7 of the 18 so far).
+            dialog.Stage = "looking";
+            (dialog.LookValue, dialog.LookDetail) = (7 * 100.0 / 18, "7 of 18 folders · 212 MB of 1022.2 MB read");
+        }
+        else if (busy == "keeping")
+        {
+            // KAN-80: the copies coming in (made up: 6 of the 16 kept).
+            dialog.Stage = "keeping";
+            (dialog.KeepValue, dialog.KeepDetail, dialog.KeepSpeed, dialog.KeepLeft) = (20 + 80 * 143.0 / 453.2, "6 of 16 copies · 143 of 453.2 MB", "48 MB/s", "about 7 s left");
+        }
+
+        return dialog;
+    }
+
+    NamedSaveViewModel NamedSave(string state)
+    {
+        var detail = shown is null ? null : Off(() => GameDetails.ReadAsync(dataDir, shown.Id, CancellationToken.None, shown.SteamAppId));
+        var names = (detail?.NamedSaves.Select(n => n.Name) ?? []).DefaultIfEmpty("Before the Warden").ToList();
+        var start = NamedSaveStart.For(shown?.Id ?? GameId.Parse("game"), shown?.Title ?? "Game", detail?.Places.Select(p => (p.Folder, p.Tag, p.Evidence)) ?? [],
+            names, state == "new" ? GameSavesViewModel.KeepNoteFor(34, 35_232_153) : null);
+        return new NamedSaveViewModel(start, actions) { Name = state == "taken" ? names[0] : "" };
+    }
+
     AddPlaceViewModel AddPlace()
     {
         var add = new AddPlaceViewModel(shown?.Id ?? GameId.Parse("game"), shown?.Title ?? "Game", actions);
@@ -613,6 +946,65 @@ if (dataDir is not null)
         return import;
     }
 
+    // Sharing (SHARE-01 to SHARE-13): the share window over this data folder's own games and versions, with a made-up
+    // locked game; Import saves over a made-up zip's games. The actions only answer, so nothing is written.
+    ShareActions Sharing(GameSync.Host.ImportPreview? preview = null) => new()
+    {
+        List = _ => Task.Run(async () =>
+        {
+            var list = (await GameSync.Host.Sharing.ListAsync(dataDir, CancellationToken.None)).ToList();
+            list.Add(new GameSync.Host.ShareGameInfo(GameId.Parse("gta-v-enhanced"), "GTA V Enhanced",
+                [new GameSync.Host.ShareVersionInfo(GameSync.Core.Model.VersionId.New(now.ToUniversalTime(), "DESKTOP"), "Current", now.ToUniversalTime().AddDays(-3), "DESKTOP", 12_582_912, false, true)],
+                "Ships an anti-cheat, so its saves can't be shared."));
+            return (IReadOnlyList<GameSync.Host.ShareGameInfo>)list;
+        }),
+        Where = () => (@"C:\Users\You\Downloads", false),
+        Preview = (zip, _) => Task.FromResult(preview ?? new GameSync.Host.ImportPreview(zip, now.ToUniversalTime(), "DESKTOP", [])),
+        CoverOf = id => games.FirstOrDefault(g => g.Id == id)?.CoverPath,
+    };
+
+    ShareViewModel Share(string mode, bool export = false, bool done = false)
+    {
+        var start = new ShareStart(mode, games.Where(g => g.Syncs).Select(g => g.Id).Take(1).ToList());
+        if (export && Task.Run(() => GameSync.Host.Sharing.ListAsync(dataDir, CancellationToken.None)).GetAwaiter().GetResult().FirstOrDefault() is { } first)
+        {
+            start = new ShareStart(ShareStart.Pick, [first.Id], first.Id, first.Versions[^1].Id);
+        }
+
+        var share = new ShareViewModel(Sharing(), start);
+        if (!done)
+        {
+            share.Load();
+        }
+        else
+        {
+            share.ZipPath = @"C:\Users\You\Downloads\GameSync-saves-" + now.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture) + ".zip";
+            share.DoneText = "2 saves of 1 game, 41.2 KB, in " + System.IO.Path.GetFileName(share.ZipPath) + ".";
+            share.Stage = "done";
+        }
+
+        return share;
+    }
+
+    ImportSavesViewModel ImportSaves()
+    {
+        var syncing = games.FirstOrDefault(g => g.Syncs);
+        var other = games.FirstOrDefault(g => !g.Syncs && !g.IsSoftware);
+        var preview = new GameSync.Host.ImportPreview(@"C:\Users\You\Downloads\GameSync-saves-2026-09-27.zip", now.ToUniversalTime().AddDays(-4), "SAM-PC",
+        [
+            new(syncing?.Id ?? GameId.Parse("terraria"), syncing?.Id, syncing?.Title ?? "Terraria", GameSync.Host.ImportMatch.Matched, 2, 4_299_161,
+                "Made on another Steam account. Some games check the account, so it may not load.", 0),
+            new(other?.Id ?? GameId.Parse("hollow-knight"), other?.Id ?? GameId.Parse("hollow-knight"), other?.Title ?? "Hollow Knight", GameSync.Host.ImportMatch.NotSyncing, 1,
+                1_153_434, null, 1),
+            new(GameId.Parse("terraria"), null, "Terraria", GameSync.Host.ImportMatch.NotInstalled, 1, 524_288, null, 0),
+            new(GameId.Parse("a-friends-game"), null, "A friend's own game", GameSync.Host.ImportMatch.Unknown, 1, 524_288,
+                @"Its save folder, D:\Servers\World, isn't on this PC.", 0),
+        ]);
+        var import = new ImportSavesViewModel(Sharing(preview), preview.ZipPath);
+        import.Load();
+        return import;
+    }
+
     Control Shell(string current, string? dialog = null) => new Shell
     {
         DataContext = new ShellViewModel(Makers(), current)
@@ -627,11 +1019,27 @@ if (dataDir is not null)
                 "add-game" => AddGame(setup: false, program: false),
                 "add-game-program" => AddGame(setup: false, program: true),
                 "setup-add-game" => AddGame(setup: true, program: false),
+                "share" => Share(ShareStart.Pick),
+                "share-all" => Share(ShareStart.All),
+                "share-export" => Share(ShareStart.Pick, export: true),
+                "share-done" => Share(ShareStart.Pick, done: true),
+                "import-saves" => ImportSaves(),
+                "named-save" => NamedSave(""),
+                "named-save-taken" => NamedSave("taken"),
+                "named-save-new" => NamedSave("new"),
+                "kept-copies" => KeptCopiesDialogFor(backup: false, done: false),
+                "kept-copies-backup" => KeptCopiesDialogFor(backup: true, done: false),
+                "kept-copies-done" => KeptCopiesDialogFor(backup: false, done: true),
+                "kept-copies-looking" => KeptCopiesDialogFor(backup: false, done: false, busy: "looking"),
+                "kept-copies-keeping" => KeptCopiesDialogFor(backup: false, done: false, busy: "keeping"),
+                "achievement-games" => new AchievementGamesViewModel(SettingsPage(SettingsViewModel.AchievementsId).Achievements, () => { }),
+                "learn-finds" => new LearnFindsViewModel(shown?.Id ?? GameId.Parse("rounds"), shown?.Title ?? "ROUNDS", LearnMadeUp(), new Dictionary<string, string?>(), null, () => { }, now),
                 _ => Properties(dialog),
             },
         },
     };
     pages["home"] = (() => Shell("home"), size.Width, size.Height);
+    pages["home-second"] = (() => Shell("home-second"), size.Width, size.Height);
     pages["home-playing"] = (() => Shell("playing"), size.Width, size.Height);
     pages["home-last-month"] = (() => Shell("home-last-month"), size.Width, size.Height);
     pages["library"] = (() => Shell("library"), size.Width, size.Height);
@@ -645,6 +1053,13 @@ if (dataDir is not null)
     pages["library-local"] = (() => Shell("local"), size.Width, size.Height);
     pages["library-search"] = (() => Shell("searched"), size.Width, size.Height);
     pages["library-game"] = (() => Shell("game"), size.Width, size.Height);
+    pages["library-game-full"] = (() => Shell("game"), size.Width, 1600);
+    foreach (var page in new[] { "achievements", "achievements-game", "game-achievements", "game-achievements-locked", "game-achievements-hidden" })
+    {
+        pages[page] = (() => Shell(page), size.Width, size.Height);
+    }
+
+    pages["achievements-full"] = (() => Shell("achievements"), size.Width, 1500);
     pages["saves"] = (() => Shell("saves"), size.Width, size.Height);
     pages["game-saves"] = (() => Shell("game-saves"), size.Width, size.Height);
     pages["conflict"] = (() => Shell("conflict"), size.Width, size.Height);
@@ -660,14 +1075,42 @@ if (dataDir is not null)
     }
 
     pages["add-place"] = (() => Shell("game-saves", "add-place"), size.Width, size.Height);
+    foreach (var dialog in new[] { "named-save", "named-save-taken", "named-save-new" })
+    {
+        pages[dialog] = (() => Shell("game-saves", dialog), size.Width, size.Height);
+    }
+
+    pages["game-saves-kept"] = (() => Shell("game-saves-kept"), size.Width, size.Height);
+    foreach (var learn in new[] { "game-saves-learn", "game-saves-learning", "game-saves-learned" })
+    {
+        pages[learn] = (() => Shell(learn), size.Width, size.Height);
+    }
+
+    pages["learn-finds"] = (() => Shell("game-saves-learned", "learn-finds"), size.Width, size.Height);
+    pages["game-saves-busy"] = (() => Shell("game-saves-busy"), size.Width, size.Height);
+    pages["game-saves-playing"] = (() => Shell("game-saves-playing"), size.Width, size.Height);
+    foreach (var dialog in new[] { "kept-copies", "kept-copies-backup", "kept-copies-done", "kept-copies-looking", "kept-copies-keeping" })
+    {
+        pages[dialog] = (() => Shell("game-saves-kept", dialog), size.Width, size.Height);
+    }
+
     pages["import-kept"] = (() => Shell("game-saves", "import-kept"), size.Width, size.Height);
     pages["home-nocloud"] = (() => Shell("home-nocloud"), size.Width, size.Height);
     pages["connect-cloud"] = (() => Shell("home-nocloud", "connect-cloud"), size.Width, size.Height);
     pages["add-game"] = (() => Shell("library", "add-game"), size.Width, size.Height);
     pages["add-game-program"] = (() => Shell("library", "add-game-program"), size.Width, size.Height);
     pages["setup-add-game"] = (() => Shell("setup-choose", "setup-add-game"), size.Width, size.Height);
+    foreach (var dialog in new[] { "share", "share-all", "share-export", "share-done", "import-saves" })
+    {
+        pages[dialog] = (() => Shell("saves", dialog), size.Width, size.Height);
+    }
+
+    // Achievements by game (KAN-131), over Settings' Achievements.
+    pages["achievement-games"] = (() => Shell("settings-achievements", "achievement-games"), size.Width, size.Height);
+    pages["saves-selected"] = (() => Shell("saves-selected"), size.Width, size.Height);
     foreach (var section in new[] { "settings", "settings-storage", "settings-backup", "settings-backup-apply", "settings-cloud", "settings-cloud-drive", "settings-devices",
-                 "settings-notifications", "settings-safety" })
+                 "settings-notifications", "settings-achievements", "settings-safety", "settings-updates", "settings-updates-latest", "settings-updates-downloading",
+                 "settings-updates-refused" })
     {
         pages[section] = (() => Shell(section), size.Width, size.Height);
     }
@@ -687,7 +1130,7 @@ if (dataDir is not null)
         "22:31:57  Hades: synced after play (3 files, 1.2 MB).",
         "22:32:02  ! Sekiro: Shadows Die Twice: changed on two PCs. A conflict waits for you.",
     ], now);
-    foreach (var current in new[] { "home", "library", "game", "saves", "game-saves", "conflict", "log", "settings", "properties", "setup", "setup-choose", "plan", "versions", "saves-log" })
+    foreach (var current in new[] { "home", "library", "game", "saves", "game-saves", "conflict", "log", "settings", "properties", "setup", "setup-choose", "plan", "versions", "saves-log", "achievements" })
     {
         glossy[current == "log" ? "glossy-console" : "glossy-" + current] = choice =>
         {
@@ -718,6 +1161,60 @@ if (dataDir is not null)
 
         return window;
     };
+
+    // KAN-124: how long switching between Dark and Light takes in Glossy for the window's own work (the theme, the glass and a
+    // frame), with the glass recoloured in place, and for comparison cleared first and made again, as it was; and the picture of
+    // the window a change of look starts from.
+    if (wanted.Contains("look-timing") && glossy.TryGetValue("glossy-home", out var timedHome))
+    {
+        var dark = new ThemeChoice();
+        var light = new ThemeChoice(Mode: ThemeMode.Light);
+        ThemeService.Apply(Application.Current!, dark);
+        var window = (MainWindow)timedHome(dark);
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+        window.CaptureRenderedFrame()?.Dispose();
+        var surfaces = new[] { dark, light }.ToDictionary(c => c.Mode, c =>
+        {
+            var glass = ThemeEngine.Glass(c, GlassStrength.Glass)!;
+            var picture = art is null ? null : Backdrop.Make(art, glass, ThemeEngine.Build(c));
+            return (Glass: glass, Picture: picture);
+        });
+        foreach (var clearFirst in new[] { true, false, true, false })
+        {
+            var times = new List<double>();
+            for (var i = 0; i < 8; i++)
+            {
+                var choice = i % 2 == 0 ? light : dark;
+                var watch = System.Diagnostics.Stopwatch.StartNew();
+                ThemeService.Apply(Application.Current!, choice);
+                var themed = watch.Elapsed.TotalMilliseconds;
+                if (clearFirst)
+                {
+                    window.ShowSurface(null, null);
+                }
+
+                window.ShowSurface(surfaces[choice.Mode].Glass, surfaces[choice.Mode].Picture);
+                var glassed = watch.Elapsed.TotalMilliseconds;
+                Dispatcher.UIThread.RunJobs();
+                var laid = watch.Elapsed.TotalMilliseconds;
+                window.CaptureRenderedFrame()?.Dispose();
+                times.Add(watch.Elapsed.TotalMilliseconds);
+                Console.WriteLine($"  theme {themed:F0}, glass {glassed - themed:F0}, layout {laid - glassed:F0}, frame {watch.Elapsed.TotalMilliseconds - laid:F0} ms");
+            }
+
+            Console.WriteLine($"{(clearFirst ? "cleared first (before)" : "in place (now)")}: {string.Join(", ", times.Select(t => t.ToString("F0")))} ms; median {times.Order().ElementAt(times.Count / 2):F0} ms");
+        }
+
+        var picture = System.Diagnostics.Stopwatch.StartNew();
+        using (var bitmap = new Avalonia.Media.Imaging.RenderTargetBitmap(new PixelSize((int)window.Width, (int)window.Height)))
+        {
+            bitmap.Render(window);
+        }
+
+        Console.WriteLine($"the window's picture, as a change of look takes it: {picture.Elapsed.TotalMilliseconds:F0} ms");
+        window.Close();
+    }
 }
 
 var themes = new[]
@@ -745,12 +1242,62 @@ foreach (var (name, make) in glossy.Where(p => wanted.Count == 0 || wanted.Conta
     }
 }
 
+// KAN-76: a change of look held part way, the save manager in Dark Glossy coming through as Light from a click near its
+// top left, to look at the curtain's frames.
+if (wanted.Contains("look-change") && glossy.TryGetValue("glossy-saves", out var savesWindow))
+{
+    foreach (var t in new[] { 0.15, 0.4, 0.7 })
+    {
+        var dark = new ThemeChoice();
+        ThemeService.Apply(Application.Current!, dark);
+        var window = (MainWindow)savesWindow(dark);
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+        var light = new ThemeChoice(Mode: ThemeMode.Light);
+        window.ChangeLookFrame(() =>
+        {
+            ThemeService.Apply(Application.Current!, light);
+            window.ShowSurface(null, null);
+        }, new Point(260, 140), t);
+        Save(window, $"look-change-{t * 100:0}.png");
+    }
+}
+
 void Save(Window window, string fileName)
 {
+    var opening = System.Diagnostics.Stopwatch.StartNew();
     window.Show();
-    Dispatcher.UIThread.RunJobs();
     if (bench > 0)
     {
+        // PERF-03: the first frame comes before what's left for idle moments (the library's later covers), as in the app.
+        Dispatcher.UIThread.RunJobs(DispatcherPriority.Render);
+        window.CaptureRenderedFrame()?.Dispose();
+        Console.WriteLine($"{fileName}: first frame in {opening.Elapsed.TotalMilliseconds:F0} ms");
+    }
+
+    Dispatcher.UIThread.RunJobs();
+    if (keys.Count > 0)
+    {
+        Tabs(window, fileName);
+        return;
+    }
+
+    if (bench > 0)
+    {
+        // The first frame: everything the page builds as it opens, as the app's window does.
+        window.CaptureRenderedFrame()?.Dispose();
+        Console.WriteLine($"{fileName}: everything made in {opening.Elapsed.TotalMilliseconds:F0} ms");
+        if (revisit && window.GetVisualDescendants().OfType<GameSync.UI.Views.Shell>().FirstOrDefault()?.DataContext is ShellViewModel shell && shell.Page is { } page)
+        {
+            shell.NavigateCommand.Execute("home");
+            Dispatcher.UIThread.RunJobs();
+            window.CaptureRenderedFrame()?.Dispose();
+            var again = System.Diagnostics.Stopwatch.StartNew();
+            shell.Page = page;
+            Dispatcher.UIThread.RunJobs();
+            window.CaptureRenderedFrame()?.Dispose();
+            Console.WriteLine($"{fileName}: back to it from Home in {again.Elapsed.TotalMilliseconds:F0} ms");
+        }
         Bench(window, fileName);
         return;
     }
@@ -781,6 +1328,77 @@ void Save(Window window, string fileName)
     frame?.Save(file);
     window.Close();
     Console.WriteLine(frame is null ? $"{file}: nothing rendered" : file);
+}
+
+void Tabs(Window window, string name)
+{
+    window.CaptureRenderedFrame()?.Dispose();
+    var first = window.GetVisualDescendants().OfType<Button>().FirstOrDefault(b => b.DataContext is SaveRow);
+    first?.Focus(Avalonia.Input.NavigationMethod.Tab);
+    Dispatcher.UIThread.RunJobs();
+    Console.WriteLine($"{name}: from {(first is null ? "the window" : Avalonia.Automation.AutomationProperties.GetName(first))}, {keys.Count} keys:");
+    var stops = new List<(string Said, Avalonia.Media.IImage Cut)>();
+    var frames = new List<IDisposable>();
+    for (var i = 0; i < keys.Count; i++)
+    {
+        window.KeyPress(keys[i], Avalonia.Input.RawInputModifiers.None, Avalonia.Input.PhysicalKey.None, null);
+        window.KeyRelease(keys[i], Avalonia.Input.RawInputModifiers.None, Avalonia.Input.PhysicalKey.None, null);
+        Dispatcher.UIThread.RunJobs();
+        window.UpdateLayout();
+        Dispatcher.UIThread.RunJobs();
+        var focused = window.FocusManager?.GetFocusedElement() as Control;
+        var heard = focused is null ? null : Avalonia.Automation.Peers.ControlAutomationPeer.CreatePeerForElement(focused).GetName();
+        var said = focused is null ? "(nothing)" : heard is { Length: > 0 } ? heard : $"no name ({focused.GetType().Name})";
+        Console.WriteLine($"  {i + 1,3}  {keys[i],-8} {said}");
+        if (focused?.TranslatePoint(new Point(0, 0), window) is { } at && window.CaptureRenderedFrame() is { } frame)
+        {
+            // The control and 8px around it, where its ring is drawn, cut out of this frame.
+            frames.Add(frame);
+            var left = Math.Max(0, (int)at.X - 8);
+            var top = Math.Max(0, (int)at.Y - 8);
+            var width = Math.Min(frame.PixelSize.Width - left, (int)Math.Min(focused.Bounds.Width + 16, 520));
+            var height = Math.Min(frame.PixelSize.Height - top, (int)Math.Min(focused.Bounds.Height + 16, 260));
+            if (width > 0 && height > 0)
+            {
+                stops.Add(($"{i + 1}. {keys[i]}: {said}", new Avalonia.Media.Imaging.CroppedBitmap(frame, new PixelRect(left, top, width, height))));
+            }
+        }
+    }
+
+    window.Close();
+    var sheet = new WrapPanel { Margin = new Thickness(12) };
+    foreach (var (said, cut) in stops)
+    {
+        sheet.Children.Add(new StackPanel
+        {
+            Margin = new Thickness(8),
+            Spacing = 4,
+            Width = 300,
+            Children =
+            {
+                new TextBlock { Text = said, FontSize = 11, TextTrimming = Avalonia.Media.TextTrimming.CharacterEllipsis },
+                new Image { Source = cut, Stretch = Avalonia.Media.Stretch.Uniform, MaxWidth = 300, MaxHeight = 120, HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Left },
+            },
+        });
+    }
+
+    var sheetWindow = new Window
+    {
+        Width = 1280,
+        SizeToContent = SizeToContent.Height,
+        Background = Application.Current!.FindResource("bg-100") as Avalonia.Media.IBrush,
+        Content = sheet,
+    };
+    sheetWindow.Show();
+    Dispatcher.UIThread.RunJobs();
+    var file = Path.Combine(output, Path.ChangeExtension(name, null) + $"-tabs.png");
+    sheetWindow.CaptureRenderedFrame()?.Save(file);
+    Console.WriteLine(file);
+    sheetWindow.Close();
+    foreach (var frame in frames)
+    {
+        frame.Dispose();
+    }
 }
 
 void Bench(Window window, string name)
@@ -852,7 +1470,7 @@ void BackdropSheet(string folder)
         foreach (var rgb in variants)
         {
             // What shows: the chroma of the finished pixels, under the scrim.
-            var baked = Backdrop.Bake(rgb, glass, Backdrop.Darkening(rgb, glass, theme));
+            var baked = Backdrop.Bake(rgb, glass, Backdrop.ScrimAlphas(rgb, glass, theme));
             var shown = new double[baked.Length / 4 * 3];
             for (int i = 0, o = 0; i < baked.Length; i += 4, o += 3)
             {
@@ -877,6 +1495,43 @@ void BackdropSheet(string folder)
     window.CaptureRenderedFrame()?.Save(sheet);
     window.Close();
     Console.WriteLine(sheet);
+}
+
+// The Zenith medal at every size it's drawn at, earned and not, the badge alone, and the monument earned and not (design
+// system version 45). Its sheen is still, as every frame here is the first.
+Control ZenithSheet()
+{
+    static StackPanel Row(params Control[] items)
+    {
+        var row = new StackPanel { Orientation = Avalonia.Layout.Orientation.Horizontal, Spacing = 28 };
+        foreach (var item in items)
+        {
+            item.VerticalAlignment = Avalonia.Layout.VerticalAlignment.Bottom;
+            row.Children.Add(item);
+        }
+
+        return row;
+    }
+
+    static GameSync.UI.Controls.GsZenithMedal Medal(double size, bool earned = true) => new() { Width = size, Height = size, IsEarned = earned };
+    return new StackPanel
+    {
+        Margin = new Thickness(48, 40),
+        Spacing = 40,
+        Children =
+        {
+            Row(Medal(180), Medal(104), Medal(64), Medal(56), Medal(48), Medal(40), Medal(34), Medal(30), Medal(26), Medal(22), Medal(18)),
+            Row(Medal(40, earned: false), Medal(26, earned: false), new GameSync.UI.Controls.GsZenithBadge { Width = 30, Height = 30 },
+                new GameSync.UI.Controls.GsZenithMonument { Width = 132, Height = 116, IsEarned = true }, new GameSync.UI.Controls.GsZenithMonument { Width = 240, Height = 200, IsEarned = true },
+                new GameSync.UI.Controls.GsZenithMonument { Width = 132, Height = 116 }),
+            // Home's card, earned and not yet, and a game's page (version 52: Home's Zenith is its dot), then the tier chips
+            Row(new GameSync.UI.Controls.GsAchievementsOverview { IsSmall = true, Done = 1, Total = 1, Bronze = 1 },
+                new GameSync.UI.Controls.GsAchievementsOverview { IsSmall = true, Done = 29, Total = 34, Gold = 4, Silver = 9, Bronze = 16 },
+                new GameSync.UI.Controls.GsAchievementsOverview { Done = 34, Total = 34, Gold = 5, Silver = 11, Bronze = 18, CompletedOn = "7 Oct" }),
+            Row(new GameSync.UI.Controls.GsTierChip { Tier = "gold", Count = "12" }, new GameSync.UI.Controls.GsTierChip { Tier = "silver", Count = "40" },
+                new GameSync.UI.Controls.GsTierChip { Tier = "bronze", Count = "71" }, new GameSync.UI.Controls.GsTierChip { Tier = "zenith" }),
+        },
+    };
 }
 
 static string? TakeOption(List<string> list, string name)

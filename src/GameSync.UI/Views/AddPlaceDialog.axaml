@@ -4,7 +4,7 @@
              xmlns:vm="using:GameSync.UI.ViewModels"
              x:Class="GameSync.UI.Views.AddPlaceDialog"
              x:DataType="vm:AddPlaceViewModel"
-             Width="640">
+             Width="{DynamicResource dw-640}">
   <!-- Add a place (design system → AddPlaceDialog, FOLD-01): a folder or one save file picked in Windows' own picker, how
        every PC reads it and what's there, what it holds, and Add this place. Program files in it are never taken. -->
   <Border Background="{DynamicResource surface-dialog}" BorderBrush="{DynamicResource edge-dialog}" BorderThickness="1" BackgroundSizing="OuterBorderEdge"
@@ -22,10 +22,10 @@
 
       <Border DockPanel.Dock="Bottom" BorderBrush="{DynamicResource line-100}" BorderThickness="0,1,0,0" Padding="24,14">
         <StackPanel Spacing="12">
-          <c:GsNote Icon="info" Text="It's backed up at the next sync. Your other PCs are asked before they take a new place, and nothing in it is ever deleted." />
+          <c:GsNote Icon="info" Text="{Binding AddNote}" />
           <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
             <c:GsButton Classes="ghost" Content="Cancel" Command="{Binding CancelCommand}" />
-            <c:GsButton Classes="primary" Icon="plus" Content="Add this place" Command="{Binding AddCommand}" IsEnabled="{Binding CanAdd}" />
+            <c:GsButton Classes="primary" Icon="plus" Content="{Binding AddLabel}" Command="{Binding AddCommand}" IsEnabled="{Binding CanAdd}" />
           </StackPanel>
         </StackPanel>
       </Border>
@@ -56,7 +56,7 @@
           </Grid>
         </Border>
 
-        <c:GsNote Icon="search" Text="Looking at what's there…" IsVisible="{Binding Looking}" />
+        <c:GsNote Icon="search" Text="Looking at what's there" IsBusy="True" IsVisible="{Binding Looking}" />
         <c:GsNote Icon="block" Foreground="{DynamicResource danger}" Text="{Binding Refused}" IsVisible="{Binding IsRefused}" />
         <c:GsNote Icon="alert" Foreground="{DynamicResource danger}" Text="{Binding Error}" IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" />
 
@@ -70,11 +70,11 @@
                       AutomationProperties.Name="{Binding CategoryLabel, StringFormat='What it holds: {0}'}">
             <c:GsButton.Flyout>
               <MenuFlyout Placement="BottomEdgeAlignedLeft">
-                <MenuItem Header="Game saves: synced between PCs" ToggleType="CheckBox" Command="{Binding SelectCommand}" CommandParameter="save"
+                <c:GsMenuItem Header="Game saves: synced between PCs" ToggleType="CheckBox" Command="{Binding SelectCommand}" CommandParameter="save"
                           IsChecked="{Binding Category, Mode=OneWay, Converter={x:Static c:EqualsConverter.Instance}, ConverterParameter=save}" />
-                <MenuItem Header="Settings: each PC keeps its own" ToggleType="CheckBox" Command="{Binding SelectCommand}" CommandParameter="config"
+                <c:GsMenuItem Header="Settings: each PC keeps its own" ToggleType="CheckBox" Command="{Binding SelectCommand}" CommandParameter="config"
                           IsChecked="{Binding Category, Mode=OneWay, Converter={x:Static c:EqualsConverter.Instance}, ConverterParameter=config}" />
-                <MenuItem Header="Screenshots: backed up on this PC" ToggleType="CheckBox" Command="{Binding SelectCommand}" CommandParameter="screenshots"
+                <c:GsMenuItem Header="Screenshots: backed up on this PC" ToggleType="CheckBox" Command="{Binding SelectCommand}" CommandParameter="screenshots"
                           IsChecked="{Binding Category, Mode=OneWay, Converter={x:Static c:EqualsConverter.Instance}, ConverterParameter=screenshots}" />
               </MenuFlyout>
             </c:GsButton.Flyout>

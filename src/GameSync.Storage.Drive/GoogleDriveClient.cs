@@ -1,4 +1,5 @@
 using System.Text.Json;
+using GameSync.Core.Storage;
 using Google.Apis.Download;
 using Google.Apis.Drive.v3;
 using Google.Apis.Http;
@@ -68,6 +69,14 @@ public sealed class GoogleDriveClient : IDriveClient, IDisposable
             content.Position = 0;
             var request = _service.Files.Create(metadata, content, mimeType);
             request.Fields = Fields;
+
+            // KAN-80: a big file goes in parts; the share sent so far counts toward its game's upload as it goes.
+            if (TransferMeter.Part is { } part)
+            {
+                var length = content.Length;
+                request.ProgressChanged += sent => part((double)sent.BytesSent / length);
+            }
+
             var progress = await request.UploadAsync(ct);
             if (progress.Status != UploadStatus.Completed)
             {
@@ -102,14 +111,24 @@ public sealed class GoogleDriveClient : IDriveClient, IDisposable
         DriveErrors.RetryAsync(async () =>
         {
             destination.SetLength(0);
-            var request = _service.Files.Get(fileId);
-            request.AcknowledgeAbuse = false;
+            var request = DownloadRequest(fileId);
             var progress = await request.DownloadAsync(destination, ct);
             if (progress.Status != DownloadStatus.Completed)
             {
                 throw progress.Exception ?? new IOException("The download didn't finish.");
             }
         }, ct);
+
+    /// <summary>
+    /// R4: a file's download, never acknowledging abuse: Google refuses a file it flags as malware unless the asker says it
+    /// knows, and GameSync never does, so such a file is never downloaded.
+    /// </summary>
+    internal FilesResource.GetRequest DownloadRequest(string fileId)
+    {
+        var request = _service.Files.Get(fileId);
+        request.AcknowledgeAbuse = false;
+        return request;
+    }
 
     public Task TrashAsync(string fileId, CancellationToken ct) =>
         DriveErrors.RetryAsync(() => _service.Files.Update(new DriveFile { Trashed = true }, fileId).ExecuteAsync(ct), ct);

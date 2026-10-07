@@ -6,7 +6,7 @@
              x:DataType="vm:PlaceholderViewModel">
   <!-- A screen that has its place on the rail but isn't built yet. -->
   <DockPanel Margin="24,20">
-    <TextBlock DockPanel.Dock="Top" Text="{Binding Title}" FontSize="15" LineHeight="20" FontWeight="SemiBold" Margin="0,0,0,20" />
+    <TextBlock DockPanel.Dock="Top" Text="{Binding Title}" FontSize="{DynamicResource fs-15}" LineHeight="{DynamicResource lh-20}" FontWeight="SemiBold" Margin="0,0,0,20" />
     <c:GsCard VerticalAlignment="Top" MaxWidth="560" HorizontalAlignment="Left">
       <StackPanel Orientation="Horizontal" Spacing="16">
         <c:GsIcon Icon="{Binding Icon}" Size="28" Foreground="{DynamicResource secondary}" VerticalAlignment="Top" />

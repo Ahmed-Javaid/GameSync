@@ -407,7 +407,7 @@ public static partial class Cli
             $"from {cloud[e.Id].Newest.Device.Name}, {cloud[e.Id].Newest.CreatedUtc.ToLocalTime():yyyy-MM-dd}");
         Group("Probably online-only: only settings found, so 'confirm --all' leaves these out", found.Where(e => e.ProbablyOnlineOnly), e =>
             (e.Installed ? "" : "not installed; ") + Evidence(e));
-        Group("Installed, no saves found yet (learn mode, in Milestone 6, watches a session for them)", waiting.Where(e => e.Installed && !cloud.ContainsKey(e.Id) && !FoundAnything(e)), e =>
+        Group("Installed, no saves found yet (learn mode watches the next time each is played: gamesync learn)", waiting.Where(e => e.Installed && !cloud.ContainsKey(e.Id) && !FoundAnything(e)), e =>
             e.Engine is { } engine and not "unknown" ? engine : "");
         Group("Saves in the cloud, game not installed here", others.Where(o => !live.Any(e => e.Id == o.Id)).Select(o => new LibraryEntry { Id = o.Id, Title = o.Title }), e =>
             $"from {cloud[e.Id].Newest.Device.Name}, {cloud[e.Id].Newest.CreatedUtc.ToLocalTime():yyyy-MM-dd}; offered once it's installed");
@@ -532,6 +532,12 @@ public static partial class Cli
             Console.WriteLine($"    {Describe(key)}");
         }
 
+        if (KeptSaves.Find(entry, here.Resolver) is { } kept)
+        {
+            Console.WriteLine($"  Its save folder holds the live save, {kept.Live}, beside {KeptSaves.CopiesText(kept)} kept by hand.");
+            Console.WriteLine($"  Confirming syncs the live save alone; keep the whole folder as one save with: gamesync confirm {entry.Id} --whole");
+        }
+
         if (entry.Confirmed is { } confirmed)
         {
             Console.WriteLine("  Syncs with:");
@@ -576,6 +582,7 @@ public static partial class Cli
         var all = rest.Remove("--all");
         var mine = rest.Remove("--mine");
         var theirs = rest.Remove("--theirs");
+        var whole = rest.Remove("--whole");
         if (mine && theirs)
         {
             throw new UsageException("Choose --mine or --theirs, not both.");
@@ -610,6 +617,7 @@ public static partial class Cli
 
             LibraryEntry confirmed;
             string source;
+            GameKept? kept = null;
             (PortableRules Rules, string From)? shared = others.GetValueOrDefault(entry.Id) is { Rules: { } r } game ? (r, game.Newest.Device.Name) : null;
             if (theirs && shared is null && await service.OtherRulesAsync(entry.Id, ct) is { } other)
             {
@@ -629,8 +637,12 @@ public static partial class Cli
             }
             else if (FoundAnything(entry))
             {
-                confirmed = Library.Confirm(entry, defaults: GameDefaults.Load(here.State));
-                source = entry.Confirmed is null ? "what the scan found" : "the new places the scan found";
+                // KAN-61: a folder holding the live save beside copies kept by hand syncs the live save alone.
+                kept = whole ? null : KeptSaves.Find(entry, here.Resolver);
+                confirmed = kept is not null
+                    ? Library.ConfirmLive(entry, kept.Root, kept.Live, defaults: GameDefaults.Load(here.State), found: (kept.LiveFiles, kept.LiveBytes, kept.LiveNewestUtc))
+                    : Library.Confirm(entry, defaults: GameDefaults.Load(here.State));
+                source = kept is not null ? "its live save alone" : entry.Confirmed is null ? "what the scan found" : "the new places the scan found";
             }
             else
             {
@@ -652,6 +664,12 @@ public static partial class Cli
             foreach (var line in PortableRules.From(portable).Describe())
             {
                 Console.WriteLine($"      {line}");
+            }
+
+            if (kept is not null)
+            {
+                Console.WriteLine($"      The {KeptSaves.CopiesText(kept)} kept by hand beside it aren't part of it. Bring them in as named saves with:");
+                Console.WriteLine($"        gamesync import-saves {confirmed.Id} \"{kept.Folder}\" --root {KeptSaves.RootKey(portable, kept)} --apply");
             }
         }
 

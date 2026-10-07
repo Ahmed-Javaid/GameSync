@@ -9,8 +9,10 @@ namespace GameSync.UI.Theming;
 /// <summary>
 /// Glossy's backdrop (LOOK-17, LOOK-18): a game's art made once into a small blurred picture (the design's 64px blur over
 /// a full window, saturated a little), then darkened from top to bottom by its strength's scrim, and further on any row
-/// where the art is bright, until every text colour keeps 4.5:1, and controls 3:1, on every surface laid over it. The
-/// pixel work needs no display, so the contrast is tested over worst-case pictures.
+/// where the art is bright, until every text colour keeps 4.5:1, and controls 3:1, on every surface laid over it. In
+/// light mode (design system version 35) the scrim is light: it lightens the art, further on any row where the art is
+/// dark, until the dark text keeps its contrast. The pixel work needs no display, so the contrast is tested over
+/// worst-case pictures.
 /// </summary>
 public static class Backdrop
 {
@@ -40,9 +42,9 @@ public static class Backdrop
     public static Bitmap? Make(string artPath, GlassSurface glass, IReadOnlyDictionary<string, string> theme) =>
         Read(artPath) is { } art ? Finish(Tame(Soften(art.Pixels, art.Width, art.Height)), glass, theme) : null;
 
-    /// <summary>Softened art under its strength's scrim, darkened wherever text would lose contrast, as a bitmap.</summary>
+    /// <summary>Softened art under its strength's scrim, laid on thicker wherever text would lose contrast, as a bitmap.</summary>
     public static Bitmap Finish(double[] rgb, GlassSurface glass, IReadOnlyDictionary<string, string> theme) =>
-        ToBitmap(Bake(rgb, glass, Darkening(rgb, glass, theme)));
+        ToBitmap(Bake(rgb, glass, ScrimAlphas(rgb, glass, theme)));
 
     /// <summary>A picture's pixels as BGRA, decoded as the backdrop reads them, or null when it can't be read.</summary>
     public static (byte[] Pixels, int Width, int Height)? Pixels(string path) => Read(path);
@@ -145,10 +147,11 @@ public static class Backdrop
     }
 
     /// <summary>
-    /// The scrim's alpha for each row: the strength's stops at least, and on a row where the art is bright, just enough
-    /// more that every text colour and control on every surface keeps its contrast over every pixel of that row.
+    /// The scrim's alpha for each row: the strength's stops at least, and on a row where the art is bright (dark, in light
+    /// mode), just enough more that every text colour and control on every surface keeps its contrast over every pixel of
+    /// that row.
     /// </summary>
-    public static double[] Darkening(double[] rgb, GlassSurface glass, IReadOnlyDictionary<string, string> theme)
+    public static double[] ScrimAlphas(double[] rgb, GlassSurface glass, IReadOnlyDictionary<string, string> theme)
     {
         var scrim = Rgb.Parse(glass.Scrim);
         var checks = Checks(glass, theme);
@@ -157,8 +160,8 @@ public static class Backdrop
         for (var y = 0; y < Height; y++)
         {
             floor[y] = Floor(glass.Stops, (y + 0.5) / Height);
-            var brightest = Brightest(rgb, y);
-            if (RowPasses(rgb, brightest, scrim, floor[y], checks))
+            var firstToFail = FirstToFail(rgb, y, glass.Lightens);
+            if (RowPasses(rgb, firstToFail, scrim, floor[y], checks))
             {
                 continue;
             }
@@ -167,14 +170,14 @@ public static class Backdrop
             for (var step = 0; step < SearchSteps; step++)
             {
                 var mid = (lo + hi) / 2;
-                (lo, hi) = RowPasses(rgb, brightest, scrim, mid, checks) ? (lo, mid) : (mid, hi);
+                (lo, hi) = RowPasses(rgb, firstToFail, scrim, mid, checks) ? (lo, mid) : (mid, hi);
             }
 
             extra[y] = hi - floor[y];
         }
 
-        // Only what bright art adds is smoothed, and never below any row's need: the widest of its neighbours, then an
-        // average over fewer. Dark art keeps the design's gradient exactly.
+        // Only what bright art adds (dark art, in light mode) is smoothed, and never below any row's need: the widest of its
+        // neighbours, then an average over fewer. Dark art keeps the design's gradient exactly (bright art, in light mode).
         var widest = new double[Height];
         for (var y = 0; y < Height; y++)
         {
@@ -185,6 +188,16 @@ public static class Backdrop
         for (var y = 0; y < Height; y++)
         {
             alphas[y] = Math.Min(1, floor[y] + widest[Math.Max(0, y - 3)..Math.Min(Height, y + 4)].Average());
+
+            // Checked again as it will be baked, and covered a little more until it reads: a row the search found just at
+            // its threshold can fall a hair short once the sums round to whole channels, and one the smoothing raised can
+            // land in a dip, as a colour with channels either side of the scrim's (cyan over light mode's grey) first
+            // gets darker, then lighter, as it's covered.
+            var firstToFail = FirstToFail(rgb, y, glass.Lightens);
+            while (alphas[y] < 1 && !RowPasses(rgb, firstToFail, scrim, alphas[y], checks))
+            {
+                alphas[y] = Math.Min(1, alphas[y] + 1.0 / 1024);
+            }
         }
 
         return alphas;
@@ -263,16 +276,20 @@ public static class Backdrop
     }
 
     /// <summary>
-    /// The pixels of row <paramref name="y"/> that can fail first, as offsets into <paramref name="rgb"/>. Every text colour
-    /// is lighter than anything the scrim leaves, so it only loses contrast as what's under it gets brighter; a pixel no
-    /// brighter than another in any channel stays readable whenever that one is, and isn't checked.
+    /// The pixels of row <paramref name="y"/> that can fail first, as offsets into <paramref name="rgb"/>. In dark mode every
+    /// text colour is lighter than anything the scrim leaves, so it only loses contrast as what's under it gets brighter: a
+    /// pixel no brighter than another in any channel stays readable whenever that one is, and isn't checked. In light mode
+    /// (<paramref name="lightens"/>) the text is darker than the scrim, so it's the darkest pixels that fail first.
     /// </summary>
-    private static List<int> Brightest(double[] rgb, int y)
+    private static List<int> FirstToFail(double[] rgb, int y, bool lightens)
     {
         var kept = new List<int>();
-        foreach (var i in Enumerable.Range(y * Width, Width).Select(p => p * 3).OrderByDescending(i => rgb[i] + rgb[i + 1] + rgb[i + 2]))
+        var pixels = Enumerable.Range(y * Width, Width).Select(p => p * 3);
+        foreach (var i in lightens ? pixels.OrderBy(i => rgb[i] + rgb[i + 1] + rgb[i + 2]) : pixels.OrderByDescending(i => rgb[i] + rgb[i + 1] + rgb[i + 2]))
         {
-            if (!kept.Exists(k => rgb[k] >= rgb[i] && rgb[k + 1] >= rgb[i + 1] && rgb[k + 2] >= rgb[i + 2]))
+            if (!kept.Exists(k => lightens
+                    ? rgb[k] <= rgb[i] && rgb[k + 1] <= rgb[i + 1] && rgb[k + 2] <= rgb[i + 2]
+                    : rgb[k] >= rgb[i] && rgb[k + 1] >= rgb[i + 1] && rgb[k + 2] >= rgb[i + 2]))
             {
                 kept.Add(i);
             }

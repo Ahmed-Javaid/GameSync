@@ -36,9 +36,11 @@ public enum GlassStrength
 
 /// <summary>
 /// A Glossy page: the tokens laid over the theme's, and its backdrop: the base colour, then the art, then the scrim
-/// colour at alpha stops (position from top to bottom, 0 to 1). The app darkens bright art further (LOOK-18).
+/// colour at alpha stops (position from top to bottom, 0 to 1). The app darkens bright art further (LOOK-18); in light
+/// mode (<see cref="Lightens"/>) the scrim is light and the app lightens dark art further instead.
 /// </summary>
-public sealed record GlassSurface(IReadOnlyDictionary<string, string> Tokens, string Base, string Scrim, IReadOnlyList<(double At, double Alpha)> Stops);
+public sealed record GlassSurface(IReadOnlyDictionary<string, string> Tokens, string Base, string Scrim, IReadOnlyList<(double At, double Alpha)> Stops,
+    bool Lightens = false);
 
 /// <summary>A preset: its primary and secondary swatches and its surface tint (hue, saturation); the Windows accent preset has none of these.</summary>
 public sealed record ThemePreset(string Id, string Name, string? Primary, string? Secondary, (double Hue, double Saturation)? Tint, string Note)
@@ -98,6 +100,9 @@ public static class ThemeEngine
     {
         ["on-art"] = "#f5f7f9", ["art-scrim"] = "rgba(5, 6, 8, 0.72)", ["glass"] = "rgba(12, 14, 17, 0.58)",
         ["glass-edge"] = "rgba(255, 255, 255, 0.16)",
+        // The achievements' metals (design system version 33): fixed in every theme, like status colours.
+        ["bronze"] = "#d7955c", ["bronze-deep"] = "#8a5530", ["silver"] = "#e3e8ee", ["silver-deep"] = "#8d99a6", ["gold"] = "#ffd76e", ["gold-deep"] = "#c08a2a",
+        ["platinum"] = "#eef7ff", ["platinum-deep"] = "#9bb6cd", ["on-metal"] = "#1b2129",
     };
 
     public static ThemePreset Preset(string id) => Presets.FirstOrDefault(p => p.Id == id) ?? Presets[0];
@@ -146,13 +151,15 @@ public static class ThemeEngine
         }
         else
         {
+            // Light mode, redone in design system version 35 (the owner, 3 Oct 2026: "it just looks white"): the page a clear
+            // cool grey, cards white with a hairline edge and a soft lift, console panes a near-white step between them.
             var tl = Math.Min(ts * 1.6, 28);
-            v["bg-000"] = Hsl(th, tl, 92.6);
-            v["bg-100"] = Hsl(th, tl, 95.6);
-            v["bg-200"] = Hsl(th, tl * 0.6, 99.6);
-            v["bg-300"] = Hsl(th, tl, 91.8);
-            v["bg-400"] = Hsl(th, tl * 0.9, 86.8);
-            v["line-100"] = Hsl(th, tl, 87.5);
+            v["bg-000"] = Hsl(th, tl * 0.7, 97.2);
+            v["bg-100"] = Hsl(th, tl, 91.2);
+            v["bg-200"] = Hsl(th, tl * 0.4, 99.7);
+            v["bg-300"] = Hsl(th, tl, 94.4);
+            v["bg-400"] = Hsl(th, tl * 0.9, 87.8);
+            v["line-100"] = Hsl(th, tl, 88.4);
             v["primary"] = Reach(LightStart(seedPrimary), [v["bg-300"], v["bg-000"], v["bg-100"]], 4.6, up: false);
             var lp = ToHsl(v["primary"]);
             v["primary-strong"] = Hsl(lp.H, lp.S, Math.Max(lp.L - 7, 6));
@@ -172,14 +179,26 @@ public static class ThemeEngine
             v["shadow-dialog"] = "0 24px 64px rgba(16, 24, 40, 0.18)";
         }
 
-        // The surfaces Glossy makes see-through (Glass below). Solid has no edges, lift or ring: its surfaces are the plain
-        // ones, and its edges are clear, so a hovered control shows no ring (the background runs under the border).
+        // The surfaces Glossy makes see-through (Glass below). Dark Solid has no edges, lift or ring: its surfaces are the plain
+        // ones and its edges clear. Light Solid gives cards, consoles, wells, dialogs and art a hairline in the theme's deep
+        // ink and cards a soft lift, as a white card on a light page needs them (version 35). A control's edge stays clear in
+        // both, so a hovered control shows no ring (the background runs under the border).
         foreach (var edge in (string[])["edge-card", "edge-control", "edge-console", "edge-well", "edge-dialog", "edge-art"])
         {
             v[edge] = Rgba("#000000", 0);
         }
 
         v["lift-card"] = "none";
+        if (light)
+        {
+            var deep = DeepInk(th, ts);
+            v["edge-card"] = Rgba(deep, 0.1);
+            v["edge-console"] = Rgba(deep, 0.08);
+            v["edge-well"] = Rgba(deep, 0.06);
+            v["edge-dialog"] = Rgba(deep, 0.1);
+            v["edge-art"] = Rgba(deep, 0.12);
+            v["lift-card"] = "0 1px 3px " + Rgba(deep, 0.08);
+        }
         v["surface-dialog"] = v["bg-200"];
         v["surface-well"] = v["bg-300"];
         v["surface-field"] = v["bg-200"];
@@ -194,17 +213,24 @@ public static class ThemeEngine
 
         v["neutral-art"] = light ? v["bg-300"] : Rgba(Hsl(th, ts, 10), 0.88);
         Add(v, Fixed);
+
+        // Zenith's word on a page: since design system version 49 the Zenith's gold running to red (version 35's was
+        // platinum); in light a deep gold to the Zenith's red, each 4.5:1 or better on light cards.
+        v["zenith-ink"] = light ? "#8f6214" : "#ffd76e";
+        v["zenith-ink-deep"] = light ? "#a51d32" : "#ef6a5a";
         return v;
     }
 
     /// <summary>
     /// Glossy (LOOK-17, LOOK-18; <c>GameSync.theme.glass()</c> in the design system): what a page's surfaces become so a
-    /// blurred, darkened copy of a game's art shows through, in three strengths, with the backdrop's base colour, scrim
-    /// colour and alpha stops from top to bottom. Null in light mode and with pure black: the page stays Solid.
+    /// blurred copy of a game's art shows through, in three strengths, with the backdrop's base colour, scrim colour and
+    /// alpha stops from top to bottom. Dark mode darkens the art; light mode (design system version 35) frosts it white,
+    /// its scrim lightening the art. Null with pure black in dark mode: the page stays Solid.
     /// </summary>
     public static GlassSurface? Glass(ThemeChoice choice, GlassStrength strength)
     {
-        if (choice.Mode == ThemeMode.Light || choice.PureBlack)
+        var light = choice.Mode == ThemeMode.Light;
+        if (!light && choice.PureBlack)
         {
             return null;
         }
@@ -215,6 +241,48 @@ public static class ThemeEngine
         var ts = preset.Tint?.Saturation ?? 10;
         var v = Build(choice);
         static string White(double a) => Rgba("#ffffff", a);
+
+        if (light)
+        {
+            // Frosted white over the art (the owner, 3 Oct 2026: "there isn't even any difference in glossy/solid in light
+            // mode"). Status chips keep their opaque light grounds: see-through, Needs-you amber can't keep 4.5:1 over
+            // every art.
+            var tl = Math.Min(ts * 1.6, 28);
+            var deep = DeepInk(th, ts);
+            string Shade(double a) => Rgba(deep, a);
+            if (strength == GlassStrength.Glow)
+            {
+                return new GlassSurface(
+                    new Dictionary<string, string>
+                    {
+                        ["bg-000"] = Rgba(v["bg-000"], 0.9), ["bg-100"] = Rgba(v["bg-100"], 0.55), ["bg-200"] = Rgba(v["bg-200"], 0.86),
+                        ["bg-300"] = Shade(0.05), ["bg-400"] = Shade(0.1), ["line-100"] = Shade(0.09), ["secondary-soft"] = Rgba(v["secondary"], 0.14),
+                        ["edge-card"] = White(0.7), ["edge-control"] = Shade(0.06), ["edge-console"] = White(0.6),
+                        ["edge-well"] = Shade(0.05), ["edge-dialog"] = White(0.8), ["edge-art"] = Shade(0.1),
+                        ["lift-card"] = "0 2px 10px " + Shade(0.06), ["surface-dialog"] = Rgba(v["bg-200"], 0.97),
+                        ["surface-well"] = Shade(0.05), ["surface-field"] = White(0.8), ["dot-ring"] = Rgba(v["bg-100"], 0.95),
+                    },
+                    v["bg-100"], v["bg-100"], [(0, 0.6), (0.36, 0.86), (0.6, 0.94), (1, 0.96)], Lightens: true);
+            }
+
+            var homeLight = strength == GlassStrength.Home;
+            return new GlassSurface(
+                new Dictionary<string, string>
+                {
+                    ["bg-000"] = White(0.5),
+                    ["bg-100"] = homeLight ? Rgba(v["bg-100"], 0.35) : White(0.12),
+                    ["bg-200"] = homeLight ? White(0.72) : White(0.6),
+                    ["bg-300"] = Shade(0.05), ["bg-400"] = Shade(0.1), ["line-100"] = Shade(0.09), ["secondary-soft"] = Rgba(v["secondary"], 0.14),
+                    ["edge-card"] = White(0.65), ["edge-control"] = Shade(0.07), ["edge-console"] = White(0.55),
+                    ["edge-well"] = Shade(0.06), ["edge-dialog"] = White(0.8), ["edge-art"] = Shade(0.12),
+                    ["lift-card"] = "0 2px 12px " + Shade(0.07), ["surface-dialog"] = Rgba(v["bg-200"], 0.96),
+                    ["surface-well"] = Shade(0.05), ["surface-field"] = White(0.7), ["dot-ring"] = Rgba(v["bg-100"], 0.95),
+                },
+                v["bg-100"],
+                Hsl(th, tl, 94),
+                homeLight ? [(0, 0.52), (0.4, 0.74), (0.68, 0.84), (1, 0.88)] : [(0, 0.46), (0.4, 0.68), (1, 0.82)],
+                Lightens: true);
+        }
 
         if (strength == GlassStrength.Glow)
         {
@@ -283,6 +351,9 @@ public static class ThemeEngine
     }
 
     private static string? HexOf(string? value) => value is null ? null : Swatch(value)?.Hex ?? value;
+
+    /// <summary>Light mode's edges and lifts: the theme's tint, deep, at a saturation that stays neutral for Mono.</summary>
+    private static string DeepInk(double hue, double tintSaturation) => Hsl(hue, Math.Min(30, tintSaturation * 2.5), 14);
 
     private static void Add(Dictionary<string, string> target, Dictionary<string, string> source)
     {

@@ -67,6 +67,9 @@ public class GsGameTile : Button
     public static readonly DirectProperty<GsGameTile, bool> ShowsMarkProperty =
         AvaloniaProperty.RegisterDirect<GsGameTile, bool>(nameof(ShowsMark), t => t.ShowsMark);
 
+    public static readonly DirectProperty<GsGameTile, string> MarkIconProperty =
+        AvaloniaProperty.RegisterDirect<GsGameTile, string>(nameof(MarkIcon), t => t.MarkIcon);
+
     public static readonly DirectProperty<GsGameTile, string> InitialProperty =
         AvaloniaProperty.RegisterDirect<GsGameTile, string>(nameof(Initial), t => t.Initial);
 
@@ -76,6 +79,7 @@ public class GsGameTile : Button
     private string _initial = "?";
     private bool _showsStatus;
     private bool _showsMark;
+    private string _markIcon = "cloudCheck";
 
     public string? Title
     {
@@ -87,6 +91,81 @@ public class GsGameTile : Button
     {
         get => GetValue(ArtProperty);
         set => SetValue(ArtProperty, value);
+    }
+
+    /// <summary>The mark's icon: a cloud with a check for Synced, a shield with a check for backed up (design system version 35).</summary>
+    public string MarkIcon
+    {
+        get => _markIcon;
+        private set => SetAndRaise(MarkIconProperty, ref _markIcon, value);
+    }
+
+    /// <summary>A cloud with a check for Synced, in the cloud and on your PCs; a shield with a check for a game kept safe but not synced by GameSync.</summary>
+    public static string MarkIconOf(GameStatus? status) => status == GameStatus.BackupOnly ? "shield" : "cloudCheck";
+
+    public static readonly StyledProperty<int> AchievementsDoneProperty = AvaloniaProperty.Register<GsGameTile, int>(nameof(AchievementsDone));
+
+    public static readonly StyledProperty<int> AchievementsTotalProperty = AvaloniaProperty.Register<GsGameTile, int>(nameof(AchievementsTotal));
+
+    public static readonly DirectProperty<GsGameTile, bool> ShowsAchievementsRingProperty =
+        AvaloniaProperty.RegisterDirect<GsGameTile, bool>(nameof(ShowsAchievementsRing), t => t.ShowsAchievementsRing);
+
+    public static readonly DirectProperty<GsGameTile, bool> ShowsAchievementsMedalProperty =
+        AvaloniaProperty.RegisterDirect<GsGameTile, bool>(nameof(ShowsAchievementsMedal), t => t.ShowsAchievementsMedal);
+
+    public static readonly DirectProperty<GsGameTile, double> AchievementsPercentProperty =
+        AvaloniaProperty.RegisterDirect<GsGameTile, double>(nameof(AchievementsPercent), t => t.AchievementsPercent);
+
+    public static readonly DirectProperty<GsGameTile, string?> AchievementsWordsProperty =
+        AvaloniaProperty.RegisterDirect<GsGameTile, string?>(nameof(AchievementsWords), t => t.AchievementsWords);
+
+    private bool _showsAchievementsRing;
+    private bool _showsAchievementsMedal;
+    private double _achievementsPercent;
+    private string? _achievementsWords;
+
+    /// <summary>
+    /// ACH-02 (design system version 39): how many of the game's achievements are unlocked, and of how many, as Steam on this
+    /// PC keeps them; a small ring at the cover's bottom right once one is, the Zenith medal once every one is.
+    /// </summary>
+    public int AchievementsDone
+    {
+        get => GetValue(AchievementsDoneProperty);
+        set => SetValue(AchievementsDoneProperty, value);
+    }
+
+    public int AchievementsTotal
+    {
+        get => GetValue(AchievementsTotalProperty);
+        set => SetValue(AchievementsTotalProperty, value);
+    }
+
+    /// <summary>The ring: some unlocked, not every one.</summary>
+    public bool ShowsAchievementsRing
+    {
+        get => _showsAchievementsRing;
+        private set => SetAndRaise(ShowsAchievementsRingProperty, ref _showsAchievementsRing, value);
+    }
+
+    /// <summary>The Zenith medal: every one unlocked.</summary>
+    public bool ShowsAchievementsMedal
+    {
+        get => _showsAchievementsMedal;
+        private set => SetAndRaise(ShowsAchievementsMedalProperty, ref _showsAchievementsMedal, value);
+    }
+
+    /// <summary>The share unlocked, 0 to 100, rounded down so it's never full before every one is.</summary>
+    public double AchievementsPercent
+    {
+        get => _achievementsPercent;
+        private set => SetAndRaise(AchievementsPercentProperty, ref _achievementsPercent, value);
+    }
+
+    /// <summary>"Achievements: 71% · 123 of 171", or "Zenith: every achievement, 12 of 12"; in the tooltip and for screen readers.</summary>
+    public string? AchievementsWords
+    {
+        get => _achievementsWords;
+        private set => SetAndRaise(AchievementsWordsProperty, ref _achievementsWords, value);
     }
 
     public GameStatus? Status
@@ -149,13 +228,29 @@ public class GsGameTile : Button
             // Games whose saves are fine get the small mark, games not syncing yet nothing, so the problems stand out.
             ShowsMark = MarkLabel is not null && Status is GameStatus.Synced or GameStatus.BackupOnly;
             ShowsStatus = Status is { } s && s != GameStatus.Synced && !ShowsMark;
+            MarkIcon = MarkIconOf(Status);
         }
 
-        if (change.Property == TitleProperty || change.Property == StatusProperty || change.Property == StatusLabelProperty || change.Property == MarkLabelProperty)
+        if (change.Property == AchievementsDoneProperty || change.Property == AchievementsTotalProperty)
         {
-            // What a screen reader says: the name, and the badge's or the mark's words (A11Y-03).
+            var (done, total) = (AchievementsDone, AchievementsTotal);
+            var started = total > 0 && done > 0;
+            ShowsAchievementsMedal = started && done >= total;
+            ShowsAchievementsRing = started && done < total;
+            AchievementsPercent = total > 0 ? Math.Floor(100.0 * Math.Min(done, total) / total) : 0;
+            string Count(int n) => n.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            AchievementsWords = !started ? null
+                : ShowsAchievementsMedal ? $"Zenith: every achievement, {Count(total)} of {Count(total)}"
+                : $"Achievements: {Count((int)AchievementsPercent)}% · {Count(done)} of {Count(total)}";
+        }
+
+        if (change.Property == TitleProperty || change.Property == StatusProperty || change.Property == StatusLabelProperty || change.Property == MarkLabelProperty ||
+            change.Property == AchievementsDoneProperty || change.Property == AchievementsTotalProperty)
+        {
+            // What a screen reader says: the name, the badge's or the mark's words (A11Y-03), and how far its achievements are.
             var words = ShowsStatus ? StatusLabel ?? GsStatusBadge.Describe(Status).Word : ShowsMark ? MarkLabel : null;
-            Avalonia.Automation.AutomationProperties.SetName(this, words is null ? Title : $"{Title}, {words}");
+            var name = words is null ? Title : $"{Title}, {words}";
+            Avalonia.Automation.AutomationProperties.SetName(this, AchievementsWords is { } achieved ? $"{name}, {achieved}" : name);
         }
         else if (change.Property == ArtProperty)
         {
@@ -190,16 +285,27 @@ public class GsGameRow : Button
     public static readonly DirectProperty<GsGameRow, bool> ShowsMarkProperty =
         AvaloniaProperty.RegisterDirect<GsGameRow, bool>(nameof(ShowsMark), r => r.ShowsMark);
 
+    public static readonly DirectProperty<GsGameRow, string> MarkIconProperty =
+        AvaloniaProperty.RegisterDirect<GsGameRow, string>(nameof(MarkIcon), r => r.MarkIcon);
+
     public static readonly DirectProperty<GsGameRow, string> InitialProperty =
         AvaloniaProperty.RegisterDirect<GsGameRow, string>(nameof(Initial), r => r.Initial);
 
     private string _initial = "?";
     private bool _showsMark;
+    private string _markIcon = "cloudCheck";
 
     public string? Title
     {
         get => GetValue(TitleProperty);
         set => SetValue(TitleProperty, value);
+    }
+
+    /// <summary>The mark's icon, as the covers have it: a cloud with a check, or a shield with a check.</summary>
+    public string MarkIcon
+    {
+        get => _markIcon;
+        private set => SetAndRaise(MarkIconProperty, ref _markIcon, value);
     }
 
     public IImage? Art
@@ -273,6 +379,10 @@ public class GsGameRow : Button
         else if (change.Property == MarkLabelProperty || change.Property == ShowsStatusProperty)
         {
             ShowsMark = MarkLabel is not null && !ShowsStatus;
+        }
+        else if (change.Property == StatusProperty)
+        {
+            MarkIcon = GsGameTile.MarkIconOf(Status);
         }
         else if (change.Property == IsInstalledProperty)
         {
@@ -554,6 +664,59 @@ public class GsHeroBanner : TemplatedControl
 
     public static readonly StyledProperty<bool> ShowsPlayProperty = AvaloniaProperty.Register<GsHeroBanner, bool>(nameof(ShowsPlay), true);
 
+    public static readonly StyledProperty<bool> IsStartingProperty = AvaloniaProperty.Register<GsHeroBanner, bool>(nameof(IsStarting));
+
+    public static readonly StyledProperty<ICommand?> OpenCommandProperty = AvaloniaProperty.Register<GsHeroBanner, ICommand?>(nameof(OpenCommand));
+
+    public static readonly StyledProperty<ICommand?> NextCommandProperty = AvaloniaProperty.Register<GsHeroBanner, ICommand?>(nameof(NextCommand));
+
+    public static readonly StyledProperty<ICommand?> PreviousCommandProperty = AvaloniaProperty.Register<GsHeroBanner, ICommand?>(nameof(PreviousCommand));
+
+    public static readonly StyledProperty<object?> PagerProperty = AvaloniaProperty.Register<GsHeroBanner, object?>(nameof(Pager));
+
+    /// <summary>
+    /// KAN-126 (the owner: "if a user clicks on the hero card, shouldn't they be taken to that games page?"): a click on the
+    /// banner, anywhere but its buttons, or Enter while it has focus, runs this; Home opens the game's page.
+    /// </summary>
+    public ICommand? OpenCommand
+    {
+        get => GetValue(OpenCommandProperty);
+        set => SetValue(OpenCommandProperty, value);
+    }
+
+    /// <summary>KAN-125: the next game, from the mouse wheel over the banner, a swipe, or Right while it has focus.</summary>
+    public ICommand? NextCommand
+    {
+        get => GetValue(NextCommandProperty);
+        set => SetValue(NextCommandProperty, value);
+    }
+
+    /// <summary>KAN-125: the game before, the other way.</summary>
+    public ICommand? PreviousCommand
+    {
+        get => GetValue(PreviousCommandProperty);
+        set => SetValue(PreviousCommandProperty, value);
+    }
+
+    /// <summary>KAN-125: what sits at the banner's top right; Home's pager between the games it can show.</summary>
+    public object? Pager
+    {
+        get => GetValue(PagerProperty);
+        set => SetValue(PagerProperty, value);
+    }
+
+    /// <summary>A wheel's notches this close together move one game, not one each.</summary>
+    private static readonly TimeSpan WheelPause = TimeSpan.FromMilliseconds(350);
+
+    private DateTime _wheeledAt;
+
+    /// <summary>KAN-80: Play was pressed and the game isn't running yet: Play says Starting….</summary>
+    public bool IsStarting
+    {
+        get => GetValue(IsStartingProperty);
+        set => SetValue(IsStartingProperty, value);
+    }
+
     public static readonly StyledProperty<string> PlayIconProperty = AvaloniaProperty.Register<GsHeroBanner, string>(nameof(PlayIcon), "play");
 
     public static readonly StyledProperty<double> RoomyHeightProperty = AvaloniaProperty.Register<GsHeroBanner, double>(nameof(RoomyHeight), RoomyAt);
@@ -802,6 +965,87 @@ public class GsHeroBanner : TemplatedControl
         {
             Avalonia.Automation.AutomationProperties.SetName(this, Title);
         }
+        else if (change.Property == OpenCommandProperty)
+        {
+            PseudoClasses.Set(":openable", OpenCommand is not null);
+            Focusable = OpenCommand is not null;
+        }
+    }
+
+    // KAN-126: a click on the banner opens its game's page, unless it's on one of the banner's buttons, or the pager.
+    protected override void OnPointerReleased(Avalonia.Input.PointerReleasedEventArgs e)
+    {
+        base.OnPointerReleased(e);
+        if (e.Handled || e.InitialPressMouseButton != Avalonia.Input.MouseButton.Left || OpenCommand is not { } open || OnAButton(e.Source))
+        {
+            return;
+        }
+
+        var point = e.GetPosition(this);
+        if (new Rect(Bounds.Size).Contains(point) && open.CanExecute(null))
+        {
+            open.Execute(null);
+            e.Handled = true;
+        }
+    }
+
+    // KAN-125: the wheel or a two-finger swipe over the banner moves between the games; Home doesn't scroll, so nothing else wants it.
+    protected override void OnPointerWheelChanged(Avalonia.Input.PointerWheelEventArgs e)
+    {
+        base.OnPointerWheelChanged(e);
+        var delta = Math.Abs(e.Delta.X) > Math.Abs(e.Delta.Y) ? -e.Delta.X : e.Delta.Y;
+        var command = delta < 0 ? NextCommand : delta > 0 ? PreviousCommand : null;
+        if (command is null || e.Handled)
+        {
+            return;
+        }
+
+        e.Handled = true;
+        if (DateTime.UtcNow - _wheeledAt < WheelPause)
+        {
+            return;
+        }
+
+        _wheeledAt = DateTime.UtcNow;
+        if (command.CanExecute(null))
+        {
+            command.Execute(null);
+        }
+    }
+
+    protected override void OnKeyDown(Avalonia.Input.KeyEventArgs e)
+    {
+        base.OnKeyDown(e);
+        if (e.Handled || e.Source != this)
+        {
+            return;
+        }
+
+        var command = e.Key switch
+        {
+            Avalonia.Input.Key.Enter or Avalonia.Input.Key.Space => OpenCommand,
+            Avalonia.Input.Key.Right => NextCommand,
+            Avalonia.Input.Key.Left => PreviousCommand,
+            _ => null,
+        };
+        if (command?.CanExecute(null) == true)
+        {
+            command.Execute(null);
+            e.Handled = true;
+        }
+    }
+
+    private bool OnAButton(object? source)
+    {
+        for (var visual = source as Visual; visual is not null && visual != this; visual = Avalonia.VisualTree.VisualExtensions.GetVisualParent(visual))
+        {
+            if (visual is Button or Avalonia.Controls.Primitives.ToggleButton)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 }
 

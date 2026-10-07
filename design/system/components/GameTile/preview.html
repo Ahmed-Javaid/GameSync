@@ -1,4 +1,4 @@
-<!-- @dsCard group="Launcher" height=330 -->
+<!-- @dsCard group="Launcher" height=330 subtitle="A cover: a cloud with a check when Synced, a shield with a check when backed up, a badge when it needs you" -->
 <!doctype html>
 <html lang="en">
 <head><meta charset="utf-8"><title>preview</title>
@@ -28,7 +28,7 @@ var IMPORT_ITEMS = [
   {id:'mystery', name:'Unknown game (a friend’s custom entry)', art:null, match:'unknown', versions:1, size:524288}
 ];
 
-ReactDOM.createRoot(document.getElementById('root')).render(h('div',{className:'gs-row',style:{alignItems:'flex-start',gap:16}},GAMES.slice(0,4).map(function(g){return h(G.GameTile,{key:g.id,name:g.name,art:g.art,status:g.status,meta:g.play+' · '+g.last,width:150})}).concat([h(G.GameTile,{key:'fnf',name:'Friday Night Funkin’',status:'synced',meta:'No art found',width:150})])));
+ReactDOM.createRoot(document.getElementById('root')).render(h('div',{className:'gs-row',style:{alignItems:'flex-start',gap:16}},[GAMES[1],GAMES[5],GAMES[0],GAMES[2],GAMES[3]].map(function(g){return h(G.GameTile,{key:g.id,name:g.name,art:g.art,status:g.status,statusLabel:g.id==='ds3'?'Synced by Steam':undefined,meta:g.play+' · '+g.last,width:150})}).concat([h(G.GameTile,{key:'fnf',name:'Friday Night Funkin’',status:'synced',meta:'No art found',width:150})])));
 </script>
 </body>
 </html>

@@ -128,9 +128,11 @@ public static partial class OwnGames
         }
 
         engine.Library.SaveAll([entry]);
-        if (game.Program is { Length: > 0 } chosen)
+        // R15: a game with an anti-cheat starts only through its anti-cheat's own launcher, never the program picked; the
+        // program still says when its folder syncs.
+        if (game.Program is { Length: > 0 } chosen && (!entry.HasAntiCheat || GameLaunch.IsAntiCheatLauncher(chosen)))
         {
-            GameLaunch.SetProgram(engine.State, entry.Id, System.IO.Path.GetFullPath(chosen));
+            GameLaunch.SetProgram(engine.State, entry.Id, System.IO.Path.GetFullPath(chosen), entry.HasAntiCheat);
         }
 
         var when = programFolder is null ? "once its folder has been quiet for 5 minutes" : $"when {System.IO.Path.GetFileName(game.Program)} closes";

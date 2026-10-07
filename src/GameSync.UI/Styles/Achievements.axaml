@@ -1,0 +1,648 @@
+<!-- Achievements (design system version 33): the metals, the progress ring, badges in their metals, tier chips, the Zenith
+     medal, a game's overview, the spotlight and the list's rows (design/system/components/bundle.css → Achievements). The
+     metals are fixed in every theme, as their tokens are (bronze, silver, gold, platinum and their -deep); AchievementsTests
+     keeps these brushes in step with the theme engine's. -->
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:c="using:GameSync.UI.Controls">
+
+  <!-- Zenith's word on a page (tokens zenith-ink and zenith-ink-deep): since design system version 49 the Zenith's gold
+       running to red (platinum before); in light a deep gold to the Zenith's red, each 4.5:1 or better on light cards -->
+  <ResourceDictionary.ThemeDictionaries>
+    <ResourceDictionary x:Key="Dark">
+      <LinearGradientBrush x:Key="zenith-ink-text" StartPoint="0%,50%" EndPoint="100%,50%">
+        <GradientStop Color="#ffd76e" Offset="0" />
+        <GradientStop Color="#ef6a5a" Offset="1" />
+      </LinearGradientBrush>
+    </ResourceDictionary>
+    <ResourceDictionary x:Key="Light">
+      <LinearGradientBrush x:Key="zenith-ink-text" StartPoint="0%,50%" EndPoint="100%,50%">
+        <GradientStop Color="#8f6214" Offset="0" />
+        <GradientStop Color="#a51d32" Offset="1" />
+      </LinearGradientBrush>
+    </ResourceDictionary>
+  </ResourceDictionary.ThemeDictionaries>
+
+  <!-- A game's 100% since version 49 (the owner, 5 Oct 2026: "gold and red seems good"): the ring gold at the top running to
+       deep red at the bottom and back -->
+  <ConicGradientBrush x:Key="zenith-ring" Center="50%,50%" Angle="0">
+    <GradientStop Color="#ffe7a3" Offset="0" />
+    <GradientStop Color="#f0c35a" Offset="0.14" />
+    <GradientStop Color="#d4553f" Offset="0.32" />
+    <GradientStop Color="#a51d32" Offset="0.46" />
+    <GradientStop Color="#7e1023" Offset="0.54" />
+    <GradientStop Color="#a51d32" Offset="0.62" />
+    <GradientStop Color="#d4553f" Offset="0.76" />
+    <GradientStop Color="#f0c35a" Offset="0.9" />
+    <GradientStop Color="#ffe7a3" Offset="1" />
+  </ConicGradientBrush>
+  <!-- The Zenith's dot (version 52; the owner, 7 Oct 2026: "have dot version for zenith, not the flag. Use a red orange
+       gradient, similar to the text color right now"): orange running to red, as Zenith's word does, fixed in every theme
+       like the metals; version 49's was gold with red in the middle -->
+  <LinearGradientBrush x:Key="zenith-dot" StartPoint="0%,0%" EndPoint="100%,100%">
+    <GradientStop Color="#ffb54b" Offset="0" />
+    <GradientStop Color="#e0483a" Offset="1" />
+  </LinearGradientBrush>
+  <!-- "Zenith reached" over the popup's dark glass: gold running to red -->
+  <LinearGradientBrush x:Key="zenith-popup-text" StartPoint="0%,50%" EndPoint="100%,50%">
+    <GradientStop Color="#ffe39a" Offset="0" />
+    <GradientStop Color="#f0c35a" Offset="0.4" />
+    <GradientStop Color="#ef6a5a" Offset="1" />
+  </LinearGradientBrush>
+  <!-- The warm glow under an earned Zenith medal, its banner -->
+  <RadialGradientBrush x:Key="glow-zenith-banner" Center="50%,55%" GradientOrigin="50%,55%" RadiusX="50%" RadiusY="50%">
+    <GradientStop Color="#5AF0C35A" Offset="0" />
+    <GradientStop Color="#00F0C35A" Offset="0.7" />
+  </RadialGradientBrush>
+
+  <LinearGradientBrush x:Key="metal-bronze" StartPoint="0%,0%" EndPoint="100%,100%">
+    <GradientStop Color="#d7955c" Offset="0" />
+    <GradientStop Color="#8a5530" Offset="1" />
+  </LinearGradientBrush>
+  <LinearGradientBrush x:Key="metal-silver" StartPoint="0%,0%" EndPoint="100%,100%">
+    <GradientStop Color="#e3e8ee" Offset="0" />
+    <GradientStop Color="#8d99a6" Offset="1" />
+  </LinearGradientBrush>
+  <LinearGradientBrush x:Key="metal-gold" StartPoint="0%,0%" EndPoint="100%,100%">
+    <GradientStop Color="#ffd76e" Offset="0" />
+    <GradientStop Color="#c08a2a" Offset="1" />
+  </LinearGradientBrush>
+  <LinearGradientBrush x:Key="metal-platinum" StartPoint="0%,0%" EndPoint="100%,100%">
+    <GradientStop Color="#eef7ff" Offset="0" />
+    <GradientStop Color="#9bb6cd" Offset="1" />
+  </LinearGradientBrush>
+  <!-- Zenith's word in the popup, always over dark glass: the metal across the text, left to right -->
+  <LinearGradientBrush x:Key="metal-platinum-text" StartPoint="0%,50%" EndPoint="100%,50%">
+    <GradientStop Color="#eef7ff" Offset="0" />
+    <GradientStop Color="#9bb6cd" Offset="1" />
+  </LinearGradientBrush>
+  <!-- The Zenith medal's disc: a highlight up and to the left, falling off to the metal's deep edge -->
+  <RadialGradientBrush x:Key="metal-platinum-disc" GradientOrigin="30%,24%" Center="30%,24%" RadiusX="110%" RadiusY="110%">
+    <GradientStop Color="#ffffff" Offset="0" />
+    <GradientStop Color="#eef7ff" Offset="0.22" />
+    <GradientStop Color="#9bb6cd" Offset="0.72" />
+    <GradientStop Color="#6f8499" Offset="1" />
+  </RadialGradientBrush>
+  <!-- The sheen that crosses an earned medal, slanted as light on metal is -->
+  <LinearGradientBrush x:Key="metal-sheen" StartPoint="0%,15%" EndPoint="100%,85%">
+    <GradientStop Color="#00FFFFFF" Offset="0.38" />
+    <GradientStop Color="#B3FFFFFF" Offset="0.5" />
+    <GradientStop Color="#00FFFFFF" Offset="0.62" />
+  </LinearGradientBrush>
+  <!-- The glow behind an achievement in its own light, in its metal; a neutral one while its rarity isn't known -->
+  <RadialGradientBrush x:Key="glow-gold" Center="50%,50%" GradientOrigin="50%,50%" RadiusX="50%" RadiusY="50%">
+    <GradientStop Color="#59ffd76e" Offset="0" />
+    <GradientStop Color="#00ffd76e" Offset="0.7" />
+  </RadialGradientBrush>
+  <RadialGradientBrush x:Key="glow-silver" Center="50%,50%" GradientOrigin="50%,50%" RadiusX="50%" RadiusY="50%">
+    <GradientStop Color="#38e3e8ee" Offset="0" />
+    <GradientStop Color="#00e3e8ee" Offset="0.7" />
+  </RadialGradientBrush>
+  <RadialGradientBrush x:Key="glow-bronze" Center="50%,50%" GradientOrigin="50%,50%" RadiusX="50%" RadiusY="50%">
+    <GradientStop Color="#47d7955c" Offset="0" />
+    <GradientStop Color="#00d7955c" Offset="0.7" />
+  </RadialGradientBrush>
+  <!-- The Achievements page's band: platinum's light from the top right -->
+  <RadialGradientBrush x:Key="glow-platinum" Center="50%,50%" GradientOrigin="50%,50%" RadiusX="50%" RadiusY="50%">
+    <GradientStop Color="#1AEEF7FF" Offset="0" />
+    <GradientStop Color="#00EEF7FF" Offset="0.92" />
+  </RadialGradientBrush>
+  <RadialGradientBrush x:Key="glow-none" Center="50%,50%" GradientOrigin="50%,50%" RadiusX="50%" RadiusY="50%">
+    <GradientStop Color="#24FFFFFF" Offset="0" />
+    <GradientStop Color="#00FFFFFF" Offset="0.7" />
+  </RadialGradientBrush>
+
+  <!-- ProgressRing: the arc in primary on a bg-400 track; a Zenith's in the metal, with a glow. Its Width is the ring's;
+       under 96px the line under the percent goes under the ring, outside it, where it has room (design system version 35;
+       the owner: Home's "123 / 171" was spilling into the ring), and the control grows to hold it. -->
+  <!-- A finished ring's light (KAN-121): a soft halo on the ring itself, round and centred, drawn past the ring's box; the
+       drop shadow it had was cut off square by the box, which light mode showed -->
+  <RadialGradientBrush x:Key="glow-zenith-ring" Center="50%,50%" GradientOrigin="50%,50%" RadiusX="50%" RadiusY="50%">
+    <GradientStop Color="#009BB6CD" Offset="0.5" />
+    <GradientStop Color="#739BB6CD" Offset="0.7" />
+    <GradientStop Color="#009BB6CD" Offset="1" />
+  </RadialGradientBrush>
+
+  <ControlTheme x:Key="{x:Type c:GsProgressRing}" TargetType="c:GsProgressRing">
+    <Setter Property="Width" Value="96" />
+    <Setter Property="ClipToBounds" Value="False" />
+    <Setter Property="Template">
+      <ControlTemplate>
+        <StackPanel Spacing="6">
+          <Panel Name="PART_Box" Width="{TemplateBinding Width}" Height="{TemplateBinding Width}" RenderTransformOrigin="50%,50%">
+            <Panel.RenderTransform>
+              <ScaleTransform />
+            </Panel.RenderTransform>
+            <!-- Version 49: a game's 100% has its light, behind the ring and over it (GsZenithGlow) -->
+            <c:GsZenithGlow Name="PART_Light" RingThickness="{TemplateBinding RingThickness}" IsVisible="False" />
+            <c:GsRingArc Name="PART_Arc" Value="{TemplateBinding Value}" Thickness="{TemplateBinding RingThickness}" Track="{DynamicResource bg-400}" Arc="{DynamicResource primary}" />
+            <c:GsZenithGlow Name="PART_Front" IsFront="True" RingThickness="{TemplateBinding RingThickness}" IsVisible="False" />
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+              <TextBlock Text="{TemplateBinding Label}" FontFamily="{DynamicResource font-mono}" FontWeight="SemiBold" FontSize="{TemplateBinding LabelSize}"
+                         LetterSpacing="-0.5" Foreground="{DynamicResource ink}" HorizontalAlignment="Center" />
+              <TextBlock Text="{TemplateBinding Sub}" FontFamily="{DynamicResource font-mono}" FontSize="{TemplateBinding SubSize}" Foreground="{DynamicResource ink-faint}"
+                         HorizontalAlignment="Center" Margin="0,2,0,0" IsVisible="{TemplateBinding ShowsSubInside}" />
+            </StackPanel>
+          </Panel>
+          <TextBlock Text="{TemplateBinding Sub}" FontFamily="{DynamicResource font-mono}" FontSize="{DynamicResource fs-11}" LineHeight="{DynamicResource lh-14}"
+                     FontWeight="Medium" Foreground="{DynamicResource ink-faint}" HorizontalAlignment="Center" IsVisible="{TemplateBinding ShowsSubUnder}" />
+        </StackPanel>
+      </ControlTemplate>
+    </Setter>
+    <Style Selector="^:zenith /template/ c|GsRingArc#PART_Arc">
+      <Setter Property="Arc" Value="{StaticResource zenith-ring}" />
+    </Style>
+    <Style Selector="^:zenith /template/ c|GsZenithGlow">
+      <Setter Property="IsVisible" Value="True" />
+    </Style>
+  </ControlTheme>
+
+  <!-- AchievementBadge: the icon on its face, inside a ring of its metal; locked, dimmed with a lock; hidden, a "?" on stripes -->
+  <ControlTheme x:Key="{x:Type c:GsAchievementBadge}" TargetType="c:GsAchievementBadge">
+    <Setter Property="Width" Value="64" />
+    <Setter Property="Height" Value="64" />
+    <Setter Property="ClipToBounds" Value="False" />
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Panel>
+          <Border Name="PART_Metal" Background="{DynamicResource line-200}" CornerRadius="16" Padding="2">
+            <Border Name="PART_Face" Background="{DynamicResource bg-300}" CornerRadius="14" ClipToBounds="True">
+              <Panel>
+                <c:GsHatch Name="PART_Hatch" Brush="{DynamicResource line-100}" IsVisible="False" />
+                <c:GsIcon Name="PART_Trophy" Icon="trophy" Size="24" Foreground="{DynamicResource ink-faint}" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="False" />
+                <Image Name="PART_Image" Source="{TemplateBinding Icon}" Stretch="UniformToFill" />
+                <TextBlock Name="PART_Q" Text="?" FontWeight="Bold" FontSize="{DynamicResource fs-24}" Foreground="{DynamicResource ink-faint}"
+                           HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="False" />
+              </Panel>
+            </Border>
+          </Border>
+          <Border Name="PART_Lock" Width="20" Height="20" CornerRadius="10" Background="{DynamicResource bg-100}" BorderBrush="{DynamicResource line-200}" BorderThickness="1"
+                  HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,-4,-4" IsVisible="False">
+            <c:GsIcon Name="PART_LockIcon" Icon="lock" Size="12" StrokeWidth="2.4" Foreground="{DynamicResource ink-muted}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+          </Border>
+        </Panel>
+      </ControlTemplate>
+    </Setter>
+    <Style Selector="^:gold /template/ Border#PART_Metal">
+      <Setter Property="Background" Value="{StaticResource metal-gold}" />
+      <Setter Property="BoxShadow" Value="0 0 22 -4 #8CFFD76E" />
+    </Style>
+    <Style Selector="^:silver /template/ Border#PART_Metal">
+      <Setter Property="Background" Value="{StaticResource metal-silver}" />
+    </Style>
+    <Style Selector="^:bronze /template/ Border#PART_Metal">
+      <Setter Property="Background" Value="{StaticResource metal-bronze}" />
+    </Style>
+    <Style Selector="^:noicon /template/ c|GsIcon#PART_Trophy">
+      <Setter Property="IsVisible" Value="True" />
+    </Style>
+    <Style Selector="^:locked /template/ Border#PART_Face">
+      <Setter Property="Opacity" Value="0.5" />
+    </Style>
+    <Style Selector="^:locked /template/ Border#PART_Lock">
+      <Setter Property="IsVisible" Value="True" />
+    </Style>
+    <Style Selector="^:hidden /template/ Border#PART_Metal">
+      <Setter Property="Background" Value="{DynamicResource line-100}" />
+    </Style>
+    <Style Selector="^:hidden /template/ c|GsHatch#PART_Hatch">
+      <Setter Property="IsVisible" Value="True" />
+    </Style>
+    <Style Selector="^:hidden /template/ Image#PART_Image">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <Style Selector="^:hidden /template/ TextBlock#PART_Q">
+      <Setter Property="IsVisible" Value="True" />
+    </Style>
+    <Style Selector="^.sm">
+      <Setter Property="Width" Value="40" />
+      <Setter Property="Height" Value="40" />
+    </Style>
+    <Style Selector="^.sm /template/ Border#PART_Metal">
+      <Setter Property="CornerRadius" Value="11" />
+    </Style>
+    <Style Selector="^.sm /template/ Border#PART_Face">
+      <Setter Property="CornerRadius" Value="9" />
+    </Style>
+    <Style Selector="^.sm /template/ TextBlock#PART_Q">
+      <Setter Property="FontSize" Value="{DynamicResource fs-18}" />
+    </Style>
+    <Style Selector="^.sm /template/ c|GsIcon#PART_Trophy">
+      <Setter Property="Size" Value="15" />
+    </Style>
+    <Style Selector="^.sm /template/ Border#PART_Lock">
+      <Setter Property="Width" Value="16" />
+      <Setter Property="Height" Value="16" />
+      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="Margin" Value="0,0,-3,-3" />
+    </Style>
+    <Style Selector="^.sm /template/ c|GsIcon#PART_LockIcon">
+      <Setter Property="Size" Value="10" />
+    </Style>
+    <Style Selector="^.lg">
+      <Setter Property="Width" Value="104" />
+      <Setter Property="Height" Value="104" />
+    </Style>
+    <Style Selector="^.lg /template/ Border#PART_Metal">
+      <Setter Property="CornerRadius" Value="22" />
+      <Setter Property="Padding" Value="3" />
+    </Style>
+    <Style Selector="^.lg /template/ Border#PART_Face">
+      <Setter Property="CornerRadius" Value="19" />
+    </Style>
+    <Style Selector="^.lg /template/ TextBlock#PART_Q">
+      <Setter Property="FontSize" Value="{DynamicResource fs-32}" />
+    </Style>
+    <Style Selector="^.lg /template/ c|GsIcon#PART_Trophy">
+      <Setter Property="Size" Value="40" />
+    </Style>
+  </ControlTheme>
+
+  <!-- TierChip: the metal's dot (Gold's glows), a count, and its word -->
+  <ControlTheme x:Key="{x:Type c:GsTierChip}" TargetType="c:GsTierChip">
+    <Setter Property="Template">
+      <ControlTemplate>
+        <StackPanel Orientation="Horizontal" Spacing="6">
+          <Border Name="PART_Dot" Width="10" Height="10" CornerRadius="5" Background="{DynamicResource line-200}" VerticalAlignment="Center" />
+          <TextBlock Text="{TemplateBinding Count}" FontFamily="{DynamicResource font-mono}" FontWeight="SemiBold" FontSize="{DynamicResource fs-13}" Foreground="{DynamicResource ink}"
+                     VerticalAlignment="Center" IsVisible="{TemplateBinding Count, Converter={x:Static ObjectConverters.IsNotNull}}" />
+          <TextBlock Name="PART_Word" Text="{TemplateBinding Word}" FontSize="{DynamicResource fs-12}" FontWeight="Medium" Foreground="{DynamicResource ink-muted}"
+                     VerticalAlignment="Center" />
+        </StackPanel>
+      </ControlTemplate>
+    </Setter>
+    <Style Selector="^:bronze /template/ Border#PART_Dot">
+      <Setter Property="Background" Value="{StaticResource metal-bronze}" />
+    </Style>
+    <Style Selector="^:silver /template/ Border#PART_Dot">
+      <Setter Property="Background" Value="{StaticResource metal-silver}" />
+    </Style>
+    <Style Selector="^:gold /template/ Border#PART_Dot">
+      <Setter Property="Background" Value="{StaticResource metal-gold}" />
+      <Setter Property="BoxShadow" Value="0 0 8 0 #99FFD76E" />
+    </Style>
+    <Style Selector="^:zenith /template/ Border#PART_Dot">
+      <Setter Property="Background" Value="{StaticResource zenith-dot}" />
+      <Setter Property="BoxShadow" Value="0 0 8 0 #8CEF6A5A" />
+    </Style>
+    <!-- Only the dot and the count, where a table's heading names the tiers -->
+    <Style Selector="^.bare /template/ TextBlock#PART_Word">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+  </ControlTheme>
+
+  <!-- A tier's dot alone, beside a percent in a row: a Border with this theme and .gold, .silver or .bronze -->
+  <ControlTheme x:Key="TierDot" TargetType="Border">
+    <Setter Property="Width" Value="8" />
+    <Setter Property="Height" Value="8" />
+    <Setter Property="CornerRadius" Value="4" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="Background" Value="{DynamicResource line-200}" />
+    <Style Selector="^.bronze">
+      <Setter Property="Background" Value="{StaticResource metal-bronze}" />
+    </Style>
+    <Style Selector="^.silver">
+      <Setter Property="Background" Value="{StaticResource metal-silver}" />
+    </Style>
+    <Style Selector="^.gold">
+      <Setter Property="Background" Value="{StaticResource metal-gold}" />
+      <Setter Property="BoxShadow" Value="0 0 8 0 #99FFD76E" />
+    </Style>
+  </ControlTheme>
+
+  <!-- The light behind an unlocked achievement shown large, in its metal: an Ellipse with this theme and .gold, .silver or .bronze -->
+  <ControlTheme x:Key="TierGlow" TargetType="Ellipse">
+    <Setter Property="Fill" Value="Transparent" />
+    <Setter Property="Opacity" Value="0.8" />
+    <Setter Property="IsHitTestVisible" Value="False" />
+    <Style Selector="^.gold">
+      <Setter Property="Fill" Value="{StaticResource glow-gold}" />
+    </Style>
+    <Style Selector="^.silver">
+      <Setter Property="Fill" Value="{StaticResource glow-silver}" />
+    </Style>
+    <Style Selector="^.bronze">
+      <Setter Property="Fill" Value="{StaticResource glow-bronze}" />
+    </Style>
+  </ControlTheme>
+
+  <!-- The light under an earned Zenith medal (version 44): a thin, soft halo hugging its edge, never a box (KAN-106: its
+       drop shadow was cut off square): the ring's dark teal close round it, then a little of the sun's red. The medal's
+       edge is at 0.62. -->
+  <RadialGradientBrush x:Key="glow-zenith" Center="50%,50%" GradientOrigin="50%,50%" RadiusX="50%" RadiusY="50%">
+    <GradientStop Color="#661B3640" Offset="0.6" />
+    <GradientStop Color="#33C73A30" Offset="0.64" />
+    <GradientStop Color="#0DC73A30" Offset="0.74" />
+    <GradientStop Color="#00C73A30" Offset="1" />
+  </RadialGradientBrush>
+
+  <!-- ZenithMedal (version 49): earned, the Zenith's banner (GsTierBanner) in its box, a warm glow under it from 30px; it
+       unfurls from its bar for the moment and the popup. Not yet, the banner's outline, dashed, round the zenith icon -->
+  <ControlTheme x:Key="{x:Type c:GsZenithMedal}" TargetType="c:GsZenithMedal">
+    <Setter Property="Width" Value="40" />
+    <Setter Property="Height" Value="40" />
+    <Setter Property="ClipToBounds" Value="False" />
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Panel>
+          <Ellipse Name="PART_Glow" Fill="{StaticResource glow-zenith-banner}" Margin="{TemplateBinding GlowMargin}" IsHitTestVisible="False"
+                   IsVisible="{TemplateBinding ShowsGlow}" />
+          <Path Name="PART_Outline" Data="M22 19H98V170L79 152L60 172L41 152L22 170Z M12 14.5H108" Stretch="Uniform" Stroke="{DynamicResource line-200}"
+                StrokeThickness="1.6" StrokeDashArray="2.5,2" StrokeJoin="Round" Margin="0,1" HorizontalAlignment="Center" />
+          <c:GsTierBanner Name="PART_Banner" Tier="zenith" IsVisible="False" RenderTransformOrigin="50%,7%">
+            <c:GsTierBanner.RenderTransform>
+              <ScaleTransform />
+            </c:GsTierBanner.RenderTransform>
+          </c:GsTierBanner>
+          <c:GsIcon Name="PART_Glyph" Icon="zenith" Size="{TemplateBinding GlyphSize}" StrokeWidth="1.8" Foreground="{DynamicResource ink-faint}"
+                    HorizontalAlignment="Center" VerticalAlignment="Center" />
+        </Panel>
+      </ControlTemplate>
+    </Setter>
+    <Style Selector="^:earned /template/ Path#PART_Outline">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <Style Selector="^:earned /template/ c|GsTierBanner#PART_Banner">
+      <Setter Property="IsVisible" Value="True" />
+    </Style>
+    <Style Selector="^:earned /template/ c|GsIcon#PART_Glyph">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+  </ControlTheme>
+
+  <!-- AchievementsOverview: the ring, the tiers unlocked, and Zenith; small (Home) has a 76px ring with its count under it,
+       the tiers in a column and a small Zenith line. Version 41 gave Home's a larger two-colour ring, coins and a Zenith
+       strip; since version 46 it's this simpler one again (the owner: "The home achievement card should be the one before
+       that. Without the zenith card. Where it was more simple"). Since version 52 the small one's Zenith is the Zenith's
+       dot in the tiers' column, its words where their counts start, an empty ring until it's earned (the owner, 7 Oct
+       2026: "have dot version for zenith, not the flag"); the large one keeps the banner. -->
+  <ControlTheme x:Key="{x:Type c:GsAchievementsOverview}" TargetType="c:GsAchievementsOverview">
+    <!-- Its Zenith medal's glow spills past it -->
+    <Setter Property="ClipToBounds" Value="False" />
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Grid Name="PART_Grid" ColumnDefinitions="Auto,*" ColumnSpacing="24">
+          <c:GsProgressRing Name="PART_Ring" Width="112" Height="112" Value="{TemplateBinding Percent}" Label="{TemplateBinding PercentLabel}"
+                            Sub="{TemplateBinding CountLabel}" IsZenith="{TemplateBinding IsZenith}" VerticalAlignment="Center"
+                            AutomationProperties.Name="{TemplateBinding Spoken}" />
+          <StackPanel Name="PART_Side" Grid.Column="1" Spacing="14" VerticalAlignment="Center">
+            <WrapPanel Name="PART_TiersWide" ItemSpacing="18" LineSpacing="8">
+              <c:GsTierChip Tier="gold" Count="{Binding Gold, RelativeSource={RelativeSource TemplatedParent}}" />
+              <c:GsTierChip Tier="silver" Count="{Binding Silver, RelativeSource={RelativeSource TemplatedParent}}" />
+              <c:GsTierChip Tier="bronze" Count="{Binding Bronze, RelativeSource={RelativeSource TemplatedParent}}" />
+            </WrapPanel>
+            <StackPanel Name="PART_TiersTall" Spacing="6" IsVisible="False">
+              <c:GsTierChip Tier="gold" Count="{Binding Gold, RelativeSource={RelativeSource TemplatedParent}}" />
+              <c:GsTierChip Tier="silver" Count="{Binding Silver, RelativeSource={RelativeSource TemplatedParent}}" />
+              <c:GsTierChip Tier="bronze" Count="{Binding Bronze, RelativeSource={RelativeSource TemplatedParent}}" />
+            </StackPanel>
+            <Grid Name="PART_Zenith" ColumnDefinitions="Auto,*" ColumnSpacing="12">
+              <c:GsZenithMedal Name="PART_Medal" Width="48" Height="48" IsEarned="{TemplateBinding IsZenith}" VerticalAlignment="Center" />
+              <Border Name="PART_ZenithDot" Width="10" Height="10" CornerRadius="5" Background="Transparent" BorderBrush="{DynamicResource line-200}"
+                      BorderThickness="1.5" VerticalAlignment="Center" RenderTransformOrigin="50%,50%" IsVisible="False">
+                <Border.RenderTransform>
+                  <ScaleTransform />
+                </Border.RenderTransform>
+              </Border>
+              <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                <TextBlock Name="PART_ZenithTitle" Text="{TemplateBinding ZenithTitle}" FontSize="{DynamicResource fs-14}" LineHeight="{DynamicResource lh-20}"
+                           FontWeight="SemiBold" Foreground="{DynamicResource ink}" TextWrapping="Wrap" />
+                <TextBlock Name="PART_ZenithSub" Text="{TemplateBinding ZenithSub}" FontSize="{DynamicResource fs-12}" LineHeight="{DynamicResource lh-16}"
+                           Foreground="{DynamicResource ink-faint}" TextWrapping="Wrap" />
+              </StackPanel>
+            </Grid>
+          </StackPanel>
+        </Grid>
+      </ControlTemplate>
+    </Setter>
+    <Style Selector="^:zenith /template/ TextBlock#PART_ZenithTitle">
+      <Setter Property="Foreground" Value="{DynamicResource zenith-ink-text}" />
+    </Style>
+    <Style Selector="^:small /template/ Grid#PART_Grid">
+      <Setter Property="ColumnSpacing" Value="16" />
+    </Style>
+    <Style Selector="^:small /template/ c|GsProgressRing#PART_Ring">
+      <Setter Property="Width" Value="76" />
+      <Setter Property="Height" Value="NaN" />
+    </Style>
+    <Style Selector="^:small /template/ StackPanel#PART_Side">
+      <Setter Property="Spacing" Value="10" />
+    </Style>
+    <Style Selector="^:small /template/ WrapPanel#PART_TiersWide">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <Style Selector="^:small /template/ StackPanel#PART_TiersTall">
+      <Setter Property="IsVisible" Value="True" />
+    </Style>
+    <Style Selector="^:small /template/ Grid#PART_Zenith">
+      <Setter Property="ColumnSpacing" Value="6" />
+    </Style>
+    <Style Selector="^:small /template/ c|GsZenithMedal#PART_Medal">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <Style Selector="^:small /template/ Border#PART_ZenithDot">
+      <Setter Property="IsVisible" Value="True" />
+    </Style>
+    <Style Selector="^:zenith /template/ Border#PART_ZenithDot">
+      <Setter Property="Background" Value="{StaticResource zenith-dot}" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="BoxShadow" Value="0 0 8 0 #8CEF6A5A" />
+    </Style>
+    <Style Selector="^:small /template/ TextBlock#PART_ZenithTitle">
+      <Setter Property="FontSize" Value="{DynamicResource fs-12}" />
+      <Setter Property="LineHeight" Value="{DynamicResource lh-16}" />
+    </Style>
+    <Style Selector="^:small /template/ TextBlock#PART_ZenithSub">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+  </ControlTheme>
+
+  <!-- AchievementSpotlight: a glow in its metal from the top left, the badge large, what it is and how rare -->
+  <ControlTheme x:Key="{x:Type c:GsAchievementSpotlight}" TargetType="c:GsAchievementSpotlight">
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border Background="{DynamicResource bg-300}" CornerRadius="{DynamicResource radius-lg}" ClipToBounds="True">
+          <Panel>
+            <Canvas IsHitTestVisible="False">
+              <Ellipse Name="PART_Glow" Width="200" Height="200" Canvas.Left="-40" Canvas.Top="-40" Fill="{StaticResource glow-none}" Opacity="0.5" />
+            </Canvas>
+            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="18" Margin="16">
+              <c:GsAchievementBadge Name="PART_Badge" Size="lg" Icon="{TemplateBinding Icon}" Tier="{TemplateBinding Tier}" VerticalAlignment="Center" />
+              <StackPanel Grid.Column="1" Spacing="4" VerticalAlignment="Center">
+                <TextBlock Classes="overline faint" Text="{TemplateBinding Eyebrow}" />
+                <TextBlock Name="PART_Title" Text="{TemplateBinding Title}" FontSize="{DynamicResource fs-18}" LineHeight="{DynamicResource lh-22}" FontWeight="SemiBold"
+                           Foreground="{DynamicResource ink}" TextWrapping="Wrap" />
+                <TextBlock Name="PART_Description" Text="{TemplateBinding Description}" FontSize="{DynamicResource fs-13}" LineHeight="{DynamicResource lh-19}"
+                           Foreground="{DynamicResource ink-muted}" TextWrapping="Wrap"
+                           IsVisible="{TemplateBinding Description, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                <WrapPanel ItemSpacing="12" LineSpacing="6" Margin="0,4,0,0">
+                  <c:GsTierChip Tier="{TemplateBinding Tier}" IsVisible="{TemplateBinding Tier, Converter={x:Static ObjectConverters.IsNotNull}}" VerticalAlignment="Center" />
+                  <TextBlock Text="{TemplateBinding Meta}" FontSize="{DynamicResource fs-12}" LineHeight="{DynamicResource lh-16}" Foreground="{DynamicResource ink-muted}"
+                             VerticalAlignment="Center" IsVisible="{TemplateBinding Meta, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                </WrapPanel>
+              </StackPanel>
+            </Grid>
+          </Panel>
+        </Border>
+      </ControlTemplate>
+    </Setter>
+    <Style Selector="^:gold /template/ Ellipse#PART_Glow">
+      <Setter Property="Fill" Value="{StaticResource glow-gold}" />
+    </Style>
+    <Style Selector="^:silver /template/ Ellipse#PART_Glow">
+      <Setter Property="Fill" Value="{StaticResource glow-silver}" />
+    </Style>
+    <Style Selector="^:bronze /template/ Ellipse#PART_Glow">
+      <Setter Property="Fill" Value="{StaticResource glow-bronze}" />
+    </Style>
+    <Style Selector="^:small /template/ c|GsAchievementBadge#PART_Badge">
+      <Setter Property="Size" Value="md" />
+    </Style>
+    <Style Selector="^:small /template/ TextBlock#PART_Description">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <Style Selector="^:small /template/ TextBlock#PART_Title">
+      <Setter Property="FontSize" Value="{DynamicResource fs-15}" />
+      <Setter Property="LineHeight" Value="{DynamicResource lh-20}" />
+    </Style>
+  </ControlTheme>
+
+  <!-- Rows packed in a list draw the focus ring just inside themselves (A11Y-02) -->
+  <FocusAdornerTemplate x:Key="AchievementFocus">
+    <Border AdornerLayer.IsClipEnabled="False" BorderBrush="{DynamicResource primary}" BorderThickness="2" CornerRadius="10" />
+  </FocusAdornerTemplate>
+
+  <!-- AchievementRow, as a list's item: bg-300 when pointed at, secondary-soft when picked -->
+  <ControlTheme x:Key="AchievementRow" TargetType="ListBoxItem">
+    <Setter Property="Padding" Value="12,10" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Cursor" Value="Hand" />
+    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+    <Setter Property="FocusAdorner" Value="{StaticResource AchievementFocus}" />
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border Background="{TemplateBinding Background}" CornerRadius="{DynamicResource radius-md}" Padding="{TemplateBinding Padding}">
+          <ContentPresenter Content="{TemplateBinding Content}" ContentTemplate="{TemplateBinding ContentTemplate}" HorizontalContentAlignment="Stretch"
+                            VerticalAlignment="Center" />
+        </Border>
+      </ControlTemplate>
+    </Setter>
+    <Style Selector="^:pointerover">
+      <Setter Property="Background" Value="{DynamicResource bg-300}" />
+    </Style>
+    <Style Selector="^:selected">
+      <Setter Property="Background" Value="{DynamicResource secondary-soft}" />
+    </Style>
+  </ControlTheme>
+
+  <!-- AchievementPopup (ACH-09; design system version 35): dark glass in every theme, as it sits on a game; its metal lights
+       it from behind the badge, colours its eyebrow and fills its bar. A Zenith's is larger, with the medal. -->
+  <RadialGradientBrush x:Key="pop-glow" Center="50%,50%" GradientOrigin="50%,50%" RadiusX="50%" RadiusY="50%">
+    <GradientStop Color="#24FFFFFF" Offset="0" />
+    <GradientStop Color="#00FFFFFF" Offset="0.65" />
+  </RadialGradientBrush>
+  <RadialGradientBrush x:Key="pop-glow-bronze" Center="50%,50%" GradientOrigin="50%,50%" RadiusX="50%" RadiusY="50%">
+    <GradientStop Color="#66D7955C" Offset="0" />
+    <GradientStop Color="#00D7955C" Offset="0.65" />
+  </RadialGradientBrush>
+  <RadialGradientBrush x:Key="pop-glow-silver" Center="50%,50%" GradientOrigin="50%,50%" RadiusX="50%" RadiusY="50%">
+    <GradientStop Color="#4DE3E8EE" Offset="0" />
+    <GradientStop Color="#00E3E8EE" Offset="0.65" />
+  </RadialGradientBrush>
+  <RadialGradientBrush x:Key="pop-glow-gold" Center="50%,50%" GradientOrigin="50%,50%" RadiusX="50%" RadiusY="50%">
+    <GradientStop Color="#73FFD76E" Offset="0" />
+    <GradientStop Color="#00FFD76E" Offset="0.65" />
+  </RadialGradientBrush>
+  <RadialGradientBrush x:Key="pop-glow-zenith" Center="50%,50%" GradientOrigin="50%,50%" RadiusX="50%" RadiusY="50%">
+    <GradientStop Color="#6BF0C35A" Offset="0" />
+    <GradientStop Color="#29A51D32" Offset="0.45" />
+    <GradientStop Color="#00A51D32" Offset="0.65" />
+  </RadialGradientBrush>
+
+  <ControlTheme x:Key="{x:Type c:GsAchievementPopup}" TargetType="c:GsAchievementPopup">
+    <Setter Property="Width" Value="440" />
+    <Setter Property="ClipToBounds" Value="False" />
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border Name="PART_Card" CornerRadius="20" Background="#F00E1014" BorderBrush="#1AFFFFFF" BorderThickness="1" BackgroundSizing="OuterBorderEdge"
+                BoxShadow="0 18 48 0 #8C000000" Padding="14,14,18,14">
+          <Panel>
+            <Border CornerRadius="19" ClipToBounds="True" Margin="-14,-14,-18,-14" IsHitTestVisible="False">
+              <Canvas>
+                <Ellipse Name="PART_Glow" Width="220" Height="220" Canvas.Left="-64" Canvas.Top="-62" Fill="{StaticResource pop-glow}" />
+              </Canvas>
+            </Border>
+            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="16">
+              <Panel VerticalAlignment="Center">
+                <c:GsAchievementBadge Size="md" Icon="{TemplateBinding Icon}" Tier="{TemplateBinding Tier}" IsVisible="{TemplateBinding IsZenith, Converter={x:Static BoolConverters.Not}}" />
+                <c:GsZenithMedal Width="76" Height="76" IsEarned="True" UnfurlsOnShow="True" IsVisible="{TemplateBinding IsZenith}" />
+              </Panel>
+              <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                <TextBlock Name="PART_Eyebrow" Text="{TemplateBinding Eyebrow}" FontSize="{DynamicResource fs-11}" LineHeight="{DynamicResource lh-14}" FontWeight="Bold"
+                           LetterSpacing="1.3" Foreground="#B8F5F7F9" TextTrimming="CharacterEllipsis" />
+                <TextBlock Name="PART_Title" Text="{TemplateBinding Title}" FontSize="{DynamicResource fs-16}" LineHeight="{DynamicResource lh-21}" FontWeight="SemiBold"
+                           Foreground="#F5F7F9" TextTrimming="CharacterEllipsis" />
+                <TextBlock Text="{TemplateBinding Meta}" FontSize="{DynamicResource fs-12}" LineHeight="{DynamicResource lh-16}" Foreground="#B3F5F7F9"
+                           TextTrimming="CharacterEllipsis" />
+              </StackPanel>
+              <StackPanel Grid.Column="2" Spacing="6" VerticalAlignment="Center" IsVisible="{TemplateBinding ShowsProgress}">
+                <TextBlock Text="{TemplateBinding ProgressText}" FontFamily="{DynamicResource font-mono}" FontSize="{DynamicResource fs-12}" LineHeight="{DynamicResource lh-14}"
+                           FontWeight="SemiBold" Foreground="#CCF5F7F9" HorizontalAlignment="Right" />
+                <Border Width="56" Height="4" CornerRadius="2" Background="#24FFFFFF" ClipToBounds="True" HorizontalAlignment="Right">
+                  <Border Name="PART_Fill" Width="{TemplateBinding FillWidth}" HorizontalAlignment="Left" CornerRadius="2" Background="#F5F7F9" />
+                </Border>
+              </StackPanel>
+            </Grid>
+          </Panel>
+        </Border>
+      </ControlTemplate>
+    </Setter>
+    <Style Selector="^:bronze /template/ Ellipse#PART_Glow">
+      <Setter Property="Fill" Value="{StaticResource pop-glow-bronze}" />
+    </Style>
+    <Style Selector="^:silver /template/ Ellipse#PART_Glow">
+      <Setter Property="Fill" Value="{StaticResource pop-glow-silver}" />
+    </Style>
+    <Style Selector="^:gold /template/ Ellipse#PART_Glow">
+      <Setter Property="Fill" Value="{StaticResource pop-glow-gold}" />
+    </Style>
+    <Style Selector="^:zenith /template/ Ellipse#PART_Glow">
+      <Setter Property="Fill" Value="{StaticResource pop-glow-zenith}" />
+      <Setter Property="Width" Value="300" />
+      <Setter Property="Height" Value="300" />
+      <Setter Property="Canvas.Left" Value="-90" />
+      <Setter Property="Canvas.Top" Value="-100" />
+    </Style>
+    <Style Selector="^:bronze /template/ TextBlock#PART_Eyebrow">
+      <Setter Property="Foreground" Value="#D7955C" />
+    </Style>
+    <Style Selector="^:silver /template/ TextBlock#PART_Eyebrow">
+      <Setter Property="Foreground" Value="#E3E8EE" />
+    </Style>
+    <Style Selector="^:gold /template/ TextBlock#PART_Eyebrow">
+      <Setter Property="Foreground" Value="#FFD76E" />
+    </Style>
+    <Style Selector="^:zenith /template/ TextBlock#PART_Eyebrow">
+      <Setter Property="Foreground" Value="{StaticResource zenith-popup-text}" />
+    </Style>
+    <Style Selector="^:bronze /template/ Border#PART_Fill">
+      <Setter Property="Background" Value="{StaticResource metal-bronze}" />
+    </Style>
+    <Style Selector="^:silver /template/ Border#PART_Fill">
+      <Setter Property="Background" Value="{StaticResource metal-silver}" />
+    </Style>
+    <Style Selector="^:gold /template/ Border#PART_Fill">
+      <Setter Property="Background" Value="{StaticResource metal-gold}" />
+    </Style>
+    <Style Selector="^:zenith">
+      <Setter Property="Width" Value="480" />
+    </Style>
+    <Style Selector="^:zenith /template/ Border#PART_Card">
+      <Setter Property="Padding" Value="18,18,22,18" />
+    </Style>
+    <Style Selector="^:zenith /template/ TextBlock#PART_Title">
+      <Setter Property="FontSize" Value="{DynamicResource fs-18}" />
+      <Setter Property="LineHeight" Value="{DynamicResource lh-24}" />
+    </Style>
+  </ControlTheme>
+</ResourceDictionary>

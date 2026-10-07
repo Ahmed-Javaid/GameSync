@@ -47,8 +47,8 @@ public static class ThemeService
     /// <summary>
     /// Fluent's own text fields and menus take the design system's colours (design system → SearchField, Menu): a field
     /// is <c>surface-field</c> inside a <c>line-200</c> border that turns <c>primary</c> with the cursor in it, and a menu
-    /// floats on the dialog's surface with rows that go <c>bg-300</c> under the pointer. The same brushes, so they recolour
-    /// with the theme.
+    /// floats on the dialog's surface with rows that go <c>bg-300</c> under the pointer, and so does a small ask from a
+    /// button (Swap's question, a named save's Rename). The same brushes, so they recolour with the theme.
     /// </summary>
     private static readonly (string Fluent, string Token)[] FluentColours =
     [
@@ -70,6 +70,8 @@ public static class ThemeService
         ("TextControlButtonForegroundPressed", "ink"),
         ("TextControlButtonBackgroundPointerOver", "bg-400"),
         ("TextControlButtonBackgroundPressed", "bg-400"),
+        ("FlyoutPresenterBackground", "surface-dialog"),
+        ("FlyoutBorderThemeBrush", "line-100"),
         ("MenuFlyoutPresenterBackground", "surface-dialog"),
         ("MenuFlyoutPresenterBorderBrush", "line-100"),
         ("MenuFlyoutItemBackgroundPointerOver", "bg-300"),
@@ -90,11 +92,29 @@ public static class ThemeService
     /// </summary>
     public static void Scope(IResourceDictionary scope, IReadOnlyDictionary<string, string>? tokens)
     {
-        scope.Clear();
-        if (tokens is not null)
+        if (tokens is null)
         {
-            Put(scope, tokens);
+            scope.Clear();
+            if (TokenColors.TryGetValue(scope, out var colors))
+            {
+                scope.MergedDictionaries.Remove(colors);
+                TokenColors.Remove(scope);
+            }
+
+            return;
         }
+
+        // In place (KAN-124): a brush already here is recoloured, so everything bound to it repaints without looking it up
+        // again; clearing first made the whole window look every token up twice, which a change of mode in Glossy felt.
+        foreach (var key in scope.Keys.OfType<string>().ToList())
+        {
+            if (!tokens.ContainsKey(key))
+            {
+                scope.Remove(key);
+            }
+        }
+
+        Put(scope, tokens);
     }
 
     /// <summary><c>#rrggbb</c> or <c>rgba(r, g, b, a)</c>.</summary>
@@ -140,6 +160,9 @@ public static class ThemeService
 
     private static void Put(IResourceDictionary resources, IReadOnlyDictionary<string, string> tokens)
     {
+        // Each token's colour (key-color) goes in a dictionary of its own, swapped in whole: written one by one, every one
+        // told the whole window that resources had changed, about 150 times for a change of mode (KAN-124).
+        var colors = new ResourceDictionary();
         foreach (var (key, value) in tokens)
         {
             if (key is "shadow-dialog" or "lift-card")
@@ -149,10 +172,24 @@ public static class ThemeService
             }
 
             var color = ParseColor(value);
-            resources[key + "-color"] = color;
+            colors[key + "-color"] = color;
             SetBrush(resources, key, color);
         }
+
+        if (TokenColors.TryGetValue(resources, out var before) && resources.MergedDictionaries.IndexOf(before) is var at and >= 0)
+        {
+            resources.MergedDictionaries[at] = colors;
+        }
+        else
+        {
+            resources.MergedDictionaries.Add(colors);
+        }
+
+        TokenColors.AddOrUpdate(resources, colors);
     }
+
+    /// <summary>Each dictionary's token colours, as last swapped in.</summary>
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<IResourceDictionary, ResourceDictionary> TokenColors = new();
 
     /// <summary>Recolours the brush under <paramref name="key"/>, or makes it: everything bound to it follows.</summary>
     private static void SetBrush(IResourceDictionary resources, string key, Color color)

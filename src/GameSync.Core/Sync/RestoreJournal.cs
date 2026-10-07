@@ -7,6 +7,18 @@ namespace GameSync.Core.Sync;
 public sealed record JournalOp(string Kind, string Target, string? Staged, string Aside);
 
 /// <summary>
+/// KAN-91: a restore's swap stopped at <see cref="Target"/>, which something opened a moment ago. <see cref="Undone"/>: what
+/// it had moved is back, and the save folder is as it was; otherwise the journal stays, to finish the swap at the next start.
+/// </summary>
+public sealed class SwapStoppedException(string target, bool undone, Exception inner)
+    : IOException($"The restore stopped at {target}: {inner.Message}", inner)
+{
+    public string Target { get; } = target;
+
+    public bool Undone { get; } = undone;
+}
+
+/// <summary>
 /// BAK-08: a restore writes every file to a staged copy next to its target and checks it first, then records the
 /// planned renames here, then swaps. If GameSync dies mid-swap, <see cref="RecoverAll"/> finishes the swap on the next
 /// start, so a save folder never ends up with half-written files.
@@ -38,29 +50,76 @@ public sealed record RestoreJournal
         File.Move(temp, path, overwrite: true);
     }
 
-    /// <summary>Runs every operation. Each step checks what's already done, so running it twice is safe.</summary>
-    public void Commit()
+    /// <summary>
+    /// Runs every operation. Each step checks what's already done, so running it twice is safe. With
+    /// <paramref name="undoOnFailure"/> (a restore under way, not one finished after a crash), a step that fails because
+    /// something opened a file a moment ago puts back every step before it, in reverse, and throws
+    /// <see cref="SwapStoppedException"/>: the save folder is as it was, never half restored (KAN-91).
+    /// </summary>
+    public void Commit(bool undoOnFailure = false)
     {
-        var done = 0;
+        var done = new List<JournalOp>();
         foreach (var op in Ops)
         {
-            if (op.Kind == "replace")
+            try
             {
-                if (op.Staged is not null && File.Exists(op.Staged))
+                if (op.Kind == "replace")
+                {
+                    if (op.Staged is not null && File.Exists(op.Staged))
+                    {
+                        MoveAside(op.Target, op.Aside);
+                        File.Move(op.Staged, op.Target);
+                    }
+                }
+                else
                 {
                     MoveAside(op.Target, op.Aside);
-                    File.Move(op.Staged, op.Target);
                 }
             }
-            else
+            catch (Exception e) when (undoOnFailure && e is IOException or UnauthorizedAccessException)
             {
-                MoveAside(op.Target, op.Aside);
+                // This step's own target is back too, if it got as far as moving it aside.
+                throw new SwapStoppedException(op.Target, Undo([.. done, op]), e);
             }
 
-            if (++done == 1)
+            done.Add(op);
+            if (done.Count == 1)
             {
                 CrashPoints.Hit(CrashPoints.MidSwap);
             }
+        }
+    }
+
+    /// <summary>Puts back what <paramref name="done"/> moved, last first; false when something couldn't be put back.</summary>
+    private static bool Undo(IEnumerable<JournalOp> done)
+    {
+        try
+        {
+            foreach (var op in done.Reverse())
+            {
+                if (op.Kind == "replace" && op.Staged is not null && !File.Exists(op.Staged) && File.Exists(op.Target) && File.Exists(op.Aside))
+                {
+                    // The new file goes back to being staged, and the one it replaced back in place.
+                    File.Move(op.Target, op.Staged);
+                }
+                else if (op.Kind == "replace" && op.Staged is not null && !File.Exists(op.Staged) && File.Exists(op.Target) && !File.Exists(op.Aside))
+                {
+                    // A file the restore added where there was none: it goes, back to being staged.
+                    File.Move(op.Target, op.Staged);
+                    continue;
+                }
+
+                if (File.Exists(op.Aside) && !File.Exists(op.Target))
+                {
+                    File.Move(op.Aside, op.Target);
+                }
+            }
+
+            return true;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return false;
         }
     }
 

@@ -28,12 +28,54 @@ public sealed record PlaceItem(string Portable, string? Folder, string? Tag, str
 
     public bool CanOpen => Folder is not null && OpenFolder is not null;
 
-    public override string ToString() => string.Join(", ", new[] { Folder ?? Portable, Tag, Evidence }.OfType<string>());
+    /// <summary>
+    /// KAN-81: what's kept there, in words, then its numbers: "The folder SPRJ0005 and everything in it · 34 files ·
+    /// 33.6 MB · newest …", so it's plain the folder around it isn't part of the save. A place taking some files only,
+    /// or a registry key, says its numbers alone.
+    /// </summary>
+    public string Caption => Tag is null && Folder is { } folder && !Portable.Contains("  (", StringComparison.Ordinal)
+        && Path.GetFileName(Path.TrimEndingDirectorySeparator(folder)) is { Length: > 0 } leaf
+        ? $"The folder {leaf} and everything in it · {Evidence}"
+        : Evidence;
+
+    /// <summary>R2 (design system version 51): the program files found here, by their full paths; never backed up (R1).</summary>
+    public IReadOnlyList<string> Programs { get; init; } = [];
+
+    /// <summary>"A program is in this folder and isn't backed up: Uninstall.exe. Programs never travel with saves; …"</summary>
+    public string? ProgramNote
+    {
+        get
+        {
+            var names = Programs.Select(Path.GetFileName).OfType<string>().ToList();
+            return names.Count switch
+            {
+                0 => null,
+                1 => $"A program is in this folder and isn't backed up: {names[0]}. Programs never travel with saves; if you didn't put it there, check where it came from.",
+                _ => $"{names.Count} programs are in this folder and aren't backed up: " +
+                    (names.Count == 2 ? $"{names[0]} and {names[1]}" : $"{names[0]}, {names[1]} and {names.Count - 2} more") +
+                    ". Programs never travel with saves; if you didn't put them there, check where they came from.",
+            };
+        }
+    }
+
+    public bool HasProgramNote => Programs.Count > 0;
+
+    public override string ToString() => string.Join(", ", new[] { Folder ?? Portable, Tag, Evidence, ProgramNote }.OfType<string>());
 }
 
 /// <summary>A named save: its name, when and on which PC it was saved, and the new name typed to rename it.</summary>
-public sealed partial class NamedSaveItem(string name, VersionId version, string when, string pc, bool inPlace = false) : ObservableObject
+public sealed partial class NamedSaveItem(string name, VersionId version, string when, string pc, bool inPlace = false, string game = "The game") : ObservableObject
 {
+    /// <summary>KAN-89: Restore's ask: "Restore Bloodborne GOTY's save to “befo ludwig”?".</summary>
+    public string Question => $"Restore {game}'s save to “{Name}”?";
+
+    /// <summary>What the ask says under it: when and where it was saved, and that the save there now is kept first.</summary>
+    public string Detail => $"Saved {When} on {Pc}. Your current save is kept first, so you can go back to it.";
+
+    /// <summary>KAN-80: being restored now: its Restore says Restoring….</summary>
+    [ObservableProperty]
+    private bool _isRestoring;
+
     public string Name { get; } = name;
 
     /// <summary>Its files are the game's save now (KAN-51): it says In place instead of offering Restore.</summary>
@@ -53,6 +95,10 @@ public sealed partial class NamedSaveItem(string name, VersionId version, string
 
     public string Meta => $"{When} · {Pc}";
 
+    /// <summary>KAN-87: where a named save is: no folder of its own, its files stored once by content.</summary>
+    public static string WhereKept =>
+        "In GameSync's history: its files are stored once, by their contents, in the backup folder on this PC and in the cloud, so saves that share files take their space once. It has no folder of its own; Export as a folder puts a plain copy wherever you choose.";
+
     public override string ToString() => $"{Name}, saved {When} on {Pc}{(IsInPlace ? ", in place now" : "")}";
 }
 
@@ -61,6 +107,14 @@ public sealed record VersionItem(VersionId Id, string Saved, string Pc, string? 
 {
     /// <summary>The version the Versions tab opened these saves on (MGR-08), marked where its Restore is.</summary>
     public bool IsPicked { get; init; }
+
+    /// <summary>KAN-80: being restored now: its Restore says Restoring….</summary>
+    public bool IsRestoring { get; init; }
+
+    /// <summary>KAN-89: Restore's ask: "Restore Lantern Keep's save to the one from 23 Sep 21:02?".</summary>
+    public string Question { get; init; } = $"Restore the save from {Saved}?";
+
+    public string Detail => $"Saved on {Pc}. Your current save is kept first, so you can go back to it.";
 
     /// <summary>What sets a version apart, beside a pin when it's pinned; the current one shows Current beside it ("Restored from …", KAN-51).</summary>
     public bool ShowsNote => Note is not null;
@@ -89,7 +143,7 @@ public sealed partial class GameSavesViewModel : ObservableObject, IPageSurface
     private string _title = "";
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsHeld), nameof(IsConflict), nameof(IsFilesInUse), nameof(IsSavesMissing), nameof(NeedsYou), nameof(IsPlaying), nameof(BackUpTip),
+    [NotifyPropertyChangedFor(nameof(IsHeld), nameof(IsConflict), nameof(IsFilesInUse), nameof(IsSavesMissing), nameof(NeedsYou), nameof(IsPlaying), nameof(BackUpTip), nameof(RunningNote), nameof(HasRunningNote),
         nameof(ShowsSettled), nameof(IsKeptOnly))]
     private GameStatus? _status;
 
@@ -106,12 +160,17 @@ public sealed partial class GameSavesViewModel : ObservableObject, IPageSurface
 
     /// <summary>The page's content has been read: until then only the header and status show.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(Syncing), nameof(NotSyncing))]
+    [NotifyPropertyChangedFor(nameof(Syncing), nameof(NotSyncing), nameof(NotSyncingPlain), nameof(NotSyncingKept))]
     private bool _hasDetail;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(Syncing), nameof(NotSyncing), nameof(IsKeptOnly))]
+    [NotifyPropertyChangedFor(nameof(Syncing), nameof(NotSyncing), nameof(IsKeptOnly), nameof(NotSyncingPlain), nameof(NotSyncingKept))]
     private bool _syncs;
+
+    /// <summary>KAN-61: a game not syncing yet whose live save sits beside copies kept by hand.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(NotSyncingPlain), nameof(NotSyncingKept), nameof(KeptTitle), nameof(KeptMeta))]
+    private GameKept? _kept;
 
     [ObservableProperty]
     private string? _foundBy;
@@ -125,8 +184,65 @@ public sealed partial class GameSavesViewModel : ObservableObject, IPageSurface
     private IReadOnlyList<PlaceItem> _suggestions = [];
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasNamedSaves), nameof(NoNamedSaves))]
+    [NotifyPropertyChangedFor(nameof(HasNamedSaves), nameof(NoNamedSaves), nameof(NamedTitle), nameof(HasNamedTools))]
     private IReadOnlyList<NamedSaveItem> _namedSaves = [];
+
+    /// <summary>KAN-82: what Find a named save holds; the list shows the named saves whose names have it.</summary>
+    [ObservableProperty]
+    private string _namedSearch = "";
+
+    /// <summary>KAN-82: <c>newest</c> first (the default) or by <c>name</c>, kept per PC.</summary>
+    [ObservableProperty]
+    private string _namedSort = "newest";
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(NoNamedMatch))]
+    private IReadOnlyList<NamedSaveItem> _shownNamedSaves = [];
+
+    /// <summary>KAN-92: the live save as the game has it now.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasCurrent))]
+    private string? _currentWritten;
+
+    [ObservableProperty]
+    private string? _currentSize;
+
+    [ObservableProperty]
+    private string? _currentBackedUp;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasSameAs))]
+    private string? _currentSameAs;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasCurrentInUse))]
+    private string? _currentInUse;
+
+    /// <summary>KAN-92: the Current save card's facts, as a game's page shows its own.</summary>
+    [ObservableProperty]
+    private IReadOnlyList<Fact> _currentFacts = [];
+
+    /// <summary>KAN-87: an export as a folder: what happened, the folder made, and whether it failed.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasExportNote), nameof(ExportDone))]
+    private string? _exportNote;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ExportDone))]
+    private bool _exporting;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ExportDone))]
+    private bool _exportFailed;
+
+    private string? _exportedFolder;
+    private string? _backupFolder;
+    private bool _sortRead;
+
+    /// <summary>KAN-84: it ships an anti-cheat, so its saves can't be shared (R16).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShareTip))]
+    private bool _hasAntiCheat;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasVersions), nameof(NoVersions))]
@@ -139,10 +255,6 @@ public sealed partial class GameSavesViewModel : ObservableObject, IPageSurface
     [NotifyPropertyChangedFor(nameof(HasLog))]
     private IReadOnlyList<LogLine> _logLines = [];
 
-    /// <summary>The name Save as… is typing.</summary>
-    [ObservableProperty]
-    private string _saveName = "";
-
     /// <param name="back">Back and the breadcrumb: every game's saves, or the page the person came from.</param>
     /// <param name="root">What the breadcrumb's first step says: "Save manager".</param>
     public GameSavesViewModel(LauncherGame game, LauncherActions? actions, ICommand back, string root = "Save manager")
@@ -151,35 +263,86 @@ public sealed partial class GameSavesViewModel : ObservableObject, IPageSurface
         _game = game;
         BackCommand = back;
         Root = root;
-        SyncGameCommand = new RelayCommand(() => _actions?.SyncGame?.Invoke(Id), () => _actions?.SyncGame is not null);
-        BackUpNowCommand = new RelayCommand(() => _actions?.BackUpNow?.Invoke(Id), () => _actions?.BackUpNow is not null);
-        SaveAsCommand = new RelayCommand(() =>
+        Transfer = actions?.TransferOf?.Invoke(game.Id);
+        SyncGameCommand = new AsyncRelayCommand(async () =>
         {
-            var name = SaveName.Trim();
-            if (name.Length > 0)
+            // KAN-61: only the live save, the copies beside it as named saves, in its dialog.
+            if (NotSyncingKept)
             {
-                _actions?.SaveAs?.Invoke(Id, name);
-                SaveName = "";
+                _actions?.OpenKeptCopies?.Invoke(new KeptCopiesStart(Id, Title, Backup: false));
             }
-        }, () => _actions?.SaveAs is not null);
+            else if (_actions?.SyncGame is { } sync)
+            {
+                await sync(Id);
+            }
+        }, () => _actions?.SyncGame is not null);
+        OpenKeptCommand = new RelayCommand<string>(mode => _actions?.OpenKeptCopies?.Invoke(new KeptCopiesStart(Id, Title, Backup: mode == "backup")),
+            _ => _actions?.OpenKeptCopies is not null);
+        BackUpNowCommand = new AsyncRelayCommand(async () =>
+        {
+            if (_actions?.BackUpNow is { } backUp)
+            {
+                await backUp(Id);
+            }
+        }, () => _actions?.BackUpNow is not null);
+        OpenNamedSaveCommand = new RelayCommand(() =>
+        {
+            if (NotSyncingKept)
+            {
+                _actions?.OpenKeptCopies?.Invoke(new KeptCopiesStart(Id, Title, Backup: true));
+                return;
+            }
+
+            _actions?.OpenNamedSave?.Invoke(NamedSaveStart.For(Id, Title, Places.Select(p => (p.Folder, p.Tag, p.Evidence)), NamedSaves.Select(n => n.Name),
+                Syncs ? null : KeepLine));
+        }, () => _actions?.OpenNamedSave is not null);
         RestoreCommand = new RelayCommand<object>(item =>
         {
             switch (item)
             {
                 case NamedSaveItem named:
-                    Restore(named.Version, named.Name, $"“{named.Name}”");
+                    Restore(named.Version, named.Name, $"“{named.Name}”", item);
                     break;
                 case VersionItem version:
-                    Restore(version.Id, null, $"the save from {version.Saved}");
+                    Restore(version.Id, null, $"the save from {version.Saved}", item);
                     break;
             }
         }, _ => _actions?.Restore is not null);
         ApproveCommand = new RelayCommand(() => _actions?.Approve?.Invoke(Id), () => _actions?.Approve is not null);
+        ExportCommand = new RelayCommand<object>(item =>
+        {
+            // Export (KAN-23, KAN-85): the share window with this save picked, to put it in a zip.
+            switch (item)
+            {
+                case VersionItem version:
+                    _actions?.OpenShare?.Invoke(new ShareStart(ShareStart.Pick, [Id], Id, version.Id));
+                    break;
+                case NamedSaveItem named:
+                    _actions?.OpenShare?.Invoke(new ShareStart(ShareStart.Pick, [Id], Id, named.Version));
+                    break;
+            }
+        }, _ => _actions?.OpenShare is not null);
+        ShareCommand = new RelayCommand(() => _actions?.OpenShare?.Invoke(new ShareStart(ShareStart.Pick, [Id], Id)),
+            () => _actions?.OpenShare is not null);
+        OpenBackupCommand = new RelayCommand(() =>
+        {
+            if (_backupFolder is { } folder)
+            {
+                _actions?.OpenFolder?.Invoke(folder);
+            }
+        }, () => _actions?.OpenFolder is not null);
+        OpenExportedCommand = new RelayCommand(() =>
+        {
+            if (_exportedFolder is { } folder)
+            {
+                _actions?.OpenFolder?.Invoke(folder);
+            }
+        }, () => _actions?.OpenFolder is not null);
         RestorePreviousCommand = new RelayCommand(() =>
         {
             if (_current is { } previous)
             {
-                Restore(previous, null, "the save from before the change");
+                Restore(previous, null, "the save from before the change", null);
             }
         }, () => _actions?.Restore is not null);
         ChooseFilesCommand = new RelayCommand(() => _actions?.OpenProperties?.Invoke(Id, "saves"), () => _actions?.OpenProperties is not null);
@@ -226,20 +389,130 @@ public sealed partial class GameSavesViewModel : ObservableObject, IPageSurface
 
     public ICommand BackCommand { get; }
 
-    /// <summary>Sync these saves, for a game not syncing yet (FIND-06).</summary>
-    public ICommand SyncGameCommand { get; }
+    /// <summary>KAN-80: its upload or download, shown under its status as it goes; null where the page only shows.</summary>
+    public TransferView? Transfer { get; }
 
-    /// <summary>Back up now (BAK-16); the primary unless the game needs you, and not while it runs.</summary>
-    public ICommand BackUpNowCommand { get; }
+    /// <summary>Sync these saves, for a game not syncing yet (FIND-06); Syncing… until its saves are kept here (KAN-80).</summary>
+    public IAsyncRelayCommand SyncGameCommand { get; }
 
-    /// <summary>Save as…: keeps this PC's save under the name typed (BAK-18).</summary>
-    public ICommand SaveAsCommand { get; }
+    /// <summary>Back up now (BAK-16); the primary unless the game needs you, and not while it runs. Backing up… until it's kept (KAN-80).</summary>
+    public IAsyncRelayCommand BackUpNowCommand { get; }
+
+    /// <summary>New named save… (BAK-18): this PC's save kept under a name, in its dialog (KAN-77).</summary>
+    public ICommand OpenNamedSaveCommand { get; }
+
+    /// <summary>KAN-61: the live save and the copies beside it, synced ("sync") or backed up only ("backup").</summary>
+    public ICommand OpenKeptCommand { get; }
+
+    /// <summary>A game not syncing yet, as before KAN-61: each button says first that GameSync starts keeping its saves.</summary>
+    public bool NotSyncingPlain => NotSyncing && Kept is null;
+
+    /// <summary>KAN-61: a game not syncing yet whose live save sits beside copies kept by hand; its buttons open KeptCopiesDialog.</summary>
+    public bool NotSyncingKept => NotSyncing && Kept is not null;
+
+    public string KeptTitle => Kept is { } kept ? $"Beside it: {Copies(kept.Copies)} you kept by hand" : "";
+
+    public string KeptMeta => Kept is { } kept
+        ? string.Join(" · ", new[]
+        {
+            kept.Names.Count > 0 ? $"In {Path.GetFileName(kept.Folder)}, such as {string.Join(" and ", kept.Names)}" : $"In {Path.GetFileName(kept.Folder)}",
+            Cli.FormatSize(kept.CopiesBytes),
+            "not part of the live save",
+        })
+        : "";
+
+    private static string Copies(int count) => count == 1 ? "1 copy" : $"{count.ToString(CultureInfo.InvariantCulture)} copies";
 
     /// <summary>Brings back a named save or a version; this PC's files are kept as a version first (BAK-08).</summary>
     public ICommand RestoreCommand { get; }
 
     /// <summary>A held save: keep the new one (BAK-12).</summary>
     public ICommand ApproveCommand { get; }
+
+    /// <summary>Export (KAN-23, KAN-85): the share window with this version or named save picked, to put it in a zip.</summary>
+    public ICommand ExportCommand { get; }
+
+    /// <summary>KAN-84: Share…, the share window with this game's current save ticked; another of its saves can be picked there.</summary>
+    public ICommand ShareCommand { get; }
+
+    /// <summary>KAN-87: the backup folder this PC keeps the game's history in, in Explorer.</summary>
+    public ICommand OpenBackupCommand { get; }
+
+    /// <summary>KAN-87: the folder an export made, in Explorer.</summary>
+    public ICommand OpenExportedCommand { get; }
+
+    /// <summary>KAN-84: Share…'s tooltip, saying why it's off for a game with an anti-cheat.</summary>
+    public string ShareTip => HasAntiCheat
+        ? "It ships an anti-cheat, so its saves can't be shared"
+        : "Puts its current save, or any named save or version, in a zip a friend can import";
+
+    public bool CanShare => !HasAntiCheat;
+
+    /// <summary>KAN-82: "Named saves · 36", the count in the heading.</summary>
+    public string NamedTitle => NamedSaves.Count == 0 ? "Named saves" : $"Named saves · {NamedSaves.Count.ToString(CultureInfo.InvariantCulture)}";
+
+    /// <summary>The search and the sort, once there's more than one to find or order.</summary>
+    public bool HasNamedTools => NamedSaves.Count > 1;
+
+    public bool NoNamedMatch => NamedSaves.Count > 0 && ShownNamedSaves.Count == 0;
+
+    public string NoMatchText => $"No named save is called anything like “{NamedSearch.Trim()}”.";
+
+    public IReadOnlyList<SelectOption> NamedSortOptions { get; } = [new("newest", "Newest first"), new("name", "Name")];
+
+    public bool HasCurrent => CurrentWritten is not null;
+
+    public bool HasSameAs => CurrentSameAs is not null;
+
+    public bool HasCurrentInUse => CurrentInUse is not null;
+
+    public bool HasExportNote => ExportNote is not null;
+
+    public bool ExportDone => HasExportNote && !Exporting && !ExportFailed;
+
+    partial void OnNamedSearchChanged(string value)
+    {
+        Filter();
+        OnPropertyChanged(nameof(NoMatchText));
+    }
+
+    partial void OnNamedSortChanged(string value)
+    {
+        Filter();
+        if (_sortRead)
+        {
+            _actions?.SetNamedSort?.Invoke(value);
+        }
+    }
+
+    partial void OnNamedSavesChanged(IReadOnlyList<NamedSaveItem> value) => Filter();
+
+    partial void OnHasAntiCheatChanged(bool value) => OnPropertyChanged(nameof(CanShare));
+
+    /// <summary>KAN-82: the named saves whose names have what's typed, newest first or by name.</summary>
+    private void Filter()
+    {
+        var wanted = NamedSearch.Trim();
+        var shown = NamedSaves.Where(n => wanted.Length == 0 || n.Name.Contains(wanted, StringComparison.CurrentCultureIgnoreCase));
+        ShownNamedSaves = (NamedSort == "name" ? shown.OrderBy(n => n.Name, StringComparer.CurrentCultureIgnoreCase) : shown).ToList();
+    }
+
+    /// <summary>
+    /// KAN-87: a named save as a plain folder in <paramref name="parent"/> (picked in Windows' folder picker), named after
+    /// it; then a line under the status saying where, with Open, or why it couldn't be.
+    /// </summary>
+    public async Task ExportFolderAsync(NamedSaveItem named, string parent)
+    {
+        if (_actions?.ExportFolder is not { } export || Exporting)
+        {
+            return;
+        }
+
+        (Exporting, ExportFailed, ExportNote) = (true, false, $"Exporting “{named.Name}” as a folder");
+        var (folder, problem) = await export(Id, named.Version, named.Name, parent);
+        (Exporting, ExportFailed, _exportedFolder) = (false, problem is not null, folder);
+        ExportNote = problem ?? $"“{named.Name}” is a folder now: {folder}. GameSync keeps it in its history as before.";
+    }
 
     /// <summary>A held save: bring back the one before the change, which is still the current version.</summary>
     public ICommand RestorePreviousCommand { get; }
@@ -312,10 +585,26 @@ public sealed partial class GameSavesViewModel : ObservableObject, IPageSurface
 
     public bool NeedsYou => SyncCounts.NeedsYou(Status);
 
-    public bool IsPlaying => Status == GameStatus.Playing;
+    /// <summary>The game is running now, by its status or by the agent seeing it run (PLAY-12).</summary>
+    public bool IsPlaying => Status == GameStatus.Playing || _game.IsRunning;
 
-    /// <summary>Why Back up now is off: a running game backs itself up once you quit.</summary>
-    public string? BackUpTip => IsPlaying ? "Once you quit, it backs up by itself" : null;
+    /// <summary>
+    /// KAN-91: Back up now works while the game runs, as New named save does (the owner, 2 Oct 2026): it keeps the save as
+    /// it is at that moment here, and the upload waits until the game closes (BG-08).
+    /// </summary>
+    public string BackUpTip => IsPlaying
+        ? "Keeps the save as it is now, on this PC; it uploads once you quit"
+        : "Keeps a version of the save as it is now, on this PC and in the cloud, without waiting for the game to close";
+
+    /// <summary>
+    /// KAN-91: Restore's ask while the game runs: it goes ahead (the owner, 2 Oct 2026), and says what to expect. A file the
+    /// game holds stops it, saying which, with nothing changed.
+    /// </summary>
+    public string? RunningNote => IsPlaying
+        ? $"{Title} is running. Load the save again from its menu afterwards; if it saves as you quit, it may write over it."
+        : null;
+
+    public bool HasRunningNote => RunningNote is not null;
 
     /// <summary>A game that syncs, once its page is read: named saves, where the saves are, and its history.</summary>
     public bool Syncing => HasDetail && Syncs;
@@ -347,11 +636,22 @@ public sealed partial class GameSavesViewModel : ObservableObject, IPageSurface
     {
         _game = game;
         Title = game.Title;
-        Status = game.Syncs ? game.Status ?? GameStatus.Synced : null;
-        StatusLabel = game.Syncs ? HomeViewModel.StatusLabel(game) : null;
-        Sentence = SentenceOf(game);
+
+        // A game the agent sees running reads Playing here as everywhere (PLAY-12), whatever its last sync said.
+        Status = game.Syncs ? game.IsRunning && !game.NeedsYou ? GameStatus.Playing : game.Status ?? GameStatus.Synced : null;
+        StatusLabel = game.Syncs && !game.IsRunning ? HomeViewModel.StatusLabel(game) : null;
+        Sentence = KeptSentence() ?? LearnSentence() ?? SentenceOf(game);
         OnPropertyChanged(nameof(BackdropArt));
+        OnPropertyChanged(nameof(IsPlaying));
+        OnPropertyChanged(nameof(BackUpTip));
+        OnPropertyChanged(nameof(RunningNote));
+        OnPropertyChanged(nameof(HasRunningNote));
     }
+
+    /// <summary>KAN-61: what the scan found, for a game not syncing yet whose live save sits beside copies kept by hand.</summary>
+    private string? KeptSentence() => !_game.Syncs && Kept is { } kept
+        ? $"GameSync found its live save, {Path.GetFileName(kept.LiveFolder)}, and {Copies(kept.Copies)} of it you kept by hand beside it. Nothing is backed up yet: Sync these saves syncs the live save and brings the copies in as named saves."
+        : null;
 
     /// <summary>What the page reads after it opens, and again whenever the games refresh.</summary>
     public async void Reload()
@@ -403,18 +703,37 @@ public sealed partial class GameSavesViewModel : ObservableObject, IPageSurface
 
     public bool RestoreDone => HasRestoreNote && !Restoring && !RestoreFailed;
 
-    /// <summary>One question was asked already (the flyout); this brings the save back and says how it went.</summary>
-    private async void Restore(VersionId version, string? name, string what)
+    /// <summary>
+    /// One question was asked already (the flyout); this brings the save back and says how it went. Meanwhile the row's
+    /// Restore says Restoring… and a line under the status says what's coming back, both moving (KAN-80).
+    /// </summary>
+    private async void Restore(VersionId version, string? name, string what, object? item)
     {
         if (_actions?.Restore is not { } restore || Restoring)
         {
             return;
         }
 
-        (Restoring, RestoreFailed, RestoreNote) = (true, false, $"Bringing back {what}…");
+        Busy(item, true);
+        (Restoring, RestoreFailed, RestoreNote) = (true, false, $"Bringing back {what}");
         var problem = await restore(Id, version, name);
+        Busy(item, false);
         (Restoring, RestoreFailed) = (false, problem is not null);
         RestoreNote = problem ?? $"{char.ToUpperInvariant(what[0])}{what[1..]} is back in place. The files it replaced are kept in the history, so you can go back to them.";
+    }
+
+    /// <summary>The row whose Restore was pressed says Restoring… while it runs.</summary>
+    private void Busy(object? item, bool restoring)
+    {
+        switch (item)
+        {
+            case NamedSaveItem named:
+                named.IsRestoring = restoring;
+                break;
+            case VersionItem version:
+                Versions = Versions.Select(v => v.Id == version.Id ? v with { IsRestoring = restoring } : v).ToList();
+                break;
+        }
     }
 
     /// <summary>Marks a version in the history, where its Restore is, as a row of the Versions tab opens it (MGR-08).</summary>
@@ -428,22 +747,84 @@ public sealed partial class GameSavesViewModel : ObservableObject, IPageSurface
     public void Show(GameDetail detail, DateTime nowLocal)
     {
         Syncs = detail.Syncs;
+        Kept = detail.Syncs ? null : detail.Kept;
+        Sentence = KeptSentence() ?? SentenceOf(_game);
         FoundBy = detail.FoundBy;
         KeepLine = KeepNoteFor(detail.FoundFiles, detail.FoundBytes);
         PlaceItem Place(GamePlace p) => new(p.Portable, p.Folder, p.Tag, p.Evidence,
-            p.Folder is { } folder && _actions?.OpenFolder is { } open ? new RelayCommand(() => open(folder)) : null);
+            p.Folder is { } folder && _actions?.OpenFolder is { } open ? new RelayCommand(() => open(folder)) : null) { Programs = p.Programs };
         Places = detail.Places.Select(Place).ToList();
         Suggestions = detail.Suggestions.Select(Place).ToList();
-        NamedSaves = detail.NamedSaves.Select(n => new NamedSaveItem(n.Name, n.Version, When(n.SavedUtc, nowLocal), n.Pc.ToUpperInvariant(), n.InPlace)).ToList();
+        NamedSaves = detail.NamedSaves.Select(n => new NamedSaveItem(n.Name, n.Version, When(n.SavedUtc, nowLocal), n.Pc.ToUpperInvariant(), n.InPlace, Title)).ToList();
         Versions = detail.Versions.Select(v => new VersionItem(v.Id, When(v.SavedUtc, nowLocal), v.Pc.ToUpperInvariant(), v.Note, v.IsCurrent, v.IsPinned,
-            Cli.FormatSize(v.Bytes), v.Uploaded) { IsPicked = v.Id == Picked }).ToList();
+            Cli.FormatSize(v.Bytes), v.Uploaded)
+        {
+            IsPicked = v.Id == Picked,
+            Question = $"Restore {Title}'s save to the one from {When(v.SavedUtc, nowLocal)}?",
+        }).ToList();
         _current = detail.Versions.FirstOrDefault(v => v.IsCurrent)?.Id;
         HistorySummary = detail.Versions.Count == 0 ? "no versions yet"
             : $"{(detail.Versions.Count == 1 ? "1 version" : $"{detail.Versions.Count.ToString(CultureInfo.InvariantCulture)} versions")} · {Cli.FormatSize(detail.HistoryBytes)}";
         Settled = detail.Conflict is { Waiting: false } settled ? settled : null;
         OnPropertyChanged(nameof(SettledText));
+        HasAntiCheat = detail.HasAntiCheat;
+        _backupFolder = detail.BackupFolder;
+        if (!_sortRead)
+        {
+            // The order kept on this PC, once; what the person picks after is kept as they pick it.
+            NamedSort = detail.NamedSort;
+            _sortRead = true;
+        }
+
+        ShowCurrent(detail.Current, nowLocal);
         LogLines = detail.Log.Select(l => ActivityLog.Line(When(l.AtUtc, nowLocal), l.Level, l.Tag, l.Message)).ToList();
         HasDetail = true;
+
+        // FIND-04: learn mode, once the places are known, and the status line as it has it.
+        Learn = detail.Learn;
+        Sentence = KeptSentence() ?? LearnSentence() ?? SentenceOf(_game);
+        foreach (var name in new[] { nameof(ShowsLearn), nameof(LearnNote), nameof(HasLearnNote), nameof(SeesLearnFinds), nameof(NothingFoundNote), nameof(LearnNothingFoundNote), nameof(ChoosesFiles) })
+        {
+            OnPropertyChanged(name);
+        }
+    }
+
+    /// <summary>KAN-92: the Current save card's facts, from the live save as it is now.</summary>
+    private void ShowCurrent(CurrentSave? current, DateTime nowLocal)
+    {
+        if (current is null)
+        {
+            (CurrentWritten, CurrentSize, CurrentBackedUp, CurrentSameAs, CurrentInUse, CurrentFacts) = (null, null, null, null, null, []);
+            return;
+        }
+
+        if (current.InUse is { } held)
+        {
+            (CurrentWritten, CurrentSize, CurrentBackedUp, CurrentSameAs) = ("Now, by the game", null, null, null);
+            CurrentInUse = $"{Title} has {held} open, so it can't be read right now.";
+            CurrentFacts = [new Fact("Last written", CurrentWritten)];
+            return;
+        }
+
+        CurrentInUse = null;
+        CurrentWritten = current.NewestUtc is { } newest ? When(newest, nowLocal) : "Unknown";
+        CurrentSize = $"{(current.Files == 1 ? "1 file" : $"{current.Files.ToString("N0", CultureInfo.InvariantCulture)} files")} · {Cli.FormatSize(current.Bytes)}";
+        var cloud = _game.Cloud;
+        CurrentBackedUp = current.BackedUpUtc is not { } backed
+            ? Versions.Count == 0 ? "Not yet" : "Not since it last changed: Back up now keeps it as a version"
+            : current.Uploaded && cloud is not null ? $"{When(backed, nowLocal)}, on this PC and in {cloud}"
+            : cloud is not null ? $"{When(backed, nowLocal)}, on this PC; it uploads next"
+            : $"{When(backed, nowLocal)}, on this PC";
+        CurrentSameAs = current.SameAs is { } same
+            ? $"“{same}”{(current.RestoredUtc is { } restored ? $", restored {When(restored, nowLocal)}" : "")}"
+            : null;
+        CurrentFacts = new[]
+        {
+            new Fact("Last written", CurrentWritten),
+            new Fact("Size", CurrentSize, Mono: true),
+            new Fact("Backed up", CurrentBackedUp),
+            CurrentSameAs is null ? null : new Fact("Same as", CurrentSameAs),
+        }.OfType<Fact>().ToList();
     }
 
     /// <summary>"23 Sep 21:10", in a table's mono.</summary>
@@ -463,7 +844,7 @@ public sealed partial class GameSavesViewModel : ObservableObject, IPageSurface
         { Status: GameStatus.Conflict } =>
             $"{DecisionEngine.WaitingReason(game.StatusDetail) ?? "It changed on two PCs since they last agreed."} Both copies are safe; Resolve shows them side by side.",
         { NeedsYou: true, StatusDetail: { Length: > 0 } detail } => detail,
-        { Status: GameStatus.Playing } => "Running now. Its save syncs a few seconds after you quit.",
+        { IsRunning: true } => "Running now. Its save syncs a few seconds after you quit; Back up now and named saves keep it as it is meanwhile.",
         { FirstBackupPending: true } => "It isn't backed up yet: its first backup happens in a moment, when GameSync next syncs. Back up now does it at once.",
         { Status: GameStatus.BackupOnly, StoreSyncs: false } =>
             "GameSync keeps every version of its saves, backed up on this PC and in the cloud, and they don't sync between your PCs. Sync between PCs keeps them in step.",

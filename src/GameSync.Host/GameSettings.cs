@@ -4,6 +4,7 @@ using GameSync.Core.Games;
 using GameSync.Core.Model;
 using GameSync.Core.Safety;
 using GameSync.Core.Scanning;
+using GameSync.Core.Storage;
 
 namespace GameSync.Host;
 
@@ -183,6 +184,13 @@ public static class GameSettings
         var title = entry?.DisplayTitle ?? configGame!.Title;
         var said = new List<string>();
 
+        // R15: a program that can't start the game is refused before anything changes.
+        var antiCheat = entry?.HasAntiCheat == true;
+        if (change.Program is { } newProgram)
+        {
+            GameLaunch.CheckProgram(newProgram, antiCheat);
+        }
+
         // ART-06: pictures are read and checked before anything changes, so a bad one changes nothing.
         var images = change.Art.Select(choice => (choice.Kind, Content: choice.File is { } file ? Picture(file, choice.Kind) : null)).ToList();
         if (change.Favourite is { } favourite)
@@ -205,7 +213,7 @@ public static class GameSettings
 
         if (change.Program is { } program)
         {
-            GameLaunch.SetProgram(engine.State, game, program);
+            GameLaunch.SetProgram(engine.State, game, program, antiCheat);
             said.Add("a new program to start");
         }
 
@@ -216,9 +224,25 @@ public static class GameSettings
         }
 
         var portable = entry?.Confirmed ?? configGame;
-        var rulesChange = change.Mode is not null || change.Conflict is not null || change.SettingsFiles is not null || change.Screenshots is not null ||
-            change.SkipDefaults is not null || change.Files.Count > 0 || change.AddPlace is not null;
-        if (rulesChange && portable is null)
+        var otherRules = change.Mode is not null || change.Conflict is not null || change.SettingsFiles is not null || change.Screenshots is not null ||
+            change.SkipDefaults is not null || change.Files.Count > 0;
+
+        // KAN-23 (the owner, 3 Oct 2026): Add a place on a game not syncing yet starts it syncing: with another PC's rules
+        // first when one syncs it already, as Sync these saves does (PC-04, R8), then the place; otherwise with the place alone.
+        var starts = false;
+        if (portable is null && entry is not null && change.AddPlace is not null && !otherRules)
+        {
+            var history = new LocalHistory(Cli.HistoryFolder(engine.State, dataDir));
+            var theirs = (await history.Log.ListAsync(game, ct)).Where(v => v.Rules is not null && v.Device.Id != engine.Device.Id).MaxBy(v => v.CreatedUtc);
+            var defaults = GameDefaults.Load(engine.State);
+            portable = theirs is not null
+                ? Library.Adopt(entry, theirs.Rules!, defaults).Confirmed
+                : defaults.Apply(Discoverer.ToDefinition(entry.Id, entry.DisplayTitle, [], entry.StoreCloud ? GameMode.BackupOnly : GameMode.Sync));
+            starts = true;
+            said.Add(theirs is not null ? $"syncing from now on, with {theirs.Device.Name}'s save rules" : "syncing from now on");
+        }
+
+        if ((otherRules || change.AddPlace is not null) && portable is null)
         {
             throw new UsageException(change.AddPlace is not null
                 ? $"{title} isn't syncing yet: sync its saves first, then add a place."
@@ -262,7 +286,7 @@ public static class GameSettings
             {
                 TitleByHand = newTitle is not null && newTitle != entry.DisplayTitle ? newTitle : entry.TitleByHand,
                 Confirmed = updated is not null ? updated with { Title = newTitle ?? updated.Title } : entry.Confirmed,
-                State = change.StopSyncing ? LibraryState.Found : entry.State,
+                State = change.StopSyncing ? LibraryState.Found : starts ? LibraryState.Synced : entry.State,
             };
             engine.Library.SaveAll([next]);
         }
@@ -502,8 +526,9 @@ public static class GameSettings
                     continue;
                 }
 
+                // R1: by its name or by its first bytes, as a backup tells (a program renamed as a save is still one).
                 SaveFileItem item;
-                if (ProgramFileDetector.HasBlockedExtension(path))
+                if (ProgramFileDetector.HasBlockedExtension(path) || ReadsAsProgram(file.FullName))
                 {
                     item = new SaveFileItem(path, file.Length, false, "A program file: never backed up", Locked: true);
                 }
@@ -546,6 +571,19 @@ public static class GameSettings
         var definition = entry.Proposals.Count > 0 ? Discoverer.ToDefinition(entry.Id, entry.DisplayTitle, entry.Proposals, GameMode.Sync)
             : new GameDefinition { Id = entry.Id, Title = entry.DisplayTitle, Roots = new Dictionary<string, string>(), Rules = [] };
         return resolver.Resolve(definition with { Registry = entry.RegistryProposals.Select(p => new RegistryRule { Key = p.Key, Category = p.Category }).ToList() });
+    }
+
+    /// <summary>R1: whether a file's first bytes show a program; one that can't be read now (the game has it open) can't tell.</summary>
+    private static bool ReadsAsProgram(string fullPath)
+    {
+        try
+        {
+            return ProgramFileDetector.IsProgramFile(fullPath);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return false;
+        }
     }
 
     /// <summary>The files under a folder as they come, so a big one is cut short rather than read whole.</summary>

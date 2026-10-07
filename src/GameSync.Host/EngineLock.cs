@@ -38,6 +38,31 @@ internal sealed class EngineLock : IDisposable
         }
     }
 
+    /// <summary>
+    /// KAN-88: one upload at a time, in any process: the app's uploads beside its rounds, and a command line's or the
+    /// daily task's within their runs. It never waits for the engine's lock while held, so the two can't deadlock.
+    /// </summary>
+    public static async Task<EngineLock> AcquireUploadAsync(string dataDir, Action? waiting, CancellationToken ct)
+    {
+        var path = Path.Combine(dataDir, "upload.lock");
+        var told = false;
+        while (true)
+        {
+            if (TryOpen(path) is { } file)
+            {
+                return new EngineLock(file);
+            }
+
+            if (!told)
+            {
+                waiting?.Invoke();
+                told = true;
+            }
+
+            await Task.Delay(TimeSpan.FromMilliseconds(250), ct);
+        }
+    }
+
     /// <summary>BG-01: the agent's own lock, held as long as it runs; null when another agent already has it.</summary>
     public static EngineLock? TryAcquireAgent(string dataDir) => TryOpen(Path.Combine(dataDir, "agent.lock")) is { } file ? new EngineLock(file) : null;
 

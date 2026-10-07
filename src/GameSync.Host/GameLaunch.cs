@@ -45,7 +45,13 @@ public static class GameLaunch
     }
 
     /// <summary>The program a game in its own folder starts from; empty goes back to the biggest program in its folder.</summary>
-    public static void SetProgram(StateStore state, GameId game, string? program)
+    /// <param name="antiCheat">The game ships an anti-cheat: only its anti-cheat's own launcher may start it (R15).</param>
+    public static void SetProgram(StateStore state, GameId game, string? program, bool antiCheat = false) =>
+        state.SetSetting(ProgramKey(game), CheckProgram(program, antiCheat));
+
+    /// <summary>A program picked to start a game, checked: a program on this PC, and for a game with an anti-cheat its anti-cheat's own launcher (R15).</summary>
+    /// <returns>Its full path, or empty for none.</returns>
+    public static string CheckProgram(string? program, bool antiCheat)
     {
         var path = (program ?? "").Trim();
         if (path.Length > 0 && (!Path.IsPathFullyQualified(path) || !path.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) || !File.Exists(path)))
@@ -53,8 +59,42 @@ public static class GameLaunch
             throw new UsageException($"{path} isn't a program on this PC.");
         }
 
-        state.SetSetting(ProgramKey(game), path);
+        if (path.Length > 0 && antiCheat && !IsAntiCheatLauncher(path))
+        {
+            throw new UsageException($"{Path.GetFileName(path)} can't start this game: it has an anti-cheat, so it starts only through its anti-cheat's own launcher, such as {EacLauncher}.");
+        }
+
+        return path;
     }
+
+    /// <summary>Easy Anti-Cheat's own launcher, which starts a game protected.</summary>
+    public const string EacLauncher = "start_protected_game.exe";
+
+    /// <summary>
+    /// R15 (design system version 51): what a game with an anti-cheat that no store starts may start from: its anti-cheat's
+    /// own launcher in its folder (Easy Anti-Cheat's <see cref="EacLauncher"/>, BattlEye's program ending in _BE), the
+    /// shallowest, never the game's program. Null when there's none: then it starts from its launcher, not from GameSync.
+    /// </summary>
+    public static string? AntiCheatLauncher(string? folder)
+    {
+        if (folder is not { Length: > 0 } || !Directory.Exists(folder))
+        {
+            return null;
+        }
+
+        var options = new EnumerationOptions { RecurseSubdirectories = true, MaxRecursionDepth = 2, IgnoreInaccessible = true, AttributesToSkip = FileAttributes.ReparsePoint };
+        return Directory.EnumerateFiles(folder, "*.exe", options)
+            .Where(IsAntiCheatLauncher)
+            .OrderBy(p => p.Count(c => c == Path.DirectorySeparatorChar))
+            .ThenBy(p => Path.GetFileName(p).Equals(EacLauncher, StringComparison.OrdinalIgnoreCase) ? 0 : 1)
+            .ThenBy(p => p, StringComparer.OrdinalIgnoreCase)
+            .FirstOrDefault();
+    }
+
+    /// <summary>R15: whether <paramref name="program"/> is an anti-cheat's own launcher, the only route GameSync starts such a game by.</summary>
+    public static bool IsAntiCheatLauncher(string program) =>
+        Path.GetFileName(program).Equals(EacLauncher, StringComparison.OrdinalIgnoreCase) ||
+        Path.GetFileNameWithoutExtension(program).EndsWith("_BE", StringComparison.OrdinalIgnoreCase);
 
     public static string? Options(StateStore state, GameId game) => state.GetSetting(OptionsKey(game)) is { Length: > 0 } options ? options : null;
 

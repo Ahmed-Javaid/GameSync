@@ -18,10 +18,12 @@ html,body{margin:0;background:var(--bg-100);}
 .gd-col{display:flex;flex-direction:column;gap:16px;min-width:0}
 .gd-about{margin:0;font:400 14px/21px var(--font-sans);color:var(--ink);display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .gd-about.is-open{display:block}
-.gd-ach-row{display:flex;gap:12px}
-.gd-ach{width:76px;display:flex;flex-direction:column;gap:6px;min-width:0}
-.gd-ach-icon{width:56px;height:56px;border-radius:var(--radius-md);background-size:cover;background-position:center;box-shadow:0 0 0 1px var(--edge-art)}
-.gd-ach-name{font:500 12px/16px var(--font-sans);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gd-achcard{display:flex;flex-direction:column;gap:22px}
+.gd-ach-shelf{display:flex;flex-direction:column;gap:12px}
+.gd-ach-label{font:600 11px/14px var(--font-sans);letter-spacing:.12em;text-transform:uppercase;color:var(--ink-faint)}
+.gd-ach-row{display:flex;gap:16px;flex-wrap:wrap}
+.gd-ach{width:84px;display:flex;flex-direction:column;align-items:flex-start;gap:6px;min-width:0}
+.gd-ach-name{max-width:100%;font:500 12px/16px var(--font-sans);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .gd-ach-when{font:400 11px/14px var(--font-sans);color:var(--ink-faint)}
 .gd-status{display:flex;flex-direction:column;gap:8px;align-items:flex-start}
 .gd-status p{margin:0;font:400 13px/19px var(--font-sans);color:var(--ink-muted)}
@@ -37,6 +39,11 @@ var INITIAL = 'ror2';
 
 var HERO_CYAN = "data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%201200%20500%27%20preserveAspectRatio%3D%27xMidYMid%20slice%27%3E%3Crect%20width%3D%271200%27%20height%3D%27500%27%20fill%3D%27%231b2a33%27/%3E%3Ccircle%20cx%3D%27860%27%20cy%3D%27150%27%20r%3D%2770%27%20fill%3D%27%237fe6f2%27%20opacity%3D%27.35%27/%3E%3Cpath%20d%3D%27M0%20330%20L180%20200%20L330%20300%20L520%20150%20L700%20290%20L880%20190%20L1200%20320%20V500%20H0Z%27%20fill%3D%27%23223640%27/%3E%3Cpath%20d%3D%27M0%20400%20L220%20290%20L420%20380%20L640%20270%20L860%20370%20L1040%20300%20L1200%20360%20V500%20H0Z%27%20fill%3D%27%23182730%27/%3E%3Cpath%20d%3D%27M0%20460%20L300%20390%20L600%20450%20L900%20380%20L1200%20440%20V500%20H0Z%27%20fill%3D%27%2310191f%27/%3E%3C/svg%3E";
 var HERO_AMBER = "data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%201200%20500%27%20preserveAspectRatio%3D%27xMidYMid%20slice%27%3E%3Crect%20width%3D%271200%27%20height%3D%27500%27%20fill%3D%27%232c2519%27/%3E%3Ccircle%20cx%3D%27860%27%20cy%3D%27150%27%20r%3D%2770%27%20fill%3D%27%23f2b544%27%20opacity%3D%27.3%27/%3E%3Cpath%20d%3D%27M0%20330%20L180%20200%20L330%20300%20L520%20150%20L700%20290%20L880%20190%20L1200%20320%20V500%20H0Z%27%20fill%3D%27%233a2f1e%27/%3E%3Cpath%20d%3D%27M0%20400%20L220%20290%20L420%20380%20L640%20270%20L860%20370%20L1040%20300%20L1200%20360%20V500%20H0Z%27%20fill%3D%27%23261f14%27/%3E%3Cpath%20d%3D%27M0%20460%20L300%20390%20L600%20450%20L900%20380%20L1200%20440%20V500%20H0Z%27%20fill%3D%27%2317130c%27/%3E%3C/svg%3E";
+// Made-up achievement icons: square pictures with a mark, as Steam's are (design system version 33).
+function achIcon(seed){ var hues=[18,200,280,140,45,340,180,95], marks=['M50 16 L60 40 L86 40 L65 57 L73 84 L50 68 L27 84 L35 57 L14 40 L40 40Z','M50 14 L80 30 L80 56 C80 73 66 83 50 90 C34 83 20 73 20 56 L20 30Z','M50 16 C66 36 76 50 76 64 A26 26 0 0 1 24 64 C24 50 34 36 50 16Z','M20 76 L50 20 L80 76Z','M28 28 L72 72 M72 28 L28 72','M26 50 A24 24 0 1 0 74 50 A24 24 0 1 0 26 50'];
+  var hu=hues[seed%hues.length], m=marks[seed%marks.length];
+  var svg="<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><defs><radialGradient id='g' cx='30%' cy='25%' r='95%'><stop offset='0' stop-color='hsl("+hu+",72%,62%)'/><stop offset='1' stop-color='hsl("+hu+",45%,12%)'/></radialGradient></defs><rect width='100' height='100' fill='url(#g)'/><path d='"+m+"' fill='rgba(255,255,255,.18)' stroke='rgba(255,255,255,.92)' stroke-width='5' stroke-linejoin='round' stroke-linecap='round'/></svg>";
+  return "data:image/svg+xml,"+encodeURIComponent(svg); }
 var C = ["data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%20200%20300%27%3E%3Crect%20width%3D%27200%27%20height%3D%27300%27%20fill%3D%27%232b2220%27/%3E%3Ccircle%20cx%3D%27140%27%20cy%3D%2790%27%20r%3D%2738%27%20fill%3D%27%23e0b36a%27%20opacity%3D%27.5%27/%3E%3Cpath%20d%3D%27M0%20220%20L70%20160%20L130%20210%20L200%20150%20V300%20H0Z%27%20fill%3D%27%23e0b36a%27%20opacity%3D%27.35%27/%3E%3C/svg%3E", "data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%20200%20300%27%3E%3Crect%20width%3D%27200%27%20height%3D%27300%27%20fill%3D%27%231d2a24%27/%3E%3Ccircle%20cx%3D%27140%27%20cy%3D%2790%27%20r%3D%2738%27%20fill%3D%27%237fd1a6%27%20opacity%3D%27.5%27/%3E%3Cpath%20d%3D%27M0%20220%20L70%20160%20L130%20210%20L200%20150%20V300%20H0Z%27%20fill%3D%27%237fd1a6%27%20opacity%3D%27.35%27/%3E%3C/svg%3E", "data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%20200%20300%27%3E%3Crect%20width%3D%27200%27%20height%3D%27300%27%20fill%3D%27%23221f33%27/%3E%3Ccircle%20cx%3D%27140%27%20cy%3D%2790%27%20r%3D%2738%27%20fill%3D%27%23b9a3ff%27%20opacity%3D%27.5%27/%3E%3Cpath%20d%3D%27M0%20220%20L70%20160%20L130%20210%20L200%20150%20V300%20H0Z%27%20fill%3D%27%23b9a3ff%27%20opacity%3D%27.35%27/%3E%3C/svg%3E", "data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%20200%20300%27%3E%3Crect%20width%3D%27200%27%20height%3D%27300%27%20fill%3D%27%231d2630%27/%3E%3Ccircle%20cx%3D%27140%27%20cy%3D%2790%27%20r%3D%2738%27%20fill%3D%27%237fe6f2%27%20opacity%3D%27.5%27/%3E%3Cpath%20d%3D%27M0%20220%20L70%20160%20L130%20210%20L200%20150%20V300%20H0Z%27%20fill%3D%27%237fe6f2%27%20opacity%3D%27.35%27/%3E%3C/svg%3E", "data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%20200%20300%27%3E%3Crect%20width%3D%27200%27%20height%3D%27300%27%20fill%3D%27%232c2519%27/%3E%3Ccircle%20cx%3D%27140%27%20cy%3D%2790%27%20r%3D%2738%27%20fill%3D%27%23f2b544%27%20opacity%3D%27.5%27/%3E%3Cpath%20d%3D%27M0%20220%20L70%20160%20L130%20210%20L200%20150%20V300%20H0Z%27%20fill%3D%27%23f2b544%27%20opacity%3D%27.35%27/%3E%3C/svg%3E", "data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%20200%20300%27%3E%3Crect%20width%3D%27200%27%20height%3D%27300%27%20fill%3D%27%2322262b%27/%3E%3Ccircle%20cx%3D%27140%27%20cy%3D%2790%27%20r%3D%2738%27%20fill%3D%27%23a4abb3%27%20opacity%3D%27.5%27/%3E%3Cpath%20d%3D%27M0%20220%20L70%20160%20L130%20210%20L200%20150%20V300%20H0Z%27%20fill%3D%27%23a4abb3%27%20opacity%3D%27.35%27/%3E%3C/svg%3E", "data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%20200%20300%27%3E%3Crect%20width%3D%27200%27%20height%3D%27300%27%20fill%3D%27%232a1f24%27/%3E%3Ccircle%20cx%3D%27140%27%20cy%3D%2790%27%20r%3D%2738%27%20fill%3D%27%23ff8a7d%27%20opacity%3D%27.5%27/%3E%3Cpath%20d%3D%27M0%20220%20L70%20160%20L130%20210%20L200%20150%20V300%20H0Z%27%20fill%3D%27%23ff8a7d%27%20opacity%3D%27.35%27/%3E%3C/svg%3E"];
 
 // rank: order of last play (0 = now); added: days since GameSync first found it. status null: found, not syncing yet.
@@ -88,7 +95,8 @@ function rail(cur, onNav){return h(G.SideRail,{current:cur,onNavigate:onNav,item
   {id:'search',icon:'search',label:'Search'},
   {id:'home',icon:'home',label:'Home',sep:true},
   {id:'library',icon:'library',label:'Game library',dot:'play',dotLabel:'Slay the Spire 2 is running'},
-  {id:'saves',icon:'saves',label:'Save manager',sep:true,dot:'warn',dotLabel:'2 games need you'},
+  {id:'achievements',icon:'trophy',label:'Achievements'},
+  {id:'saves',icon:'saves',label:'Save manager',sep:true,dot:'warn',dotLabel:'2 conflicts'},
   {id:'log',icon:'terminal',label:'Console'},
   {id:'settings',icon:'settings',label:'Settings',bottom:true}]})}
 
@@ -97,17 +105,17 @@ var INFO = {
   ror2:{about:'A roguelike shooter for one to four players. Fight across a hostile alien planet while the monsters grow stronger by the minute, collect items that stack in odd ways, and find the way off before the difficulty runs away from you.',
     dev:'Hopoo Games',pub:'Gearbox Publishing',released:'11 Aug 2020',genres:['Action','Roguelike','Co-op'],appId:'632360',engine:'Unity',
     dir:'E:\\Steam\\steamapps\\common\\Risk of Rain 2',size:'1.8 GB',build:'15632211',options:'-novid',found:'Steam\u2019s library, 28 Sep',
-    ach:{done:43,total:58,rarest:{name:'Eclipse 8',pct:'1.2%'},latest:[{name:'Mercenary',when:'21 Sep',art:C[3]},{name:'Deicide',when:'18 Sep',art:C[2]},{name:'Cosmic Explorer',when:'14 Sep',art:C[1]},{name:'Newtist',when:'2 Sep',art:C[5]},{name:'Glorious Battle',when:'30 Aug',art:C[0]}]},
+    ach:{done:43,total:58,tiers:{gold:6,silver:14,bronze:23},rarest:{name:'Eclipse 8',desc:'Beat the game on Eclipse 8 with any survivor.',pct:1.2,art:achIcon(4)},latest:[{name:'Mercenary',when:'21 Sep',pct:24,art:achIcon(1)},{name:'Deicide',when:'18 Sep',pct:12,art:achIcon(2)},{name:'Cosmic Explorer',when:'14 Sep',pct:3.8,art:achIcon(3)},{name:'Newtist',when:'2 Sep',pct:16,art:achIcon(5)},{name:'Glorious Battle',when:'30 Aug',pct:41,art:achIcon(0)}]},
     saves:{last:'25 Sep 03:36 \u00b7 DESKTOP',kept:'17 versions \u00b7 2.6 MB',named:'2',path:'E:\\Steam\\userdata\\41755\\632360\\remote\\UserProfiles',places:3}},
   terraria:{about:'A 2D sandbox of digging, building and fighting. Carve through a generated world, craft gear from what you find, and take on its bosses alone or with friends on a shared world.',
     dev:'Re-Logic',pub:'Re-Logic',released:'16 May 2011',genres:['Sandbox','Adventure','Co-op'],appId:'105600',engine:'XNA',
     dir:'E:\\Steam\\steamapps\\common\\Terraria',size:'468 MB',build:'14892355',found:'Steam\u2019s library, 27 Sep',
-    ach:{done:61,total:115,rarest:{name:'Rainbows and Unicorns',pct:'3.4%'},latest:[{name:'Head in the Clouds',when:'Yesterday',art:C[1]},{name:'Slippery Shinobi',when:'26 Sep',art:C[3]},{name:'Boots of the Hero',when:'24 Sep',art:C[5]},{name:'Timber!!',when:'20 Sep',art:C[0]}]},
+    ach:{done:61,total:115,tiers:{gold:9,silver:21,bronze:31},rarest:{name:'Rainbows and Unicorns',desc:'Fire a unicorn-mounted rainbow gun.',pct:3.4,art:achIcon(6)},latest:[{name:'Head in the Clouds',when:'Yesterday',pct:22,art:achIcon(1)},{name:'Slippery Shinobi',when:'26 Sep',pct:9.5,art:achIcon(3)},{name:'Boots of the Hero',when:'24 Sep',pct:15,art:achIcon(5)},{name:'Timber!!',when:'20 Sep',pct:88,art:achIcon(0)}]},
     saves:{last:'Yesterday 23:12 \u00b7 DESKTOP',kept:'52 versions \u00b7 326 MB',named:'1',path:'C:\\Users\\You\\Documents\\My Games\\Terraria',places:1}},
   sekiro:{about:'A third-person action game set in a war-torn Sengoku Japan. A shinobi with a prosthetic arm fights to rescue his young lord, with a combat system built on deflecting blows and breaking posture.',
     dev:'FromSoftware',pub:'Activision',released:'22 Mar 2019',genres:['Action','Adventure'],appId:'814380',engine:'FromSoftware\u2019s own',
     dir:'E:\\Steam\\steamapps\\common\\Sekiro',size:'14.6 GB',build:'4336713',found:'Steam\u2019s library, 27 Sep',
-    ach:{done:29,total:34,rarest:{name:'Return',pct:'9.8%'},latest:[{name:'Shura',when:'Today',art:C[0]},{name:'Isshin Ashina',when:'Today',art:C[4]},{name:'Great Shinobi',when:'26 Sep',art:C[6]}]},
+    ach:{done:34,total:34,completedOn:'2 Oct',tiers:{gold:4,silver:11,bronze:19},rarest:{name:'Return',desc:'Reach the Return ending.',pct:4.6,art:achIcon(2)},latest:[{name:'Shura',when:'2 Oct',pct:9.1,art:achIcon(0)},{name:'Isshin Ashina',when:'2 Oct',pct:7.2,art:achIcon(4)},{name:'Great Shinobi',when:'26 Sep',pct:21,art:achIcon(6)},{name:'Purification',when:'24 Sep',pct:8.4,art:achIcon(1)},{name:'Immortal Severance',when:'20 Sep',pct:18,art:achIcon(5)}]},
     saves:{last:'Today 21:04 \u00b7 DESKTOP',kept:'14 versions \u00b7 29 MB',named:'1',path:'C:\\Users\\You\\AppData\\Roaming\\Sekiro\\76561198041',places:1}},
   sts2:{about:'A deck-building roguelike. Climb the Spire with one of several characters, build a deck from the cards you find on the way, and beat the bosses at the top of each act.',
     dev:'Mega Crit',pub:'Mega Crit',released:'2026',genres:['Strategy','Card game','Roguelike'],appId:'2868840',engine:'Godot',
@@ -116,11 +124,12 @@ var INFO = {
   wukong:{about:'An action RPG drawn from Journey to the West. As the Destined One, face the great yaoguai of Chinese myth in hard, fast fights, and change shape to turn a battle.',
     dev:'Game Science',pub:'Game Science',released:'20 Aug 2024',genres:['Action','RPG'],appId:'2358720',engine:'Unreal Engine 5',
     dir:'G:\\Black Myth Wukong',size:'128 GB',program:'G:\\Black Myth Wukong\\b1\\Binaries\\Win64\\b1-Win64-Shipping.exe',found:'the Unreal engine rule, 27 Sep',
+    ach:{done:0,total:81,source:'not-steam',tiers:{}},
     saves:{last:'23 Sep 21:10 \u00b7 DESKTOP',kept:'17 versions \u00b7 31.4 MB',named:'3',path:'G:\\Black Myth Wukong\\b1\\Saved\\SaveGames',places:1}},
   core:{about:'A mining and crafting adventure for up to eight players. Wake beneath the ground next to an ancient relic, dig out a home, farm, fish and fight the titans of the underground.',
     dev:'Pugstorm',pub:'Fireshine Games',released:'27 Aug 2024',genres:['Adventure','Survival','Co-op'],appId:'1621690',engine:'Unity',
     dir:'E:\\Steam\\steamapps\\common\\Core Keeper',size:'1.2 GB',found:'Steam\u2019s library, 28 Sep',
-    ach:{done:12,total:43,rarest:{name:'Hive Mother',pct:'6.1%'},latest:[{name:'Deep Diver',when:'23 Sep',art:C[1]},{name:'Farmer',when:'22 Sep',art:C[5]}]}},
+    ach:{done:12,total:43,tiers:{gold:1,silver:3,bronze:8},rarest:{name:'Hive Mother',desc:'Defeat the Hive Mother.',pct:6.1,art:achIcon(7)},latest:[{name:'Deep Diver',when:'23 Sep',pct:31,art:achIcon(1)},{name:'Farmer',when:'22 Sep',pct:52,art:achIcon(5)}]}},
   valheim:{about:'A survival and exploration game for one to ten Vikings. Sail, build and fight through a procedurally made world of Norse myth, and prove yourself worthy of Valhalla.',
     dev:'Iron Gate AB',pub:'Coffee Stain Publishing',released:'2 Feb 2021',genres:['Survival','Adventure','Co-op'],appId:'892970',engine:'Unity',
     dir:'E:\\Steam\\steamapps\\common\\Valheim',size:'1.6 GB',found:'Steam\u2019s library, 27 Sep',
@@ -135,6 +144,7 @@ var INFO = {
   hollow:{about:'A hand-drawn action adventure through a ruined kingdom of insects and heroes, with a wide web of caverns to explore and old secrets to find.',
     dev:'Team Cherry',pub:'Team Cherry',released:'24 Feb 2017',genres:['Action','Metroidvania'],appId:'367520',engine:'Unity',
     dir:'E:\\Steam\\steamapps\\common\\Hollow Knight',size:'9.1 GB',found:'Steam\u2019s library, 27 Sep',
+    ach:{done:0,total:63,source:'not-played',tiers:{}},
     saves:{last:'2 Jul 22:40 \u00b7 LAPTOP',kept:'8 versions \u00b7 1.1 MB',named:'0',path:'C:\\Users\\You\\AppData\\LocalLow\\Team Cherry\\Hollow Knight',places:1}},
   mcworld:{byHand:true,dir:'D:\\Minecraft Server\\world',program:'D:\\Minecraft Server\\run.bat',found:'you, 28 Sep',
     saves:{last:'28 Sep 23:10 \u00b7 DESKTOP',kept:'4 versions \u00b7 612 MB',named:'0',path:'D:\\Minecraft Server\\world',places:1}},
@@ -201,7 +211,7 @@ function GamePage(p){
   var stats = [
     {label:'Last played',value:g.last||'Never'},
     {label:'Play time',value:g.hours?g.hours+' hours':'None yet'},
-    info.ach ? {label:'Achievements',value:info.ach.done+' of '+info.ach.total} : null,
+    info.ach && !info.ach.off ? {label:'Achievements',value:info.ach.done+' of '+info.ach.total} : null,
     {label:'Saves',value:statusWord(g),status:g.status||'not-syncing'}];
   var actions = [
     h(G.IconButton,{key:'fav',icon:'star',pressed:!!g.fav,label:g.fav?'Remove from favourites':'Add to favourites',onClick:function(){p.onFav(g)}}),
@@ -226,11 +236,29 @@ function GamePage(p){
           h(G.Facts,{items:[{label:'Developer',value:info.dev},{label:'Publisher',value:info.pub},{label:'Released',value:info.released},
             {label:'Genres',value:info.genres?h('span',{className:'gd-genres'},info.genres.map(function(x){return h('span',{key:x,className:'gs-tag'},x)})):null},
             {label:'Engine',value:info.engine||g.engine}]})),
-        info.ach ? h(G.Card,{title:'Achievements',subtitle:info.ach.done+' of '+info.ach.total+' unlocked on Steam',action:h(G.Button,{size:'sm',variant:'ghost',iconAfter:'chevronRight'},'View all')},
-          h(G.ProgressBar,{value:pct,label:'Unlocked',right:pct+'%',ariaLabel:pct+'% of achievements unlocked'}),
-          h('div',{className:'gd-ach-row'},info.ach.latest.map(function(a){return h('div',{key:a.name,className:'gd-ach',title:a.name+', unlocked '+a.when},
-            h('span',{className:'gd-ach-icon',style:{backgroundImage:'url('+a.art+')'},'aria-hidden':'true'}),h('span',{className:'gd-ach-name'},a.name),h('span',{className:'gd-ach-when'},a.when))})),
-          h('div',{className:'gs-note'},h(G.Icon,{name:'trophy',size:16}),'Rarest: '+info.ach.rarest.name+', unlocked by '+info.ach.rarest.pct+' of players.')) : null),
+        // Every game's page has its Achievements card (version 35; the owner: "it should still have achievements on its game
+        // page. Let it say 0"): its own from Steam on this PC; Steam's list at 0 for a copy that isn't Steam's or a game not
+        // run here; a line for a game with no list; and a game left out says so.
+        info.ach && info.ach.off ? h(G.Card,{title:'Achievements',subtitle:'Left out of your achievements'},
+            h('div',{className:'gd-status'},h('p',null,'No popups while you play it, and it isn\u2019t counted on the Achievements page or Home.')),
+            h('div',{className:'gs-row'},h(G.Button,{size:'sm',variant:'secondary',icon:'trophy'},'Count it again')))
+        : info.ach ? h(G.Card,{title:'Achievements',
+            subtitle:info.ach.source==='record'?info.ach.done+' of '+info.ach.total+' unlocked \u00b7 this copy\u2019s record':info.ach.source==='not-steam'?'0 of '+info.ach.total+' \u00b7 Steam\u2019s list':info.ach.source==='not-played'?'0 of '+info.ach.total+' \u00b7 none unlocked on this PC'
+              :info.ach.done>=info.ach.total?'Every achievement unlocked on Steam':info.ach.done+' of '+info.ach.total+' unlocked on Steam',
+            action:h(G.Button,{size:'sm',variant:'ghost',iconAfter:'chevronRight',title:'Every one of its achievements: what each is, when you unlocked it, how rare it is'},'View all')},
+          h('div',{className:'gd-achcard'},
+            h(G.AchievementsOverview,{done:info.ach.done,total:info.ach.total,tiers:info.ach.tiers,completedOn:info.ach.completedOn,moment:info.ach.moment}),
+            info.ach.latest ? h('div',{className:'gd-ach-shelf'},
+              h('span',{className:'gd-ach-label'},'Latest unlocked'),
+              h('div',{className:'gd-ach-row'},info.ach.latest.map(function(a){return h('div',{key:a.name,className:'gd-ach',title:a.name+', unlocked '+a.when+(a.pct!=null?', '+G.achievements.percent(a.pct)+' of players':'')},
+                h(G.AchievementBadge,{icon:a.art,name:a.name,tier:G.achievements.tierOf(a.pct)}),h('span',{className:'gd-ach-name'},a.name),h('span',{className:'gd-ach-when'},a.when))}))) : null,
+            info.ach.source ? h('div',{className:'gs-note'},h(G.Icon,{name:'info',size:16}),info.ach.source==='record'
+              ? 'This copy isn\u2019t Steam\u2019s, so what you\u2019ve unlocked comes from its own record, in a folder added in Settings, Achievements. Each one\u2019s name, icon and how rare it is are Steam\u2019s.'
+              : info.ach.source==='not-steam'
+              ? 'This copy isn\u2019t Steam\u2019s, so what you unlock in it doesn\u2019t show here: if it keeps its own record, add the folder in Settings, Achievements. The list is Steam\u2019s, with how rare each one is.'
+              : 'Steam on this PC hasn\u2019t seen you play it, so nothing shows as unlocked yet; once you play it here, what you unlock does.') : null,
+            info.ach.rarest ? h(G.AchievementSpotlight,{item:{name:info.ach.rarest.name,desc:info.ach.rarest.desc,pct:info.ach.rarest.pct,icon:info.ach.rarest.art}}) : null))
+        : h(G.Card,{title:'Achievements'},h('div',{className:'gs-note'},h(G.Icon,{name:'trophy',size:16}),'GameSync can\u2019t read this game\u2019s achievements yet: it reads Steam\u2019s for now.'))),
       h('div',{className:'gd-col'},
         h(G.Card,{title:'Saves',action:h(G.Button,{size:'sm',variant:'ghost',iconAfter:'chevronRight',onClick:p.onSaves},'Open in Saves')},
           h('div',{className:'gd-status'},h(G.StatusBadge,{status:g.status||'not-syncing',label:statusWord(g)}),h('p',null,blurbOf(g))),
@@ -256,7 +284,7 @@ function Covers(p){
   return h(React.Fragment,null,
     h('header',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',gap:16}},
       h('div',{style:{minWidth:0}},h('div',{style:{font:'600 15px/20px var(--font-sans)'}},'My games'),h('div',{className:'gs-faint',style:{fontSize:12}},GAMES.length+' games \u00b7 '+GAMES.filter(function(g){return g.installed!==false}).length+' installed')),
-      h(G.PillTabs,{label:'Library view',value:p.tab,onChange:p.onTab,items:[{id:'all',label:'All games'},{id:'attn',label:'Needs you',count:GAMES.filter(function(g){return NEEDS[g.status]}).length},{id:'software',label:'Software'},{id:'hidden',label:'Hidden'}]}),
+      h(G.PillTabs,{label:'Library view',value:p.tab,onChange:p.onTab,items:[{id:'all',label:'All games'},{id:'attn',label:'Conflicts',count:GAMES.filter(function(g){return NEEDS[g.status]}).length},{id:'software',label:'Software'},{id:'hidden',label:'Hidden'}]}),
       h(G.Button,{icon:'plus'},'Add game')),
     p.games.length === 0 ? h('div',{className:'gs-note',style:{fontSize:13}},h(G.Icon,{name:'search',size:16}),'No game here matches \u201c'+p.query+'\u201d.')
     : favs.length ? [h('div',{key:'fh',className:'gs-overline'},'Favourites'),h('div',{key:'ft'},tiles(favs)),rest.length?h('div',{key:'rh',className:'gs-overline'},p.tab==='all'?'All games':'The rest'):null,h('div',{key:'rt'},tiles(rest))]
@@ -267,8 +295,19 @@ function App(){
   var games = useState(GAMES.concat(SOFTWARE, HIDDEN)), all = games[0];
   // A render can open a game, and its Properties: #core, or #ror2/saves.
   var hash = (location.hash || '').slice(1).split('/');
-  var sel = useState(hash[0] || INITIAL), tab = useState('all'), sort = useState('recent'), q = useState(''), menu = useState(null), props = useState(hash[1] ? {section:hash[1]} : null);
+  var sel = useState(hash[0] || INITIAL), tab = useState('all'), sort = useState('recent'), q = useState(''), menu = useState(null), props = useState(hash[1] && hash[1].indexOf('ach') !== 0 ? {section:hash[1]} : null);
+  // #core/ach-off: the game left out of the achievements (Settings, Achievements; version 35).
+  if (hash[1] === 'ach-off' && INFO[hash[0]] && INFO[hash[0]].ach) INFO[hash[0]].ach.off = true;
+  // #sekiro/ach-moment: the first time its 100% is seen, the Zenith's moment plays (version 49).
+  if (hash[1] === 'ach-moment' && INFO[hash[0]] && INFO[hash[0]].ach) { INFO[hash[0]].ach.moment = true; hash[1] = 'ach'; }
+  // #wukong/ach-record: a copy that isn't Steam's, with its own record of what's unlocked read from a folder added in
+  // Settings, Achievements (version 48, KAN-123): counted like a Steam game's, its names, icons and rarity Steam's.
+  if (hash[1] === 'ach-record' && INFO[hash[0]] && INFO[hash[0]].ach) Object.assign(INFO[hash[0]].ach, {source:'record', done:27, tiers:{gold:2,silver:6,bronze:19},
+    rarest:{name:'Unbroken',desc:'Finish a chapter without being struck.',pct:3.4,art:achIcon(6)},
+    latest:[{name:'Toad Bane',when:'Yesterday',pct:41,art:achIcon(3)},{name:'Bell Ringer',when:'3 Oct',pct:18,art:achIcon(5)},{name:'Brushed Away',when:'30 Sep',pct:62,art:achIcon(1)}]});
   var frame = useRef(null), search = useRef(null);
+  // #ror2/ach: the page scrolled to its Achievements card (design system version 33).
+  useEffect(function(){ if(hash[1]&&hash[1].indexOf('ach')===0){ var c=Array.prototype.filter.call(document.querySelectorAll('.gs-card'),function(x){return x.getAttribute('aria-label')==='Achievements'})[0]; if(c) c.scrollIntoView({block:'start'}); } },[]);
   function back(){ sel[1](null); }
   useEffect(function(){
     function key(e){
@@ -287,7 +326,7 @@ function App(){
   var shown = sorted(inView.filter(function(g){return matches(g,q[0])}), sort[0]);
   var current = sel[0] ? all.filter(function(g){return g.id===sel[0]})[0] : null;
   var groups = [{id:'fav',label:'Favourites',games:shown.filter(function(g){return g.fav})},
-    {id:'rest',label:{all:'Games',attn:'Needs you',software:'Software',hidden:'Hidden'}[tab[0]],games:shown.filter(function(g){return !g.fav})}];
+    {id:'rest',label:{all:'Games',attn:'Conflicts',software:'Software',hidden:'Hidden'}[tab[0]],games:shown.filter(function(g){return !g.fav})}];
   var menuEl = null;
   if (menu[0]) {
     var m = menu[0], g = m.game;

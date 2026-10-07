@@ -14,7 +14,16 @@ namespace GameSync.UI.ViewModels;
 /// <summary>A row of the save manager's table: the game, its status, where its saves are, how many versions, their size, the last backup.</summary>
 public sealed record SaveRow(GameId Id, string Title, GameStatus? Status, string? StatusLabel, string Path, string Versions, string Size, string LastBackup)
 {
-    public override string ToString() => string.Join(", ", new[] { Title, StatusLabel ?? GsStatusBadge.Describe(Status).Word, Versions == "" ? null : $"{Versions} versions", LastBackup == "" ? null : $"last backup {LastBackup}" }.OfType<string>());
+    /// <summary>In the Syncing table, where games are ticked for Share selected (SHARE-01).</summary>
+    public bool Selectable { get; init; }
+
+    public bool Selected { get; init; }
+
+    public override string ToString() => string.Join(", ", new[]
+    {
+        Title, StatusLabel ?? GsStatusBadge.Describe(Status).Word, Selectable && Selected ? "ticked to share" : null,
+        Versions switch { "" => null, "1" => "1 version", _ => $"{Versions} versions" }, LastBackup == "" ? null : $"last backup {LastBackup}",
+    }.OfType<string>());
 }
 
 /// <summary>
@@ -72,6 +81,9 @@ public sealed partial class TableSort : ObservableObject
     }
 
     public string Table { get; }
+
+    /// <summary>The Syncing table, whose games are ticked to share them: its heading has Select all (MGR-02).</summary>
+    public bool Selectable => Table == "syncing";
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ByName), nameof(ByStatus), nameof(NameIdle), nameof(StatusIdle), nameof(CommandLine), nameof(GameHeadingName), nameof(StatusHeadingName))]
@@ -148,15 +160,25 @@ public sealed partial class SaveManagerViewModel : ObservableObject, IPageSurfac
 
     /// <summary>The Every game table: every game with saves, syncing or not (KAN-49).</summary>
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(AllCount))]
     private IReadOnlyList<SaveRow> _rows = [];
 
     /// <summary>The Syncing table above it: the games that sync, in its own order.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasSyncingRows))]
+    [NotifyPropertyChangedFor(nameof(HasSyncingRows), nameof(SyncingCount))]
     private IReadOnlyList<SaveRow> _syncingRows = [];
 
     [ObservableProperty]
     private IReadOnlyList<SaveStat> _stats = [];
+
+    /// <summary>The line under the Syncing table's heading (KAN-114): where the games that sync keep their saves.</summary>
+    [ObservableProperty]
+    private string _syncingSub = SyncingSubFor("your Google Drive");
+
+    /// <summary>What syncing means with this cloud, or with none yet (Skip for now).</summary>
+    public static string SyncingSubFor(string? cloud) => cloud is null
+        ? "Kept on this PC until a cloud is connected, then brought to your other PCs too. Tick games to share them."
+        : $"Backed up here and in {cloud}, the newest save brought down to your other PCs. Tick games to share them.";
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(TopSubtitle))]
@@ -233,6 +255,31 @@ public sealed partial class SaveManagerViewModel : ObservableObject, IPageSurfac
             }
         });
         SyncNowCommand = new RelayCommand(() => _actions?.SyncNow(), () => _actions is not null);
+        SelectCommand = new RelayCommand<GameId>(id =>
+        {
+            if (!_selected.Remove(id))
+            {
+                _selected.Add(id);
+            }
+
+            Rebuild(DateTime.Now);
+        });
+        SelectAllCommand = new RelayCommand(() =>
+        {
+            var games = SyncingRows.Select(r => r.Id).ToList();
+            if (games.All(_selected.Contains))
+            {
+                _selected.Clear();
+            }
+            else
+            {
+                _selected.UnionWith(games);
+            }
+
+            Rebuild(DateTime.Now);
+        });
+        ShareSelectedCommand = new RelayCommand(() => _actions?.OpenShare?.Invoke(new ShareStart(ShareStart.Pick, _selected.ToList())));
+        ShareAllCommand = new RelayCommand(() => _actions?.OpenShare?.Invoke(new ShareStart(ShareStart.All, [])));
         BackCommand = new RelayCommand(Back);
         ConflictBackCommand = new RelayCommand(ConflictBack);
         TableCommand = new RelayCommand(() =>
@@ -254,6 +301,29 @@ public sealed partial class SaveManagerViewModel : ObservableObject, IPageSurfac
 
     private string? _conflictReturnTo;
 
+    /// <summary>The games ticked in the Syncing table, for Share selected (SHARE-01); kept while the games refresh.</summary>
+    private readonly HashSet<GameId> _selected = [];
+
+    /// <summary>Ticks a game in the Syncing table, or unticks it.</summary>
+    public ICommand SelectCommand { get; }
+
+    /// <summary>MGR-02: Select all, over the Syncing table: ticks every game in it, or none once they all are.</summary>
+    public ICommand SelectAllCommand { get; }
+
+    /// <summary>The Select all box: ticked when every game in Syncing is, a dash when some are.</summary>
+    public bool? AllSelected => _selected.Count == 0 ? false : SyncingRows.All(r => _selected.Contains(r.Id)) ? true : null;
+
+    public ICommand ShareSelectedCommand { get; }
+
+    public ICommand ShareAllCommand { get; }
+
+    public bool HasSelection => _selected.Count > 0;
+
+    public string ShareSelectedLabel => _selected.Count == 0 ? "Share selected" : $"Share {_selected.Count} selected";
+
+    /// <summary>Import saves (SHARE-10), for the zip picked in Windows' picker.</summary>
+    public void ImportZip(string zip) => _actions?.OpenImport?.Invoke(zip);
+
     public ObservableCollection<LogLine> Log { get; }
 
     public string Title => "Save manager";
@@ -263,6 +333,12 @@ public sealed partial class SaveManagerViewModel : ObservableObject, IPageSurfac
     public bool ShowsNeeds => Game is null && Conflict is null && Tab == NeedsTab;
 
     public bool HasSyncingRows => SyncingRows.Count > 0;
+
+    /// <summary>The count beside the Syncing table's heading (KAN-114).</summary>
+    public string SyncingCount => SyncingRows.Count.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+    /// <summary>The count beside the Every game table's heading.</summary>
+    public string AllCount => Rows.Count.ToString(System.Globalization.CultureInfo.InvariantCulture);
 
     /// <summary>The Syncing table's order, its own (KAN-49).</summary>
     public TableSort SyncingSort { get; }
@@ -303,9 +379,9 @@ public sealed partial class SaveManagerViewModel : ObservableObject, IPageSurfac
     {
         NeedsTab => NeedsRows.Count switch
         {
-            0 => "Nothing needs you",
-            1 => "1 game needs you",
-            var n => $"{n.ToString(CultureInfo.InvariantCulture)} games need you",
+            0 => "No conflicts",
+            1 => "1 conflict",
+            var n => $"{n.ToString(CultureInfo.InvariantCulture)} conflicts",
         },
         "versions" => Versions.Subtitle,
         "log" => "Everything GameSync did, per game, newest first",
@@ -317,7 +393,7 @@ public sealed partial class SaveManagerViewModel : ObservableObject, IPageSurfac
     private static IReadOnlyList<Controls.NavItem> TabsWith(int needYou) =>
     [
         new("saves", "Saves", "saves"),
-        new(NeedsTab, "Needs you", "alert", needYou > 0 ? needYou.ToString(CultureInfo.InvariantCulture) : null),
+        new(NeedsTab, "Conflicts", "alert", needYou > 0 ? needYou.ToString(CultureInfo.InvariantCulture) : null),
         new("plan", "Plan", "chevronsRight"),
         new("versions", "Versions", "clock"),
         new("log", "Log", "terminal"),
@@ -464,6 +540,11 @@ public sealed partial class SaveManagerViewModel : ObservableObject, IPageSurfac
     public void Update(IReadOnlyList<LauncherGame> games)
     {
         _games = games;
+        if (games.Count > 0)
+        {
+            SyncingSub = SyncingSubFor(games[0].Cloud);
+        }
+
         if (Conflict is { } conflict)
         {
             if (games.FirstOrDefault(g => g.Id == conflict.Id) is { } game)
@@ -580,7 +661,11 @@ public sealed partial class SaveManagerViewModel : ObservableObject, IPageSurfac
         }
 
         Rows = AllSort.Order(shown).Select(Row).ToList();
-        SyncingRows = SyncingSort.Order(shown.Where(g => g.Syncs)).Select(Row).ToList();
+        _selected.IntersectWith(shown.Where(g => g.Syncs).Select(g => g.Id));
+        SyncingRows = SyncingSort.Order(shown.Where(g => g.Syncs)).Select(g => Row(g) with { Selectable = true, Selected = _selected.Contains(g.Id) }).ToList();
+        OnPropertyChanged(nameof(ShareSelectedLabel));
+        OnPropertyChanged(nameof(HasSelection));
+        OnPropertyChanged(nameof(AllSelected));
 
         NeedsRows = shown.Where(g => g.NeedsYou).Select(g =>
         {
@@ -602,7 +687,7 @@ public sealed partial class SaveManagerViewModel : ObservableObject, IPageSurfac
                 _space is { } on ? on.FreeBytes is { } free ? $"{on.Drive} · {Cli.FormatSize(free)} free" : on.Drive : null),
             new SaveStat("Versions", _summaries.Values.Sum(s => s.Versions).ToString(CultureInfo.InvariantCulture)),
             new SaveStat("Last backup", latest is { } at ? Launcher.WhenText(at, nowLocal) ?? "None yet" : "None yet"),
-            new SaveStat("Needs you", shown.Count(g => g.NeedsYou).ToString(CultureInfo.InvariantCulture)),
+            new SaveStat("Conflicts", shown.Count(g => g.NeedsYou).ToString(CultureInfo.InvariantCulture)),
         ];
         var found = shown.Count - syncing;
         Subtitle = syncing == 0 ? $"No games syncing yet · {found} found with saves" : $"{syncing} {(syncing == 1 ? "game" : "games")} syncing · {found} found, not syncing yet";

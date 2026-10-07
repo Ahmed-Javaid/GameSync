@@ -1,4 +1,4 @@
-<!-- @dsCard group="Save manager" height=860 subtitle="Sync only the live save, and bring the copies kept by hand beside it in as named saves (KAN-61)" -->
+<!-- @dsCard group="Save manager" height=860 subtitle="Sync only the live save, and bring the copies kept by hand beside it in as named saves (KAN-61); #looking and #keeping show how far they are" -->
 <!doctype html>
 <html lang="en">
 <head><meta charset="utf-8"><title>preview</title>
@@ -8,7 +8,8 @@
 <div id="root"></div>
 <script>
 var G = window.GameSync, h = React.createElement;
-// #backup: from Back up now on a game not syncing yet; #done: after the primary; otherwise Sync these saves.
+// #backup: from Back up now on a game not syncing yet; #looking: as it opens; #keeping: after the primary, the copies
+// coming in; #done: once they're in; otherwise Sync these saves.
 var STATE = location.hash.slice(1);
 var MB = 1048576;
 var ITEMS = [
@@ -30,7 +31,9 @@ var ITEMS = [
   {id:'c16', name:'after ludwig', saved:'13 Sep 23:40', files:34, bytes:Math.round(33.6*MB)},
   {id:'c17', name:'After maria', saved:'15 Sep 01:22', files:34, bytes:Math.round(33.6*MB)},
   {id:'c18', name:'Before Orphan', saved:'16 Sep 23:58', files:34, bytes:Math.round(33.6*MB)}];
-var props = {game:'Bloodborne GOTY', mode:STATE === 'backup' ? 'backup' : 'sync', stage:STATE === 'done' ? 'done' : 'review', items:ITEMS, wholeBytes:1071872663,
+var props = {game:'Bloodborne GOTY', mode:STATE === 'backup' ? 'backup' : 'sync', stage:{done:'done', looking:'looking', keeping:'keeping'}[STATE] || 'review', items:ITEMS, wholeBytes:1071872663,
+  look:{done:7, total:18, readBytes:Math.round(212*MB), totalBytes:Math.round(1022*MB)},
+  progress:{value:32, detail:'6 of 16 copies \u00b7 143.0 of 453.2 MB', speed:'48 MB/s', left:'about 7 s left'},
   live:{path:'G:\\Bloodborne GOTY\\Shadlix\\user\\savedata\\1\\CUSA00207\\SPRJ0005', saved:'17 Sep 02:14', files:34, bytes:Math.round(33.6*MB)}};
 ReactDOM.createRoot(document.getElementById('root')).render(
   h('div',{className:'gs-scrim',style:{minHeight:840}},h(G.KeptCopiesDialog,props)));

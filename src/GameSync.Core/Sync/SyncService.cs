@@ -37,6 +37,32 @@ public sealed record SyncOptions
     /// ("Daily backup", MGR-08); held saves keep their own. Null for a sync after play.
     /// </summary>
     public string? UploadLabel { get; init; }
+
+    /// <summary>
+    /// KAN-88: this run does its work on this PC and leaves the upload (the outbox, the plain latest copy, this PC's
+    /// device record, the restore kit) to <see cref="SyncService.UploadAsync"/>, which runs beside it, so the person's
+    /// next move never waits on the network. False, as the command line runs, uploads before it returns.
+    /// </summary>
+    public bool DeferUploads { get; init; }
+
+    /// <summary>
+    /// KAN-88: held around every upload, so two never run at once, in this process or another (the upload lock); an
+    /// upload waits for one already under way. Null holds nothing.
+    /// </summary>
+    public Func<CancellationToken, Task<IDisposable>>? UploadGate { get; init; }
+
+    /// <summary>
+    /// KAN-88: how long a person's action (a named save, a restore, an import, a game's saves) waits to hear what's
+    /// new in the cloud before going on with what this PC knows, as it does offline. Null waits as long as it takes,
+    /// as a sync, which decides from it, always does.
+    /// </summary>
+    public TimeSpan? PullBudget { get; init; }
+
+    /// <summary>
+    /// R16: why a game's saves stay with the account that made them (it has an anti-cheat, or plays only online), so a
+    /// save someone shared is never restored for it; null when they can move. Without it, nothing is refused.
+    /// </summary>
+    public Func<GameId, string?>? StaysWithAccount { get; init; }
 }
 
 /// <summary>
@@ -98,7 +124,8 @@ public sealed partial class SyncService
     // ---- planning and syncing ----
 
     /// <summary>Copies what's new in the cloud into the backup folder, then plans each game without acting (SYNC-14).</summary>
-    public async Task<IReadOnlyList<GamePlan>> PlanAsync(IReadOnlyCollection<GameId>? only, CancellationToken ct)
+    /// <param name="whilePlaying">KAN-91: a person's Back up now: a running game's files are read now too.</param>
+    public async Task<IReadOnlyList<GamePlan>> PlanAsync(IReadOnlyCollection<GameId>? only, CancellationToken ct, bool whilePlaying = false)
     {
         var streams = Select(only).ToList();
         var views = await PrepareAsync(streams, ct);
@@ -114,7 +141,7 @@ public sealed partial class SyncService
 
             plans.Add(problem is not null
                 ? new GamePlan { Stream = stream, Error = problem, Cloud = view }
-                : await TryPlanAsync(stream, treatAsInSession: false, view, warnings, ct));
+                : await TryPlanAsync(stream, treatAsInSession: false, view, warnings, ct, whilePlaying));
         }
 
         return plans;
@@ -126,8 +153,12 @@ public sealed partial class SyncService
     /// </summary>
     public async Task<IReadOnlyList<GameResult>> ExecuteAsync(IReadOnlyList<GamePlan> plans, CancellationToken ct)
     {
+        // KAN-88: uploading here, the run holds the upload gate throughout; when the upload comes after, it touches
+        // nothing in the cloud but what deciding needs.
+        var defer = _options.DeferUploads;
+        using var gate = defer ? null : await UploadGateAsync(ct);
         var online = plans.Any(p => p.Error is null && p.Cloud.Problem is null);
-        if (online)
+        if (online && !defer)
         {
             await TryAnnounceDeviceAsync(ct);
         }
@@ -143,8 +174,9 @@ public sealed partial class SyncService
                     throw plan.Error;
                 }
 
-                // BG-08: while the game runs, not even its outbox uploads.
-                if (plan.Decision?.Action == SyncAction.Playing || IsRunning(plan.Stream.Game.Id))
+                // BG-08: while the game runs, not even its outbox uploads; a person's Back up now keeps its save here (KAN-91).
+                var playingNow = IsRunning(plan.Stream.Game.Id);
+                if (plan.Decision?.Action == SyncAction.Playing || (playingNow && !plan.WhilePlaying))
                 {
                     var playing = new GameResult(plan.Stream.Id, plan.Title, SyncAction.Playing, GameStatus.Playing, "Playing: it syncs once the game closes.");
                     _state.SetStatus(plan.Stream.Id, GameStatus.Playing, playing.Message);
@@ -153,13 +185,14 @@ public sealed partial class SyncService
                     continue;
                 }
 
-                // Whatever earlier runs left in the outbox goes first.
-                (CloudException? Problem, IReadOnlyList<string> Warnings) upload = plan.Cloud.Problem is null
+                // Whatever earlier runs left in the outbox goes first; a game being played keeps it until it closes.
+                var uploads = !defer && !playingNow;
+                (CloudException? Problem, IReadOnlyList<string> Warnings) upload = plan.Cloud.Problem is null && uploads
                     ? await TryPushAsync(plan.Stream, ct)
                     : (plan.Cloud.Problem, []);
 
                 var current = plan;
-                var fresh = await PlanStreamAsync(plan.Stream, plan.TreatAsInSession, plan.Cloud, plan.Warnings, ct);
+                var fresh = await PlanStreamAsync(plan.Stream, plan.TreatAsInSession, plan.Cloud, plan.Warnings, ct, plan.WhilePlaying);
                 var changed = fresh.Fingerprint != plan.Fingerprint;
                 if (changed)
                 {
@@ -172,7 +205,7 @@ public sealed partial class SyncService
                     result = result with { Message = $"Changed since the plan, so it was planned again: {result.Message}" };
                 }
 
-                if (plan.Cloud.Problem is null && upload.Problem is null)
+                if (plan.Cloud.Problem is null && upload.Problem is null && uploads)
                 {
                     upload = await TryPushAsync(plan.Stream, ct);
                     if (upload.Problem is null)
@@ -197,13 +230,109 @@ public sealed partial class SyncService
             }
         }
 
-        if (online)
+        if (online && !defer)
         {
             await TryWriteRestoreKitAsync(ct);
         }
 
         await PruneHistoryAsync(ct);
         return results;
+    }
+
+    /// <summary>
+    /// KAN-88: the upload half of runs that left it to come after (<see cref="SyncOptions.DeferUploads"/>). Each game's
+    /// outbox goes up, oldest first, then its plain latest copy, and its status settles: uploaded, or waiting with the
+    /// reason; then this PC's device record and the restore kit. It holds the upload gate, not the engine, so syncs and
+    /// the person's actions carry on beside it, and a game being played waits for its session to end (BG-08).
+    /// </summary>
+    /// <returns>A result for each game that had something to upload, or that couldn't.</returns>
+    public async Task<IReadOnlyList<GameResult>> UploadAsync(IReadOnlyCollection<GameId>? only, CancellationToken ct)
+    {
+        using var gate = await UploadGateAsync(ct);
+        var results = new List<GameResult>();
+        var reached = false;
+        foreach (var stream in Select(only))
+        {
+            if (IsRunning(stream.Game.Id))
+            {
+                continue;
+            }
+
+            var waiting = _history.HasPending(stream.Id);
+            var (problem, warnings) = await TryPushAsync(stream, ct);
+            if (problem is null)
+            {
+                reached |= waiting;
+                await TryWriteLatestAsync(stream, ct);
+            }
+
+            if (waiting || problem is not null)
+            {
+                results.Add(SettleUpload(stream, problem, warnings));
+            }
+        }
+
+        if (reached)
+        {
+            await TryAnnounceDeviceAsync(ct);
+            await TryWriteRestoreKitAsync(ct);
+        }
+
+        return results;
+    }
+
+    /// <summary>
+    /// A game's status once its upload has run: still waiting, with why (said once in the log, not at every retry), or
+    /// back to synced once nothing waits; anything else it was (a conflict, a held save) stays.
+    /// </summary>
+    private GameResult SettleUpload(SyncStream stream, CloudException? problem, IReadOnlyList<string> warnings)
+    {
+        var current = _state.GetState(stream.Id);
+        var status = current.Status ?? StatusFor(stream);
+        var message = current.Detail ?? "";
+        if (_history.HasPending(stream.Id))
+        {
+            if (problem is not null)
+            {
+                message = $"Kept on this PC; the upload waits: {Describe(problem)}";
+                if (status is GameStatus.Synced or GameStatus.BackupOnly or GameStatus.UploadPending)
+                {
+                    status = GameStatus.UploadPending;
+                }
+
+                if (current.Detail != message)
+                {
+                    _state.Log(stream.Id, "warn", message, EventTags.Cloud);
+                }
+            }
+        }
+        else if (status == GameStatus.UploadPending)
+        {
+            status = StatusFor(stream);
+            message = "Uploaded to the cloud.";
+        }
+
+        _state.SetStatus(stream.Id, status, message);
+        return new GameResult(stream.Id, stream.Definition.Title, SyncAction.None, status, message)
+        {
+            Warnings = warnings,
+            CloudProblem = problem?.Kind,
+        };
+    }
+
+    private async Task<IDisposable?> UploadGateAsync(CancellationToken ct) =>
+        _options.UploadGate is { } gate ? await gate(ct) : null;
+
+    /// <summary>A change of names or pins reaches the cloud now, or with the upload that comes after (KAN-88).</summary>
+    private async Task UploadUnlessDeferredAsync(SyncStream stream, CancellationToken ct)
+    {
+        if (_options.DeferUploads)
+        {
+            return;
+        }
+
+        using var gate = await UploadGateAsync(ct);
+        await TryPushAsync(stream, ct);
     }
 
     public async Task<IReadOnlyList<GameResult>> SyncAsync(IReadOnlyCollection<GameId>? only, CancellationToken ct) =>
@@ -214,6 +343,12 @@ public sealed partial class SyncService
     {
         foreach (var journal in RestoreJournal.RecoverAll(_dataDir))
         {
+            // A restore's version is recorded once its files are in place (KAN-91): one a crash cut off gets it now.
+            if (_streams.Any(s => s.Id == journal.Game) && await _log.GetAsync(journal.Game, journal.Target.Id, ct) is null)
+            {
+                await _log.AppendAsync(journal.Game, journal.Target, ct);
+            }
+
             _state.SetBase(journal.Game, journal.Target);
             _state.Log(journal.Game, "info", "Finished a restore that was interrupted.", EventTags.Restore);
             journal.Delete(_dataDir);
@@ -234,7 +369,9 @@ public sealed partial class SyncService
     /// <summary>BAK-16: backs up any game now, Backup-only ones included. It never downloads.</summary>
     public async Task<IReadOnlyList<GameResult>> BackupNowAsync(GameId game, CancellationToken ct)
     {
-        var plans = await PlanAsync([game], ct);
+        // KAN-91: it works while the game runs, as New named save does: the save as it is now is kept here, and goes up
+        // once the game closes.
+        var plans = await PlanAsync([game], ct, whilePlaying: true);
         var results = new List<GameResult>();
         foreach (var plan in plans)
         {
@@ -267,17 +404,23 @@ public sealed partial class SyncService
     /// files become a new current version, then they're swapped into place. Swap and undo use this too.
     /// </summary>
     /// <param name="name">A named save's name, used in place of the version id in what's shown and logged.</param>
-    public async Task<GameResult> RestoreAsync(GameId streamId, VersionId version, CancellationToken ct, string? name = null)
+    /// <param name="pulled">The cloud was just asked (finding a named save), so it isn't asked again.</param>
+    public async Task<GameResult> RestoreAsync(GameId streamId, VersionId version, CancellationToken ct, string? name = null, bool pulled = false)
     {
         var shown = name is null ? version.Value : $"'{name}'";
         var stream = Find(streamId);
-        ThrowIfRunning(stream, $"restoring {shown}");
+
+        // KAN-91 (the owner, 2 Oct 2026): a restore goes ahead while the game runs, as many games take a save back from
+        // their menu; a file the game holds stops it, and it says which, with nothing changed.
         if (SharedSaves().TryGetValue(stream.Game.Id, out var clash))
         {
             throw new InvalidGameDefinitionException($"{stream.Game.Title}: {clash} Nothing was restored.");
         }
 
-        await TryPullAsync(stream, ct);
+        if (!pulled)
+        {
+            await TryPullForActionAsync(stream, ct);
+        }
         var (versions, _) = await LoadVersionsAsync(stream, ct);
         var thinned = await _log.ListThinnedAsync(stream.Id, ct);
         var target = versions.FirstOrDefault(v => v.Id == version)
@@ -287,14 +430,31 @@ public sealed partial class SyncService
             throw new InvalidOperationException($"Version {version} was thinned; its files are gone.");
         }
 
-        var snapshot = ScanOrThrowIfUnavailable(stream);
+        // R16: a save someone shared never goes into a game whose saves stay with the account that made them, even one
+        // brought in before GameSync knew it had an anti-cheat (a game not installed then).
+        if (target.SharedFrom is not null && _options.StaysWithAccount?.Invoke(stream.Game.Id) is { } staysWith)
+        {
+            throw new BlockedException($"{stream.Definition.Title}: that save came from a shared zip. {staysWith} Nothing was restored.");
+        }
+
+        // The save there now is kept first (a rule that never breaks): one the game holds can't be read, so nothing changes.
+        Snapshot snapshot;
+        try
+        {
+            snapshot = ScanOrThrowIfUnavailable(stream);
+        }
+        catch (FileInUseException e)
+        {
+            throw InUse(stream, e.FilePath, "restored", e);
+        }
+
         var state = _state.GetState(stream.Id);
         await KeepIfNotStoredAsync(stream, snapshot.Files, versions, VersionOrigin.KeptBeforeRestore,
             $"{Device.Name}'s save before restoring {shown}", state.Base?.Id, ct);
 
         var heads = VersionGraph.Heads(versions);
-        var current = await AppendAsync(stream, target.Files, VersionKind.Normal, VersionOrigin.Restore,
-            heads.FirstOrDefault()?.Id, heads.Skip(1).Select(h => h.Id).ToList(), pinned: false, $"Restored from {shown}", ct);
+        var current = NewVersion(stream, target.Files, VersionKind.Normal, VersionOrigin.Restore,
+            heads.FirstOrDefault()?.Id, heads.Skip(1).Select(h => h.Id).ToList(), pinned: false, $"Restored from {shown}");
         await RestoreFilesAsync(stream, current, snapshot.Files, ct);
 
         // In the log's plain, per-game voice (MGR-09): which save, not its version's ID.
@@ -378,8 +538,8 @@ public sealed partial class SyncService
         }
 
         var current = heads.Count > 1
-            ? await AppendAsync(stream, winner.Files, VersionKind.Normal, VersionOrigin.Resolve, winner.Id,
-                heads.Where(h => h.Id != winner.Id).Select(h => h.Id).ToList(), pinned: false, $"Chosen in a conflict on {Device.Name}", ct)
+            ? NewVersion(stream, winner.Files, VersionKind.Normal, VersionOrigin.Resolve, winner.Id,
+                heads.Where(h => h.Id != winner.Id).Select(h => h.Id).ToList(), pinned: false, $"Chosen in a conflict on {Device.Name}")
             : winner;
         await RestoreFilesAsync(stream, current, snapshot.Files, ct);
         _state.Log(stream.Id, "info", $"Conflict resolved by hand: kept {winner.Device.Name}'s save; the other stays in history.", EventTags.Conflict);
@@ -395,10 +555,10 @@ public sealed partial class SyncService
     {
         var stream = Find(streamId);
         await _log.SetPinAsync(stream.Id, new PinRecord(version, label, DateTime.UtcNow, Device), ct);
-        await TryPushAsync(stream, ct);
+        await UploadUnlessDeferredAsync(stream, ct);
     }
 
-    /// <summary>Needs the cloud: an unpin made only on this PC would come back with the next sync.</summary>
+    /// <summary>Gone on this PC at once; the cloud's goes with the next upload, and a pull doesn't bring it back meanwhile.</summary>
     public async Task UnpinAsync(GameId streamId, VersionId version, CancellationToken ct)
     {
         var stream = Find(streamId);
@@ -409,12 +569,13 @@ public sealed partial class SyncService
         }
 
         await _log.RemovePinAsync(stream.Id, version, ct);
+        await UploadUnlessDeferredAsync(stream, ct);
     }
 
     public async Task<IReadOnlyList<HistoryEntry>> HistoryAsync(GameId streamId, CancellationToken ct)
     {
         var stream = Find(streamId);
-        await TryPullAsync(stream, ct);
+        await TryPullForActionAsync(stream, ct);
         var (versions, _) = await LoadVersionsAsync(stream, ct);
         var thinned = await _log.ListThinnedAsync(stream.Id, ct);
         var pins = (await _log.ListPinsAsync(stream.Id, ct)).ToDictionary(p => p.Version);
@@ -663,6 +824,31 @@ public sealed partial class SyncService
         }
     }
 
+    /// <summary>
+    /// KAN-88: for a person's action, what's new in the cloud within <see cref="SyncOptions.PullBudget"/>; past it, the
+    /// action goes on with what this PC knows, as offline. A pull stopped part way leaves whole records only, and the
+    /// next one finishes it.
+    /// </summary>
+    private async Task TryPullForActionAsync(SyncStream stream, CancellationToken ct)
+    {
+        if (_options.PullBudget is not { } budget)
+        {
+            await TryPullAsync(stream, ct);
+            return;
+        }
+
+        using var limit = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        limit.CancelAfter(budget);
+        try
+        {
+            await TryPullAsync(stream, limit.Token);
+        }
+        catch (OperationCanceledException) when (limit.IsCancellationRequested && !ct.IsCancellationRequested)
+        {
+            // The cloud is slow just now: what this PC knows will do, as offline.
+        }
+    }
+
     private async Task<(CloudException? Problem, IReadOnlyList<string> Warnings)> TryPushAsync(SyncStream stream, CancellationToken ct)
     {
         if (!_history.HasPending(stream.Id))
@@ -684,6 +870,13 @@ public sealed partial class SyncService
     /// <summary>After a manual action: upload what it made, refresh the plain copy, and settle the game's status.</summary>
     private async Task<GameResult> AfterManualAsync(SyncStream stream, GameResult result, CancellationToken ct)
     {
+        if (_options.DeferUploads)
+        {
+            // KAN-88: done on this PC; the upload follows beside whatever the person does next.
+            return Settle(stream, result, null, log: false);
+        }
+
+        using var gate = await UploadGateAsync(ct);
         var (problem, warnings) = await TryPushAsync(stream, ct);
         if (problem is null)
         {
@@ -798,22 +991,30 @@ public sealed partial class SyncService
 
     // ---- planning internals ----
 
-    private async Task<GamePlan> TryPlanAsync(SyncStream stream, bool treatAsInSession, CloudView view, IReadOnlyList<string> warnings, CancellationToken ct)
+    private async Task<GamePlan> TryPlanAsync(SyncStream stream, bool treatAsInSession, CloudView view, IReadOnlyList<string> warnings, CancellationToken ct,
+        bool whilePlaying = false)
     {
         try
         {
-            return await PlanStreamAsync(stream, treatAsInSession, view, warnings, ct);
+            return await PlanStreamAsync(stream, treatAsInSession, view, warnings, ct, whilePlaying) with { WhilePlaying = whilePlaying };
         }
         catch (Exception e) when (e is not OperationCanceledException and not SimulatedCrashException)
         {
-            return new GamePlan { Stream = stream, Error = e, TreatAsInSession = treatAsInSession, Cloud = view };
+            return new GamePlan { Stream = stream, Error = e, TreatAsInSession = treatAsInSession, Cloud = view, WhilePlaying = whilePlaying };
         }
     }
 
-    private async Task<GamePlan> PlanStreamAsync(SyncStream stream, bool treatAsInSession, CloudView view, IReadOnlyList<string> warnings, CancellationToken ct)
+    private async Task<GamePlan> PlanStreamAsync(SyncStream stream, bool treatAsInSession, CloudView view, IReadOnlyList<string> warnings, CancellationToken ct,
+        bool whilePlaying = false)
     {
-        // BAK-10, BG-08: a running game's files aren't even read until it closes.
-        if (IsRunning(stream.Game.Id))
+        // KAN-91: a person's Back up now while the game runs reads its files now; what changed was made while playing.
+        if (whilePlaying && IsRunning(stream.Game.Id))
+        {
+            treatAsInSession = true;
+        }
+
+        // BAK-10, BG-08: otherwise a running game's files aren't even read until it closes.
+        else if (IsRunning(stream.Game.Id))
         {
             return new GamePlan
             {
@@ -828,7 +1029,7 @@ public sealed partial class SyncService
 
         var state = _state.GetState(stream.Id);
         ExportRegistry(stream.Game);
-        var snapshot = _scanner.Scan(stream.Definition, stream.Includes);
+        var snapshot = Scan(stream);
         var (versions, problems) = await LoadVersionsAsync(stream, ct);
         var decision = DecisionEngine.Decide(new SyncInputs
         {
@@ -1026,7 +1227,37 @@ public sealed partial class SyncService
             Notice = decision.Notice,
             Warnings = warnings,
             NewVersion = created?.Id,
+            Moved = decision.Action switch
+            {
+                SyncAction.Upload or SyncAction.UploadHeld when created is not null => $"Kept {Files(created)}{Played(created.Session)}.",
+                SyncAction.Download => $"Brought down {Files(decision.Head!)} from {decision.Head!.Device.Name}.",
+                _ => null,
+            },
         };
+    }
+
+    /// <summary>KAN-40: a version's size and files, as the log says them: "2.1 MB (3 files)".</summary>
+    private static string Files(VersionRecord version)
+    {
+        var bytes = FileSet.TotalSize(version.Files);
+        var size = bytes < 1024 * 1024 ? $"{Math.Max(1, (bytes + 1023) / 1024)} KB" : FormatSize(bytes);
+        return $"{size} ({(version.Files.Count == 1 ? "1 file" : $"{version.Files.Count} files")})";
+    }
+
+    /// <summary>KAN-40: ", after 3 h 10 min of play" for a version made from a play session; empty for any other.</summary>
+    private static string Played(SessionInfo? session)
+    {
+        if (session is null)
+        {
+            return "";
+        }
+
+        var minutes = (int)Math.Round((session.EndUtc - session.StartUtc).TotalMinutes);
+        var length = minutes < 1 ? "under a minute"
+            : minutes < 60 ? $"{minutes} min"
+            : minutes % 60 == 0 ? $"{minutes / 60} h"
+            : $"{minutes / 60} h {minutes % 60} min";
+        return $", after {length} of play";
     }
 
     /// <summary>
@@ -1055,9 +1286,11 @@ public sealed partial class SyncService
         {
             // A conflict newest-wins settled has its Swap, and a held save waits for the person: both are worth a look.
             var level = result.Notice is not null ||
-                status is GameStatus.Conflict or GameStatus.HeldForReview or GameStatus.NotAvailable or GameStatus.SavesMissing or GameStatus.UploadPending
+                status is GameStatus.Conflict or GameStatus.HeldForReview or GameStatus.NotAvailable or GameStatus.SavesMissing ||
+                (status is GameStatus.UploadPending && uploadProblem is not null)
                 ? "warn" : "info";
-            _state.Log(stream.Id, level, result.Notice is null ? message : $"{message} {result.Notice}", TagOf(stream, result.Action, result.Notice));
+            var line = string.Join(" ", new[] { message, result.Moved, result.Notice }.OfType<string>());
+            _state.Log(stream.Id, level, line, TagOf(stream, result.Action, result.Notice));
         }
 
         return result with { Status = status, Message = message };
@@ -1137,7 +1370,8 @@ public sealed partial class SyncService
 
     /// <param name="open">Where the files' contents come from; by default this PC's save folders.</param>
     private async Task<VersionRecord> UploadAsync(SyncStream stream, IReadOnlyList<FileEntry> files, VersionKind kind, VersionOrigin origin,
-        VersionId? parent, IReadOnlyList<VersionId> supersedes, bool pinned, string? label, CancellationToken ct, Func<FileEntry, Stream>? open = null)
+        VersionId? parent, IReadOnlyList<VersionId> supersedes, bool pinned, string? label, CancellationToken ct, Func<FileEntry, Stream>? open = null,
+        string? sharedFrom = null)
     {
         await Parallel.ForEachAsync(files.DistinctBy(f => f.Hash), new ParallelOptions { MaxDegreeOfParallelism = Parallelism, CancellationToken = ct },
             async (file, token) =>
@@ -1152,14 +1386,26 @@ public sealed partial class SyncService
             });
 
         CrashPoints.Hit(CrashPoints.AfterBlobsBeforeRecord);
-        return await AppendAsync(stream, files, kind, origin, parent, supersedes, pinned, label, ct);
+        return await AppendAsync(stream, files, kind, origin, parent, supersedes, pinned, label, ct, sharedFrom);
     }
 
     private async Task<VersionRecord> AppendAsync(SyncStream stream, IReadOnlyList<FileEntry> files, VersionKind kind, VersionOrigin origin,
-        VersionId? parent, IReadOnlyList<VersionId> supersedes, bool pinned, string? label, CancellationToken ct)
+        VersionId? parent, IReadOnlyList<VersionId> supersedes, bool pinned, string? label, CancellationToken ct, string? sharedFrom = null)
+    {
+        var version = NewVersion(stream, files, kind, origin, parent, supersedes, pinned, label) with { SharedFrom = sharedFrom };
+        await _log.AppendAsync(stream.Id, version, ct);
+        return version;
+    }
+
+    /// <summary>
+    /// A version not recorded yet: a restore's, which <see cref="RestoreFilesAsync"/> records once its files are in place,
+    /// so a restore that stops (a file in use, KAN-91) leaves no version behind for a later sync to bring in by itself.
+    /// </summary>
+    private VersionRecord NewVersion(SyncStream stream, IReadOnlyList<FileEntry> files, VersionKind kind, VersionOrigin origin,
+        VersionId? parent, IReadOnlyList<VersionId> supersedes, bool pinned, string? label)
     {
         var now = DateTime.UtcNow;
-        var version = new VersionRecord
+        return new VersionRecord
         {
             Id = VersionId.New(now, Device.Name),
             Game = stream.Id,
@@ -1176,8 +1422,6 @@ public sealed partial class SyncService
             Rules = PortableRules.From(stream.Game),
             Files = files,
         };
-        await _log.AppendAsync(stream.Id, version, ct);
-        return version;
     }
 
     /// <summary>Stores this PC's files as a pinned Kept version, unless some version already holds exactly them.</summary>
@@ -1222,19 +1466,33 @@ public sealed partial class SyncService
             }
         }
 
+        // KAN-80: what this PC doesn't have yet comes down first, four files at a time, saying how far it is; nothing is
+        // written into the game's folders until all of it is here.
+        await _store.FetchAsync(stream.Id, incoming, _options.Progress, ct);
+
         var journal = new RestoreJournal { Id = journalId, Game = stream.Id, Target = target, Ops = ops };
         journal.Save(_dataDir);
+        var unscanned = 0;
         try
         {
             foreach (var (file, full) in plannedTargets)
             {
                 Directory.CreateDirectory(Path.GetDirectoryName(full)!);
-                await StageAsync(stream.Id, file, $"{full}.gs-new-{suffix}", ct);
+                if (await StageAsync(stream.Id, file, $"{full}.gs-new-{suffix}", ct) == ScanVerdict.Unavailable)
+                {
+                    unscanned++;
+                }
             }
 
             foreach (var (file, full) in plannedTargets.Where(p => IsRegistryExport(p.File)))
             {
                 CheckRegistryExport(stream.Game, file, $"{full}.gs-new-{suffix}");
+            }
+
+            // KAN-91: a file the game holds open can't be swapped, so the restore stops here, before anything moves.
+            foreach (var op in ops)
+            {
+                ThrowIfHeld(stream, op.Target);
             }
         }
         catch (Exception e) when (e is not SimulatedCrashException)
@@ -1254,9 +1512,41 @@ public sealed partial class SyncService
         journal = journal with { Ready = true };
         journal.Save(_dataDir);
         CrashPoints.Hit(CrashPoints.AfterStagingBeforeSwap);
-        journal.Commit();
+        try
+        {
+            journal.Commit(undoOnFailure: true);
+        }
+        catch (SwapStoppedException e) when (e.Undone)
+        {
+            // A file was opened a moment ago: what was moved is back where it was, and nothing changed.
+            journal.Abort();
+            journal.Delete(_dataDir);
+            if (registryKeys)
+            {
+                _state.SetSetting(RegistryPending(stream.Game.Id), "");
+            }
+
+            throw InUse(stream, e.Target, "restored", e);
+        }
+
+        // A restore's own version is recorded now that its files are in place (KAN-91); a download's is there already.
+        if (await _log.GetAsync(stream.Id, target.Id, ct) is null)
+        {
+            await _log.AppendAsync(stream.Id, target, ct);
+        }
+
         _state.SetBase(stream.Id, target);
         journal.Delete(_dataDir);
+
+        // R3: a file no antivirus answered for (none installed or running, or one too big to hand it) is restored, and the
+        // game's log says so; Windows' own real-time scan still checks files as they're written.
+        if (unscanned > 0)
+        {
+            _state.Log(stream.Id, "warn",
+                $"No antivirus answered for {(unscanned == 1 ? "1 file" : $"{unscanned} files")} of this restore, so {(unscanned == 1 ? "it was" : "they were")} put in place without that check.",
+                EventTags.Restore);
+        }
+
         if (registryKeys)
         {
             try
@@ -1271,7 +1561,44 @@ public sealed partial class SyncService
         }
     }
 
-    private async Task StageAsync(GameId game, FileEntry file, string staged, CancellationToken ct)
+    /// <summary>KAN-91: stops a restore before its swap when the game (or anything) holds one of the files it would move.</summary>
+    private static void ThrowIfHeld(SyncStream stream, string path)
+    {
+        if (!File.Exists(path))
+        {
+            return;
+        }
+
+        try
+        {
+            using var probe = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.None);
+        }
+        catch (IOException e) when (e.HResult is unchecked((int)0x80070020) or unchecked((int)0x80070021))
+        {
+            throw InUse(stream, path, "restored", e);
+        }
+    }
+
+    /// <summary>
+    /// KAN-91: a file the game holds, said plainly: which one (from its save folder), that nothing changed, and what to do:
+    /// "Bloodborne GOTY has SPRJ0005\userdata0000 open, so nothing was restored and its save is as it was. …".
+    /// </summary>
+    private static InvalidOperationException InUse(SyncStream stream, string path, string what, Exception inner)
+    {
+        var shown = stream.Game.Roots.Values.Where(r => !RootResolver.IsUnresolved(r))
+            .Select(r => Path.GetFullPath(r))
+            .Where(r => path.StartsWith(Path.TrimEndingDirectorySeparator(r) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+            .Select(r => Path.Join(Path.GetFileName(Path.TrimEndingDirectorySeparator(r)), Path.GetRelativePath(r, path)))
+            .FirstOrDefault() ?? Path.GetFileName(path);
+        return new InvalidOperationException(
+            $"{stream.Game.Title} has {shown} open, so nothing was {what} and its save is as it was. Go back to the game's main menu, or quit it, then try again.", inner);
+    }
+
+    private Task<ScanVerdict?> StageAsync(GameId game, FileEntry file, string staged, CancellationToken ct) => StageAsync(game, file, staged, restoring: true, ct);
+
+    /// <param name="restoring">False when packing a shared zip, which leaves a program out itself rather than stopping.</param>
+    /// <returns>What the antivirus said of a file being restored (R3); null when nothing is restored.</returns>
+    private async Task<ScanVerdict?> StageAsync(GameId game, FileEntry file, string staged, bool restoring, CancellationToken ct)
     {
         using var sha = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
         await using (var source = await _blobs.GetAsync(game, file.Hash, ct))
@@ -1291,7 +1618,14 @@ public sealed partial class SyncService
 
         if (BlobId.FromHash(sha.GetHashAndReset()) != file.Hash)
         {
-            throw new BlockedException($"'{file.Path}' is damaged in the cloud: its contents don't match its hash. Nothing was restored.");
+            throw new BlockedException(restoring
+                ? $"'{file.Path}' is damaged in the cloud: its contents don't match its hash. Nothing was restored."
+                : $"'{file.Path}' is damaged in the cloud: its contents don't match its hash, so the zip wasn't made.");
+        }
+
+        if (!restoring)
+        {
+            return null;
         }
 
         if (ProgramFileDetector.IsProgramFile(staged))
@@ -1299,12 +1633,14 @@ public sealed partial class SyncService
             throw new BlockedException($"'{file.Path}' is a program, not a save. Nothing was restored.");
         }
 
-        if (_malware.ScanFile(staged) == ScanVerdict.Detected)
+        var verdict = _malware.ScanFile(staged);
+        if (verdict == ScanVerdict.Detected)
         {
             throw new BlockedException($"Your antivirus flagged '{file.Path}'. Nothing was restored.");
         }
 
         File.SetLastWriteTimeUtc(staged, file.ModifiedUtc);
+        return verdict;
     }
 
     /// <summary>Where a file from a version goes on this PC, after every check a path from the cloud must pass.</summary>
@@ -1359,10 +1695,40 @@ public sealed partial class SyncService
         }
 
         ExportRegistry(stream.Game);
-        var snapshot = _scanner.Scan(stream.Definition, stream.Includes);
+        var snapshot = Scan(stream);
         if (snapshot.Problems.Count > 0)
         {
             throw new InvalidOperationException($"{stream.Definition.Title}: {snapshot.Problems[0].Message}. Nothing was changed.");
+        }
+
+        return snapshot;
+    }
+
+    /// <summary>The setting that holds the programs last found in a game's save folders (R2), one full path a line.</summary>
+    public static string ProgramsKey(GameId stream) => "programs." + stream.Value;
+
+    /// <summary>
+    /// Reads the game's files, and keeps the programs found among them with the game (R2, design system version 51): its
+    /// saves page shows them under their place, and its log says so once, when one is first found, not at every backup.
+    /// They're never backed up (R1).
+    /// </summary>
+    private Snapshot Scan(SyncStream stream)
+    {
+        var snapshot = _scanner.Scan(stream.Definition, stream.Includes);
+        var key = ProgramsKey(stream.Id);
+        var before = _state.GetSetting(key) is { Length: > 0 } kept
+            ? kept.Split('\n').ToHashSet(StringComparer.OrdinalIgnoreCase)
+            : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var program in snapshot.Programs.Where(p => !before.Contains(p)))
+        {
+            _state.Log(stream.Id, "warn", $"Left out {Path.GetFileName(program)}: a program, never backed up or synced. It's in {Path.GetDirectoryName(program)}.",
+                EventTags.Backup);
+        }
+
+        // A folder that couldn't be read (an unplugged drive) leaves what was found there as it was.
+        if (snapshot.Problems.Count == 0 && !before.SetEquals(snapshot.Programs))
+        {
+            _state.SetSetting(key, string.Join('\n', snapshot.Programs));
         }
 
         return snapshot;

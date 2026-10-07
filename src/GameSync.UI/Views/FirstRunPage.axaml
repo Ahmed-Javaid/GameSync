@@ -7,7 +7,12 @@
              x:DataType="vm:FirstRunViewModel">
   <!-- First run (design system → OnboardingScreen): four steps down the left, no side rail until it's done. The scan only
        reads, and nothing syncs until Start using GameSync. -->
-  <Grid ColumnDefinitions="280,*">
+  <Grid>
+    <!-- The steps grow a little with Windows' text size (A11Y-04) -->
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="{DynamicResource col-setup-nav}" />
+      <ColumnDefinition Width="*" />
+    </Grid.ColumnDefinitions>
 
     <!-- The steps -->
     <Border Background="{DynamicResource bg-100}" BorderBrush="{DynamicResource line-100}" BorderThickness="0,0,1,0" Padding="16,28,16,24">
@@ -15,7 +20,7 @@
         <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="12" Margin="12,0,12,24">
           <c:GsIcon Icon="logo" Size="28" VerticalAlignment="Center" />
           <StackPanel VerticalAlignment="Center">
-            <TextBlock Text="Set up GameSync" FontSize="15" LineHeight="20" FontWeight="SemiBold" />
+            <TextBlock Text="Set up GameSync" FontSize="{DynamicResource fs-15}" LineHeight="{DynamicResource lh-20}" FontWeight="SemiBold" />
             <TextBlock Classes="caption faint" Text="Four steps, about two minutes" />
           </StackPanel>
         </StackPanel>
@@ -39,7 +44,8 @@
                       ToolTip.Tip="Once the scan has finished" />
         </StackPanel>
         <StackPanel Spacing="16">
-          <c:GsProgress Value="{Binding ScanValue}" Label="{Binding ScanLabel}" Right="{Binding ScanRight}" />
+          <!-- KAN-80: the scan as a job: a spinner and how far it is, then how it ended -->
+          <c:GsJobProgress Classes="boxed" Title="{Binding ScanTitle}" Value="{Binding ScanBar}" State="{Binding ScanState}" Detail="{Binding ScanLabel}" Note="{Binding ScanLabel}" />
           <TextBlock Foreground="{DynamicResource warn}" Text="{Binding ScanError}" TextWrapping="Wrap" IsVisible="{Binding HasScanError}" />
           <Grid ColumnDefinitions="*,*" ColumnSpacing="16">
             <c:GsCard Title="Stores" VerticalAlignment="Stretch">
@@ -108,14 +114,14 @@
                             <Border Grid.Column="1" Width="24" Height="36" CornerRadius="6" ClipToBounds="True" Background="{DynamicResource bg-300}" VerticalAlignment="Center">
                               <Panel>
                                 <Image Source="{Binding Cover}" Stretch="UniformToFill" IsVisible="{Binding HasCover}" />
-                                <TextBlock Text="{Binding Initial}" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource ink-muted}"
+                                <TextBlock Text="{Binding Initial}" FontSize="{DynamicResource fs-12}" FontWeight="SemiBold" Foreground="{DynamicResource ink-muted}"
                                            HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding NoCover}" />
                               </Panel>
                             </Border>
                             <TextBlock Grid.Column="2" Text="{Binding Title}" FontWeight="Medium" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
                                        ToolTip.Tip="{Binding Title}" />
                             <TextBlock Grid.Column="3" Classes="mono-small muted" Text="{Binding SavePath}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
-                                       ToolTip.Tip="{Binding SavePath}" />
+                                       ToolTip.Tip="{Binding SavePathTip}" />
                             <TextBlock Grid.Column="4" Classes="caption faint" Text="{Binding FoundBy}" VerticalAlignment="Center" />
                           </Grid>
                         </DataTemplate>

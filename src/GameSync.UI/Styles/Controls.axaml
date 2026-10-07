@@ -3,15 +3,16 @@
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                     xmlns:c="using:GameSync.UI.Controls">
 
-  <!-- Focus: a 2px primary ring offset by 2px, shown for keyboard focus (A11Y-02). -->
+  <!-- Focus: a 2px primary ring offset by 2px, shown for keyboard focus (A11Y-02). An adorner is clipped to its control's
+       bounds unless told not to, which cut the ring away outside it and left only its corners on a pill or a circle. -->
   <FocusAdornerTemplate x:Key="PillFocus">
-    <Border BorderBrush="{DynamicResource primary}" BorderThickness="2" CornerRadius="999" Margin="-4" />
+    <Border AdornerLayer.IsClipEnabled="False" BorderBrush="{DynamicResource primary}" BorderThickness="2" CornerRadius="999" Margin="-4" />
   </FocusAdornerTemplate>
   <FocusAdornerTemplate x:Key="RoundedFocus">
-    <Border BorderBrush="{DynamicResource primary}" BorderThickness="2" CornerRadius="12" Margin="-4" />
+    <Border AdornerLayer.IsClipEnabled="False" BorderBrush="{DynamicResource primary}" BorderThickness="2" CornerRadius="12" Margin="-4" />
   </FocusAdornerTemplate>
   <FocusAdornerTemplate x:Key="SmallFocus">
-    <Border BorderBrush="{DynamicResource primary}" BorderThickness="2" CornerRadius="8" Margin="-4" />
+    <Border AdornerLayer.IsClipEnabled="False" BorderBrush="{DynamicResource primary}" BorderThickness="2" CornerRadius="8" Margin="-4" />
   </FocusAdornerTemplate>
 
   <!-- Button -->
@@ -24,7 +25,7 @@
     <Setter Property="BorderBrush" Value="{DynamicResource edge-control}" />
     <Setter Property="BorderThickness" Value="1" />
     <Setter Property="Foreground" Value="{DynamicResource ink}" />
-    <Setter Property="FontSize" Value="14" />
+    <Setter Property="FontSize" Value="{DynamicResource fs-14}" />
     <Setter Property="FontWeight" Value="SemiBold" />
     <Setter Property="Cursor" Value="Hand" />
     <Setter Property="HorizontalAlignment" Value="Left" />
@@ -34,12 +35,13 @@
       <ControlTemplate>
         <Border Name="PART_Border" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}"
                 BackgroundSizing="OuterBorderEdge" CornerRadius="{TemplateBinding CornerRadius}" Padding="{TemplateBinding Padding}">
+          <!-- KAN-80: busy, the spinner takes the icon's place and the busy words the content's, with dots counting up -->
           <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center" VerticalAlignment="Center">
-            <c:GsIcon Icon="{TemplateBinding Icon}" Size="{TemplateBinding IconSize}" VerticalAlignment="Center"
-                      IsVisible="{Binding $parent[c:GsButton].Icon, Converter={x:Static ObjectConverters.IsNotNull}}" />
-            <ContentPresenter Content="{TemplateBinding Content}" VerticalAlignment="Center" />
-            <c:GsIcon Icon="{TemplateBinding IconAfter}" Size="16" VerticalAlignment="Center"
-                      IsVisible="{Binding $parent[c:GsButton].IconAfter, Converter={x:Static ObjectConverters.IsNotNull}}" />
+            <c:GsIcon Icon="{TemplateBinding Icon}" Size="{TemplateBinding IconSize}" VerticalAlignment="Center" IsVisible="{TemplateBinding ShowsIcon}" />
+            <c:GsSpinner Size="{TemplateBinding IconSize}" VerticalAlignment="Center" IsVisible="{TemplateBinding ShowsBusy}" />
+            <ContentPresenter Content="{TemplateBinding Content}" VerticalAlignment="Center" IsVisible="{Binding !ShowsBusy, RelativeSource={RelativeSource TemplatedParent}}" />
+            <c:GsBusyText Words="{TemplateBinding BusyWords}" VerticalAlignment="Center" IsVisible="{TemplateBinding ShowsBusy}" />
+            <c:GsIcon Icon="{TemplateBinding IconAfter}" Size="16" VerticalAlignment="Center" IsVisible="{TemplateBinding ShowsIconAfter}" />
           </StackPanel>
         </Border>
       </ControlTemplate>
@@ -73,7 +75,7 @@
       <Setter Property="Height" Value="32" />
       <Setter Property="CornerRadius" Value="16" />
       <Setter Property="Padding" Value="16,0" />
-      <Setter Property="FontSize" Value="13" />
+      <Setter Property="FontSize" Value="{DynamicResource fs-13}" />
       <Setter Property="IconSize" Value="16" />
     </Style>
     <Style Selector="^.ghost.sm">
@@ -81,6 +83,11 @@
     </Style>
     <Style Selector="^:disabled">
       <Setter Property="Opacity" Value="0.45" />
+    </Style>
+    <!-- KAN-80: a busy button isn't disabled: it keeps its colour, whatever its command says meanwhile -->
+    <Style Selector="^:busy">
+      <Setter Property="Opacity" Value="1" />
+      <Setter Property="Cursor" Value="AppStarting" />
     </Style>
   </ControlTheme>
 
@@ -99,7 +106,8 @@
       <ControlTemplate>
         <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}"
                 BackgroundSizing="OuterBorderEdge" CornerRadius="999">
-          <c:GsIcon Icon="{TemplateBinding Icon}" Size="{TemplateBinding IconSize}" Filled="{TemplateBinding IsOn}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+          <c:GsIcon Icon="{TemplateBinding Icon}" Size="{TemplateBinding IconSize}" Filled="{TemplateBinding IsOn}" IsSpinning="{TemplateBinding IsBusy}"
+                    HorizontalAlignment="Center" VerticalAlignment="Center" />
         </Border>
       </ControlTemplate>
     </Setter>
@@ -136,7 +144,7 @@
     <Setter Property="Background" Value="Transparent" />
     <Setter Property="Foreground" Value="{DynamicResource ink-muted}" />
     <Setter Property="Padding" Value="0" />
-    <Setter Property="FontSize" Value="13" />
+    <Setter Property="FontSize" Value="{DynamicResource fs-13}" />
     <Setter Property="FontWeight" Value="Medium" />
     <Setter Property="Cursor" Value="Hand" />
     <Setter Property="VerticalAlignment" Value="Center" />
@@ -156,26 +164,41 @@
     <Setter Property="Background" Value="{DynamicResource bg-200}" />
     <Setter Property="BorderBrush" Value="{DynamicResource edge-card}" />
     <Setter Property="BorderThickness" Value="1" />
+    <!-- Light mode's lift (design system version 35) is a shadow under the card, outside its box: unclipped -->
+    <Setter Property="ClipToBounds" Value="False" />
     <Setter Property="CornerRadius" Value="{DynamicResource radius-lg}" />
     <Setter Property="Padding" Value="20" />
     <Setter Property="Template">
       <ControlTemplate>
         <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}"
-                BackgroundSizing="OuterBorderEdge" BoxShadow="{DynamicResource lift-card}" CornerRadius="{TemplateBinding CornerRadius}" Padding="{TemplateBinding Padding}">
-          <DockPanel>
-            <Grid Name="PART_Header" DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,16" IsVisible="False">
-              <StackPanel VerticalAlignment="Center">
+                BackgroundSizing="OuterBorderEdge" BoxShadow="{DynamicResource lift-card}" CornerRadius="{TemplateBinding CornerRadius}">
+          <Panel>
+          <!-- Art behind the title and content (Backdrop): the whole card, clipped to its corners -->
+          <Border Name="PART_Backdrop" CornerRadius="{TemplateBinding CornerRadius}" ClipToBounds="True" IsHitTestVisible="False" IsVisible="False">
+            <ContentPresenter Content="{TemplateBinding Backdrop}" />
+          </Border>
+          <DockPanel Margin="{TemplateBinding Padding}">
+            <Grid Name="PART_Header" DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto" Margin="0,0,0,16" IsVisible="False">
+              <ContentPresenter Name="PART_Lead" Content="{TemplateBinding Lead}" VerticalAlignment="Center" Margin="0,0,12,0" IsVisible="False" />
+              <StackPanel Grid.Column="1" VerticalAlignment="Center">
                 <TextBlock Classes="card-title" Text="{TemplateBinding Title}" TextWrapping="Wrap" />
                 <TextBlock Name="PART_Subtitle" Classes="caption muted" Text="{TemplateBinding Subtitle}" Margin="0,2,0,0" TextWrapping="Wrap" IsVisible="False" />
               </StackPanel>
-              <ContentPresenter Grid.Column="1" Content="{TemplateBinding Action}" VerticalAlignment="Center" Margin="12,0,0,0" />
+              <ContentPresenter Grid.Column="2" Content="{TemplateBinding Action}" VerticalAlignment="Center" Margin="12,0,0,0" />
             </Grid>
             <ContentPresenter Content="{TemplateBinding Content}" ContentTemplate="{TemplateBinding ContentTemplate}" />
           </DockPanel>
+          </Panel>
         </Border>
       </ControlTemplate>
     </Setter>
+    <Style Selector="^:backdrop /template/ Border#PART_Backdrop">
+      <Setter Property="IsVisible" Value="True" />
+    </Style>
     <Style Selector="^:header /template/ Grid#PART_Header">
+      <Setter Property="IsVisible" Value="True" />
+    </Style>
+    <Style Selector="^:lead /template/ ContentPresenter#PART_Lead">
       <Setter Property="IsVisible" Value="True" />
     </Style>
     <Style Selector="^:subtitle /template/ TextBlock#PART_Subtitle">
@@ -189,7 +212,7 @@
     <Setter Property="Padding" Value="8,0,10,0" />
     <Setter Property="HorizontalAlignment" Value="Left" />
     <Setter Property="VerticalAlignment" Value="Center" />
-    <Setter Property="FontSize" Value="12" />
+    <Setter Property="FontSize" Value="{DynamicResource fs-12}" />
     <Setter Property="FontWeight" Value="Medium" />
     <Setter Property="Template">
       <ControlTemplate>
@@ -254,21 +277,24 @@
     <Setter Property="Template">
       <ControlTemplate>
         <Border Background="{TemplateBinding Background}" CornerRadius="999" Height="18" Padding="7,0">
-          <TextBlock Text="{TemplateBinding Text, Converter={x:Static c:UpperConverter.Instance}}" FontSize="10" LineHeight="14"
+          <TextBlock Text="{TemplateBinding Text, Converter={x:Static c:UpperConverter.Instance}}" FontSize="{DynamicResource fs-10}" LineHeight="{DynamicResource lh-14}"
                      FontWeight="SemiBold" LetterSpacing="0.8" VerticalAlignment="Center" />
         </Border>
       </ControlTemplate>
     </Setter>
   </ControlTheme>
 
-  <!-- Note -->
+  <!-- Note; busy, a BusyLine (KAN-80) -->
   <ControlTheme x:Key="{x:Type c:GsNote}" TargetType="c:GsNote">
     <Setter Property="Foreground" Value="{DynamicResource ink-muted}" />
     <Setter Property="Template">
       <ControlTemplate>
         <Grid ColumnDefinitions="Auto,*">
-          <c:GsIcon Icon="{TemplateBinding Icon}" Size="16" VerticalAlignment="Top" />
-          <TextBlock Grid.Column="1" Text="{TemplateBinding Text}" Margin="8,0,0,0" FontSize="12" LineHeight="16" TextWrapping="Wrap" />
+          <Panel VerticalAlignment="Top">
+            <c:GsIcon Icon="{TemplateBinding Icon}" Size="16" IsVisible="{Binding !IsBusy, RelativeSource={RelativeSource TemplatedParent}}" />
+            <c:GsSpinner Size="16" IsVisible="{TemplateBinding IsBusy}" />
+          </Panel>
+          <c:GsBusyText Grid.Column="1" Words="{TemplateBinding Text}" IsBusy="{TemplateBinding IsBusy}" Margin="8,0,0,0" FontSize="{DynamicResource fs-12}" LineHeight="{DynamicResource lh-16}" TextWrapping="Wrap" />
         </Grid>
       </ControlTemplate>
     </Setter>
@@ -358,6 +384,64 @@
       </ControlTemplate>
     </Setter>
   </ControlTheme>
+  <!-- JobProgress (KAN-80): a job under way where its result will show; boxed, on a card of its own -->
+  <ControlTheme x:Key="{x:Type c:GsJobProgress}" TargetType="c:GsJobProgress">
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border Name="PART_Box" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}"
+                BackgroundSizing="OuterBorderEdge" CornerRadius="{TemplateBinding CornerRadius}" Padding="{TemplateBinding Padding}">
+          <StackPanel Spacing="8">
+            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+              <Panel VerticalAlignment="Center">
+                <c:GsSpinner Name="PART_Spinner" Size="16" Foreground="{DynamicResource primary}" IsVisible="{TemplateBinding IsRunning}" />
+                <c:GsIcon Name="PART_Icon" Icon="{TemplateBinding IconName}" Size="16" StrokeWidth="2" Foreground="{DynamicResource primary}"
+                          IsVisible="{Binding !IsRunning, RelativeSource={RelativeSource TemplatedParent}}" />
+              </Panel>
+              <c:GsBusyText Grid.Column="1" Words="{TemplateBinding Title}" FontSize="{DynamicResource fs-13}" LineHeight="{DynamicResource lh-18}" FontWeight="SemiBold" Foreground="{DynamicResource ink}"
+                            TextTrimming="CharacterEllipsis" VerticalAlignment="Center" IsBusy="False" />
+              <TextBlock Grid.Column="2" Classes="mono-small" Text="{TemplateBinding RightText}" FontWeight="Medium" Foreground="{DynamicResource ink}" VerticalAlignment="Center" />
+            </Grid>
+            <c:GsJobBar Name="PART_Bar" Value="{TemplateBinding BarValue}" IsRunning="{TemplateBinding IsRunning}" Fill="{DynamicResource primary}" Track="{DynamicResource bg-400}" />
+            <!-- How far, in mono; or once it's stopped, why or how it ended, in prose -->
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12" IsVisible="{Binding FootText, RelativeSource={RelativeSource TemplatedParent}, Converter={x:Static ObjectConverters.IsNotNull}}">
+              <TextBlock Classes="mono-small muted" Text="{TemplateBinding FootText}" TextTrimming="CharacterEllipsis" IsVisible="{Binding !ShowsNote, RelativeSource={RelativeSource TemplatedParent}}" />
+              <TextBlock Classes="caption muted" Text="{TemplateBinding FootText}" TextWrapping="Wrap" IsVisible="{TemplateBinding ShowsNote}" />
+              <TextBlock Grid.Column="1" Classes="mono-small muted" Text="{TemplateBinding Left}" IsVisible="{TemplateBinding ShowsLeft}" />
+            </Grid>
+          </StackPanel>
+        </Border>
+      </ControlTemplate>
+    </Setter>
+    <Style Selector="^.boxed">
+      <Setter Property="Background" Value="{DynamicResource bg-200}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource edge-card}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="{DynamicResource radius-lg}" />
+      <Setter Property="Padding" Value="20,14" />
+    </Style>
+    <Style Selector="^.boxed /template/ Border#PART_Box">
+      <Setter Property="BoxShadow" Value="{DynamicResource lift-card}" />
+    </Style>
+    <!-- How it ended, or why it waits: the status colours, which never follow the theme -->
+    <Style Selector="^:done /template/ c|GsIcon#PART_Icon">
+      <Setter Property="Foreground" Value="{DynamicResource ok}" />
+    </Style>
+    <Style Selector="^:done /template/ c|GsJobBar#PART_Bar">
+      <Setter Property="Fill" Value="{DynamicResource ok}" />
+    </Style>
+    <Style Selector="^:failed /template/ c|GsIcon#PART_Icon">
+      <Setter Property="Foreground" Value="{DynamicResource warn}" />
+    </Style>
+    <Style Selector="^:failed /template/ c|GsJobBar#PART_Bar">
+      <Setter Property="Fill" Value="{DynamicResource warn}" />
+    </Style>
+    <Style Selector="^:paused /template/ c|GsIcon#PART_Icon">
+      <Setter Property="Foreground" Value="{DynamicResource neutral}" />
+    </Style>
+    <Style Selector="^:paused /template/ c|GsJobBar#PART_Bar">
+      <Setter Property="Fill" Value="{DynamicResource neutral}" />
+    </Style>
+  </ControlTheme>
   <ControlTheme x:Key="{x:Type c:GsProgress}" TargetType="c:GsProgress">
     <Setter Property="Template">
       <ControlTemplate>
@@ -382,6 +466,10 @@
         <Grid Name="PART_Grid" ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" Margin="{TemplateBinding Padding}">
           <StackPanel Name="PART_Text" Spacing="2" VerticalAlignment="Center" Margin="0,0,20,0">
             <StackPanel Orientation="Horizontal" Spacing="8">
+              <Border Width="20" Height="30" CornerRadius="4" ClipToBounds="True" Margin="0,0,2,0" VerticalAlignment="Center"
+                      IsVisible="{Binding $parent[c:GsSettingsRow].Thumb, Converter={x:Static ObjectConverters.IsNotNull}}">
+                <Image Source="{TemplateBinding Thumb}" Stretch="UniformToFill" />
+              </Border>
               <TextBlock Name="PART_Title" Text="{TemplateBinding Title}" FontWeight="Medium" TextWrapping="Wrap" VerticalAlignment="Center" />
               <c:GsTag Text="{TemplateBinding TagText}" IsVisible="{Binding $parent[c:GsSettingsRow].TagText, Converter={x:Static ObjectConverters.IsNotNull}}" />
             </StackPanel>
@@ -413,7 +501,7 @@
     <Setter Property="Background" Value="Transparent" />
     <Setter Property="BorderBrush" Value="{DynamicResource bg-400}" />
     <Setter Property="Foreground" Value="{DynamicResource ink-muted}" />
-    <Setter Property="FontSize" Value="13" />
+    <Setter Property="FontSize" Value="{DynamicResource fs-13}" />
     <Setter Property="FontWeight" Value="Medium" />
     <Setter Property="FocusAdorner" Value="{StaticResource PillFocus}" />
     <Setter Property="Template">
@@ -431,6 +519,15 @@
       <Setter Property="BorderBrush" Value="{DynamicResource secondary-soft}" />
       <Setter Property="Foreground" Value="{DynamicResource ink}" />
     </Style>
+    <!-- Needs you while something does (design system version 32): the warn colours, selected or not -->
+    <Style Selector="^.warn, ^.warn:pointerover, ^.warn:selected">
+      <Setter Property="Background" Value="{DynamicResource warn-soft}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource warn-soft}" />
+      <Setter Property="Foreground" Value="{DynamicResource warn}" />
+    </Style>
+    <Style Selector="^.warn:selected">
+      <Setter Property="BorderBrush" Value="{DynamicResource warn}" />
+    </Style>
   </ControlTheme>
   <ControlTheme x:Key="{x:Type c:GsPillTabs}" TargetType="c:GsPillTabs">
     <Setter Property="ItemContainerTheme" Value="{StaticResource PillTabItem}" />
@@ -443,12 +540,17 @@
     <Setter Property="ItemTemplate">
       <DataTemplate x:DataType="c:NavItem">
         <StackPanel Orientation="Horizontal" Spacing="8">
-          <c:GsIcon Classes="selectable" Icon="{Binding Icon}" Size="16" VerticalAlignment="Center" IsVisible="{Binding Icon, Converter={x:Static ObjectConverters.IsNotNull}}" />
+          <c:GsIcon Classes="selectable" Icon="{Binding PlainIcon}" Size="16" VerticalAlignment="Center" IsVisible="{Binding PlainIcon, Converter={x:Static ObjectConverters.IsNotNull}}" />
+          <c:GsIcon Icon="alert" Size="16" Foreground="{DynamicResource warn}" VerticalAlignment="Center" IsVisible="{Binding IsWarn}" />
           <TextBlock Text="{Binding Label}" VerticalAlignment="Center" />
-          <Border Background="{DynamicResource secondary}" CornerRadius="999" Padding="6,0" VerticalAlignment="Center"
-                  IsVisible="{Binding Count, Converter={x:Static ObjectConverters.IsNotNull}}">
-            <TextBlock Text="{Binding Count}" Foreground="{DynamicResource on-secondary}" FontFamily="{DynamicResource font-mono}" FontSize="11" LineHeight="16" FontWeight="Medium" />
-          </Border>
+          <Panel VerticalAlignment="Center" IsVisible="{Binding Count, Converter={x:Static ObjectConverters.IsNotNull}}">
+            <Border Background="{DynamicResource secondary}" CornerRadius="999" Padding="6,0" IsVisible="{Binding !IsWarn}">
+              <TextBlock Text="{Binding Count}" Foreground="{DynamicResource on-secondary}" FontFamily="{DynamicResource font-mono}" FontSize="{DynamicResource fs-11}" LineHeight="{DynamicResource lh-16}" FontWeight="Medium" />
+            </Border>
+            <Border Background="{DynamicResource bg-100}" CornerRadius="999" Padding="6,0" IsVisible="{Binding IsWarn}">
+              <TextBlock Text="{Binding Count}" Foreground="{DynamicResource warn}" FontFamily="{DynamicResource font-mono}" FontSize="{DynamicResource fs-11}" LineHeight="{DynamicResource lh-16}" FontWeight="Medium" />
+            </Border>
+          </Panel>
         </StackPanel>
       </DataTemplate>
     </Setter>
@@ -500,7 +602,7 @@
           <TextBlock Grid.Column="1" Text="{Binding Label}" Margin="12,0,0,0" VerticalAlignment="Center" />
           <Border Grid.Column="2" Background="{DynamicResource warn-soft}" CornerRadius="999" Padding="6,0" VerticalAlignment="Center"
                   IsVisible="{Binding Count, Converter={x:Static ObjectConverters.IsNotNull}}">
-            <TextBlock Text="{Binding Count}" Foreground="{DynamicResource warn}" FontFamily="{DynamicResource font-mono}" FontSize="11" LineHeight="16" FontWeight="Medium" />
+            <TextBlock Text="{Binding Count}" Foreground="{DynamicResource warn}" FontFamily="{DynamicResource font-mono}" FontSize="{DynamicResource fs-11}" LineHeight="{DynamicResource lh-16}" FontWeight="Medium" />
           </Border>
         </Grid>
       </DataTemplate>
@@ -529,6 +631,11 @@
                      IsVisible="{Binding $parent[c:GsRailButton].DotBrush, Converter={x:Static ObjectConverters.IsNotNull}}" />
             <Ellipse Width="8" Height="8" Fill="{TemplateBinding DotBrush}" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,7,7,0"
                      IsVisible="{Binding $parent[c:GsRailButton].DotBrush, Converter={x:Static ObjectConverters.IsNotNull}}" />
+            <!-- Something needs the person: a caution mark on the rail's own ring (design system version 32) -->
+            <Panel Width="17" Height="17" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,2,1,0" IsVisible="{TemplateBinding IsCaution}">
+              <Ellipse Fill="{DynamicResource dot-ring}" />
+              <c:GsIcon Icon="alert" Size="12" StrokeWidth="2.5" Foreground="{DynamicResource warn}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Panel>
           </Panel>
         </Border>
       </ControlTemplate>
@@ -541,41 +648,28 @@
       <Setter Property="Background" Value="{DynamicResource secondary-soft}" />
       <Setter Property="Foreground" Value="{DynamicResource secondary}" />
     </Style>
+    <Style Selector="^:caution">
+      <Setter Property="Foreground" Value="{DynamicResource warn}" />
+    </Style>
   </ControlTheme>
   <ControlTheme x:Key="{x:Type c:GsSideRail}" TargetType="c:GsSideRail">
     <Setter Property="Width" Value="{DynamicResource rail-width}" />
     <Setter Property="Template">
       <ControlTemplate>
         <Border Background="{DynamicResource bg-100}" BorderBrush="{DynamicResource line-100}" BorderThickness="0,0,1,0" Padding="0,16">
-          <DockPanel>
-            <Panel DockPanel.Dock="Top" Width="40" Height="40" Margin="0,0,0,12" ToolTip.Tip="GameSync">
+          <!-- In the order they're seen, so Tab goes down the rail: the mark, the pages, then Settings at the bottom -->
+          <Grid RowDefinitions="Auto,*,Auto">
+            <Panel Grid.Row="0" Width="40" Height="40" Margin="0,0,0,12" ToolTip.Tip="GameSync">
               <c:GsIcon Icon="logo" Size="22" StrokeWidth="2" Foreground="{DynamicResource primary}" HorizontalAlignment="Center" VerticalAlignment="Center" />
             </Panel>
-            <ItemsControl DockPanel.Dock="Bottom" ItemsSource="{TemplateBinding BottomItems}">
-              <ItemsControl.ItemTemplate>
-                <DataTemplate x:DataType="c:RailItem">
-                  <c:GsRailButton Icon="{Binding Icon}" Margin="0,4" HorizontalAlignment="Center"
-                                  ToolTip.Tip="{Binding FullLabel}" AutomationProperties.Name="{Binding FullLabel}"
-                                  DotBrush="{Binding Dot, Converter={x:Static c:TokenBrushConverter.Instance}}"
-                                  Command="{Binding $parent[c:GsSideRail].PickCommand}" CommandParameter="{Binding Id}">
-                    <c:GsRailButton.IsCurrent>
-                      <MultiBinding Converter="{x:Static c:AllEqualConverter.Instance}">
-                        <Binding Path="Id" />
-                        <Binding Path="$parent[c:GsSideRail].Current" />
-                      </MultiBinding>
-                    </c:GsRailButton.IsCurrent>
-                  </c:GsRailButton>
-                </DataTemplate>
-              </ItemsControl.ItemTemplate>
-            </ItemsControl>
-            <ItemsControl ItemsSource="{TemplateBinding TopItems}">
+            <ItemsControl Grid.Row="1" ItemsSource="{TemplateBinding TopItems}">
               <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="c:RailItem">
                   <StackPanel HorizontalAlignment="Center">
                     <Border Width="28" Height="1" Background="{DynamicResource line-100}" Margin="0,8" IsVisible="{Binding Separator}" />
                     <c:GsRailButton Icon="{Binding Icon}" Margin="0,4" HorizontalAlignment="Center"
                                     ToolTip.Tip="{Binding FullLabel}" AutomationProperties.Name="{Binding FullLabel}"
-                                    DotBrush="{Binding Dot, Converter={x:Static c:TokenBrushConverter.Instance}}"
+                                    DotBrush="{Binding PlainDot, Converter={x:Static c:TokenBrushConverter.Instance}}" IsCaution="{Binding IsCaution}"
                                     Command="{Binding $parent[c:GsSideRail].PickCommand}" CommandParameter="{Binding Id}">
                       <c:GsRailButton.IsCurrent>
                         <MultiBinding Converter="{x:Static c:AllEqualConverter.Instance}">
@@ -588,7 +682,24 @@
                 </DataTemplate>
               </ItemsControl.ItemTemplate>
             </ItemsControl>
-          </DockPanel>
+            <ItemsControl Grid.Row="2" ItemsSource="{TemplateBinding BottomItems}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="c:RailItem">
+                  <c:GsRailButton Icon="{Binding Icon}" Margin="0,4" HorizontalAlignment="Center"
+                                  ToolTip.Tip="{Binding FullLabel}" AutomationProperties.Name="{Binding FullLabel}"
+                                  DotBrush="{Binding PlainDot, Converter={x:Static c:TokenBrushConverter.Instance}}" IsCaution="{Binding IsCaution}"
+                                  Command="{Binding $parent[c:GsSideRail].PickCommand}" CommandParameter="{Binding Id}">
+                    <c:GsRailButton.IsCurrent>
+                      <MultiBinding Converter="{x:Static c:AllEqualConverter.Instance}">
+                        <Binding Path="Id" />
+                        <Binding Path="$parent[c:GsSideRail].Current" />
+                      </MultiBinding>
+                    </c:GsRailButton.IsCurrent>
+                  </c:GsRailButton>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </Grid>
         </Border>
       </ControlTemplate>
     </Setter>

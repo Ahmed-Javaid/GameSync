@@ -42,10 +42,12 @@ public sealed partial class AddPlaceViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(CategoryLabel))]
     private string _category = "save";
 
-    public AddPlaceViewModel(GameId id, string title, LauncherActions? actions)
+    /// <param name="starts">KAN-23: the game isn't syncing yet, so adding the place starts it syncing.</param>
+    public AddPlaceViewModel(GameId id, string title, LauncherActions? actions, bool starts = false)
     {
         Id = id;
         Title = title;
+        Starts = starts;
         _actions = actions;
         AddCommand = new RelayCommand(Add);
         CancelCommand = new RelayCommand(() => _actions?.CloseDialog?.Invoke());
@@ -68,6 +70,16 @@ public sealed partial class AddPlaceViewModel : ObservableObject
     public GameId Id { get; }
 
     public string Title { get; }
+
+    /// <summary>KAN-23 (the owner, 3 Oct 2026): a game not syncing yet starts syncing with the place added.</summary>
+    public bool Starts { get; }
+
+    /// <summary>What adding it does, above the buttons.</summary>
+    public string AddNote => Starts
+        ? $"{Title} starts syncing with this place: every version is kept on this PC and in the cloud, and the newest comes to your other PCs. If another PC syncs it already, its places come first. Nothing in it is ever deleted."
+        : "It's backed up at the next sync. Your other PCs are asked before they take a new place, and nothing in it is ever deleted.";
+
+    public string AddLabel => Starts ? "Add and sync" : "Add this place";
 
     public string Subtitle => $"Where {Title} keeps saves GameSync didn't find";
 

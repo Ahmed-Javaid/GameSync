@@ -4,7 +4,7 @@
              xmlns:vm="using:GameSync.UI.ViewModels"
              x:Class="GameSync.UI.Views.AddOwnDialog"
              x:DataType="vm:AddOwnViewModel"
-             Width="640">
+             Width="{DynamicResource dw-640}">
   <!-- Add a game or folder (design system → AddGameDialog, LIB-13): a name, a folder picked in Windows' own picker with what's
        there, and the program that uses it, if there is one. Program files in the folder are never copied. -->
   <Border Background="{DynamicResource surface-dialog}" BorderBrush="{DynamicResource edge-dialog}" BorderThickness="1" BackgroundSizing="OuterBorderEdge"
@@ -27,6 +27,7 @@
           <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
             <c:GsButton Classes="ghost" Content="Cancel" Command="{Binding CancelCommand}" />
             <c:GsButton Classes="primary" Icon="plus" Content="{Binding AddLabel}" Command="{Binding AddCommand}" IsEnabled="{Binding CanAdd}"
+                        IsBusy="{Binding Adding}" BusyText="Adding"
                         ToolTip.Tip="{Binding AddTip}" ToolTip.ShowOnDisabled="True" />
           </StackPanel>
         </StackPanel>
@@ -57,7 +58,7 @@
               <c:GsIconButton Grid.Column="3" Classes="sm" Icon="folder" Label="Open in Explorer" Command="{Binding OpenCommand}" VerticalAlignment="Center" />
             </Grid>
           </Border>
-          <c:GsNote Icon="search" Text="Looking at what's there…" IsVisible="{Binding Looking}" />
+          <c:GsNote Icon="search" Text="Looking at what's there" IsBusy="True" IsVisible="{Binding Looking}" />
           <c:GsNote Icon="block" Foreground="{DynamicResource danger}" Text="{Binding Refused}" IsVisible="{Binding IsRefused}" />
         </StackPanel>
 

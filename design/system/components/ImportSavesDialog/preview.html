@@ -25,7 +25,8 @@ var IMPORT_ITEMS = [
   {id:'terraria', name:'Terraria', art:COVERS[1], match:'matched', versions:1, size:338000000},
   {id:'sekiro', name:'Sekiro: Shadows Die Twice', art:COVERS[0], match:'matched', versions:2, size:4299161, warn:'Made on another Steam account. FromSoftware saves check the account, so it may not load.'},
   {id:'hk', name:'Hollow Knight', art:null, match:'not-installed', versions:1, size:1153434, removed:'1 program file (launcher.dll) was left out.'},
-  {id:'mystery', name:'Unknown game (a friend’s custom entry)', art:null, match:'unknown', versions:1, size:524288}
+  {id:'mystery', name:'Unknown game (a friend’s custom entry)', art:null, match:'unknown', versions:1, size:524288},
+  {id:'apex', name:'Apex Legends', art:COVERS[6], match:'matched', versions:1, size:2400000, blocked:'Has an anti-cheat, so its saves stay with the account that made them.'}
 ];
 
 ReactDOM.createRoot(document.getElementById('root')).render(h('div',{className:'gs-scrim',style:{minHeight:700}},h(G.ImportSavesDialog,{zipName:'GameSync-saves-2026-09-27.zip',from:'27 Sep 2026',items:IMPORT_ITEMS})));

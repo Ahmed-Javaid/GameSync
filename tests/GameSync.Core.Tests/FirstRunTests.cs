@@ -110,6 +110,7 @@ public class FirstRunTests
         await FirstRun.ConnectAsync(data, world.Cloud, Ct);
         Assert.Equal(world.Cloud, AppConfig.Load(data)!.Remote);
         await AppActions.RetryAsync(data, id, output, Ct);
+        await Uploads.RunAsync(data, null, Ct);
         var up = await new FolderCloud(world.Cloud).Log.ListAsync(id, Ct);
         Assert.Equal([VersionOrigin.KeptAtFirstSync, VersionOrigin.FirstBackup], up.OrderBy(v => v.CreatedUtc).Select(v => v.Origin));
         Assert.False(history.HasPending(id));

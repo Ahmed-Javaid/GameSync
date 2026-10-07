@@ -472,13 +472,20 @@ public sealed partial class PropertiesViewModel : ObservableObject
 
     public bool IsSteam => _loaded?.About.Store == StoreKind.Steam && _loaded.About.SteamAppId is not null;
 
-    public string RouteTitle => ThroughStore ? $"Starts through {StoreNames.Name(_loaded!.About.Store) ?? "its store"}" : "Program";
+    /// <summary>R15 (design system version 51): a game with an anti-cheat no store starts goes through its anti-cheat's own launcher.</summary>
+    private bool ThroughAntiCheat => HasAntiCheat && !ThroughStore;
+
+    public string RouteTitle => ThroughStore ? $"Starts through {StoreNames.Name(_loaded!.About.Store) ?? "its store"}"
+        : ThroughAntiCheat ? "Starts through its anti-cheat's launcher" : "Program";
 
     public string RouteDescription => ThroughStore
         ? $"{StoreNames.Name(_loaded!.About.Store) ?? "Its store"} starts it, so its overlay, its cloud and its own launch options work as usual."
+        : ThroughAntiCheat ? $"It has an anti-cheat, so GameSync never starts its program itself: only its anti-cheat's own launcher, such as {GameLaunch.EacLauncher}."
         : "GameSync starts it in its own folder, never as admin.";
 
-    public string RouteText => ThroughStore ? _loaded!.About.StoreLink! : Program.Length > 0 ? Program : _loaded?.About.Program ?? "No program found in its folder yet";
+    public string RouteText => ThroughStore ? _loaded!.About.StoreLink!
+        : Program.Length > 0 ? Program
+        : _loaded?.About.Program ?? (ThroughAntiCheat ? "No anti-cheat launcher in its folder: start it from its launcher" : "No program found in its folder yet");
 
     public bool ProgramPicked => Program.Length > 0;
 

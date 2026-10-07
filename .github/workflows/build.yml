@@ -1,0 +1,27 @@
+# R20 (the safety audit, 7 Oct 2026): every push to main and every pull request builds GameSync and runs its tests on
+# Windows, with packages restored exactly as the lock files pin them. The workflow's token can only read the repository,
+# and each action is pinned to the commit of its release, not a tag that can move.
+name: Build and test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: 10.0.x
+      - run: dotnet restore GameSync.sln --locked-mode
+      - run: dotnet build GameSync.sln --no-restore -c Release
+      - run: dotnet test tests/GameSync.Core.Tests --no-build -c Release

@@ -92,7 +92,7 @@ public class CloudTests
     }
 
     [Fact]
-    public async Task PC_05_a_pin_made_offline_reaches_the_cloud_later_and_an_unpin_needs_the_cloud()
+    public async Task PC_05_a_pin_and_an_unpin_made_offline_reach_the_cloud_later_and_the_cloud_never_brings_the_pin_back()
     {
         using var world = new TestWorld();
         using var desktop = world.Pc("DESKTOP");
@@ -105,11 +105,22 @@ public class CloudTests
         desktop.Offline = true;
         await desktop.Service().PinAsync(version.Game, version.Id, "before the final boss", Ct);
         Assert.Empty(await cloudLog.ListPinsAsync(version.Game, Ct));
-        await Assert.ThrowsAsync<CloudException>(() => desktop.Service().UnpinAsync(version.Game, version.Id, Ct));
 
         desktop.Offline = false;
         await desktop.SyncAsync();
         Assert.Equal("before the final boss", Assert.Single(await cloudLog.ListPinsAsync(version.Game, Ct)).Label);
+
+        // KAN-88: an unpin made offline is done on this PC at once, and waits in the outbox; the next sync's pull leaves
+        // the cloud's pin out rather than bringing it back, and its upload takes it away there too.
+        desktop.Offline = true;
+        await desktop.Service().UnpinAsync(version.Game, version.Id, Ct);
+        Assert.False(Assert.Single(await desktop.Service().HistoryAsync(version.Game, Ct)).Pinned);
+        Assert.Single(await cloudLog.ListPinsAsync(version.Game, Ct));
+
+        desktop.Offline = false;
+        await desktop.SyncAsync();
+        Assert.Empty(await cloudLog.ListPinsAsync(version.Game, Ct));
+        Assert.False(Assert.Single(await desktop.Service().HistoryAsync(version.Game, Ct)).Pinned);
     }
 
     [Theory]

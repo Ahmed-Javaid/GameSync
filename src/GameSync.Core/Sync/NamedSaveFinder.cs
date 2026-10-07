@@ -19,8 +19,9 @@ public static class NamedSaveFinder
 
     /// <param name="folder">Where the kept folders are, such as Bloodborne's CUSA00207.</param>
     /// <param name="liveFolder">The live save folder they're copies of, such as CUSA00207\SPRJ0005.</param>
-    /// <param name="tempFolder">Where .zip files are unpacked; the caller deletes it afterwards.</param>
-    public static (IReadOnlyList<FoundSave> Found, IReadOnlyList<string> Skipped) Find(string folder, string liveFolder, string tempFolder)
+    /// <param name="tempFolder">Where .zip files are unpacked; the caller deletes it afterwards. Null only counts them: each .zip is
+    /// found as itself, unopened (KAN-61's count of the copies beside a live save).</param>
+    public static (IReadOnlyList<FoundSave> Found, IReadOnlyList<string> Skipped) Find(string folder, string liveFolder, string? tempFolder)
     {
         var live = Path.TrimEndingDirectorySeparator(Path.GetFullPath(liveFolder));
         var leaf = Path.GetFileName(live);
@@ -38,18 +39,22 @@ public static class NamedSaveFinder
 
             var name = Path.GetFileName(full);
             var wrapped = Path.Combine(full, leaf);
-            if (Directory.Exists(wrapped))
-            {
-                found.Add(new FoundSave(name, wrapped, Path.GetRelativePath(folder, wrapped)));
 
-                // A second copy kept inside the same folder, like "Before sus\ded beast\SPRJ0005".
-                foreach (var variant in Directory.EnumerateDirectories(full).Order(StringComparer.OrdinalIgnoreCase))
+            // A copy kept one folder further in, like "Before sus\ded beast\SPRJ0005", with or without one directly inside.
+            var nested = Directory.EnumerateDirectories(full).Order(StringComparer.OrdinalIgnoreCase)
+                .Where(variant => !Path.GetFullPath(variant).Equals(wrapped, StringComparison.OrdinalIgnoreCase) && Directory.Exists(Path.Combine(variant, leaf)))
+                .ToList();
+            if (Directory.Exists(wrapped) || nested.Count > 0)
+            {
+                if (Directory.Exists(wrapped))
+                {
+                    found.Add(new FoundSave(name, wrapped, Path.GetRelativePath(folder, wrapped)));
+                }
+
+                foreach (var variant in nested)
                 {
                     var inner = Path.Combine(variant, leaf);
-                    if (!Path.GetFullPath(variant).Equals(wrapped, StringComparison.OrdinalIgnoreCase) && Directory.Exists(inner))
-                    {
-                        found.Add(new FoundSave($"{name} / {Path.GetFileName(variant)}", inner, Path.GetRelativePath(folder, inner)));
-                    }
+                    found.Add(new FoundSave($"{name} / {Path.GetFileName(variant)}", inner, Path.GetRelativePath(folder, inner)));
                 }
             }
             else if (RelativeFiles(full).Overlaps(liveFiles))
@@ -76,6 +81,12 @@ public static class NamedSaveFinder
                 if (found.Any(f => f.Name.Equals(name, StringComparison.OrdinalIgnoreCase)))
                 {
                     name += " (zip)";
+                }
+
+                if (tempFolder is null)
+                {
+                    found.Add(new FoundSave(name, file, Path.GetFileName(file)));
+                    continue;
                 }
 
                 var target = Path.Combine(tempFolder, $"zip-{found.Count}");

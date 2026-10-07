@@ -28,7 +28,7 @@ var IMPORT_ITEMS = [
   {id:'mystery', name:'Unknown game (a friend’s custom entry)', art:null, match:'unknown', versions:1, size:524288}
 ];
 
-ReactDOM.createRoot(document.getElementById('root')).render(h('div',{className:'gs-stack'},h(G.PillTabs,{label:'Library view',items:[{id:'all',label:'My games'},{id:'recent',label:'Recently played'},{id:'fav',label:'Favourites'},{id:'attn',label:'Needs you',count:2}],value:'recent'}),h(G.PillTabs,{label:'Save manager view',items:[{id:'saves',label:'Saves',icon:'saves'},{id:'versions',label:'Versions',icon:'clock'},{id:'log',label:'Log',icon:'terminal'}]}),h(G.PillTabs,{label:'Theme mode',items:[{id:'dark',label:'Dark',icon:'moon'},{id:'light',label:'Light',icon:'sun'},{id:'system',label:'Match Windows',icon:'monitor'}]})));
+ReactDOM.createRoot(document.getElementById('root')).render(h('div',{className:'gs-stack'},h(G.PillTabs,{label:'Library view',items:[{id:'all',label:'My games'},{id:'recent',label:'Recently played'},{id:'fav',label:'Favourites'},{id:'attn',label:'Conflicts',count:2}],value:'recent'}),h(G.PillTabs,{label:'Save manager view',items:[{id:'saves',label:'Saves',icon:'saves'},{id:'versions',label:'Versions',icon:'clock'},{id:'log',label:'Log',icon:'terminal'}]}),h(G.PillTabs,{label:'Theme mode',items:[{id:'dark',label:'Dark',icon:'moon'},{id:'light',label:'Light',icon:'sun'},{id:'system',label:'Match Windows',icon:'monitor'}]})));
 </script>
 </body>
 </html>

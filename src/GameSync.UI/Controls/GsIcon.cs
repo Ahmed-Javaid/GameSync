@@ -22,10 +22,45 @@ public sealed class GsIcon : Control
 
     public static readonly StyledProperty<bool> FilledProperty = AvaloniaProperty.Register<GsIcon, bool>(nameof(Filled));
 
+    public static readonly StyledProperty<bool> IsSpinningProperty = AvaloniaProperty.Register<GsIcon, bool>(nameof(IsSpinning));
+
+    private FrameLoop? _loop;
+
     static GsIcon()
     {
-        AffectsRender<GsIcon>(IconProperty, StrokeWidthProperty, ForegroundProperty, FilledProperty);
+        AffectsRender<GsIcon>(IconProperty, StrokeWidthProperty, ForegroundProperty, FilledProperty, IsSpinningProperty);
         AffectsMeasure<GsIcon>(SizeProperty);
+    }
+
+    /// <summary>KAN-80: it turns once a second about its middle, as Sync now's arrows do while GameSync syncs; still with Windows' animation effects off.</summary>
+    public bool IsSpinning
+    {
+        get => GetValue(IsSpinningProperty);
+        set => SetValue(IsSpinningProperty, value);
+    }
+
+    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
+    {
+        base.OnPropertyChanged(change);
+        if (change.Property == IsSpinningProperty && IsSpinning)
+        {
+            (_loop ??= new FrameLoop(this, () => IsSpinning && IsVisible)).Start();
+        }
+    }
+
+    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnAttachedToVisualTree(e);
+        if (IsSpinning)
+        {
+            (_loop ??= new FrameLoop(this, () => IsSpinning && IsVisible)).Start();
+        }
+    }
+
+    protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnDetachedFromVisualTree(e);
+        _loop?.Stop();
     }
 
     public string? Icon
@@ -52,7 +87,7 @@ public sealed class GsIcon : Control
         set => SetValue(ForegroundProperty, value);
     }
 
-    /// <summary>Fills the <c>star</c>, for a favourite; <c>play</c> is always filled and no other icon ever is.</summary>
+    /// <summary>Fills the <c>star</c>, for a favourite; <c>play</c> and the <c>zenith</c> icon's star are always filled and no other icon ever is.</summary>
     public bool Filled
     {
         get => GetValue(FilledProperty);
@@ -69,15 +104,18 @@ public sealed class GsIcon : Control
         }
 
         var scale = Size / 24;
-        using (context.PushTransform(Matrix.CreateScale(scale, scale)))
+        var turned = IsSpinning && _loop?.Motion != false ? DateTime.UtcNow.TimeOfDay.TotalMilliseconds % 1000 / 1000 * 2 * Math.PI : 0;
+        using (context.PushTransform(Matrix.CreateTranslation(-12, -12) * Matrix.CreateRotation(turned) * Matrix.CreateTranslation(12, 12) * Matrix.CreateScale(scale, scale)))
         {
             // A store's mark is filled and never outlined (KAN-55); the design system's icons are outlined.
             var brand = Icons.IsBrand(Icon);
             var pen = brand ? null : new Pen(brush, StrokeWidth, lineCap: PenLineCap.Round, lineJoin: PenLineJoin.Round);
             var fill = brand || Icon == "play" || Filled && Icon == "star" ? brush : null;
-            foreach (var path in paths)
+            for (var i = 0; i < paths.Length; i++)
             {
-                context.DrawGeometry(fill, pen, path);
+                // The Zenith's star is solid over its outlined mountain (design system version 41), with a finer edge.
+                var solid = Icon == "zenith" && i == 1;
+                context.DrawGeometry(solid ? brush : fill, solid ? new Pen(brush, 1, lineJoin: PenLineJoin.Round) : pen, paths[i]);
             }
         }
     }

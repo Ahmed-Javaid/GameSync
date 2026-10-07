@@ -9,7 +9,11 @@ namespace GameSync.Core.Scanning;
 /// <summary>A root folder that couldn't be read. A missing drive or folder never reads as "no saves" (SYNC-12).</summary>
 public sealed record RootProblem(string RootKey, string Folder, string Message, bool DriveMissing);
 
-public sealed record Snapshot(IReadOnlyList<FileEntry> Files, IReadOnlyList<string> Warnings, IReadOnlyList<RootProblem> Problems);
+public sealed record Snapshot(IReadOnlyList<FileEntry> Files, IReadOnlyList<string> Warnings, IReadOnlyList<RootProblem> Problems)
+{
+    /// <summary>R2: the program files found in the save folders, by their full paths, which are never backed up (R1).</summary>
+    public IReadOnlyList<string> Programs { get; init; } = [];
+}
 
 /// <summary>A save file another program holds open; the game waits and every other game carries on (SYNC-02).</summary>
 public sealed class FileInUseException(string path, Exception inner)
@@ -29,6 +33,7 @@ public sealed class SnapshotScanner(SensitivePathGuard guard, StateStore? hashCa
         var files = new Dictionary<string, FileEntry>(StringComparer.OrdinalIgnoreCase);
         var warnings = new List<string>();
         var problems = new List<RootProblem>();
+        var programs = new List<string>();
         var checkedRoots = new HashSet<string>(StringComparer.Ordinal);
 
         foreach (var rule in game.Rules)
@@ -106,16 +111,10 @@ public sealed class SnapshotScanner(SensitivePathGuard guard, StateStore? hashCa
                     continue;
                 }
 
-                if (ProgramFileDetector.HasBlockedExtension(fullPath))
+                if (ProgramFileDetector.HasBlockedExtension(fullPath) || ReadEntry(fullPath, portable, rule.Category) is not { } entry)
                 {
                     warnings.Add($"Program file in the save folder, not backed up: {fullPath}");
-                    continue;
-                }
-
-                var entry = ReadEntry(fullPath, portable, rule.Category);
-                if (entry is null)
-                {
-                    warnings.Add($"Program file in the save folder, not backed up: {fullPath}");
+                    programs.Add(fullPath);
                     continue;
                 }
 
@@ -123,7 +122,10 @@ public sealed class SnapshotScanner(SensitivePathGuard guard, StateStore? hashCa
             }
         }
 
-        return new Snapshot(files.Values.OrderBy(f => f.Path, StringComparer.OrdinalIgnoreCase).ToList(), warnings, problems);
+        return new Snapshot(files.Values.OrderBy(f => f.Path, StringComparer.OrdinalIgnoreCase).ToList(), warnings, problems)
+        {
+            Programs = programs.Distinct(StringComparer.OrdinalIgnoreCase).ToList(),
+        };
     }
 
     /// <summary>Hashes one file, or returns null when its first bytes show it's a program (R1).</summary>

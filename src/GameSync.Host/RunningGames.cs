@@ -1,3 +1,4 @@
+using System.Globalization;
 using GameSync.Core.Model;
 using GameSync.Core.Sessions;
 using GameSync.Windows;
@@ -26,6 +27,12 @@ internal sealed class RunningGames(Engine engine)
     public const string QuietOpenPrefix = "quiet.open.";
 
     /// <summary>
+    /// PLAY-06: when the person last said they're done playing the game. Its processes started before then, such as an
+    /// emulator still closing, aren't the game any more; a new start of it is.
+    /// </summary>
+    public static string EndedByHandKey(GameId game) => $"session.byhand.{game}";
+
+    /// <summary>
     /// LIB-13: the setting the agent keeps while a folder of the person's own is changing, from when it started: in use,
     /// so nothing is restored into it meanwhile, but not played, so Home and the play time leave it out.
     /// </summary>
@@ -49,7 +56,9 @@ internal sealed class RunningGames(Engine engine)
             _programs[game] = programs;
         }
 
-        var running = programs is { Names.Count: > 0 } && _watcher.Find([programs]).Count > 0;
+        var byHand = engine.State.GetSetting(EndedByHandKey(game)) is { Length: > 0 } said &&
+            DateTime.TryParse(said, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var at) ? at.ToUniversalTime() : (DateTime?)null;
+        var running = programs is { Names.Count: > 0 } && _watcher.Find([programs]).Any(p => byHand is null || p.StartedUtc > byHand);
         _answers[game] = (DateTime.UtcNow, running);
         return running;
     }

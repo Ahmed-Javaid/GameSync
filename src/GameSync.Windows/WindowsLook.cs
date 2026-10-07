@@ -25,6 +25,15 @@ public static class WindowsLook
 
     private const uint GetClientAreaAnimation = 0x1042;
 
+    /// <summary>
+    /// Settings → Accessibility → Text size (A11Y-04): how much bigger Windows makes text, 1 by default and up to 2.25.
+    /// </summary>
+    public static double TextScale()
+    {
+        using var accessibility = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Accessibility");
+        return accessibility?.GetValue("TextScaleFactor") is int percent and >= 100 and <= 225 ? percent / 100.0 : 1;
+    }
+
     [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true)]
     [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
     private static extern bool SystemParametersInfo(uint action, uint param, out int value, uint update);

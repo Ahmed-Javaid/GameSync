@@ -82,13 +82,27 @@ public sealed class SensitivePathGuard
         [RegistryExports(gameSyncDataDir)]);
     }
 
-    /// <summary>Returns why <paramref name="folder"/> can't be a save root, or null when it can.</summary>
+    /// <summary>
+    /// Returns why <paramref name="folder"/> can't be a save root, or null when it can. A folder reached through a link (a
+    /// junction or a symbolic link, anywhere along its path) is checked where it really is too, so a link can't lead a
+    /// rule into a protected folder (the safety audit, 7 Oct 2026).
+    /// </summary>
     public string? CheckRoot(string folder)
+    {
+        if (Check(folder, folder, via: null) is { } refusal)
+        {
+            return refusal;
+        }
+
+        return RealPath(folder) is { } real && Normalize(real) != Normalize(folder) ? Check(real, folder, via: real) : null;
+    }
+
+    private string? Check(string folder, string shown, string? via)
     {
         var path = Normalize(folder);
         if (Path.GetPathRoot(path) is { } driveRoot && Normalize(driveRoot) == path)
         {
-            return "a whole drive is too broad for a save folder";
+            return via is null ? "a whole drive is too broad for a save folder" : $"{shown} leads to {via}, a whole drive, too broad for a save folder";
         }
 
         if (_allowed.Any(a => IsSameOrInside(path, a)))
@@ -96,20 +110,53 @@ public sealed class SensitivePathGuard
             return null;
         }
 
+        var leads = via is null ? "" : $" (it leads to {via})";
         foreach (var (blocked, reason) in _blocked)
         {
             if (IsSameOrInside(path, blocked))
             {
-                return $"{folder} can't hold saves: {reason}";
+                return $"{shown} can't hold saves{leads}: {reason}";
             }
 
             if (IsSameOrInside(blocked, path))
             {
-                return $"{folder} is too broad: it contains {blocked}, and {reason}";
+                return $"{shown} is too broad{leads}: it contains {blocked}, and {reason}";
             }
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// Where <paramref name="folder"/> really is, every junction or symbolic link along its path followed; the part that
+    /// doesn't exist yet is kept as written. Null when it can't be read.
+    /// </summary>
+    internal static string? RealPath(string folder)
+    {
+        try
+        {
+            var full = Path.GetFullPath(folder);
+            var root = Path.GetPathRoot(full) ?? "";
+            var real = root;
+            var parts = full[root.Length..].Split(Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries);
+            for (var i = 0; i < parts.Length; i++)
+            {
+                var next = Path.Combine(real, parts[i]);
+                var info = new DirectoryInfo(next);
+                if (!info.Exists)
+                {
+                    return Path.Combine([next, .. parts[(i + 1)..]]);
+                }
+
+                real = info.LinkTarget is not null && info.ResolveLinkTarget(returnFinalTarget: true) is { } target ? target.FullName : next;
+            }
+
+            return real;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+        {
+            return null;
+        }
     }
 
     /// <summary>Defense in depth for single files found while scanning.</summary>

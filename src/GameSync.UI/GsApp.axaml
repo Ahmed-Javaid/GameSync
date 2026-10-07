@@ -15,6 +15,12 @@
     <DataTemplate DataType="vm:GameViewModel">
       <v:GamePage />
     </DataTemplate>
+    <DataTemplate DataType="vm:AchievementsViewModel">
+      <v:AchievementsPage />
+    </DataTemplate>
+    <DataTemplate DataType="vm:TrophyRoomViewModel">
+      <v:TrophyRoomPage />
+    </DataTemplate>
     <DataTemplate DataType="vm:SaveManagerViewModel">
       <v:SaveManagerPage />
     </DataTemplate>
@@ -29,6 +35,18 @@
     </DataTemplate>
     <DataTemplate DataType="vm:AddPlaceViewModel">
       <v:AddPlaceDialog />
+    </DataTemplate>
+    <DataTemplate DataType="vm:NamedSaveViewModel">
+      <v:NamedSaveDialog />
+    </DataTemplate>
+    <DataTemplate DataType="vm:AchievementGamesViewModel">
+      <v:AchievementGamesDialog />
+    </DataTemplate>
+    <DataTemplate DataType="vm:LearnFindsViewModel">
+      <v:LearnFindsDialog />
+    </DataTemplate>
+    <DataTemplate DataType="vm:KeptCopiesViewModel">
+      <v:KeptCopiesDialog />
     </DataTemplate>
     <DataTemplate DataType="vm:AddOwnViewModel">
       <v:AddOwnDialog />
@@ -48,6 +66,12 @@
     <DataTemplate DataType="vm:SettingsViewModel">
       <v:SettingsPage />
     </DataTemplate>
+    <DataTemplate DataType="vm:ShareViewModel">
+      <v:ShareDialog />
+    </DataTemplate>
+    <DataTemplate DataType="vm:ImportSavesViewModel">
+      <v:ImportSavesDialog />
+    </DataTemplate>
     <DataTemplate DataType="vm:PlaceholderViewModel">
       <v:PlaceholderPage />
     </DataTemplate>
@@ -61,6 +85,7 @@
         <ResourceInclude Source="avares://GameSync.UI/Styles/Console.axaml" />
         <ResourceInclude Source="avares://GameSync.UI/Styles/Settings.axaml" />
         <ResourceInclude Source="avares://GameSync.UI/Styles/Window.axaml" />
+        <ResourceInclude Source="avares://GameSync.UI/Styles/Achievements.axaml" />
       </ResourceDictionary.MergedDictionaries>
     </ResourceDictionary>
   </Application.Resources>

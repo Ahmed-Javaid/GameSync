@@ -1,5 +1,7 @@
-2:3 cover-art tile with the game's name, optional meta line and a status badge when the status isn't Synced.
+2:3 cover-art tile with the game's name, optional meta line, and on its art a status badge, or a small mark when its saves are fine.
 
-Provide `name`, `art` (Steam's 600×900 library capsule, `library_capsule_2x`), `status`, `meta` ("61 h · Today 21:04"), `onClick` and optional `width`. Synced games show no badge so the problems stand out.
+Provide `name`, `art` (Steam's 600×900 library capsule, `library_capsule_2x`), `status`, `meta` ("61 h · Today 21:04"), `onClick` and optional `width`. A game whose saves are fine shows a small round mark instead of a badge, so the problems stand out (KAN-48; version 35 drew it): a **cloud with a check** for Synced, on your PCs and in the cloud, and a **shield with a check** for Backed up or Synced by its store, in `ok` on `ok-art`, its words in its tooltip and in its screen-reader name. Never a bare tick: it could mean anything (the owner, 3 Oct 2026). A game not syncing yet has neither.
 
 - No `art`: the tile becomes a title cover, the game's name on `bg-300` with its first letter large behind it. Never leave a tile empty.
+
+**How far its achievements are** (version 39; ACH-02, "library covers show progress"): give `achievements` ({ done, total }, as Steam on this PC keeps them). Once one is unlocked, a small ring at the cover's bottom right, opposite the save mark, fills with the share unlocked (rounded down) round a trophy, on the art's dark tint; once every one is, the Zenith medal takes its place: its banner since version 49. Its words ("Achievements: 71% · 123 of 171", "Zenith: every achievement, 12 of 12") are in its tooltip and the tile's screen-reader name. A game none of whose achievements are unlocked, one left out of the achievements, or one Steam here doesn't keep them for shows nothing. It's a ring, not a bar along the bottom: Steam draws downloads that way.

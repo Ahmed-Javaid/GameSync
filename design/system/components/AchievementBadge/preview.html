@@ -1,0 +1,43 @@
+<!-- @dsCard group="Achievements" height=700 subtitle="Achievement badges in their metals (Gold, Silver, Bronze by rarity), locked and hidden; tier chips, the Zenith's dot orange to red (version 52), an empty ring until it's earned; the Zenith medal, its banner since version 49" -->
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>preview</title>
+<style>html,body{margin:0;background:var(--bg-100);} .pv{padding:24px;display:flex;flex-direction:column;gap:22px} .row{display:flex;gap:22px;align-items:flex-end;flex-wrap:wrap} .pv figure{margin:0;display:flex;flex-direction:column;align-items:center;gap:8px} .pv figcaption{font:400 12px/16px var(--font-sans);color:var(--ink-faint)} .lbl{font:600 11px/14px var(--font-sans);letter-spacing:.12em;text-transform:uppercase;color:var(--ink-faint)}</style>
+</head>
+<body class="gs-root">
+<div id="root" class="pv"></div>
+<script>
+var G = window.GameSync, h = React.createElement;
+// Made-up achievement icons: square pictures with a mark, as Steam's are.
+function achIcon(seed){ var hues=[18,200,280,140,45,340,180,95], marks=['M50 16 L60 40 L86 40 L65 57 L73 84 L50 68 L27 84 L35 57 L14 40 L40 40Z','M50 14 L80 30 L80 56 C80 73 66 83 50 90 C34 83 20 73 20 56 L20 30Z','M50 16 C66 36 76 50 76 64 A26 26 0 0 1 24 64 C24 50 34 36 50 16Z','M20 76 L50 20 L80 76Z','M28 28 L72 72 M72 28 L28 72','M26 50 A24 24 0 1 0 74 50 A24 24 0 1 0 26 50'];
+  var hu=hues[seed%hues.length], m=marks[seed%marks.length];
+  var svg="<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><defs><radialGradient id='g' cx='30%' cy='25%' r='95%'><stop offset='0' stop-color='hsl("+hu+",72%,62%)'/><stop offset='1' stop-color='hsl("+hu+",45%,12%)'/></radialGradient></defs><rect width='100' height='100' fill='url(#g)'/><path d='"+m+"' fill='rgba(255,255,255,.18)' stroke='rgba(255,255,255,.92)' stroke-width='5' stroke-linejoin='round' stroke-linecap='round'/></svg>";
+  return "data:image/svg+xml,"+encodeURIComponent(svg); }
+function fig(el,cap){ return h('figure',{key:cap},el,h('figcaption',null,cap)); }
+ReactDOM.createRoot(document.getElementById('root')).render([
+  h('div',{key:'a',className:'lbl'},'Unlocked, by rarity'),
+  h('div',{key:'b',className:'row'},
+    fig(h(G.AchievementBadge,{icon:achIcon(4),name:'Eclipse 8',tier:'gold',size:'lg'}),'Gold · 2.7%'),
+    fig(h(G.AchievementBadge,{icon:achIcon(1),name:'Mercenary',tier:'silver',size:'lg'}),'Silver · 11%'),
+    fig(h(G.AchievementBadge,{icon:achIcon(0),name:'The Journey Begins',tier:'bronze',size:'lg'}),'Bronze · 74%'),
+    fig(h(G.AchievementBadge,{icon:achIcon(2),name:'Deicide'}),'Rarity not known yet'),
+    fig(h(G.AchievementBadge,{icon:achIcon(3),name:'Cosmic Explorer',tier:'gold'}),'md'),
+    fig(h(G.AchievementBadge,{icon:achIcon(5),name:'Newtist',tier:'silver',size:'sm'}),'sm')),
+  h('div',{key:'c',className:'lbl'},'Locked and hidden'),
+  h('div',{key:'d',className:'row'},
+    fig(h(G.AchievementBadge,{icon:achIcon(6),name:'Glorious Battle',state:'locked',size:'lg'}),'Locked'),
+    fig(h(G.AchievementBadge,{state:'hidden',size:'lg'}),'Hidden'),
+    fig(h(G.AchievementBadge,{icon:achIcon(7),name:'Rapidfire',state:'locked'}),'Locked, md'),
+    fig(h(G.AchievementBadge,{state:'hidden'}),'Hidden, md'),
+    fig(h(G.AchievementBadge,{state:'hidden',size:'sm'}),'Hidden, sm')),
+  h('div',{key:'e',className:'row',style:{alignItems:'center',gap:28}},
+    h(G.TierChip,{key:1,tier:'gold',count:12}),h(G.TierChip,{key:2,tier:'silver',count:40}),h(G.TierChip,{key:3,tier:'bronze',count:71}),h(G.TierChip,{key:4,tier:'zenith'}),
+    h('span',{key:5,className:'gs-tier'},h('span',{className:'gs-tier-dot gs-tier--zenith is-not-yet','aria-hidden':'true'}),h('span',{className:'gs-tier-word'},'Zenith, not yet')),
+    h(G.TierBanner,{key:8,tier:'zenith',size:44,label:'Zenith'})),
+  h('div',{key:'f',className:'lbl'},'The Zenith medal: its banner since version 49; not yet, the banner\u2019s outline'),
+  h('div',{key:'g',className:'row',style:{alignItems:'center',gap:28}},
+    h(G.ZenithMedal,{key:0,earned:true,size:180}),h(G.ZenithMedal,{key:1,earned:true,size:104}),h(G.ZenithMedal,{key:2,earned:true,size:56}),h(G.ZenithMedal,{key:3,earned:true,size:40}),h(G.ZenithMedal,{key:4,earned:true,size:26}),h(G.ZenithMedal,{key:5,size:56}),h(G.ZenithMedal,{key:6,size:30}))
+]);
+</script>
+</body>
+</html>

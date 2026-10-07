@@ -1,0 +1,90 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="using:GameSync.UI.Controls"
+             xmlns:vm="using:GameSync.UI.ViewModels"
+             x:Class="GameSync.UI.Views.AchievementGamesDialog"
+             x:DataType="vm:AchievementGamesViewModel"
+             Width="{DynamicResource dw-720}">
+  <!-- Achievements by game (KAN-131; design system version 41 → AchievementGamesDialog; the owner, 4 Oct 2026: "it needs
+       to be either a popup or a new window that shows all the games in the achievement system"): every game GameSync reads
+       achievements for, found by name, each with Counts and GameSync's popup, off by default where a launcher shows its
+       own. Every change applies at once; Done or Esc closes it. -->
+  <UserControl.Styles>
+    <!-- A game left out: its cover and words dimmed -->
+    <Style Selector="Border.off Border.cover">
+      <Setter Property="Opacity" Value="0.45" />
+    </Style>
+    <Style Selector="Border.off TextBlock.name">
+      <Setter Property="Foreground" Value="{DynamicResource ink-faint}" />
+    </Style>
+  </UserControl.Styles>
+  <Border Background="{DynamicResource surface-dialog}" BorderBrush="{DynamicResource edge-dialog}" BorderThickness="1" BackgroundSizing="OuterBorderEdge"
+          CornerRadius="16" BoxShadow="{DynamicResource shadow-dialog}" ClipToBounds="True">
+    <DockPanel>
+      <StackPanel DockPanel.Dock="Top" Margin="24,20,24,0" Spacing="16">
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
+          <StackPanel>
+            <TextBlock Classes="card-title" Text="Achievements by game" />
+            <TextBlock Classes="muted" TextWrapping="Wrap"
+                       Text="Every game GameSync reads achievements for on this PC: whether it counts, and whether GameSync shows its popup." />
+          </StackPanel>
+          <c:GsIconButton Grid.Column="1" Classes="sm" Icon="x" Label="Close Achievements by game" Command="{Binding CloseCommand}" VerticalAlignment="Top" />
+        </Grid>
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
+          <TextBox x:Name="SearchBox" Classes="search clearButton" PlaceholderText="Find a game" Text="{Binding Query}" AutomationProperties.Name="Find a game">
+            <TextBox.InnerLeftContent>
+              <c:GsIcon Icon="search" Size="16" Margin="12,0,0,0" Foreground="{DynamicResource ink-faint}" VerticalAlignment="Center" />
+            </TextBox.InnerLeftContent>
+          </TextBox>
+          <TextBlock Grid.Column="1" Classes="caption faint" Text="{Binding Summary}" VerticalAlignment="Center" />
+        </Grid>
+        <!-- The columns' headings; a screen reader hears each switch's own name instead -->
+        <Grid ColumnDefinitions="*,72,120" ColumnSpacing="12" Margin="0,4,14,0">
+          <TextBlock Classes="overline faint" Text="GAME" />
+          <TextBlock Grid.Column="1" Classes="overline faint" Text="COUNTS" HorizontalAlignment="Center" />
+          <TextBlock Grid.Column="2" Classes="overline faint" Text="GAMESYNC'S POPUP" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" />
+        </Grid>
+      </StackPanel>
+
+      <Border DockPanel.Dock="Bottom" BorderBrush="{DynamicResource line-100}" BorderThickness="0,1,0,0" Padding="24,14">
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
+          <c:GsNote Icon="info"
+                    Text="Steam, Epic and the EA app show their own popup, so GameSync's starts off for the games they run. Turn one on to have GameSync's too, and turn the launcher's off in its settings so you don't get two." />
+          <c:GsButton Grid.Column="1" Classes="primary" Content="Done" Command="{Binding CloseCommand}" VerticalAlignment="Center" />
+        </Grid>
+      </Border>
+
+      <Panel Margin="24,8,24,8">
+        <ScrollViewer MaxHeight="440" HorizontalScrollBarVisibility="Disabled" IsVisible="{Binding !NoMatch}">
+          <ItemsControl ItemsSource="{Binding Shown}" AutomationProperties.Name="Games with achievements">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:AchievementGameItem">
+                <Border BorderBrush="{DynamicResource line-100}" BorderThickness="0,1,0,0" Padding="0,8,14,8" Classes.off="{Binding !Counted}">
+                  <Grid ColumnDefinitions="*,72,120" ColumnSpacing="12">
+                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12" Background="Transparent" ToolTip.Tip="{Binding Line}">
+                      <Border Classes="cover" Width="28" Height="42" CornerRadius="4" ClipToBounds="True" Background="{DynamicResource bg-400}" BorderBrush="{DynamicResource line-100}" BorderThickness="1">
+                        <Image Source="{Binding Thumb}" Stretch="UniformToFill" />
+                      </Border>
+                      <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                          <TextBlock Classes="name" Text="{Binding Title}" FontSize="{DynamicResource fs-14}" LineHeight="{DynamicResource lh-20}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                          <c:GsZenithMedal Width="18" Height="18" IsEarned="True" IsVisible="{Binding Zenith}" VerticalAlignment="Center" ToolTip.Tip="Zenith: every achievement" />
+                        </StackPanel>
+                        <TextBlock Classes="caption muted" Text="{Binding Line}" TextTrimming="CharacterEllipsis" />
+                      </StackPanel>
+                    </Grid>
+                    <c:GsSwitch Grid.Column="1" IsChecked="{Binding Counted}" AutomationProperties.Name="{Binding SwitchName}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    <c:GsSwitch Grid.Column="2" IsChecked="{Binding PopupShown}" IsEnabled="{Binding CanPopup}" AutomationProperties.Name="{Binding PopupSwitchName}"
+                                HorizontalAlignment="Center" VerticalAlignment="Center" />
+                  </Grid>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </ScrollViewer>
+        <TextBlock Classes="muted" Text="{Binding NoMatchLine}" IsVisible="{Binding NoMatch}" Margin="0,12" />
+        <TextBlock Classes="muted" TextWrapping="Wrap" Text="Steam games show here once Steam has run them on this PC." IsVisible="{Binding NoGames}" Margin="0,12" />
+      </Panel>
+    </DockPanel>
+  </Border>
+</UserControl>

@@ -11,5 +11,6 @@ public class GsApp : Application
     {
         AvaloniaXamlLoader.Load(this);
         ThemeService.Apply(this, new ThemeChoice());
+        TextScale.Apply(Resources, 1);
     }
 }

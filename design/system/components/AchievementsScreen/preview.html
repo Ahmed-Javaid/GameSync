@@ -1,0 +1,140 @@
+<!-- @dsCard group="Screens" height=800 width=1280 page=true subtitle="Every achievement of a game (its page's View all): the list with Unlocked, Locked and Hidden, and the one picked; hidden ones stay secret (#all, #zenith, #hidden)" -->
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>preview</title>
+<style>
+html,body{margin:0;background:var(--bg-100);}
+.lib-pane{width:272px;flex-shrink:0;padding:12px;gap:12px;min-height:0;display:flex;flex-direction:column}
+.lib-scroll{flex:1;min-height:0;overflow:auto;margin:0 -6px;padding:0 6px;scrollbar-width:thin;scrollbar-color:var(--bg-400) transparent}
+.lib-crumb{display:flex;align-items:center;gap:6px;font:500 13px/20px var(--font-sans);min-width:0}
+.lib-crumb button{border:0;background:none;padding:0;color:var(--ink-muted);font:inherit;cursor:pointer}
+.lib-crumb button:hover{color:var(--ink);text-decoration:underline}
+.lib-crumb span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ac-page{flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;gap:16px}
+.ac-top{display:flex;align-items:center;gap:12px;min-height:40px}
+.ac-head{position:relative;display:flex;align-items:center;justify-content:space-between;gap:24px;padding:20px 24px;border-radius:var(--radius-lg);overflow:hidden;background:var(--bg-200);border:1px solid var(--edge-card,transparent)}
+.ac-head::before{content:"";position:absolute;inset:0;background:var(--head-art) center/cover;opacity:.22;filter:blur(18px) saturate(1.2);transform:scale(1.2)}
+.ac-head::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,var(--bg-200) 18%,transparent 70%)}
+.ac-head > *{position:relative;z-index:1}
+.ac-title{margin:0;font:600 24px/30px var(--font-sans);color:var(--ink)}
+.ac-sub{margin:4px 0 0;font:400 13px/19px var(--font-sans);color:var(--ink-muted)}
+.ac-body{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:16px}
+.ac-list{display:flex;flex-direction:column;min-height:0;padding:16px;gap:12px}
+.ac-tools{display:flex;gap:8px;align-items:center}
+.ac-tools .gs-search{flex:1;min-width:0}
+.ac-rows{flex:1;min-height:0;overflow:auto;margin:0 -8px;padding:0 8px;scrollbar-width:thin;scrollbar-color:var(--bg-400) transparent}
+.ac-detail{display:flex;flex-direction:column;align-items:center;text-align:center;gap:14px;padding:28px 24px;min-height:0;overflow:auto}
+.ac-detail h3{margin:6px 0 0;font:600 20px/26px var(--font-sans);color:var(--ink)}
+.ac-detail p{margin:0;font:400 13px/20px var(--font-sans);color:var(--ink-muted)}
+.ac-facts{align-self:stretch;text-align:left;display:flex;flex-direction:column;gap:14px;margin-top:8px;padding-top:18px;border-top:1px solid var(--line-100)}
+.ac-fact{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.ac-fact-label{font:600 11px/14px var(--font-sans);letter-spacing:.12em;text-transform:uppercase;color:var(--ink-faint)}
+.ac-fact-value{font:500 13px/18px var(--font-sans);color:var(--ink)}
+.ac-glow{position:relative;display:grid;place-items:center;padding:8px}
+.ac-glow::before{content:"";position:absolute;inset:-30px;border-radius:50%;opacity:.55;background:radial-gradient(circle,var(--glow,transparent),transparent 65%)}
+.ac-glow > *{position:relative}
+.ac-empty{padding:24px 8px;text-align:center;color:var(--ink-faint);font:400 13px/19px var(--font-sans)}
+</style>
+</head>
+<body class="gs-root">
+<div id="root"></div>
+<script>
+var G = window.GameSync, h = React.createElement, useState = React.useState, useEffect = React.useEffect, useRef = React.useRef;
+var A = G.achievements;
+function achIcon(seed){ var hues=[18,200,280,140,45,340,180,95], marks=['M50 16 L60 40 L86 40 L65 57 L73 84 L50 68 L27 84 L35 57 L14 40 L40 40Z','M50 14 L80 30 L80 56 C80 73 66 83 50 90 C34 83 20 73 20 56 L20 30Z','M50 16 C66 36 76 50 76 64 A26 26 0 0 1 24 64 C24 50 34 36 50 16Z','M20 76 L50 20 L80 76Z','M28 28 L72 72 M72 28 L28 72','M26 50 A24 24 0 1 0 74 50 A24 24 0 1 0 26 50'];
+  var hu=hues[seed%hues.length], m=marks[seed%marks.length];
+  var svg="<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><defs><radialGradient id='g' cx='30%' cy='25%' r='95%'><stop offset='0' stop-color='hsl("+hu+",72%,62%)'/><stop offset='1' stop-color='hsl("+hu+",45%,12%)'/></radialGradient></defs><rect width='100' height='100' fill='url(#g)'/><path d='"+m+"' fill='rgba(255,255,255,.18)' stroke='rgba(255,255,255,.92)' stroke-width='5' stroke-linejoin='round' stroke-linecap='round'/></svg>";
+  return "data:image/svg+xml,"+encodeURIComponent(svg); }
+var HERO = "data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%201200%20500%27%20preserveAspectRatio%3D%27xMidYMid%20slice%27%3E%3Crect%20width%3D%271200%27%20height%3D%27500%27%20fill%3D%27%23123142%27/%3E%3Ccircle%20cx%3D%27860%27%20cy%3D%27150%27%20r%3D%2790%27%20fill%3D%27%237fe6f2%27%20opacity%3D%27.45%27/%3E%3Cpath%20d%3D%27M0%20330%20L180%20200%20L330%20300%20L520%20150%20L700%20290%20L880%20190%20L1200%20320%20V500%20H0Z%27%20fill%3D%27%2318405a%27/%3E%3C/svg%3E";
+
+// #all: the All tab. #zenith: every one unlocked. #hidden: the Hidden tab, a hidden one picked.
+var MODE = (location.hash || '').slice(1);
+var NAMES = [['Eclipse 8','Beat the game on Eclipse 8 with any survivor.',1.2,'Today 21:14'],['The Long Road','Clear the first stage three times in one run.',41,'26 Sep'],
+  ['Mercenary','Unlock the Mercenary.',24,'21 Sep'],['Deicide','Defeat the twin titans in one run.',12,'18 Sep'],['Cosmic Explorer','Visit every environment in the cosmos.',3.8,'14 Sep'],
+  ['Newtist','Discover and activate eight Newt Altars.',16,'2 Sep'],['Glorious Battle','Win a fight with no damage taken.',41,'30 Aug'],['Bookworm','Read every log in the logbook.',6.4,'28 Aug'],
+  ['Learning Process','Die five times.',92,'27 Aug'],['Slaughter','Defeat 3,000 enemies.',58,'27 Aug'],['Huntress: Mastery','As Huntress, beat the game on Monsoon.',8.9,null],
+  ['Engineer: Mastery','As Engineer, beat the game on Monsoon.',7.1,null],['One with the Void','Escape the void with every friend alive.',2.2,null],['Moon Shot','Reach the moon within 30 minutes.',18,null],
+  ['Collector','Have 30 different items in one run.',27,null],['Pacifist','Clear a stage without attacking.',11,null],['Rapidfire','Fire 1,000 shots in ten seconds.',38,null]];
+function build(){
+  var list = NAMES.map(function(n,i){ var unlocked = MODE==='zenith' || !!n[3]; return {id:'a'+i,name:n[0],desc:n[1],pct:n[2],when:unlocked?(n[3]||'2 Oct'):null,state:unlocked?'unlocked':'locked',icon:achIcon(i)}; });
+  if (MODE !== 'zenith') [3.1,0.9,14,5.5].forEach(function(p,i){ list.push({id:'h'+i,state:'hidden',pct:p,hidden:true}); });
+  else list.push({id:'h0',name:'A Moment, Fractured',desc:'Complete the secret ending.',pct:3.1,when:'2 Oct',state:'unlocked',icon:achIcon(9),hidden:true});
+  return list; }
+var ALL = build();
+var SORTS = [{id:'recent',label:'Recently unlocked'},{id:'rarest',label:'Rarest first'},{id:'players',label:'Most players first'},{id:'name',label:'Name'}];
+var ORDER = {'Today 21:14':100,'2 Oct':99,'26 Sep':90,'21 Sep':85,'18 Sep':82,'14 Sep':78,'2 Sep':66,'30 Aug':64,'28 Aug':62,'27 Aug':61};
+function sorted(items, by){ var c = items.slice();
+  if (by==='rarest') c.sort(function(a,b){return a.pct-b.pct}); else if (by==='players') c.sort(function(a,b){return b.pct-a.pct});
+  else if (by==='name') c.sort(function(a,b){return (a.name||'￿').localeCompare(b.name||'￿')});
+  else c.sort(function(a,b){ var x=a.when?ORDER[a.when]||0:-1, y=b.when?ORDER[b.when]||0:-1; return y-x || b.pct-a.pct; });
+  return c; }
+function rail(cur){return h(G.SideRail,{current:cur,items:[
+  {id:'search',icon:'search',label:'Search'},{id:'home',icon:'home',label:'Home',sep:true},
+  {id:'library',icon:'library',label:'Game library'},{id:'achievements',icon:'trophy',label:'Achievements'},
+  {id:'saves',icon:'saves',label:'Save manager',sep:true},{id:'log',icon:'terminal',label:'Console'},{id:'settings',icon:'settings',label:'Settings',bottom:true}]})}
+var C = ['#3a2a20','#1d2a33','#2a2033','#1d2a24'];
+function cover(i){ return "data:image/svg+xml,"+encodeURIComponent("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 90'><rect width='60' height='90' fill='"+C[i%4]+"'/><circle cx='40' cy='28' r='12' fill='rgba(255,255,255,.25)'/><path d='M0 70 L22 52 L40 64 L60 48 V90 H0Z' fill='rgba(255,255,255,.12)'/></svg>").replace(/\(/g,'%28').replace(/\)/g,'%29').replace(/'/g,'%27'); }
+var LIBRARY = [{id:'fav',label:'Favourites',games:[{id:'sts2',name:'Slay the Spire 2',art:cover(2)},{id:'sekiro',name:'Sekiro: Shadows Die Twice',art:cover(0)}]},
+  {id:'rest',label:'Games',games:[{id:'ror2',name:'Risk of Rain 2',art:cover(1)},{id:'valheim',name:'Valheim',art:cover(3)},{id:'core',name:'Core Keeper',art:cover(3)},{id:'apex',name:'Apex Legends',art:cover(0)},{id:'bloons',name:'Bloons TD 6',art:cover(2)},{id:'l4d2',name:'Left 4 Dead 2',art:cover(1)}]}];
+
+function Details(p){
+  var a = p.item;
+  if (!a) return h('section',{className:'gs-card ac-detail'},h('div',{className:'ac-empty'},'Pick an achievement to see what it is.'));
+  var hiddenNow = a.state === 'hidden', tier = a.state==='unlocked' ? A.tierOf(a.pct) : null;
+  var mine = ALL.filter(function(x){return x.state==='unlocked'}).sort(function(x,y){return x.pct-y.pct});
+  var rank = mine.indexOf(a) + 1;
+  var glow = tier==='gold' ? 'rgba(255,215,110,.5)' : tier==='silver' ? 'rgba(227,232,238,.28)' : tier==='bronze' ? 'rgba(215,149,92,.35)' : 'transparent';
+  return h('section',{className:'gs-card ac-detail','aria-label':'Achievement details'},
+    h('div',{className:'ac-glow',style:{'--glow':glow}},h(G.AchievementBadge,{icon:a.icon,name:a.name,state:a.state,tier:tier,size:'lg'})),
+    h('h3',null,hiddenNow?'Hidden achievement':a.name),
+    h('p',null,hiddenNow?'Its name and what it asks stay secret until you unlock it.':a.desc),
+    tier ? h(G.TierChip,{tier:tier}) : null,
+    h('div',{className:'ac-facts'},
+      h('div',{className:'ac-fact'},h('span',{className:'ac-fact-label'},'Unlocked'),h('span',{className:'ac-fact-value'},a.when?(a.when.indexOf(':')>0?a.when:a.when+', 22:41'):'Not yet')),
+      h('div',{className:'gs-stack',style:{gap:6}},
+        h('div',{className:'ac-fact'},h('span',{className:'ac-fact-label'},'Players who have it'),h('span',{className:'ac-fact-value gs-mono'},A.percent(a.pct))),
+        h(G.ProgressBar,{value:Math.max(1,a.pct),ariaLabel:A.percent(a.pct)+' of players have it'})),
+      h('div',{className:'ac-fact'},h('span',{className:'ac-fact-label'},'Rarity'),h('span',{className:'ac-fact-value'},A.rarityWord(a.pct))),
+      rank>0 ? h('div',{className:'ac-fact'},h('span',{className:'ac-fact-label'},'Among yours'),h('span',{className:'ac-fact-value'},rank===1?'Your rarest':'Your '+rank+(rank===2?'nd':rank===3?'rd':'th')+' rarest')) : null));
+}
+
+function App(){
+  var start = MODE==='hidden' ? 'hidden' : MODE==='all' || MODE==='zenith' ? 'all' : 'unlocked';
+  var tab = useState(start), sort = useState('recent'), q = useState(''), sel = useState(null);
+  var counts = {all:ALL.length, unlocked:ALL.filter(function(a){return a.state==='unlocked'}).length, locked:ALL.filter(function(a){return a.state==='locked'}).length, hidden:ALL.filter(function(a){return a.state==='hidden'}).length};
+  var done = counts.unlocked, total = ALL.length;
+  var inTab = ALL.filter(function(a){ return tab[0]==='all' || a.state===tab[0]; });
+  var needle = q[0].trim().toLowerCase();
+  var shown = sorted(inTab.filter(function(a){ return !needle || (a.state!=='hidden' && ((a.name+' '+a.desc).toLowerCase().indexOf(needle)>=0)); }), sort[0]);
+  var current = shown.filter(function(a){return a.id===sel[0]})[0] || shown[0];
+  var tiers = {gold:0,silver:0,bronze:0}; ALL.forEach(function(a){ if(a.state==='unlocked') tiers[A.tierOf(a.pct)]++; });
+  var tabs = [{id:'all',label:'All',count:counts.all},{id:'unlocked',label:'Unlocked',count:counts.unlocked}].concat(counts.locked?[{id:'locked',label:'Locked',count:counts.locked}]:[]).concat(counts.hidden?[{id:'hidden',label:'Hidden',count:counts.hidden}]:[]);
+  return h(G.ThemeScope,{strength:'glass',art:HERO,style:{width:1280,height:800,display:'flex'}},
+    rail('library'),
+    h('main',{style:{flex:1,minWidth:0,padding:'20px 24px',display:'flex',gap:16}},
+      h('aside',{className:'gs-card lib-pane','aria-label':'Your games'},
+        h(G.SearchField,{placeholder:'Search your games',hint:'Ctrl F'}),
+        h('div',{className:'lib-scroll'},h(G.GameList,{groups:LIBRARY,selected:'ror2'}))),
+      h('section',{className:'ac-page','aria-label':'Achievements in Risk of Rain 2'},
+        h('header',{className:'ac-top'},
+          h(G.Button,{size:'sm',variant:'secondary',icon:'arrowLeft',title:'Back to Risk of Rain 2 (Esc)'},'Back'),
+          h('nav',{'aria-label':'Breadcrumb',className:'lib-crumb'},h('button',{type:'button'},'My games'),h(G.Icon,{name:'chevronRight',size:14}),h('button',{type:'button'},'Risk of Rain 2'),h(G.Icon,{name:'chevronRight',size:14}),h('span',{'aria-current':'page'},'Achievements'))),
+        h('div',{className:'ac-head',style:{'--head-art':'url("'+HERO+'")'}},
+          h('div',null,h('h2',{className:'ac-title'},'Achievements in Risk of Rain 2'),
+            h('p',{className:'ac-sub'},'From Steam on this PC · how rare each is, from Steam’s players this week')),
+          h(G.AchievementsOverview,{done:done,total:total,tiers:tiers,completedOn:'2 Oct'})),
+        h('div',{className:'ac-body'},
+          h('section',{className:'gs-card ac-list','aria-label':'Every achievement'},
+            h(G.PillTabs,{label:'Which achievements',items:tabs,value:tab[0],onChange:function(id){tab[1](id);sel[1](null);}}),
+            h('div',{className:'ac-tools'},
+              h(G.SearchField,{value:q[0],onChange:q[1],placeholder:'Find an achievement'}),
+              h(G.Select,{label:'Sort',value:sort[0],options:SORTS,onChange:sort[1]})),
+            h('div',{className:'ac-rows',role:'list'},
+              shown.length ? shown.map(function(a){ return h(G.AchievementRow,{key:a.id,item:a,selected:current&&a.id===current.id,onClick:function(){sel[1](a.id)}}); })
+                : h('div',{className:'ac-empty'},needle?'No achievement matches “'+q[0]+'”. Hidden ones aren’t searched: they stay secret.':'Nothing here yet.'))),
+          h(Details,{item:current})))));
+}
+ReactDOM.createRoot(document.getElementById('root')).render(h(App));
+</script>
+</body>
+</html>

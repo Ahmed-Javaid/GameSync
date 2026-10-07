@@ -1,0 +1,68 @@
+<!-- @dsCard group="Achievements" height=780 width=1280 subtitle="The popup when an achievement unlocks while you play: over the game in a corner, never taking focus or a click; each tier, a hidden one, and a Zenith; its motion and sound" -->
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>preview</title>
+<style>
+html,body{margin:0;background:var(--bg-100);}
+.pv{padding:24px;display:grid;grid-template-columns:744px minmax(0,1fr);gap:24px;align-items:start}
+.lbl{font:600 11px/14px var(--font-sans);letter-spacing:.12em;text-transform:uppercase;color:var(--ink-faint);margin:0 0 10px}
+.note{font:400 12px/17px var(--font-sans);color:var(--ink-muted);margin:10px 0 0;max-width:744px}
+/* A made-up game in a window, as the popup would sit over it (top right, by default) */
+.game{position:relative;width:744px;height:418px;border-radius:12px;overflow:hidden;box-shadow:0 0 0 1px var(--line-100);
+  background:linear-gradient(180deg,#1d3557 0%,#457b9d 38%,#e9c46a 64%,#6d4c3d 66%,#2b2118 100%)}
+.game::before{content:"";position:absolute;left:-40px;right:-40px;bottom:120px;height:150px;background:#2c3e50;clip-path:polygon(0 100%,12% 40%,22% 70%,36% 18%,50% 64%,62% 30%,76% 72%,88% 36%,100% 100%);opacity:.85}
+.game::after{content:"";position:absolute;left:0;right:0;bottom:0;height:120px;background:linear-gradient(180deg,#3a2c22,#1b140f)}
+.hud{position:absolute;left:18px;bottom:16px;z-index:2;display:flex;gap:10px;align-items:center;font:700 13px/16px var(--font-sans);color:#f5f7f9;text-shadow:0 1px 2px rgba(0,0,0,.6)}
+.hud i{display:block;width:140px;height:10px;border-radius:5px;background:linear-gradient(90deg,#e63946 72%,rgba(255,255,255,.2) 72%)}
+.game .gs-pop{position:absolute;top:18px;right:18px;z-index:3;width:400px}
+.corners{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:10px}
+.corner{position:relative;height:66px;border-radius:8px;background:linear-gradient(180deg,#24324a,#4a3a2a);box-shadow:0 0 0 1px var(--line-100)}
+.corner b{position:absolute;width:44px;height:12px;border-radius:4px;background:rgba(14,16,20,.94);box-shadow:0 0 0 1px rgba(255,255,255,.18)}
+.corner span{position:absolute;left:8px;bottom:6px;font:500 11px/14px var(--font-sans);color:#f5f7f9}
+.stack{display:flex;flex-direction:column;gap:12px}
+.stack .gs-pop{width:100%}
+.phases{display:flex;gap:10px;margin-top:6px}
+.phases figure{margin:0;flex:1;display:flex;flex-direction:column;gap:6px}
+.phases figcaption{font:400 11px/14px var(--font-sans);color:var(--ink-faint)}
+.phases .gs-pop{transform-origin:left center}
+</style>
+</head>
+<body class="gs-root">
+<div id="root" class="pv"></div>
+<script>
+var G = window.GameSync, h = React.createElement;
+function achIcon(seed){ var hues=[18,200,280,140,45,340,180,95], marks=['M50 16 L60 40 L86 40 L65 57 L73 84 L50 68 L27 84 L35 57 L14 40 L40 40Z','M50 14 L80 30 L80 56 C80 73 66 83 50 90 C34 83 20 73 20 56 L20 30Z','M50 16 C66 36 76 50 76 64 A26 26 0 0 1 24 64 C24 50 34 36 50 16Z','M20 76 L50 20 L80 76Z','M28 28 L72 72 M72 28 L28 72','M26 50 A24 24 0 1 0 74 50 A24 24 0 1 0 26 50'];
+  var hu=hues[seed%hues.length], m=marks[seed%marks.length];
+  var svg="<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><defs><radialGradient id='g' cx='30%' cy='25%' r='95%'><stop offset='0' stop-color='hsl("+hu+",72%,62%)'/><stop offset='1' stop-color='hsl("+hu+",45%,12%)'/></radialGradient></defs><rect width='100' height='100' fill='url(#g)'/><path d='"+m+"' fill='rgba(255,255,255,.18)' stroke='rgba(255,255,255,.92)' stroke-width='5' stroke-linejoin='round' stroke-linecap='round'/></svg>";
+  return "data:image/svg+xml,"+encodeURIComponent(svg); }
+var GAME = 'Risk of Rain 2';
+function corner(where, label){ var pos = { 'top-right':{top:6,right:6}, 'top-left':{top:6,left:6}, 'bottom-right':{bottom:22,right:6}, 'bottom-left':{bottom:22,left:6} }[where];
+  return h('div',{key:where,className:'corner'},h('b',{style:pos}),h('span',null,label)); }
+ReactDOM.createRoot(document.getElementById('root')).render([
+  h('section',{key:'l'},
+    h('p',{className:'lbl'},'Over a game'),
+    h('div',{className:'game','aria-label':'A game, with the popup over it'},
+      h('div',{className:'hud'},h('i'),'HP 72'),
+      h(G.AchievementPopup,{item:{name:'Seeker: Scorched Earth',icon:achIcon(4),pct:2.7},game:GAME,progress:{done:124,total:171},phase:'in'})),
+    h('p',{className:'note'},'GameSync’s own small window, over the game in a window or borderless, in the corner Settings → Achievements picks (top right by default). It never takes focus, a click or a key, so the game goes on; it shows for 5 seconds (a Zenith 8), then goes. Two at once wait their turn. In a game running in exclusive fullscreen, where no window can show over it, only the sound plays, and the unlocks wait for a notification once the game closes.'),
+    h('p',{className:'lbl',style:{marginTop:18}},'Its motion'),
+    h('div',{className:'phases'},
+      h('figure',null,h(G.AchievementPopup,{item:{name:'Mercenary',icon:achIcon(1),pct:11},game:GAME,progress:{done:125,total:171},phase:'in',style:{width:'100%',animationDelay:'-0.12s',animationPlayState:'paused'}}),h('figcaption',null,'In: slides from its side over 0.28 s (halfway here), then stays still for 5 s')),
+      h('figure',null,h(G.AchievementPopup,{item:{name:'Mercenary',icon:achIcon(1),pct:11},game:GAME,progress:{done:125,total:171},phase:'out',style:{width:'100%',animationDelay:'-0.1s',animationPlayState:'paused'}}),h('figcaption',null,'Out: back to its side over 0.22 s (halfway here)'))),
+    h('p',{className:'note'},'With Windows’ animation effects off it simply shows and goes. The sound: a short chime GameSync makes itself, brighter for each tier (Bronze two notes, Silver three, Gold three with a shimmer), and a Zenith its own rising run; Settings → Achievements turns it off, and it follows Windows’ volume for GameSync.')),
+  h('section',{key:'r'},
+    h('p',{className:'lbl'},'Each tier'),
+    h('div',{className:'stack'},
+      h(G.AchievementPopup,{item:{name:'The Journey Begins',icon:achIcon(0),pct:74},game:GAME,progress:{done:12,total:171}}),
+      h(G.AchievementPopup,{item:{name:'Mercenary',icon:achIcon(1),pct:11},game:GAME,progress:{done:125,total:171}}),
+      h(G.AchievementPopup,{item:{name:'Seeker: Scorched Earth',icon:achIcon(4),pct:2.7},game:GAME,progress:{done:124,total:171}}),
+      h(G.AchievementPopup,{item:{name:'Deicide',icon:achIcon(2),pct:0.6,hidden:true},game:GAME,progress:{done:170,total:171}}),
+      h(G.AchievementPopup,{item:{name:'Cosmic Explorer',icon:achIcon(3)},game:GAME,progress:{done:126,total:171}}),
+      h(G.AchievementPopup,{kind:'zenith',game:GAME,progress:{done:171,total:171}})),
+    h('p',{className:'note'},'A hidden one, unlocked, says so; its name shows now, as everywhere once it’s unlocked. Rarity not known yet: no metal, no tier word. A Zenith follows the achievement that earned it.'),
+    h('p',{className:'lbl',style:{marginTop:16}},'Where it shows'),
+    h('div',{className:'corners'},corner('top-left','Top left'),corner('top-right','Top right (default)'),corner('bottom-left','Bottom left'),corner('bottom-right','Bottom right')))
+]);
+</script>
+</body>
+</html>

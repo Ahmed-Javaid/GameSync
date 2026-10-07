@@ -17,7 +17,7 @@ namespace GameSync.Host;
 public static partial class Cli
 {
     private const string Usage = """
-        GameSync (Milestone 4: sessions, launching and the background app, from the command line)
+        Your game saves, backed up and synced across your PCs, from the command line.
 
         gamesync [--data <folder>] <command> ...
 
@@ -39,7 +39,10 @@ public static partial class Cli
           show <game>                 where a game's saves were found and why, and the rules it syncs with
           confirm <game>... | --all   syncs the game with the places found. A game another PC already syncs
                                       takes up that PC's rules. Confirming again adds new places a scan found.
+                                      A save folder holding the live save beside copies kept by hand syncs the
+                                      live save alone; 'show' says so, and import-saves brings the copies in.
                   [--mine|--theirs]   use this PC's findings, or the rules another PC's newest save used
+                  [--whole]           keep such a folder whole, as one save
           ignore <game>...  /  unignore <game>...
           rename <game> <title>       the title GameSync shows; rescans keep it
           merge <game> <into>         makes two entries one game for good, like Spacewar into its real game
@@ -107,6 +110,10 @@ public static partial class Cli
           launch <game> -- <command> runs the command instead, as Steam's launch options give it: put
                                      "<folder>\GameSync.Tray.exe" launch <game> -- %command% there
           done <game>                ends a session a launcher keeps open after you quit ("I'm done playing")
+          learn [<game>]             learn mode: the games it watches next time they're played, as GameSync hasn't
+                                     found their saves, and what it found; nothing syncs until you pick
+          learn <game> --on|--off    watches its next session, or stops and forgets what it found
+          learn <game> --add <n>[,<n>]   adds those places, as Add a place does, and the game syncs
           agent                      the background app in this window: notices games however they start,
                                      and syncs each after you play. Ctrl+C stops it.
 
@@ -114,7 +121,22 @@ public static partial class Cli
           schedule                   what Windows runs for GameSync, and the last daily run
           schedule daily <20:00|off> the daily backup, and a catch-up after sign-in when the PC was off then
           schedule background on|off starts GameSync (GameSync.Tray.exe) in the tray when you sign in
+          quit                       closes GameSync's app, as its tray menu's Quit does, and waits until it has
+          update [--install [--background]]
+                                     asks GitHub for a newer GameSync and gets it ready; --install installs it:
+                                     GameSync closes, updates and opens again (--background: in the tray). Every
+                                     update is checked against GameSync's own release signature first, and anything
+                                     else is refused
           daily [--if-missed]        the daily backup now; the background app runs it when it's running
+          achievements [game] [--fetch]  each Steam game's achievements here, from Steam's own files; one game's in full;
+                                     --fetch asks Steam for their icons and how rare each is
+          add-achievement-folder <folder>  /  remove-achievement-folder <folder>
+                                     where copies Steam doesn't run keep their own record of what's unlocked: one
+                                     folder per game, named by its Steam number. Their achievements then count like
+                                     Steam's. Kept on this PC only; the records are read, never changed
+          achievements popup [--tier gold|silver|bronze|hidden|zenith] [--in <seconds>]
+                                     shows the popup GameSync puts over a game when you unlock one, with its chime,
+                                     after a moment to switch to the game; GameSync must be running
           art [--refresh]            each game's cover, hero and logo for the launcher: from Steam's own cache on
                                      this PC first, and from Steam's store only for new games and missing art
           hide <game>... / unhide <game>...
@@ -129,12 +151,62 @@ public static partial class Cli
           log [<game>]
         """;
 
+    /// <summary>
+    /// A command, as <c>gamesync</c> runs it. With GameSync's app open on the same data folder, <c>sync</c>, <c>plan</c>,
+    /// <c>restore</c> and <c>launch</c> are done by the app, which prints what they print here (BG-09); otherwise they
+    /// run here.
+    /// </summary>
     public static async Task<int> RunAsync(string[] args)
+    {
+        var list = args.ToList();
+        var dataDir = TakeOption(list, "--data") ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "GameSync");
+        if (CliRelay.Takes(list) && await AppPipe.RunAsync(dataDir, list, Console.Out) is { } code)
+        {
+            return code;
+        }
+
+        return await RunHereAsync(args);
+    }
+
+    /// <summary>
+    /// <c>gamesync quit</c>: asks GameSync's app, open on this data folder, to quit as its tray menu's Quit does (an open
+    /// session is recorded and the agent stops), then waits until it has let the data folder go, so a script can rebuild
+    /// it (tools/dev/run.ps1) or an installer replace it.
+    /// </summary>
+    private static async Task<int> QuitAppAsync(string dataDir)
+    {
+        if (await AppPipe.SendAsync(dataDir, "quit", TimeSpan.FromSeconds(2)) is null)
+        {
+            Console.WriteLine("GameSync isn't running.");
+            return 0;
+        }
+
+        // The app holds its claim on the data folder until it has ended.
+        for (var waited = TimeSpan.Zero; waited < TimeSpan.FromSeconds(60); waited += TimeSpan.FromMilliseconds(250))
+        {
+            if (AppPipe.TryClaim(dataDir) is { } claim)
+            {
+                claim.ReleaseMutex();
+                claim.Dispose();
+                Console.WriteLine("GameSync has quit.");
+                return 0;
+            }
+
+            await Task.Delay(250);
+        }
+
+        Console.Error.WriteLine("GameSync was asked to quit but is still running after a minute.");
+        return 1;
+    }
+
+    /// <summary>A command run in this process: by the command line when the app isn't open, or by the app for it (BG-09).</summary>
+    public static async Task<int> RunHereAsync(string[] args)
     {
         var list = args.ToList();
         var dataDir = TakeOption(list, "--data") ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "GameSync");
         if (list.Count == 0 || list[0] is "help" or "--help" or "-h")
         {
+            Console.WriteLine($"GameSync {AppVersion}");
             Console.WriteLine(Usage);
             return list.Count == 0 ? 2 : 0;
         }
@@ -163,8 +235,24 @@ public static partial class Cli
                     return ScheduleCommand(dataDir, rest);
                 case "art":
                     return await ArtAsync(dataDir, rest);
+                case "achievements":
+                    return await AchievementsAsync(dataDir, rest);
+                case "learn":
+                    return await LearnAsync(dataDir, rest);
                 case "add":
                     return await AddOwnAsync(dataDir, rest);
+                case "quit":
+                    return await QuitAppAsync(dataDir);
+                case "update":
+                    return await UpdateAsync(dataDir, rest);
+                case "uninstalling":
+                    return await UninstallingAsync(dataDir);
+                case "add-achievement-folder":
+                    Console.WriteLine(Achievements.AddRecordFolder(dataDir, Arg(rest, 0, "folder")));
+                    return 0;
+                case "remove-achievement-folder":
+                    Console.WriteLine(Achievements.RemoveRecordFolder(dataDir, Arg(rest, 0, "folder")));
+                    return 0;
             }
 
             if (command == "add-game")
@@ -911,7 +999,7 @@ public static partial class Cli
         SyncAction.Upload => "Upload",
         SyncAction.UploadHeld => "Hold for review",
         SyncAction.Download => "Download",
-        SyncAction.NeedsYou => "Needs you",
+        SyncAction.NeedsYou => "Conflict",
         SyncAction.Unavailable => "Not available",
         SyncAction.SavesMissing => "Saves missing",
         SyncAction.NoSaves => "No saves yet",
@@ -1022,14 +1110,14 @@ internal sealed class ConsoleProgress(Func<GameId, string?> titleOf) : IProgress
 
         lock (_gate)
         {
-            var done = value.FilesDone == value.FilesTotal;
+            var done = value.Finished;
             if (!done && value.FilesDone > 0 && DateTime.UtcNow - _last < TimeSpan.FromSeconds(3))
             {
                 return;
             }
 
             _last = DateTime.UtcNow;
-            Console.WriteLine($"  Uploading {titleOf(value.Game) ?? value.Game.Value}: {value.FilesDone} of {value.FilesTotal} files, " +
+            Console.WriteLine($"  {(value.Direction == TransferDirection.Down ? "Downloading" : "Uploading")} {titleOf(value.Game) ?? value.Game.Value}: {value.FilesDone} of {value.FilesTotal} files, " +
                 $"{Cli.FormatSize(value.BytesDone)} of {Cli.FormatSize(value.BytesTotal)}");
         }
     }

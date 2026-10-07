@@ -20,6 +20,27 @@ namespace GameSync.UI.ViewModels;
 /// <param name="SetHidden">Hides a game from the launcher on this PC, or shows it again.</param>
 public sealed record LauncherActions(Action<GameId> Play, Action SyncNow, Action<string, string?> Show, Action<GameId, bool> SetHidden)
 {
+    /// <summary>KAN-80: Play, waited for: done once the game is on its way, or the check before playing said why it can't start.</summary>
+    public Func<GameId, Task>? Start { get; init; }
+
+    /// <summary>KAN-80: Play was pressed and the game isn't running yet, so its Play says Starting….</summary>
+    public Func<GameId, bool>? IsStarting { get; init; }
+
+    /// <summary>KAN-80: GameSync is syncing or uploading now, so Home's Sync now turns its arrows.</summary>
+    public Func<bool>? IsWorking { get; init; }
+
+    /// <summary>KAN-80: a game's upload or download, which its saves show as it goes.</summary>
+    public Func<GameId, TransferView>? TransferOf { get; init; }
+
+    /// <summary>A cloud is connected, so what's kept here uploads next.</summary>
+    public Func<bool>? HasCloud { get; init; }
+
+    /// <summary>The share window (SHARE-01, SHARE-04): picking saves or sharing all, with games ticked, or one version from Export (KAN-23).</summary>
+    public Action<ShareStart>? OpenShare { get; init; }
+
+    /// <summary>Import saves (SHARE-10), for a shared zip picked in Windows' own picker.</summary>
+    public Action<string>? OpenImport { get; init; }
+
     /// <summary>Makes a game a favourite on this PC, or an ordinary game again (LIB-17).</summary>
     public Action<GameId, bool>? SetFavourite { get; init; }
 
@@ -53,20 +74,62 @@ public sealed record LauncherActions(Action<GameId> Play, Action SyncNow, Action
     /// <summary>Opens a game's page in the library, as a click on its cover anywhere does (LIB-18).</summary>
     public Action<GameId>? OpenGame { get; init; }
 
+    /// <summary>
+    /// A game's achievements, every one (design system → AchievementsScreen), beside the library's list: from its page's
+    /// View all, or Home's card with the page Back returns to (<c>home</c>); null returns to the game's page.
+    /// </summary>
+    public Action<GameId, string?>? OpenAchievements { get; init; }
+
+    /// <summary>KAN-110: leaves a game out of the achievements on this PC, or counts it again; the pages read again after.</summary>
+    public Action<GameId, bool>? SetAchievementsLeftOut { get; init; }
+
+    /// <summary>Version 49: a game's 100% seen, its moment played; remembered on this PC.</summary>
+    public Action<GameId>? SeeZenith { get; init; }
+
+    /// <summary>PKG-03 (design system version 53): Restart to update, from Home's top bar.</summary>
+    public Action? RestartToUpdate { get; init; }
+
+    /// <summary>
+    /// ACH-01 to ACH-03: a game's achievements read off the UI thread, after asking Steam, when told to, for each icon the
+    /// list of every one shows (never a hidden one's) and rarity a week old; null for a game with none GameSync can read.
+    /// </summary>
+    public Func<GameId, bool, CancellationToken, Task<GameAchievementsView?>>? LoadAchievements { get; init; }
+
+    /// <summary>The Achievements page: every game's achievements here, read off the UI thread as it says (design system → TrophyRoomScreen).</summary>
+    public Func<AchievementsLoad, CancellationToken, Task<IReadOnlyList<GameAchievementsView>>>? LoadAllAchievements { get; init; }
+
     /// <summary>Reads a game's page: its places, named saves, versions and log, off the UI thread.</summary>
     public Func<GameId, CancellationToken, Task<GameDetail?>>? LoadGame { get; init; }
 
     /// <summary>Opens a folder in Explorer: where a game keeps its saves.</summary>
     public Action<string>? OpenFolder { get; init; }
 
-    /// <summary>Sync these saves: confirms what the scan found for a game, so it syncs from the agent's next round (FIND-06).</summary>
-    public Action<GameId>? SyncGame { get; init; }
+    /// <summary>Sync these saves: confirms what the scan found for a game and syncs it, done once its saves are kept here (FIND-06).</summary>
+    public Func<GameId, Task>? SyncGame { get; init; }
 
-    /// <summary>Backs a game up now (BAK-16).</summary>
-    public Action<GameId>? BackUpNow { get; init; }
+    /// <summary>Backs a game up now (BAK-16), done once the save is kept here; its upload follows beside whatever comes next.</summary>
+    public Func<GameId, Task>? BackUpNow { get; init; }
 
-    /// <summary>Save as…: keeps the game's save as it is now under a name (BAK-18); a game not syncing yet is kept first (KAN-63).</summary>
-    public Action<GameId, string>? SaveAs { get; init; }
+    /// <summary>New named save…, over the page (BAK-18, KAN-77).</summary>
+    public Action<NamedSaveStart>? OpenNamedSave { get; init; }
+
+    /// <summary>KAN-61: a game's live save beside copies kept by hand, over the page: only the live save, the copies as named saves.</summary>
+    public Action<KeptCopiesStart>? OpenKeptCopies { get; init; }
+
+    /// <summary>KAN-61: the live save and each copy beside it, read off the UI thread without changing anything, saying how far it is (KAN-80).</summary>
+    public Func<GameId, IProgress<WorkProgress>?, CancellationToken, Task<KeptLook>>? LookKept { get; init; }
+
+    /// <summary>
+    /// KAN-61: keeps only the live save, backed up only when told (KAN-63), and the copies as named saves when told,
+    /// saying how far it is (KAN-80); what goes wrong is thrown, for the dialog to say.
+    /// </summary>
+    public Func<GameId, bool, bool, IProgress<WorkProgress>?, CancellationToken, Task<KeptDone>>? ApplyKept { get; init; }
+
+    /// <summary>
+    /// Keeps the game's save as it is now under a name (BAK-18); a game not syncing yet is kept first (KAN-63). Null once
+    /// it's kept, or why it couldn't be.
+    /// </summary>
+    public Func<GameId, string, Task<string?>>? KeepNamed { get; init; }
 
     /// <summary>KAN-63: starts keeping a game not syncing yet (backed up only, not synced between PCs); true once it's kept.</summary>
     public Func<GameId, Task<bool>>? Keep { get; init; }
@@ -79,6 +142,15 @@ public sealed record LauncherActions(Action<GameId> Play, Action SyncNow, Action
 
     /// <summary>A game's saves in the save manager: its named saves, where they are, every version and its log (MGR-07).</summary>
     public Action<GameId>? OpenSaves { get; init; }
+
+    /// <summary>
+    /// KAN-87: a named save or any version as a plain folder in the folder picked, named after it: the game, the version,
+    /// its name (null: its date), the folder picked. The folder made, or why it couldn't be.
+    /// </summary>
+    public Func<GameId, VersionId, string?, string, Task<(string? Folder, string? Problem)>>? ExportFolder { get; init; }
+
+    /// <summary>KAN-82: keeps how named saves are listed on this PC: <c>newest</c> or <c>name</c>.</summary>
+    public Action<string>? SetNamedSort { get; init; }
 
     /// <summary>A game's Properties, on a section (<c>general</c>, <c>launch</c>, <c>files</c>, <c>saves</c>, <c>sync</c>) or the first (LIB-20).</summary>
     public Action<GameId, string?>? OpenProperties { get; init; }
@@ -118,6 +190,15 @@ public sealed record LauncherActions(Action<GameId> Play, Action SyncNow, Action
 
     /// <summary>Adds a place to a game: the folder or file, and what it holds.</summary>
     public Action<GameId, string, SaveCategory>? AddPlace { get; init; }
+
+    /// <summary>FIND-04: what learn mode found for a game, over its saves (LearnModeDialog).</summary>
+    public Action<GameId>? OpenLearnFinds { get; init; }
+
+    /// <summary>FIND-04: learn mode on for the game's next session, or off (forgetting what it found).</summary>
+    public Action<GameId, bool>? SetLearn { get; init; }
+
+    /// <summary>FIND-04: the places picked from learn mode's finds are added and the game syncs; why not, when it can't.</summary>
+    public Func<GameId, IReadOnlyList<string>, Task<string?>>? AddLearned { get; init; }
 
     /// <summary>Import kept saves, over the page (BAK-19).</summary>
     public Action<GameId>? OpenImportKept { get; init; }
@@ -162,6 +243,11 @@ public sealed record TileItem(GameId Id, string Title, IImage? Art, GameStatus? 
     /// <summary>The small cover for the library's list (Steam's 300×450 capsule, decoded small).</summary>
     public IImage? SmallArt { get; init; }
 
+    /// <summary>ACH-02: how many of its achievements are unlocked, as Steam on this PC keeps them; 0 of 0 for a game with none it counts.</summary>
+    public int AchievementsDone { get; init; }
+
+    public int AchievementsTotal { get; init; }
+
     public string Initial => GsGameTile.InitialOf(Title);
 
     /// <summary>Installed on this PC; the list dims a game that isn't, and it can't be played from here.</summary>
@@ -204,6 +290,98 @@ public sealed record TileItem(GameId Id, string Title, IImage? Art, GameStatus? 
     }.OfType<string>());
 
     public override string ToString() => SpokenName;
+}
+
+/// <summary>
+/// Home's Achievements card (the owner, 3 Oct 2026; design system version 33, the simpler one again since 46): the hero
+/// game's overview (its ring, tiers and Zenith) and the last two unlocked, or the last game played that has some, saying so;
+/// its arrow opens that game's achievements, every one.
+/// </summary>
+public sealed record HomeAchievements(GameId Game, string Title, string Subtitle, AchievementsProgress Progress, IReadOnlyList<AchievementItem> Latest, string OpenLabel)
+{
+    /// <summary>Version 49: this game's 100% hasn't been seen on this PC yet, so its moment plays here.</summary>
+    public bool CelebratesZenith { get; init; }
+
+    public bool HasLatest => Latest.Count > 0;
+
+    public bool NoneUnlocked => Latest.Count == 0;
+
+    /// <param name="heroHasNone">The card is about another game than the hero, which keeps none.</param>
+    /// <param name="heroLeftOut">The hero has some, but is left out of the achievements in Settings (KAN-110).</param>
+    /// <param name="zenithSeen">The game's Zenith has been seen on this PC, so its moment doesn't play.</param>
+    public static HomeAchievements Of(GameAchievementsView view, LauncherGame? hero, bool heroHasNone, IReadOnlyList<LauncherGame> games, DateTime nowLocal,
+        bool heroLeftOut = false, bool zenithSeen = true)
+    {
+        var game = games.FirstOrDefault(g => g.Id == view.Game);
+        var title = game?.Title ?? view.Title;
+        // The hero has none to show: said plainly (the owner, 3 Oct 2026, found "Bloodborne GOTY's copy keeps none" odd).
+        // A copy Steam knows by its app ID but doesn't run here (the owner's Sons of the Forest, in its own folder): Steam keeps
+        // no record of what's unlocked in it, which is why, rather than GameSync not finding them.
+        var why = heroLeftOut ? "is left out of your achievements"
+            : hero?.Store == StoreKind.Steam ? "has none on Steam"
+            : hero?.SteamAppId is not null ? "isn't run by Steam here, so Steam keeps none of its achievements"
+            : "has none GameSync can read";
+        var subtitle = heroHasNone && hero is not null
+            ? $"{title}, played {Played(game?.LastPlayedUtc, nowLocal)}. {hero.Title} {why}."
+            : $"{title} · {view.Unlocked.ToString(CultureInfo.InvariantCulture)} of {view.Total.ToString(CultureInfo.InvariantCulture)}{(view.From == AchievementsFrom.CopyRecord ? " in its own record" : " on Steam")}";
+        return new HomeAchievements(
+            view.Game,
+            title,
+            subtitle,
+            AchievementsProgress.Of(view, nowLocal),
+            view.Latest(2).Select(a => AchievementItem.Of(a, nowLocal)).ToList(),
+            $"All of {title}'s achievements")
+        {
+            CelebratesZenith = view.IsComplete && !zenithSeen,
+        };
+    }
+
+    private static string Played(DateTime? utc, DateTime nowLocal) => utc is null ? "before" : AchievementItem.Day(utc.Value, nowLocal) switch
+    {
+        "Today" => "today",
+        "Yesterday" => "yesterday",
+        var day => $"on {day}",
+    };
+}
+
+/// <summary>
+/// One game Home's banner can show (KAN-125): its art, logo and words, its status, its Play, the art Glossy follows while
+/// it's shown, and its Achievements card.
+/// </summary>
+public sealed record HeroSlide(GameId Id, string Title, IImage? Art, IImage? Logo, string? Eyebrow, string? Chip, GameStatus? Status, string? StatusLabel,
+    string? Blurb, string PlayLabel, bool ShowsPlay, string? BackdropArt, HomeAchievements? Achievements)
+{
+    public static HeroSlide Of(LauncherGame game, DateTime nowLocal, LauncherActions? actions, HomeAchievements? achievements) => new(
+        game.Id,
+        game.Title,
+        ArtImages.Load(game.HeroPath, 1920),
+        ArtImages.Load(game.LogoPath, 760),
+        HomeViewModel.HeroPhrase(game, nowLocal),
+        game.Playtime <= TimeSpan.Zero ? null : HomeViewModel.HoursPlayed(game.Playtime),
+        // PLAY-12: the game playing now reads Playing now, whether its saves sync or not.
+        game.IsRunning ? GameStatus.Playing : game.Syncs ? game.Status ?? GameStatus.Synced : null,
+        game.IsRunning ? "Playing now" : game is { Syncs: true, Status: null or GameStatus.Synced } ? "Save synced" : HomeViewModel.StatusLabel(game),
+        HomeViewModel.Blurb(game),
+        game.LastPlayedUtc is null ? "Play" : "Continue playing",
+        !game.IsRunning,
+        game.HeroPath ?? game.CoverPath,
+        achievements);
+}
+
+/// <summary>A dot of Home's pager (KAN-125): which game it is, whether it's the one shown, and the button that shows it.</summary>
+public sealed partial class HeroDot(int index, string title, int count, bool isCurrent, ICommand show) : ObservableObject
+{
+    public int Index { get; } = index;
+
+    public ICommand Show { get; } = show;
+
+    /// <summary>"Valheim, 2 of 5", for screen readers and the tooltip.</summary>
+    public string Name { get; } = $"{title}, {(index + 1).ToString(CultureInfo.InvariantCulture)} of {count.ToString(CultureInfo.InvariantCulture)}";
+
+    [ObservableProperty]
+    private bool _isCurrent = isCurrent;
+
+    public override string ToString() => Name;
 }
 
 /// <summary>A row of the Needs you card: a small cover, the game, its status and the button that deals with it.</summary>
@@ -314,14 +492,53 @@ public sealed partial class HomeViewModel : ObservableObject, IPageSurface
     [ObservableProperty]
     private string _selectedTab = ThisPage;
 
+    /// <summary>KAN-80: the hero's Play was pressed and the game isn't running yet: Play says Starting….</summary>
+    [ObservableProperty]
+    private bool _heroStarting;
+
+    /// <summary>KAN-80: GameSync is syncing or uploading: Sync now turns its arrows.</summary>
+    [ObservableProperty]
+    private bool _isSyncing;
+
+    /// <summary>
+    /// PKG-03 (design system version 53 → LauncherScreen #update): a newer GameSync is downloaded and checked, so the top
+    /// bar offers Restart to update; this is its tooltip, saying which and what happens, or why it waits. Null otherwise.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowsUpdate))]
+    private string? _updateReady;
+
+    /// <summary>Restart to update waits while a game is being played.</summary>
+    [ObservableProperty]
+    private bool _canUpdate = true;
+
+    public bool ShowsUpdate => UpdateReady is not null;
+
+    public IRelayCommand RestartToUpdateCommand => _restartToUpdate ??= new RelayCommand(() => Actions?.RestartToUpdate?.Invoke());
+
+    private IRelayCommand? _restartToUpdate;
+
     public HomeViewModel()
     {
-        PlayCommand = new RelayCommand(() =>
+        PlayCommand = new AsyncRelayCommand(async () =>
         {
-            if (HeroId is { } game)
+            if (HeroId is not { } game)
+            {
+                return;
+            }
+
+            // KAN-80: Play says Starting… from the press until the game runs, or the check says why it can't.
+            HeroStarting = true;
+            if (Actions?.Start is { } start)
+            {
+                await start(game);
+            }
+            else
             {
                 Actions?.Play(game);
             }
+
+            HeroStarting = Actions?.IsStarting?.Invoke(game) == true;
         });
         SyncNowCommand = new RelayCommand(() => Actions?.SyncNow());
         OpenLibraryCommand = new RelayCommand(() => Actions?.Show("library", "all"));
@@ -419,10 +636,85 @@ public sealed partial class HomeViewModel : ObservableObject, IPageSurface
 
     public IReadOnlyList<NavItem> Tabs { get; init; } = [];
 
-    public GameId? HeroId { get; init; }
+    /// <summary>
+    /// KAN-125 (the owner: "I want the main screens hero card to be scrollable ... Recently played games?"): the games the
+    /// banner can show, the one playing now or played last first, then the next ones played, five at most.
+    /// </summary>
+    public IReadOnlyList<HeroSlide> HeroSlides { get; init; } = [];
+
+    /// <summary>How many games the banner can show.</summary>
+    public const int HeroSlideCount = 5;
+
+    /// <summary>Which of <see cref="HeroSlides"/> the banner shows.</summary>
+    [ObservableProperty]
+    private int _heroIndex;
+
+    /// <summary>The game the banner shows.</summary>
+    public HeroSlide? Hero => HeroIndex >= 0 && HeroIndex < HeroSlides.Count ? HeroSlides[HeroIndex] : null;
+
+    public GameId? HeroId => Hero?.Id;
 
     /// <summary>There's a game to put in the banner: the last one played, or else one that's installed.</summary>
     public bool HasHero => HeroId is not null;
+
+    /// <summary>More than one game to show: the pager, the wheel and the arrow keys move between them.</summary>
+    public bool HasHeroPages => HeroSlides.Count > 1;
+
+    /// <summary>The pager's dots, one a game.</summary>
+    public IReadOnlyList<HeroDot> HeroDots => _heroDots ??= HeroSlides.Select((slide, i) => new HeroDot(i, slide.Title, HeroSlides.Count, i == HeroIndex,
+        new RelayCommand(() => HeroIndex = i))).ToList();
+
+    private List<HeroDot>? _heroDots;
+
+    /// <summary>The next game the banner can show, round to the first after the last.</summary>
+    public ICommand NextHeroCommand => new RelayCommand(() => HeroIndex = (HeroIndex + 1) % HeroSlides.Count, () => HeroSlides.Count > 1);
+
+    /// <summary>The game before, round to the last before the first.</summary>
+    public ICommand PreviousHeroCommand => new RelayCommand(() => HeroIndex = (HeroIndex + HeroSlides.Count - 1) % HeroSlides.Count, () => HeroSlides.Count > 1);
+
+    /// <summary>What a screen reader says of the banner: the game, where it is among them, and what Enter does.</summary>
+    public string? HeroSpoken => Hero is { } hero
+        ? HasHeroPages
+            ? $"{hero.Title}, {(HeroIndex + 1).ToString(CultureInfo.InvariantCulture)} of {HeroSlides.Count.ToString(CultureInfo.InvariantCulture)}. Enter opens its page; Left and Right show the other games you played last."
+            : $"{hero.Title}. Enter opens its page."
+        : null;
+
+    /// <summary>Glossy's art while the banner shows this game (its wide art, else its cover), so the page's colours follow it.</summary>
+    public string? HeroBackdropArt => Hero?.BackdropArt;
+
+    /// <summary>Raised when the banner shows another game, for the window's colours to follow it.</summary>
+    public event Action? HeroShown;
+
+    partial void OnHeroIndexChanged(int value)
+    {
+        foreach (var dot in HeroDots)
+        {
+            dot.IsCurrent = dot.Index == value;
+        }
+
+        HeroStarting = Hero is { ShowsPlay: true } hero && Actions?.IsStarting?.Invoke(hero.Id) == true;
+        foreach (var name in (string[])[nameof(Hero), nameof(HeroId), nameof(HasHero), nameof(HeroShowsPlay), nameof(HeroIsPlaying), nameof(HeroArt), nameof(HeroLogo),
+                     nameof(HeroTitle), nameof(HeroEyebrow), nameof(HeroChip), nameof(HeroStatus), nameof(HeroStatusLabel), nameof(HeroBlurb), nameof(HeroPlayLabel),
+                     nameof(HeroSpoken), nameof(HeroBackdropArt), nameof(Achievements), nameof(HasAchievements), nameof(NoAchievements), nameof(CelebratesZenith)])
+        {
+            OnPropertyChanged(name);
+        }
+
+        HeroShown?.Invoke();
+    }
+
+    /// <summary>
+    /// After the pages are read again: keeps showing the game <paramref name="before"/> showed, so a refresh doesn't take the
+    /// banner back to the first; unless another game is first now (one that started playing), which is then shown.
+    /// </summary>
+    public void KeepShowing(HomeViewModel? before)
+    {
+        if (before?.HeroId is { } shown && before.HeroSlides.FirstOrDefault()?.Id == HeroSlides.FirstOrDefault()?.Id &&
+            HeroSlides.ToList().FindIndex(s => s.Id == shown) is var index and > 0)
+        {
+            HeroIndex = index;
+        }
+    }
 
     /// <summary>GameSync hasn't found any games on this PC yet (it hasn't scanned): Home says so instead of an empty banner.</summary>
     public bool NoGames { get; init; }
@@ -431,30 +723,73 @@ public sealed partial class HomeViewModel : ObservableObject, IPageSurface
     public bool CanChoose => NoneSyncing && !NoGames;
 
     /// <summary>The hero's Play, except while the hero game runs (PLAY-12).</summary>
-    public bool HeroShowsPlay { get; init; } = true;
+    public bool HeroShowsPlay => Hero?.ShowsPlay ?? true;
 
     /// <summary>The hero game is running now: the banner glows in the play colour (KAN-50).</summary>
     public bool HeroIsPlaying => HeroId is not null && !HeroShowsPlay;
 
-    public IImage? HeroArt { get; init; }
+    public IImage? HeroArt => Hero?.Art;
 
-    public IImage? HeroLogo { get; init; }
+    public IImage? HeroLogo => Hero?.Logo;
 
-    public string? HeroTitle { get; init; }
+    public string? HeroTitle => Hero?.Title;
 
-    public string? HeroEyebrow { get; init; }
+    public string? HeroEyebrow => Hero?.Eyebrow;
 
-    public string? HeroChip { get; init; }
+    public string? HeroChip => Hero?.Chip;
 
-    public GameStatus? HeroStatus { get; init; }
+    public GameStatus? HeroStatus => Hero?.Status;
 
-    public string? HeroStatusLabel { get; init; }
+    public string? HeroStatusLabel => Hero?.StatusLabel;
 
-    public string? HeroBlurb { get; init; }
+    public string? HeroBlurb => Hero?.Blurb;
 
-    public string HeroPlayLabel { get; init; } = "Continue playing";
+    public string HeroPlayLabel => Hero?.PlayLabel ?? "Continue playing";
 
     public IReadOnlyList<NeedsYouItem> NeedsYou { get; init; } = [];
+
+    /// <summary>
+    /// Home's Achievements card (design system version 33): the shown game's, following the banner (KAN-125); null when no
+    /// game here has any GameSync can read.
+    /// </summary>
+    public HomeAchievements? Achievements => Hero?.Achievements;
+
+    public bool HasAchievements => Achievements is not null;
+
+    public bool NoAchievements => Achievements is null;
+
+    private readonly HashSet<GameId> _zenithsSeenHere = [];
+
+    /// <summary>Version 49: the shown game's 100% is seen for the first time, so the card's moment plays; once.</summary>
+    public bool CelebratesZenith => Achievements is { CelebratesZenith: true } card && !_zenithsSeenHere.Contains(card.Game);
+
+    /// <summary>The card's moment played: remembered on this PC, so it doesn't again.</summary>
+    public ICommand SeeZenithCommand => new RelayCommand(() =>
+    {
+        if (Achievements is not { } card || !_zenithsSeenHere.Add(card.Game))
+        {
+            return;
+        }
+
+        OnPropertyChanged(nameof(CelebratesZenith));
+        Actions?.SeeZenith?.Invoke(card.Game);
+    });
+
+    /// <summary>The Achievements card's arrow: every one of the game's achievements, with Back to Home.</summary>
+    public ICommand OpenAchievementsCommand => new RelayCommand(() =>
+    {
+        if (Achievements is { } card)
+        {
+            if (Actions?.OpenAchievements is { } open)
+            {
+                open(card.Game, "home");
+            }
+            else
+            {
+                Actions?.OpenGame?.Invoke(card.Game);
+            }
+        }
+    });
 
     /// <summary>Some games sync, and none needs the person.</summary>
     public bool AllFine => NeedsYou.Count == 0 && AnySyncing;
@@ -519,11 +854,28 @@ public sealed partial class HomeViewModel : ObservableObject, IPageSurface
 
     /// <param name="actions">What the page asks of the app; null where it only shows, as in the snapshot tool.</param>
     /// <param name="status">The cloud and the PCs, for the top bar.</param>
-    public static HomeViewModel From(LauncherHome home, IReadOnlyList<LauncherGame> all, DateTime nowLocal, LauncherActions? actions = null, HomeStatus? status = null)
+    /// <param name="achievements">
+    /// Home's Achievements card: the game's, whether it's another game than the hero, which keeps none, and whether the hero
+    /// is left out of the achievements instead (KAN-110).
+    /// </param>
+    /// <param name="achievementsOf">The same for each other game the banner can show (KAN-125); without it they show the hero's.</param>
+    /// <param name="progress">ACH-02: how far each game's achievements are, for the ring on Jump back in's covers.</param>
+    public static HomeViewModel From(LauncherHome home, IReadOnlyList<LauncherGame> all, DateTime nowLocal, LauncherActions? actions = null, HomeStatus? status = null,
+        (GameAchievementsView? View, bool HeroHasNone, bool HeroLeftOut) achievements = default,
+        Func<LauncherGame, (GameAchievementsView? View, bool HeroHasNone, bool HeroLeftOut)>? achievementsOf = null,
+        IReadOnlyDictionary<GameId, (int Done, int Total)>? progress = null, IReadOnlySet<GameId>? zenithsSeen = null)
     {
         var games = all.Where(g => g.Shown).ToList();
         var hero = home.Hero;
         var needsYouCount = games.Count(g => g.NeedsYou);
+
+        // KAN-125: the hero first, then the games played last, each with its own Achievements card.
+        var shown = hero is null ? [] : games.Where(g => g.Id != hero.Id && g.LastPlayedUtc is not null && !g.IsFolder)
+            .OrderByDescending(g => g.LastPlayedUtc).Take(HeroSlideCount - 1).Prepend(hero).ToList();
+        HomeAchievements? CardOf(LauncherGame game, (GameAchievementsView? View, bool HeroHasNone, bool HeroLeftOut) card) =>
+            card.View is { } view ? HomeAchievements.Of(view, game, card.HeroHasNone, games, nowLocal, card.HeroLeftOut, zenithsSeen?.Contains(view.Game) ?? true) : null;
+        var slides = shown.Select((game, i) => HeroSlide.Of(game, nowLocal, actions,
+            CardOf(game, i == 0 ? achievements : achievementsOf?.Invoke(game) ?? achievements))).ToList();
         var covers = all.ToDictionary(g => g.Id, g => g.CoverPath);
         var months = home.Months.Select(month => new ActivityMonthItem(
             month.Name,
@@ -538,28 +890,22 @@ public sealed partial class HomeViewModel : ObservableObject, IPageSurface
             [
                 new NavItem(ThisPage, "Recently played"),
                 new NavItem("all", "My games"),
-                new NavItem(NeedsYouTab, "Needs you", Count: needsYouCount > 0 ? needsYouCount.ToString(CultureInfo.InvariantCulture) : null),
+                // Something needs the person: the pill in warn, with a caution mark and the count (design system version 32).
+                new NavItem(NeedsYouTab, "Conflicts", Count: needsYouCount > 0 ? needsYouCount.ToString(CultureInfo.InvariantCulture) : null,
+                    Tone: needsYouCount > 0 ? "warn" : null),
             ],
-            HeroId = hero?.Id,
+            HeroSlides = slides,
             NoGames = games.Count == 0,
-            HeroShowsPlay = hero?.IsRunning != true,
-            HeroArt = ArtImages.Load(hero?.HeroPath, 1920),
-            HeroLogo = ArtImages.Load(hero?.LogoPath, 760),
-            HeroTitle = hero?.Title,
-            HeroEyebrow = hero is null ? null : HeroPhrase(hero, nowLocal),
-            HeroChip = hero is null || hero.Playtime <= TimeSpan.Zero ? null : HoursPlayed(hero.Playtime),
-            // PLAY-12: the game playing now reads Playing now, whether its saves sync or not.
-            HeroStatus = hero?.IsRunning == true ? GameStatus.Playing : hero?.Syncs == true ? hero.Status ?? GameStatus.Synced : null,
-            HeroStatusLabel = hero?.IsRunning == true ? "Playing now" : hero is { Syncs: true, Status: null or GameStatus.Synced } ? "Save synced" : StatusLabel(hero),
-            HeroBlurb = hero is null ? null : Blurb(hero),
-            HeroPlayLabel = hero?.LastPlayedUtc is null ? "Play" : "Continue playing",
+            HeroStarting = hero is { IsRunning: false } && actions?.IsStarting?.Invoke(hero.Id) == true,
+            IsSyncing = actions?.IsWorking?.Invoke() == true,
             NeedsYou = home.NeedsYou.Select(g => new NeedsYouItem(g.Id, g.Title, ArtImages.Load(g.CoverPath, 96), GsGameTile.InitialOf(g.Title), g.Status, ActionFor(g.Status))).ToList(),
             AnySyncing = home.Syncing > 0,
             HasActivity = home.Months.Any(m => m.Levels.Any(d => d > 0)),
             SyncedLabel = home.Syncing == 0 ? $"{games.Count} games found, none syncing yet" : $"{home.Synced} of {home.Syncing} games synced",
             SyncedRight = home.Syncing == 0 ? "" : $"{Math.Round(100.0 * home.Synced / home.Syncing).ToString(CultureInfo.InvariantCulture)}%",
             SyncedPercent = home.Syncing == 0 ? 0 : 100.0 * home.Synced / home.Syncing,
-            JumpBackIn = home.JumpBackIn.Select(g => Tile(g, nowLocal, width: 300, withMeta: false, actions)).ToList(),
+            JumpBackIn = home.JumpBackIn.Select(g => Tile(g, nowLocal, width: 300, withMeta: false, actions,
+                achievements: progress is not null && progress.TryGetValue(g.Id, out var done) ? done : null)).ToList(),
             Months = months,
             MonthIndex = months.Count - 1,
         };
@@ -587,9 +933,13 @@ public sealed partial class HomeViewModel : ObservableObject, IPageSurface
     }
 
     /// <param name="smallWidth">Also decode the cover this wide for the library's list; 0 leaves it out.</param>
-    public static TileItem Tile(LauncherGame game, DateTime nowLocal, int width = 320, bool withMeta = true, LauncherActions? actions = null, int smallWidth = 0) =>
+    /// <param name="achievements">ACH-02: how many of its achievements are unlocked, and of how many, when they count (design system version 39).</param>
+    public static TileItem Tile(LauncherGame game, DateTime nowLocal, int width = 320, bool withMeta = true, LauncherActions? actions = null, int smallWidth = 0,
+        (int Done, int Total)? achievements = null) =>
         new(game.Id, game.Title, ArtImages.LoadCover(game.CoverPath, width), game.IsRunning ? GameStatus.Playing : game.Status, withMeta ? Launcher.Meta(game, nowLocal) : null)
         {
+            AchievementsDone = achievements?.Done ?? 0,
+            AchievementsTotal = achievements?.Total ?? 0,
             StatusLabel = StatusLabel(game),
             MarkLabel = game.IsRunning ? null : MarkLabel(game.Status, game.Store, game.StoreSyncs),
             SmallArt = smallWidth > 0 ? ArtImages.LoadCover(game.CoverPath, smallWidth) : null,
@@ -618,7 +968,7 @@ public sealed partial class HomeViewModel : ObservableObject, IPageSurface
     /// <param name="storeSyncs">Its store's cloud syncs it; otherwise it's backed up only by the person's choice (KAN-63).</param>
     public static string? MarkLabel(GameStatus? status, StoreKind? store, bool storeSyncs = true) => status switch
     {
-        GameStatus.Synced => "Synced",
+        GameStatus.Synced => "Synced between your PCs",
         GameStatus.BackupOnly when !storeSyncs => "Backed up; not synced between your PCs",
         GameStatus.BackupOnly => StoreNames.BackedUpSyncedBy(store),
         _ => null,
@@ -658,12 +1008,15 @@ public sealed partial class HomeViewModel : ObservableObject, IPageSurface
             : $"Last played on {Launcher.WhenText(utc, nowLocal)}";
     }
 
-    private static string HoursPlayed(TimeSpan playtime) =>
+    internal static string HoursPlayed(TimeSpan playtime) =>
         playtime.TotalHours >= 1 ? Math.Round(playtime.TotalHours) is var hours && hours == 1 ? "1 hr played" : $"{hours.ToString(CultureInfo.InvariantCulture)} hrs played"
         : $"{Math.Max(1, (int)Math.Round(playtime.TotalMinutes))} min played";
 
-    private static string Blurb(LauncherGame game) => game switch
+    internal static string Blurb(LauncherGame game) => game switch
     {
+        // FIND-04 (design system version 43, LauncherScreen #learning): a game nothing was found for, watched by learn mode.
+        { IsRunning: true, Syncs: false, Learning: true } =>
+            "GameSync hasn't found where it saves, so learn mode is watching. When you quit, it shows you the places it wrote to; nothing syncs until you choose.",
         { IsRunning: true, Syncs: false } => "GameSync saw it start, so its play counts. Its saves aren't synced yet: sync them from its page when you're done.",
         { Syncs: false } => "GameSync found its saves. Sync them from its page to back them up and keep them in step.",
         { NeedsYou: true, StatusDetail: { Length: > 0 } detail } => detail,

@@ -1,0 +1,26 @@
+<!-- @dsCard group="Save manager" height=600 subtitle="This save kept under a name, on every PC: what's kept, the name, Keep this save" -->
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>preview</title>
+<style>html,body{margin:0;background:var(--bg-100);}</style>
+</head>
+<body class="gs-root">
+<div id="root"></div>
+<script>
+var G = window.GameSync, h = React.createElement;
+// #taken: a name the game has already; #not-syncing: a game GameSync doesn't keep yet; #keeping: on its way; otherwise just opened.
+var STATE = location.hash.slice(1);
+var props = {game:'Dark Souls III', names:['Before Nameless King','Ringed City start'],
+  save:{path:'C:\\Users\\You\\AppData\\Roaming\\DarkSoulsIII\\0110000100000666', files:1, bytes:9332736, newest:'7 Sep 23:27'}};
+if (STATE === 'taken') props.name = 'Before Nameless King';
+if (STATE === 'keeping') { props.name = 'Before the Twin Princes'; props.stage = 'keeping'; }
+if (STATE === 'not-syncing') {
+  props = {game:'Bloodborne GOTY', names:[],
+    save:{path:'G:\\Bloodborne GOTY\\Shadlix\\user\\savedata\\1\\CUSA00207\\SPRJ0005', files:34, bytes:35232153, newest:'17 Sep 02:14'},
+    keepLine:'GameSync starts keeping its saves, 34 files and 33.6 MB as they are now: every version backed up on this PC and in the cloud. They don\u2019t sync between your PCs until you choose Sync these saves.'};
+}
+ReactDOM.createRoot(document.getElementById('root')).render(
+  h('div',{className:'gs-scrim',style:{minHeight:580}},h(G.NamedSaveDialog,props)));
+</script>
+</body>
+</html>

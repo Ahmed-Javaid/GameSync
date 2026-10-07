@@ -15,13 +15,14 @@ public sealed record HistoryLimits(int VersionsPerGame = 10, long MaxBytes = 2L 
 
 /// <summary>
 /// The backup folder on this PC (FOLD-02): every version record this PC knows, the files of recent versions, and an
-/// outbox of versions and pins not uploaded yet. It has the folder cloud's layout, plus <c>outbox/</c> per game and
-/// <c>devices/</c> at the top.
+/// outbox of versions, pins and pin removals not uploaded yet. It has the folder cloud's layout, plus <c>outbox/</c>
+/// per game and <c>devices/</c> at the top.
 /// </summary>
 public sealed class LocalHistory
 {
     private const string Versions = "versions";
     private const string Pins = "pins";
+    private const string Unpins = "unpins";
     private const string Abandoned = "abandoned";
 
     public LocalHistory(string folder, Action<StorageProblem>? onProblem = null)
@@ -63,15 +64,22 @@ public sealed class LocalHistory
 
     public Task AddPendingVersionAsync(GameId game, VersionId id, CancellationToken ct) => AddMarkerAsync(game, Versions, id, ct);
 
-    public void RemovePendingVersion(GameId game, VersionId id) => File.Delete(MarkerPath(game, Versions, id));
+    public void RemovePendingVersion(GameId game, VersionId id) => DeleteMarker(game, Versions, id);
 
     public IReadOnlyList<VersionId> PendingPins(GameId game) => Markers(game, Pins);
 
     public Task AddPendingPinAsync(GameId game, VersionId version, CancellationToken ct) => AddMarkerAsync(game, Pins, version, ct);
 
-    public void RemovePendingPin(GameId game, VersionId version) => File.Delete(MarkerPath(game, Pins, version));
+    public void RemovePendingPin(GameId game, VersionId version) => DeleteMarker(game, Pins, version);
 
-    public bool HasPending(GameId game) => PendingVersions(game).Count > 0 || PendingPins(game).Count > 0;
+    /// <summary>KAN-88: pins taken away on this PC whose removal still has to reach the cloud.</summary>
+    public IReadOnlyList<VersionId> PendingUnpins(GameId game) => Markers(game, Unpins);
+
+    public Task AddPendingUnpinAsync(GameId game, VersionId version, CancellationToken ct) => AddMarkerAsync(game, Unpins, version, ct);
+
+    public void RemovePendingUnpin(GameId game, VersionId version) => DeleteMarker(game, Unpins, version);
+
+    public bool HasPending(GameId game) => PendingVersions(game).Count > 0 || PendingPins(game).Count > 0 || PendingUnpins(game).Count > 0;
 
     /// <summary>Versions the cloud lost whose files are gone from this PC too; they're reported once, not retried forever.</summary>
     public IReadOnlyList<VersionId> AbandonedVersions(GameId game) => Markers(game, Abandoned);
@@ -307,6 +315,16 @@ public sealed class LocalHistory
         AtomicFile.WriteAllBytesAsync(MarkerPath(game, kind, id), [], overwrite: true, ct);
 
     private string MarkerPath(GameId game, string kind, VersionId id) => Path.Combine(Folder, "games", game.Value, "outbox", kind, id.Value);
+
+    // File.Delete doesn't mind a missing file, but it does a missing folder, as before a game's first pin removal.
+    private void DeleteMarker(GameId game, string kind, VersionId id)
+    {
+        var path = MarkerPath(game, kind, id);
+        if (File.Exists(path))
+        {
+            File.Delete(path);
+        }
+    }
 
     /// <summary>One game's blobs during pruning: which are needed no matter what, and which only by recent versions.</summary>
     private sealed class GameFiles(GameId game, Dictionary<BlobId, long> sizes)

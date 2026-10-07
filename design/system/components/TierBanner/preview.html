@@ -1,0 +1,24 @@
+<!-- @dsCard group="Achievements" height=560 subtitle="The tiers as banners, each a harder mountain: Bronze Fuji, Silver the Matterhorn, Gold K2, the Zenith Everest in red" -->
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>preview</title>
+<style>html,body{margin:0;background:var(--bg-100);} .pv{padding:24px;display:flex;flex-direction:column;gap:24px} .row{display:flex;gap:36px;align-items:flex-end;flex-wrap:wrap} .pv figure{margin:0;display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center} .pv figcaption{font:400 12px/16px var(--font-sans);color:var(--ink-faint);max-width:190px} .pv figcaption b{display:block;font:600 13px/18px var(--font-sans);color:var(--ink)} .lbl{font:600 11px/14px var(--font-sans);letter-spacing:.12em;text-transform:uppercase;color:var(--ink-faint)}</style>
+</head>
+<body class="gs-root">
+<div id="root" class="pv"></div>
+<script>
+var G = window.GameSync, h = React.createElement;
+var TIERS = [
+  ['bronze','Bronze \u00b7 Fuji','3,776 m, a walk-up'],
+  ['silver','Silver \u00b7 the Matterhorn','4,478 m, rock, ice and ropes'],
+  ['gold','Gold \u00b7 K2','8,611 m, the savage mountain'],
+  ['zenith','Zenith \u00b7 Everest','8,849 m, the roof of the world']];
+ReactDOM.createRoot(document.getElementById('root')).render([
+  h('div',{key:'a',className:'row'},TIERS.map(function(t){ return h('figure',{key:t[0]},h(G.TierBanner,{tier:t[0],size:t[0]==='zenith'?260:220,label:t[1]}),h('figcaption',null,h('b',null,t[1]),t[2])); })),
+  h('div',{key:'b',className:'lbl'},'Side by side, and small'),
+  h('div',{key:'c',className:'row'},TIERS.map(function(t){ return h(G.TierBanner,{key:t[0],tier:t[0],size:96}); }).concat(
+    [48,30,22].map(function(s){ return h('figure',{key:'z'+s},h(G.TierBanner,{tier:'zenith',size:s}),h('figcaption',null,s+' px')); })))
+]);
+</script>
+</body>
+</html>

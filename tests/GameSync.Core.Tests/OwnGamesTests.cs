@@ -42,6 +42,7 @@ public class OwnGamesTests
 
         // Backed up like any game, and the server's program files in it are never copied (R1).
         await AppActions.BackUpNowAsync(data, World, output, Ct);
+        await Uploads.RunAsync(data, null, Ct);
         var version = Assert.Single(await new FolderCloud(world.Cloud).Log.ListAsync(World, Ct));
         Assert.Contains(version.Files, f => f.Path.EndsWith("/level.dat", StringComparison.Ordinal));
         Assert.DoesNotContain(version.Files, f => f.Path.EndsWith(".jar", StringComparison.Ordinal));

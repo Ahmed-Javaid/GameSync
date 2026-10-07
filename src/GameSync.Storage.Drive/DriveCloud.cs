@@ -35,6 +35,13 @@ public sealed class DriveCloud : ICloud
     private readonly ConcurrentDictionary<GameId, IReadOnlyDictionary<VersionId, string>> _versionFiles = new();
     private string? _root;
 
+    // KAN-88: a pin's file changes only when the pin does (a rename writes it again), and Drive lists each file's MD5,
+    // so a pin read once is known by its file and contents for as long as the app runs. A pull then lists the pins and
+    // reads only new or changed ones, where it read every one (36 for the owner's Bloodborne) at every named save,
+    // restore and look at a game's saves. Kept only when what was read matches the MD5 listed.
+    private static readonly ConcurrentDictionary<(string FileId, string Md5), PinRecord> KnownPins = new();
+    private const int MostKnownPins = 20_000;
+
     /// <param name="rootName">The GameSync folder's name when GameSync creates it.</param>
     /// <param name="rootMark">What marks the folder as GameSync's; a test gets its own mark, so it never touches the real folder.</param>
     public DriveCloud(IDriveClient drive, Func<GameId, string?>? titleOf = null, Action<StorageProblem>? onProblem = null,
@@ -564,7 +571,7 @@ public sealed class DriveCloud : ICloud
         foreach (var item in await _drive.ListChildrenAsync(folder, ct))
         {
             if (!item.IsFolder && item.Name.EndsWith(".json", StringComparison.Ordinal) &&
-                await ReadJsonAsync<PinRecord>(game, item, ct) is { } pin && item.Name == pin.Version.Value + ".json" &&
+                await ReadPinAsync(game, item, ct) is { } pin && item.Name == pin.Version.Value + ".json" &&
                 !pins.Any(p => p.Version == pin.Version))
             {
                 pins.Add(pin);
@@ -572,6 +579,41 @@ public sealed class DriveCloud : ICloud
         }
 
         return pins;
+    }
+
+    /// <summary>A pin, known already by its file and MD5, or read and then known.</summary>
+    private async Task<PinRecord?> ReadPinAsync(GameId game, DriveItem item, CancellationToken ct)
+    {
+        if (item.Md5 is { } listed && KnownPins.TryGetValue((item.Id, listed), out var known))
+        {
+            return known;
+        }
+
+        using var buffer = new MemoryStream();
+        await _drive.DownloadAsync(item.Id, buffer, ct);
+        var bytes = buffer.ToArray();
+        PinRecord? pin;
+        try
+        {
+            pin = JsonSerializer.Deserialize<PinRecord>(bytes, Json.Options);
+        }
+        catch (JsonException e)
+        {
+            _onProblem?.Invoke(new StorageProblem(game, item.Name, $"Unreadable: {e.Message}"));
+            return null;
+        }
+
+        if (pin is not null && item.Md5 is { } md5 && md5.Equals(Convert.ToHexStringLower(MD5.HashData(bytes)), StringComparison.OrdinalIgnoreCase))
+        {
+            if (KnownPins.Count >= MostKnownPins)
+            {
+                KnownPins.Clear();
+            }
+
+            KnownPins[(item.Id, md5)] = pin;
+        }
+
+        return pin;
     }
 
     private async Task SetPinAsync(GameId game, PinRecord pin, CancellationToken ct)

@@ -1,4 +1,4 @@
-<!-- @dsCard group="Screens" height=800 width=1280 page=true subtitle="One game's saves in the save manager: status, named saves, where the saves are, every version with Restore, its log; #bloodborne, a game not syncing yet whose live save sits beside copies kept by hand" -->
+<!-- @dsCard group="Screens" height=800 width=1280 page=true subtitle="One game's saves in the save manager: status, named saves, where the saves are and the current save, every version with Restore, its log; #many, 36 named saves with a search and a sort (#many-find, #many-where); #bloodborne, a game not syncing yet whose live save sits beside copies kept by hand; #uploading, its upload under way beside a restore; #rounds, a game with no saves found and learn mode (#rounds-playing, #rounds-found, #rounds-open, #rounds-none)" -->
 <!doctype html>
 <html lang="en">
 <head><meta charset="utf-8"><title>preview</title>
@@ -18,6 +18,16 @@ html,body{margin:0;background:var(--bg-100);} .pv{padding:24px;}
 .sm-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:start}
 .sm-log .gs-log-line{grid-template-columns:92px 72px 1fr}
 .sm-hist .gs-ctable td{height:34px}
+.sm-named-tools{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+.sm-named{display:flex;flex-direction:column;max-height:364px;overflow:auto;margin:0 -10px;padding:0 10px;scrollbar-width:thin;scrollbar-color:var(--bg-400) transparent}
+.sm-named-row{display:flex;align-items:center;gap:4px;min-height:52px;border-bottom:1px solid var(--line-100)}
+.sm-named-row:last-child{border-bottom:0}
+.sm-named-name{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sm-inplace{gap:6px;flex-wrap:nowrap;color:var(--ok);font:500 12px/16px var(--font-sans);padding:0 12px}
+.sm-more{width:340px;padding:14px;background:var(--surface-dialog);border:1px solid var(--edge-dialog);border-radius:var(--radius-md);box-shadow:var(--shadow-dialog);display:flex;flex-direction:column;gap:10px;text-align:left}
+.sm-more-title{font:600 13px/18px var(--font-sans);color:var(--ink)}
+.sm-more-text{margin:0;font:400 12px/16px var(--font-sans);color:var(--ink-muted)}
+.sm-more-sep{height:1px;background:var(--line-100)}
 </style>
 </head>
 <body class="gs-root">
@@ -51,7 +61,8 @@ function rail(cur){return h(G.SideRail,{current:cur,items:[
   {id:'search',icon:'search',label:'Search'},
   {id:'home',icon:'home',label:'Home',sep:true},
   {id:'library',icon:'library',label:'Game library',dot:'play',dotLabel:'Slay the Spire 2 is running'},
-  {id:'saves',icon:'saves',label:'Save manager',sep:true,dot:'warn',dotLabel:'2 games need you'},
+  {id:'achievements',icon:'trophy',label:'Achievements'},
+  {id:'saves',icon:'saves',label:'Save manager',sep:true,dot:'warn',dotLabel:'2 conflicts'},
   {id:'log',icon:'terminal',label:'Console'},
   {id:'settings',icon:'settings',label:'Settings',bottom:true}]})}
 function topbar(title,sub,tabs,right){return h('header',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',gap:16}},h('div',null,h('div',{style:{font:'600 15px/20px var(--font-sans)'}},title),h('div',{className:'gs-faint',style:{fontSize:12}},sub)),tabs,h('div',{className:'gs-row',style:{flexWrap:'nowrap'}},right));}
@@ -78,58 +89,159 @@ var SENTENCE = {
   synced:function(){return 'DESKTOP and LAPTOP have the same save. Every version is kept: 17 in the cloud, the last 10 on this PC.'},
   playing:function(){return 'Running now. Its save syncs a few seconds after you quit.'},
   'newer-in-cloud':function(){return 'LAPTOP saved a newer game on 29 Sep 19:30. It comes down before you play.'},
-  'backup-only':function(){return 'Steam syncs its saves between your PCs; GameSync keeps a backup of every version.'}};
+  'backup-only':function(){return 'Steam syncs its saves between your PCs; GameSync keeps a backup of every version.'},
+  'upload-pending':function(){return 'Its live save and 36 named saves are kept on this PC, and uploading to Google Drive now. Play, restore or make a named save meanwhile: nothing waits for the upload.'}};
+// #uploading: Bloodborne just after Sync and keep 36 named saves: its upload under way, and a named save being restored beside it (KAN-80, KAN-88).
+var UPLOADING = {id:'uploading', name:'Bloodborne GOTY', art:COVERS[0], status:'upload-pending', path:'G:\\Bloodborne GOTY\\Shadlix\\user\\savedata\\1\\CUSA00207\\SPRJ0005', size:35232153, versions:37, backup:'2 Oct 00:04'};
+NAMED.uploading = [{name:'Before Orphan',when:'16 Sep 23:58',pc:'DESKTOP'},{name:'After maria',when:'15 Sep 01:22',pc:'DESKTOP'},{name:'after ludwig',when:'13 Sep 23:40',pc:'DESKTOP'},{name:'befo ludwig',when:'10 Sep 23:51',pc:'DESKTOP',restoring:true}];
+PLACES.uploading = [{portable:'<home>/savedata/1/CUSA00207/SPRJ0005',here:UPLOADING.path,files:'34 files \u00b7 33.6 MB \u00b7 newest 17 Sep 02:14'}];
 function Note(r){
   if(r.note==='current')return h('span',{className:'gs-tag',style:{background:'var(--secondary-soft)',color:'var(--ink)'}},'Current');
   if(!r.note)return null;
-  return h('span',{className:'gs-row',style:{gap:6,flexWrap:'nowrap',color:'var(--ink-muted)'}},h(G.Icon,{name:'pin',size:14}),r.note);
+  return h('span',{className:'gs-row',style:{gap:6,flexWrap:'nowrap',color:'var(--ink-muted)'},title:'Kept forever: never thinned'},h(G.Icon,{name:'pin',size:14}),r.note);
 }
 function Actions(r){return h('span',{className:'gs-row',style:{gap:4,flexWrap:'nowrap',justifyContent:'flex-end'}},
-  r.note==='current'?null:h(G.Button,{size:'sm',variant:'ghost'},'Restore'), h(G.Button,{size:'sm',variant:'ghost'},'Export'));}
+  r.note==='current'?null:h(G.Button,{size:'sm',variant:'ghost','aria-haspopup':'dialog',title:'Puts this save in place of your current one; your current save is kept first'},'Restore'),
+  h(G.Button,{size:'sm',variant:'ghost','aria-haspopup':'dialog',title:'Puts this save in a zip to share'},'Export'));}
+
+// KAN-82: Bloodborne GOTY syncing, with its 36 named saves (#many): the card keeps its height and scrolls inside itself,
+// with a search and a sort; #many-find has a search typed, #many-where a named save's More open (KAN-87).
+var MANY = {id:'many', name:'Bloodborne GOTY', art:COVERS[0], status:'synced', path:'G:\\Bloodborne GOTY\\Shadlix\\user\\savedata\\1\\CUSA00207\\SPRJ0005', size:35232153, versions:58, backup:'Today 21:10'};
+NAMED.many = ['After Orphan','Before Orphan','Fishing Hamlet','After maria','Before Lady Maria','Research Hall','after ludwig','Befo living failure','After Failure',
+  'befo ludwig','Near Bloody Bride','Mensis Fog','Before Mergo\u2019s Wet Nurse','Before Micolash','Nightmare Frontier','Before Amygdala','BEFORE church dog lady',
+  'Lumenwood garden','Before Ebrietas','SPRJ0005 - Copy','Before Rom','After crow','Before Crow (zip)','Before Crow','After ROM at chapel','Old Yharnam',
+  'Before Iosefka clinic and FF boss / anoter','Before Iosefka clinic and FF boss','Cathedral Ward','After Gascoigne','Before Gascoigne',
+  'After Abandoned Workshop Before Amelia','Witch ded','Chalice dungeon 2','Chalice dungeon 1','First lamp'].map(function(name, i){
+    var at = new Date(2026, 8, 30, 23, 10 - i * 7);
+    at.setHours(at.getHours() - i * 19);
+    var two = function(n){ return ('0' + n).slice(-2); };
+    return {name:name, when:at.getDate() + ' Sep ' + two(at.getHours()) + ':' + two(at.getMinutes()), pc:i % 5 === 3 ? 'LAPTOP' : 'DESKTOP',
+      inPlace:name === 'befo ludwig'};
+  });
+PLACES.many = [{portable:'<installDir>/Shadlix/user/savedata/1/CUSA00207/SPRJ0005', here:MANY.path, files:'34 files \u00b7 33.6 MB \u00b7 newest today 21:04'}];
+// KAN-92: the live save as it is now, beside where it is.
+var CURRENT = {
+  wukong:{written:'22 Sep 09:14', size:'3 files \u00b7 0.5 MB', backup:'Held for review: it changed while the game wasn\u2019t running'},
+  many:{written:'Today 21:04', size:'34 files \u00b7 33.6 MB', backup:'Today 21:10, on this PC and in your Google Drive', same:'befo ludwig', sameWhen:'restored today 20:52'},
+  sekiro:{written:'Today 21:04', size:'2 files \u00b7 2.1 MB', backup:'Today 21:06, on this PC and in your Google Drive'},
+  terraria:{written:'Today 20:00', size:'38 files \u00b7 326 MB', backup:'Today 20:00, on this PC and in your Google Drive'},
+  uploading:{written:'2 Oct 00:04', size:'34 files \u00b7 33.6 MB', backup:'Kept on this PC; uploading to your Google Drive now', same:'Before Orphan'}};
+function leaf(path){ var parts = path.replace(/[\\/]+$/,'').split(/[\\/]/); return parts[parts.length - 1]; }
+
+// KAN-87: a named save's More: Rename, where it's kept with Export as a folder, and Remove the name.
+function More(n){
+  return h('div',{className:'sm-more',role:'dialog','aria-label':'More for '+n.name},
+    h('div',{className:'sm-more-title'},'Give this save a new name'),
+    h('div',{className:'gs-row',style:{flexWrap:'nowrap'}},
+      h('input',{className:'gs-input',defaultValue:n.name,'aria-label':'New name for '+n.name,style:{flex:1,minWidth:0}}),
+      h(G.Button,{size:'sm',variant:'primary',icon:'pencil',title:'Renames it on every PC'},'Rename')),
+    h('div',{className:'sm-more-sep'}),
+    h('div',{className:'sm-more-title'},'Where it\u2019s kept'),
+    h('p',{className:'sm-more-text'},'In GameSync\u2019s history: its files are stored once, by their contents, in the backup folder on this PC and in your Google Drive, so saves that share files take their space once. It has no folder of its own; Export as a folder puts a plain copy wherever you choose.'),
+    h('div',{className:'gs-row'},
+      h(G.Button,{size:'sm',variant:'secondary',icon:'folder','aria-haspopup':'dialog',title:'Copies its files into a folder you pick, named after it, as the game keeps them'},'Export as a folder\u2026'),
+      h(G.Button,{size:'sm',variant:'ghost',icon:'external',title:'Opens the backup folder in Explorer; its files there are stored by content, not as a save'},'Open the backup folder')),
+    h('div',{className:'sm-more-sep'}),
+    h('p',{className:'sm-more-text'},'Without its name, the save stays in the history, where it comes back like any version.'),
+    h('div',{className:'gs-row'},h(G.Button,{size:'sm',variant:'secondary',icon:'x',title:'Takes the name away; the save stays in the history'},'Remove the name')));
+}
+
+// A small ask floats over the page like a Menu, never cut off by the list it opened from (as in the app, a flyout).
+function Floating(p){
+  var pos = React.useState(null);
+  React.useLayoutEffect(function(){
+    var main = document.querySelector('.sm-main'), r = p.anchor && p.anchor.getBoundingClientRect();
+    if (!main || !r) return;
+    var m = main.getBoundingClientRect();
+    pos[1]({left:r.right - m.left + main.scrollLeft - 340, top:r.bottom - m.top + main.scrollTop + 6});
+  }, [p.anchor]);
+  var main = document.querySelector('.sm-main');
+  return pos[0] && main ? ReactDOM.createPortal(h('div',{style:{position:'absolute',left:pos[0].left,top:pos[0].top,zIndex:20}},p.children), main) : null;
+}
 
 function GameSaves(p){
-  var g = p.game, named = NAMED[g.id] || [], places = PLACES[g.id] || [{portable:'<roaming>/'+g.name.replace(/[^A-Za-z0-9]/g,''),here:g.path,files:'2 files \u00b7 '+G.formatBytes(g.size)+' \u00b7 newest '+g.backup}];
-  var need = {held:1,conflict:1}[g.status];
+  var g = p.game, all = NAMED[g.id] || [], places = PLACES[g.id] || [{portable:'<roaming>/'+g.name.replace(/[^A-Za-z0-9]/g,''),here:g.path,files:'2 files \u00b7 '+G.formatBytes(g.size)+' \u00b7 newest '+g.backup}];
+  var need = {held:1,conflict:1}[g.status], cur = CURRENT[g.id];
+  var q = React.useState(p.find || ''), sort = React.useState('newest'), more = React.useState(p.more || null), anchor = React.useState(null);
+  var shown = all.filter(function(n){ return !q[0] || n.name.toLowerCase().indexOf(q[0].toLowerCase()) >= 0; });
+  if (sort[0] === 'name') shown = shown.slice().sort(function(a, b){ return a.name.localeCompare(b.name, undefined, {sensitivity:'base'}); });
+  function row(n){
+    return h('div',{key:n.name,className:'sm-named-row',role:'listitem'},
+      h('div',{style:{flex:1,minWidth:0}},
+        h('div',{className:'sm-named-name',title:n.name},n.name),
+        h('div',{className:'gs-faint gs-mono',style:{fontSize:12,lineHeight:'16px'}},n.when+' \u00b7 '+n.pc)),
+      n.inPlace ? h('span',{className:'gs-row sm-inplace',title:'These are the game\u2019s save files now'},h(G.Icon,{name:'check',size:14,strokeWidth:2}),'In place')
+        : h(G.Button,{size:'sm',variant:'ghost',icon:'reset',busy:!!n.restoring,busyLabel:'Restoring','aria-haspopup':'dialog',
+            title:'Puts this save in place of your current one; your current save is kept first'},'Restore'),
+      h(G.Button,{size:'sm',variant:'ghost','aria-haspopup':'dialog',title:'Puts this save in a zip to share; More exports it as a plain folder'},'Export'),
+      h('span',{ref:function(el){ if (el && more[0]===n.name && anchor[0]!==el) anchor[1](el); }},
+        h(G.IconButton,{size:'sm',icon:'more',label:'More for '+n.name,'aria-haspopup':'dialog','aria-expanded':String(more[0]===n.name),
+          onClick:function(){ more[1](more[0]===n.name ? null : n.name); }})),
+      more[0]===n.name && anchor[0] ? h(Floating,{anchor:anchor[0]},More(n)) : null);
+  }
   return h(React.Fragment,null,
     h('header',{className:'sm-top'},
       h('div',{className:'gs-row',style:{flexWrap:'nowrap',gap:12,minWidth:0}},
         h(G.Button,{size:'sm',variant:'secondary',icon:'arrowLeft',onClick:p.onBack,title:'Back to every game\u2019s saves (Esc)'},'Back'),
         h('nav',{'aria-label':'Breadcrumb',className:'sm-crumb'},h('button',{type:'button',onClick:p.onBack},'Save manager'),h(G.Icon,{name:'chevronRight',size:14}),h('span',{'aria-current':'page'},g.name))),
       h('div',{className:'gs-row',style:{flexWrap:'nowrap'}},
-        h(G.Button,{variant:'ghost',icon:'download','aria-haspopup':'dialog',title:'Copies of its saves you kept by hand become named saves'},'Import kept saves\u2026'),
-        h(G.Button,{variant:need?'secondary':'primary',icon:'upload',disabled:g.status==='playing',title:g.status==='playing'?'Once you quit, it backs up by itself':null},'Back up now'))),
+        h(G.Button,{variant:'ghost',icon:'download','aria-haspopup':'dialog',title:'Copies of its saves you kept by hand become named saves; the copies aren\u2019t changed'},'Import kept saves\u2026'),
+        // KAN-84: its current save, or any named save or version, in a zip a friend can import (SHARE-01).
+        h(G.Button,{variant:'ghost',icon:'share','aria-haspopup':'dialog',disabled:!!g.blocked,
+          title:g.blocked || 'Puts its current save, or any named save or version, in a zip a friend can import'},'Share\u2026'),
+        h(G.Button,{variant:need?'secondary':'primary',icon:'upload',
+          title:g.status==='playing'?'Keeps the save as it is now, on this PC; it uploads once you quit':'Keeps a version of the save as it is now, on this PC and in your Google Drive, without waiting for the game to close'},'Back up now'))),
     h('section',{className:'gs-card sm-status','aria-label':'Status'},
       h(G.StatusBadge,{status:g.status,label:g.status==='backup-only'?'Synced by Steam':undefined}),
       h('p',null,(SENTENCE[g.status]||SENTENCE.synced)(g)),
-      g.status==='held' ? h('div',{className:'gs-row',style:{flexWrap:'nowrap'}},h(G.Button,{variant:'secondary',icon:'reset'},'Restore the previous save'),h(G.Button,{variant:'primary',icon:'check'},'Keep the new save'))
-      : g.status==='conflict' ? h(G.Button,{variant:'primary',icon:'alert'},'Resolve')
-      : g.status==='in-use' ? h(G.Button,{variant:'primary',icon:'sync'},'Retry') : null),
+      g.status==='held' ? h('div',{className:'gs-row',style:{flexWrap:'nowrap'}},h(G.Button,{variant:'secondary',icon:'reset',title:'Brings back the save from before the change; the changed one stays in the history'},'Restore the previous save'),h(G.Button,{variant:'primary',icon:'check',title:'Keeps the changed save as its current one, and syncs it'},'Keep the new save'))
+      : g.status==='conflict' ? h(G.Button,{variant:'primary',icon:'alert',title:'Both saves side by side, to choose the one to carry on with'},'Resolve')
+      : g.status==='in-use' ? h(G.Button,{variant:'primary',icon:'sync',title:'Syncs it again, once the program holding its files lets go'},'Retry') : null),
+    g.id==='uploading' ? h(G.JobProgress,{boxed:true,title:'Uploading to Google Drive',value:37,detail:'42.1 of 113 MB \u00b7 412 of 1,108 files',speed:'6.1 MB/s',left:'about 12 s left'}) : null,
+    g.id==='uploading' ? h(G.BusyLine,{text:'Bringing back \u201cbefo ludwig\u201d'}) : null,
     SETTLED[g.id] ? h('section',{className:'gs-card sm-status','aria-label':'Last conflict'},
       h(G.Icon,{name:'sync',size:16}),
-      h('p',null,'Newest kept: '+SETTLED[g.id].kept+'’s save is current, '+SETTLED[g.id].pinned+'’s is pinned in history.'),
-      h('div',{className:'gs-row',style:{flexWrap:'nowrap'}},h(G.Button,{size:'sm',variant:'ghost'},'See both'),h(G.Button,{size:'sm',variant:'secondary',icon:'sync','aria-haspopup':'dialog'},'Swap to '+SETTLED[g.id].pinned+'’s'))) : null,
+      h('p',null,'Newest kept: '+SETTLED[g.id].kept+'\u2019s save is current, '+SETTLED[g.id].pinned+'\u2019s is pinned in history.'),
+      h('div',{className:'gs-row',style:{flexWrap:'nowrap'}},h(G.Button,{size:'sm',variant:'ghost',title:'Both saves side by side'},'See both'),h(G.Button,{size:'sm',variant:'secondary',icon:'sync','aria-haspopup':'dialog',title:'Puts '+SETTLED[g.id].pinned+'\u2019s save in place; this one is kept first'},'Swap to '+SETTLED[g.id].pinned+'\u2019s'))) : null,
     h('div',{className:'sm-grid'},
-      h(G.Card,{title:'Named saves',subtitle:'On every PC, and back in one step.',action:h(G.Button,{size:'sm',variant:'secondary',icon:'plus','aria-haspopup':'dialog',title:'Keeps this save under a name, on every PC'},'New named save\u2026')},
-        named.length ? named.map(function(n){return h('div',{key:n.name,style:{display:'flex',alignItems:'center',gap:12}},
-          h(G.Icon,{name:'pin',size:16}),
-          h('div',{style:{flex:1,minWidth:0}},h('div',{style:{fontWeight:600,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}},n.name),h('div',{className:'gs-faint gs-mono',style:{fontSize:12,lineHeight:'16px'}},n.when+' \u00b7 '+n.pc)),
-          h(G.Button,{size:'sm',variant:'ghost',icon:'reset'},'Restore'),
-          h(G.IconButton,{size:'sm',icon:'more',label:'More for '+n.name,'aria-haspopup':'dialog'}))})
-        : h('div',{className:'gs-note'},h(G.Icon,{name:'info',size:16}),'None yet. New named save\u2026 keeps this save under a name, on every PC: before a boss or a big choice.')),
-      h(G.Card,{title:'Where the saves are',subtitle:'Found by the save list, confirmed 27 Sep.',action:h(G.Button,{size:'sm',variant:'ghost',icon:'settings'},'Choose files\u2026')},
-        places.map(function(pl){return h('div',{key:pl.here,className:'gs-well-line',style:{alignItems:'flex-start',fontFamily:'var(--font-sans)'}},
-          h('div',{style:{flex:1,minWidth:0,display:'flex',flexDirection:'column',gap:2}},
-            h('div',{className:'gs-mono',style:{fontSize:13,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'},title:pl.here},pl.here),
-            h('div',{className:'gs-faint',style:{fontSize:12,lineHeight:'16px'}},pl.files)),
-          h(G.IconButton,{size:'sm',icon:'folder',label:'Open the save folder'}))}),
-        h('div',{className:'gs-row'},h(G.Button,{size:'sm',variant:'secondary',icon:'plus','aria-haspopup':'dialog'},'Add a place\u2026')))),
+      // KAN-82, KAN-83, KAN-85: the count in the heading, a search and a sort, a list that scrolls inside the card, no pin, Export beside Restore.
+      h(G.Card,{title:all.length ? 'Named saves \u00b7 ' + all.length : 'Named saves',subtitle:'On every PC, and back in one step.',
+        action:h(G.Button,{size:'sm',variant:'secondary',icon:'plus','aria-haspopup':'dialog',onClick:p.onName,title:'Keeps the save as it is now under a name, on every PC'},'New named save\u2026')},
+        all.length > 1 ? h('div',{className:'sm-named-tools'},
+          h(G.SearchField,{value:q[0],onChange:q[1],placeholder:'Find a named save',label:'Find a named save',style:{flex:1,minWidth:0}}),
+          h(G.Select,{label:'Sort',value:sort[0],onChange:sort[1],options:[{id:'newest',label:'Newest first'},{id:'name',label:'Name'}]})) : null,
+        all.length ? h('div',{className:'sm-named',role:'list','aria-label':'Named saves'},shown.map(row)) : null,
+        all.length && !shown.length ? h('div',{className:'gs-note'},h(G.Icon,{name:'search',size:16}),'No named save is called anything like \u201c'+q[0]+'\u201d.') : null,
+        all.length ? null : h('div',{className:'gs-note'},h(G.Icon,{name:'info',size:16}),'None yet. New named save\u2026 keeps this save under a name, on every PC: before a boss or a big choice.')),
+      h('div',{className:'gs-stack'},
+        // KAN-81: each place says it's that folder and everything in it, with the numbers of what's kept.
+        h(G.Card,{title:'Where the saves are',subtitle:'Found by the save list, confirmed 27 Sep.',
+          action:h(G.Button,{size:'sm',variant:'ghost',icon:'settings',title:'Which of its files are backed up'},'Choose files\u2026')},
+          places.map(function(pl){return h('div',{key:pl.here,className:'gs-well-line',style:{alignItems:'flex-start',fontFamily:'var(--font-sans)'}},
+            h('div',{style:{flex:1,minWidth:0,display:'flex',flexDirection:'column',gap:2}},
+              h('div',{className:'gs-mono',style:{fontSize:13,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',direction:'rtl',textAlign:'left'},title:pl.here},pl.here),
+              h('div',{className:'gs-faint',style:{fontSize:12,lineHeight:'16px'}},'The folder '+leaf(pl.here)+' and everything in it \u00b7 '+pl.files),
+              // Version 51 (R1, R2): a program found here is never backed up, and the place says so in warn.
+              p.program && pl === places[0] ? h('div',{style:{display:'flex',alignItems:'flex-start',gap:6,marginTop:4,color:'var(--warn)',fontSize:12,lineHeight:'16px'}},
+                h(G.Icon,{name:'alert',size:14,strokeWidth:2,style:{flexShrink:0,marginTop:1}}),
+                h('span',null,'A program is in this folder and isn\u2019t backed up: ',h('span',{className:'gs-mono'},'Uninstall.exe'),'. Programs never travel with saves; if you didn\u2019t put it there, check where it came from.')) : null),
+            h(G.IconButton,{size:'sm',icon:'folder',label:'Open the save folder'}))}),
+          h('div',{className:'gs-row'},h(G.Button,{size:'sm',variant:'secondary',icon:'plus','aria-haspopup':'dialog',title:'A folder or file where it keeps saves GameSync didn\u2019t find'},'Add a place\u2026'))),
+        // KAN-92: the live save as it is now: when the game wrote it, its size, whether it's backed up, and what it's the same as.
+        cur ? h(G.Card,{title:'Current save',subtitle:'As the game has it now, on this PC.'},
+          h(G.Facts,{items:[
+            {label:'Last written',value:cur.written},
+            {label:'Size',value:cur.size,mono:true},
+            {label:'Backed up',value:cur.backup},
+            cur.same ? {label:'Same as',value:'\u201c'+cur.same+'\u201d'+(cur.sameWhen ? ', '+cur.sameWhen : '')} : null]})) : null)),
     h('div',{className:'sm-hist'},h(G.ConsoleTable,{command:'history '+g.id,
       toolbar:h('span',null,g.versions+' versions \u00b7 '+G.formatBytes(g.size)+' of history'),
       rows:VERSIONS,columns:[{key:'saved',label:'Saved'},{key:'pc',label:'PC'},{key:'note',label:'Note',render:Note},{key:'size',label:'Size',align:'right',render:function(r){return G.formatBytes(r.size)}},{key:'act',label:'',align:'right',render:Actions}]})),
     h('div',{className:'sm-log'},h(G.ConsoleLog,{label:g.name+' activity',lines:[
+      p.program ? {time:'23 Sep 21:10',level:'warn',tag:'backup',msg:'Left out Uninstall.exe: a program, never backed up or synced. It\u2019s in G:\\Black Myth Wukong\\b1\\Saved\\SaveGames.'} : null,
       {time:'23 Sep 21:10',level:'ok',tag:'upload',msg:'Session over after 3 h 08 min. Uploaded 1 changed file, 0.5 MB.'},
       {time:'23 Sep 21:02',level:'info',tag:'named',msg:'Saved as \u201cBefore Erlang Shen\u201d, pinned on every PC.'},
-      {time:'23 Sep 18:02',level:'info',tag:'play',msg:'Started from GameSync. The cloud had nothing newer.'}]})));
+      {time:'23 Sep 18:02',level:'info',tag:'play',msg:'Started from GameSync. The cloud had nothing newer.'}].filter(Boolean)})));
 }
 
 /* ---------- A game not syncing yet, its live save beside copies kept by hand (KAN-61) ---------- */
@@ -187,27 +299,80 @@ function NotSyncing(p){
     h('div',{className:'sm-hist'},h('div',{className:'gs-note'},h(G.Icon,{name:'clock',size:16}),'No versions yet. Sync these saves makes the first, and each copy you bring in becomes a named save.')));
 }
 
+/* ---------- A game with no saves found yet, and learn mode (version 43; FIND-04, KAN-134) ---------- */
+// #rounds: learn mode waits for the next time ROUNDS is played; #rounds-playing: it's watching now; #rounds-found: what it
+// found waits for you (#rounds-open: the dialog open over it); #rounds-none: it watched and saw nothing like a save.
+var RD = {name:'ROUNDS', folder:'E:\\Games\\ROUNDS', session:'4 Oct, 21:04 to 21:52'};
+var RD_FINDS = [
+  {id:'a', path:'<localLow>/Landfall Games/ROUNDS', here:'C:\\Users\\Sam\\AppData\\LocalLow\\Landfall Games\\ROUNDS', files:3, bytes:49152, newest:'21:51', examples:['Player.sav','Unlocks.sav','Settings.json'], tags:['Looks like saves']},
+  {id:'b', path:'<documents>/My Games/ROUNDS/Replays', here:'C:\\Users\\Sam\\Documents\\My Games\\ROUNDS\\Replays', files:12, bytes:2306867, newest:'21:48', examples:['replay-0412.rpl','replay-0413.rpl']},
+  {id:'c', path:'<installDir>/settings.cfg', here:'E:\\Games\\ROUNDS\\settings.cfg', file:true, files:1, bytes:812, newest:'21:52', examples:['settings.cfg'], tags:['In its own folder']},
+  {id:'d', path:'<steamRoot>/userdata/123456789/1557740/remote', here:'E:\\Steam\\userdata\\123456789\\1557740\\remote', files:1, bytes:1024, newest:'21:52', examples:['stats.bin'], tags:['Steam\u2019s cloud folder']}];
+function Learning(p){
+  var state = p.state, picked = React.useState(['a']), dialog = React.useState(state === 'open' || state === 'none'), adding = React.useState(false);
+  var found = state === 'found' || state === 'open', playing = state === 'playing', none = state === 'none';
+  var sentence = playing ? 'Learn mode is watching where ROUNDS saves. When you quit, GameSync shows you the places it wrote to; nothing syncs until you choose.'
+    : found ? 'Learn mode watched you play on ' + RD.session + ' and found where ROUNDS saves. Nothing is backed up yet: choose what to sync.'
+    : none ? 'Learn mode watched you play on 4 Oct and saw nothing written that looks like a save. It watches again next time.'
+    : 'GameSync hasn\u2019t found where ROUNDS saves. Learn mode watches the next time you play it, from anywhere, and shows you the places it wrote to.';
+  return h(React.Fragment,null,
+    h('header',{className:'sm-top'},
+      h('div',{className:'gs-row',style:{flexWrap:'nowrap',gap:12,minWidth:0}},
+        h(G.Button,{size:'sm',variant:'secondary',icon:'arrowLeft',onClick:p.onBack,title:'Back to every game\u2019s saves (Esc)'},'Back'),
+        h('nav',{'aria-label':'Breadcrumb',className:'sm-crumb'},h('button',{type:'button',onClick:p.onBack},'Save manager'),h(G.Icon,{name:'chevronRight',size:14}),h('span',{'aria-current':'page'},RD.name))),
+      h('div',{className:'gs-row',style:{flexWrap:'nowrap'}},
+        h(G.Button,{variant:'secondary',icon:'plus','aria-haspopup':'dialog',title:'A folder or file where it keeps saves, if you know it'},'Add a place\u2026'))),
+    h('section',{className:'gs-card sm-status','aria-label':'Status'},
+      playing ? h(G.StatusBadge,{status:'playing',label:'Playing now'}) : h(G.StatusBadge,{status:'not-syncing',label:found?'Saves found by learn mode':'No saves found yet'}),
+      h('p',null,sentence),
+      found ? h(G.Button,{variant:'primary',icon:'search','aria-haspopup':'dialog',onClick:function(){dialog[1](true)}},'See what it found') : null),
+    h('div',{className:'sm-grid'},
+      h(G.Card,{title:'Learn mode',subtitle:found?'Watched '+RD.session+'.':playing?'Watching since 21:04.':'Watches the next time you play.'},
+        playing ? h('div',{className:'gs-note'},h(G.Spinner,{size:16}),'Watching your usual save folders, ROUNDS\u2019 own folder and Steam\u2019s, for the files it writes. It only reads where files change; it never touches the game.')
+        : found ? h('div',{className:'gs-stack'},
+            RD_FINDS.slice(0,2).map(function(f){return h('div',{key:f.id,className:'gs-well-line',style:{alignItems:'flex-start',fontFamily:'var(--font-sans)'}},
+              h('div',{style:{flex:1,minWidth:0,display:'flex',flexDirection:'column',gap:2}},
+                h('div',{className:'gs-mono',style:{fontSize:13,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'},title:f.here},f.path),
+                h('div',{className:'gs-faint',style:{fontSize:12,lineHeight:'16px'}},f.files+(f.files===1?' file':' files')+' \u00b7 '+G.formatBytes(f.bytes)+' \u00b7 newest '+f.newest)),
+              f.tags?h('span',{className:'gs-tag'},f.tags[0]):null)}),
+            h('div',{className:'gs-faint',style:{fontSize:12}},'And 2 more places. See what it found\u2026 lists them all.'))
+        : h('div',{className:'gs-note'},h(G.Icon,{name:'search',size:16}),'Play ROUNDS as usual, from GameSync, Steam or a shortcut. While it runs, GameSync notes the files written in your usual save folders, its own folder and Steam\u2019s; when you quit, it shows you where they went.'),
+        h('div',{className:'gs-row'},
+          found ? h(G.Button,{size:'sm',variant:'secondary',icon:'search','aria-haspopup':'dialog',onClick:function(){dialog[1](true)}},'See what it found\u2026') : null,
+          h(G.Button,{size:'sm',variant:'ghost',title:'GameSync stops watching ROUNDS; Add a place\u2026 still sets where its saves are'},'Turn off learn mode'))),
+      h(G.Card,{title:'Where the saves are',subtitle:'Not found yet.'},
+        h('div',{className:'gs-note'},h(G.Icon,{name:'info',size:16}),'Its folder, '+RD.folder+', has nothing GameSync knows as saves, and the save list doesn\u2019t know this copy. Learn mode finds them by watching; Add a place\u2026 sets them if you know where they are.'))),
+    h('div',{className:'sm-hist'},h('div',{className:'gs-note'},h(G.Icon,{name:'clock',size:16}),'No versions yet. Once you choose its saves, every session backs them up.')),
+    dialog[0] ? h('div',{className:'gs-scrim',style:{position:'fixed',inset:0,zIndex:5}},
+      h(G.LearnModeDialog,{game:RD.name,session:none?'4 Oct, 21:04 to 21:52':RD.session,finds:none?[]:RD_FINDS,picked:picked[0],onPick:picked[1],stage:adding[0]?'adding':null,
+        onSync:function(){adding[1](true)},onClose:function(){dialog[1](false)},onNotThese:function(){dialog[1](false)},onAgain:function(){dialog[1](false)},onAddPlace:function(){dialog[1](false)}})) : null);
+}
+
 function App(){
  var s=React.useState(['sekiro','cuphead']), d=React.useState(null);
- var open=React.useState(((location.hash||'').slice(1)||INITIAL).replace(/-sync$|-backup$/,''));
+ var open=React.useState(((location.hash||'').slice(1)||INITIAL).replace(/-sync$|-backup$|-named$|-program$/,'').replace(/^named$/,'wukong'));
  var kept=React.useState(/-sync$/.test(location.hash)?'sync':/-backup$/.test(location.hash)?'backup':null);
- var game=open[0]?GAMES.filter(function(g){return g.id===open[0]})[0]:null;
+ // #named (or #<game>-named): New named save… open over the game's saves (NamedSaveDialog, KAN-77).
+ var naming=React.useState(/named$/.test(location.hash));
+ var game=open[0]==='uploading'?UPLOADING:/^many/.test(open[0]||'')?MANY:open[0]?GAMES.filter(function(g){return g.id===open[0]})[0]:null;
  React.useEffect(function(){
-   function key(e){ if(e.key==='Escape'&&!d[0]&&open[0]) open[1](null); else if(e.altKey&&e.key==='ArrowLeft'&&open[0]){ e.preventDefault(); open[1](null); } }
+   function key(e){ if(e.key==='Escape'&&naming[0]) naming[1](false); else if(e.key==='Escape'&&!d[0]&&open[0]) open[1](null); else if(e.altKey&&e.key==='ArrowLeft'&&open[0]){ e.preventDefault(); open[1](null); } }
    document.addEventListener('keydown',key); return function(){document.removeEventListener('keydown',key)};
  });
  return h(G.ThemeScope,{strength:'glass',art:ART,style:{width:1280,height:800,display:'flex',position:'relative'}},
   rail('saves'),
   h('main',{className:'sm-main'},
-   open[0]==='bloodborne' ? h(NotSyncing,{onBack:function(){open[1](null)},onSync:function(){kept[1]('sync')},onBackup:function(){kept[1]('backup')}})
-   : game ? h(GameSaves,{key:game.id,game:game,onBack:function(){open[1](null)}}) : [
+   /^rounds/.test(open[0]||'') ? h(Learning,{state:(open[0].split('-')[1]||'armed'),onBack:function(){open[1](null)}})
+   : open[0]==='bloodborne' ? h(NotSyncing,{onBack:function(){open[1](null)},onSync:function(){kept[1]('sync')},onBackup:function(){kept[1]('backup')}})
+   : game ? h(GameSaves,{key:game.id,game:game,find:/-find$/.test(location.hash)?'lud':'',more:/-where$/.test(location.hash)?'Before Orphan':null,program:/-program$/.test(location.hash),
+       onBack:function(){open[1](null)},onName:function(){naming[1](true)}}) : [
    h(React.Fragment,{key:'top'},topbar('Save manager','DESKTOP \u00b7 daily backup 20:00',
      h(G.PillTabs,{label:'Save manager view',items:[{id:'saves',label:'Saves',icon:'saves'},{id:'plan',label:'Plan',icon:'chevronsRight'},{id:'versions',label:'Versions',icon:'clock'},{id:'log',label:'Log',icon:'terminal'}]}),
      [h(G.Button,{key:1,variant:'secondary',icon:'share',disabled:!s[0].length,onClick:function(){d[1]('pick')}},s[0].length?'Share '+s[0].length+' selected':'Share selected'),
       h(G.Button,{key:2,variant:'secondary',icon:'zip',onClick:function(){d[1]('all')}},'Share all'),
       h(G.IconButton,{key:4,icon:'download',label:'Import saves',onClick:function(){d[1]('import')}}),
       h(G.Button,{key:3,variant:'primary',icon:'sync'},'Sync now')])),
-   h('div',{key:'stats',style:{display:'flex',gap:48,padding:'4px 4px 0'}},h(Stat,{k:'Games',v:'12'}),h(Stat,{k:'Save folder',v:'1.04 GB'}),h(Stat,{k:'Versions',v:'214'}),h(Stat,{k:'Last backup',v:'20:00'}),h(Stat,{k:'Needs you',v:'2'})),
+   h('div',{key:'stats',style:{display:'flex',gap:48,padding:'4px 4px 0'}},h(Stat,{k:'Games',v:'12'}),h(Stat,{k:'Save folder',v:'1.04 GB'}),h(Stat,{k:'Versions',v:'214'}),h(Stat,{k:'Last backup',v:'20:00'}),h(Stat,{k:'Conflicts',v:'2'})),
    h(G.ConsoleTable,{key:'table',command:'saves --pc DESKTOP --sort last-played',toolbar:h('span',null,s[0].length+' of '+GAMES.length+' selected \u00b7 a game\u2019s name opens its saves'),selected:s[0],onSelect:s[1],rows:GAMES,columns:[
      {key:'name',label:'Game',render:function(r){return h('button',{type:'button',className:'sm-open',onClick:function(e){e.stopPropagation();open[1](r.id)}},r.name)}},
      {key:'status',label:'Status'},{key:'path',label:'Save path',path:true},{key:'versions',label:'Ver',align:'right'},{key:'size',label:'Size',align:'right',render:function(r){return G.formatBytes(r.size)}},{key:'backup',label:'Last backup',align:'right'}]}),
@@ -217,6 +382,9 @@ function App(){
     {time:'20:00:11',level:'warn',tag:'held',msg:'Black Myth: Wukong changed while the game was not running. Held for review.'},
     {time:'21:04:40',level:'warn',tag:'conflict',msg:'Sekiro: DESKTOP saved 21:04, LAPTOP saved 19:30. Newest kept, LAPTOP copy pinned.'},
     {time:'21:06:13',level:'ok',tag:'upload',msg:'Sekiro  v14  2.1 MB'}]})]),
+  naming[0]&&game?h('div',{className:'gs-scrim',style:{position:'absolute',inset:0}},
+    h(G.NamedSaveDialog,{game:game.name,names:(NAMED[game.id]||[]).map(function(n){return n.name}),onClose:function(){naming[1](false)},onKeep:function(){naming[1](false)},
+      save:game.id==='wukong'?{path:PLACES.wukong[0].here,files:3,bytes:524288,newest:'23 Sep 21:09'}:{path:game.path,files:2,bytes:game.size,newest:game.backup}})):null,
   kept[0]?h('div',{className:'gs-scrim',style:{position:'absolute',inset:0,overflow:'auto'}},
     h(G.KeptCopiesDialog,{key:kept[0],game:BB.name,mode:kept[0],live:BB.live,items:BB_ITEMS,wholeBytes:1071872663,onClose:function(){kept[1](null)},onWhole:function(){kept[1](null)}})):null,
   d[0]?h('div',{className:'gs-scrim',style:{position:'absolute',inset:0}},

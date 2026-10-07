@@ -1,6 +1,11 @@
 <!-- The type styles (design/system/tokens.json → type), as classes on TextBlock: hero-title, page-title, card-title, body,
      body-strong, caption, overline for the Launcher; mono-stat, mono-body, mono-small for the Console. And ink colours. -->
 <Styles xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:c="using:GameSync.UI.Controls">
+  <!-- A11Y-04: text with no size of its own follows Windows' text size, in the window and in its menus and flyouts. -->
+  <Style Selector=":is(TopLevel)">
+    <Setter Property="FontSize" Value="{DynamicResource fs-14}" />
+  </Style>
+
   <!-- The current tab's or section's icon takes the secondary colour (control themes can't reach into their content). -->
   <Style Selector="ListBoxItem:selected c|GsIcon.selectable">
     <Setter Property="Foreground" Value="{DynamicResource secondary}" />
@@ -33,8 +38,8 @@
   <!-- Console table cells: uppercase mono headers with tracking, mono cells, numbers right-aligned, paths muted. -->
   <Style Selector="TextBlock.th">
     <Setter Property="FontFamily" Value="{DynamicResource font-mono}" />
-    <Setter Property="FontSize" Value="11" />
-    <Setter Property="LineHeight" Value="16" />
+    <Setter Property="FontSize" Value="{DynamicResource fs-11}" />
+    <Setter Property="LineHeight" Value="{DynamicResource lh-16}" />
     <Setter Property="FontWeight" Value="Medium" />
     <Setter Property="LetterSpacing" Value="0.88" />
     <Setter Property="Foreground" Value="{DynamicResource ink-faint}" />
@@ -43,7 +48,7 @@
   </Style>
   <Style Selector="TextBlock.td">
     <Setter Property="FontFamily" Value="{DynamicResource font-mono}" />
-    <Setter Property="FontSize" Value="13" />
+    <Setter Property="FontSize" Value="{DynamicResource fs-13}" />
     <Setter Property="Margin" Value="12,0" />
     <Setter Property="VerticalAlignment" Value="Center" />
     <Setter Property="TextTrimming" Value="CharacterEllipsis" />
@@ -60,7 +65,7 @@
   <Style Selector="MenuItem">
     <Setter Property="CornerRadius" Value="6" />
     <Setter Property="MinHeight" Value="36" />
-    <Setter Property="FontSize" Value="14" />
+    <Setter Property="FontSize" Value="{DynamicResource fs-14}" />
   </Style>
   <Style Selector="MenuItem c|GsIcon">
     <Setter Property="Foreground" Value="{DynamicResource ink-muted}" />
@@ -73,7 +78,7 @@
   <Style Selector="TextBox.search">
     <Setter Property="MinHeight" Value="40" />
     <Setter Property="CornerRadius" Value="10" />
-    <Setter Property="FontSize" Value="14" />
+    <Setter Property="FontSize" Value="{DynamicResource fs-14}" />
     <Setter Property="VerticalContentAlignment" Value="Center" />
     <Setter Property="Padding" Value="8,0,4,0" />
   </Style>
@@ -83,21 +88,21 @@
     <Setter Property="Background" Value="{DynamicResource bg-100}" />
     <Setter Property="Foreground" Value="{DynamicResource ink}" />
     <Setter Property="FontFamily" Value="{DynamicResource font-sans}" />
-    <Setter Property="FontSize" Value="14" />
+    <Setter Property="FontSize" Value="{DynamicResource fs-14}" />
   </Style>
   <Style Selector="TextBlock.hero-title">
-    <Setter Property="FontSize" Value="32" />
-    <Setter Property="LineHeight" Value="38" />
+    <Setter Property="FontSize" Value="{DynamicResource fs-32}" />
+    <Setter Property="LineHeight" Value="{DynamicResource lh-38}" />
     <Setter Property="FontWeight" Value="SemiBold" />
   </Style>
   <Style Selector="TextBlock.page-title">
-    <Setter Property="FontSize" Value="24" />
-    <Setter Property="LineHeight" Value="30" />
+    <Setter Property="FontSize" Value="{DynamicResource fs-24}" />
+    <Setter Property="LineHeight" Value="{DynamicResource lh-30}" />
     <Setter Property="FontWeight" Value="SemiBold" />
   </Style>
   <Style Selector="TextBlock.card-title">
-    <Setter Property="FontSize" Value="18" />
-    <Setter Property="LineHeight" Value="24" />
+    <Setter Property="FontSize" Value="{DynamicResource fs-18}" />
+    <Setter Property="LineHeight" Value="{DynamicResource lh-24}" />
     <Setter Property="FontWeight" Value="Medium" />
   </Style>
   <Style Selector="TextBlock.body-strong">
@@ -105,41 +110,45 @@
   </Style>
   <!-- A field's name above it in a dialog, as the design system's gs-own-label -->
   <Style Selector="TextBlock.field-label">
-    <Setter Property="FontSize" Value="13" />
-    <Setter Property="LineHeight" Value="18" />
+    <Setter Property="FontSize" Value="{DynamicResource fs-13}" />
+    <Setter Property="LineHeight" Value="{DynamicResource lh-18}" />
     <Setter Property="FontWeight" Value="SemiBold" />
   </Style>
   <Style Selector="TextBlock.caption">
-    <Setter Property="FontSize" Value="12" />
-    <Setter Property="LineHeight" Value="16" />
+    <Setter Property="FontSize" Value="{DynamicResource fs-12}" />
+    <Setter Property="LineHeight" Value="{DynamicResource lh-16}" />
   </Style>
   <!-- 0.12em, as the design system's overline -->
   <Style Selector="TextBlock.overline">
-    <Setter Property="FontSize" Value="11" />
-    <Setter Property="LineHeight" Value="14" />
+    <Setter Property="FontSize" Value="{DynamicResource fs-11}" />
+    <Setter Property="LineHeight" Value="{DynamicResource lh-14}" />
     <Setter Property="FontWeight" Value="SemiBold" />
     <Setter Property="LetterSpacing" Value="1.32" />
   </Style>
+  <!-- A fact's label lines up with its value's first line (GsFacts) -->
+  <Style Selector="TextBlock.overline.fact-label">
+    <Setter Property="LineHeight" Value="{DynamicResource lh-20}" />
+  </Style>
   <Style Selector="TextBlock.mono-stat">
     <Setter Property="FontFamily" Value="{DynamicResource font-mono}" />
-    <Setter Property="FontSize" Value="28" />
-    <Setter Property="LineHeight" Value="32" />
+    <Setter Property="FontSize" Value="{DynamicResource fs-28}" />
+    <Setter Property="LineHeight" Value="{DynamicResource lh-32}" />
     <Setter Property="FontWeight" Value="Medium" />
   </Style>
   <Style Selector="TextBlock.mono, TextBlock.mono-body">
     <Setter Property="FontFamily" Value="{DynamicResource font-mono}" />
-    <Setter Property="FontSize" Value="13" />
-    <Setter Property="LineHeight" Value="20" />
+    <Setter Property="FontSize" Value="{DynamicResource fs-13}" />
+    <Setter Property="LineHeight" Value="{DynamicResource lh-20}" />
   </Style>
   <!-- A fact that's a path, a build or an option -->
   <Style Selector="TextBlock.mono-fact">
     <Setter Property="FontFamily" Value="{DynamicResource font-mono}" />
-    <Setter Property="FontSize" Value="12" />
+    <Setter Property="FontSize" Value="{DynamicResource fs-12}" />
   </Style>
   <Style Selector="TextBlock.mono-small">
     <Setter Property="FontFamily" Value="{DynamicResource font-mono}" />
-    <Setter Property="FontSize" Value="12" />
-    <Setter Property="LineHeight" Value="18" />
+    <Setter Property="FontSize" Value="{DynamicResource fs-12}" />
+    <Setter Property="LineHeight" Value="{DynamicResource lh-18}" />
   </Style>
   <Style Selector="TextBlock.muted">
     <Setter Property="Foreground" Value="{DynamicResource ink-muted}" />

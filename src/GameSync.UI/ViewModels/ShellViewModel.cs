@@ -26,8 +26,21 @@ public sealed partial class ShellViewModel : ObservableObject
     private string _current;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowsRail))]
+    [NotifyPropertyChangedFor(nameof(ShowsRail), nameof(ShowsLibrary), nameof(OtherPage))]
     private object? _page;
+
+    /// <summary>
+    /// PERF-03: the library, once opened, stays made while the window is open, so going back to it shows it at once (it
+    /// took about half a second to make again with 60 games, two and a half with 500); every other page is made as it's
+    /// shown. Its covers keep where they were scrolled to, as Steam's do.
+    /// </summary>
+    [ObservableProperty]
+    private LibraryViewModel? _keptLibrary;
+
+    public bool ShowsLibrary => Page is LibraryViewModel;
+
+    /// <summary>The page shown when it isn't the library, which shows in its own place (<see cref="KeptLibrary"/>).</summary>
+    public object? OtherPage => Page is LibraryViewModel ? null : Page;
 
     /// <summary>The side rail, on every page but first run's (design system → OnboardingScreen).</summary>
     public bool ShowsRail => Page is not IWholeWindowPage;
@@ -61,22 +74,35 @@ public sealed partial class ShellViewModel : ObservableObject
         _makePage = makePage;
         _current = current == SearchId ? "library" : current;
         _page = makePage(_current);
+        _keptLibrary = _page as LibraryViewModel;
         Follow(null, _page);
     }
 
     /// <summary>A page's strength; pages that don't say take the glow, the calmest.</summary>
     public static GlassStrength StrengthOf(object? page) => (page as IPageSurface)?.Strength ?? GlassStrength.Glow;
 
-    partial void OnPageChanged(object? oldValue, object? newValue) => Follow(oldValue, newValue);
+    partial void OnPageChanged(object? oldValue, object? newValue)
+    {
+        if (newValue is LibraryViewModel library)
+        {
+            KeptLibrary = library;
+        }
 
-    /// <summary>Search at the top; Home, the library, the save manager, the console, and settings at the bottom; dots say a game runs or needs you.</summary>
+        Follow(oldValue, newValue);
+    }
+
+    /// <summary>
+    /// Search at the top; Home, the library, Achievements (design system version 33), the save manager, the console, and
+    /// settings at the bottom; dots say a game runs or needs you.
+    /// </summary>
     public static IReadOnlyList<RailItem> DefaultRail(string? playing, int? needYou) =>
     [
         new RailItem(SearchId, "search", "Search"),
         new RailItem("home", "home", "Home", Separator: true),
         new RailItem("library", "library", "Game library", Dot: playing is null ? null : "play", DotLabel: playing is null ? null : $"{playing} is running"),
+        new RailItem("achievements", "trophy", "Achievements"),
         new RailItem("saves", "saves", "Save manager", Separator: true, Dot: needYou > 0 ? "warn" : null,
-            DotLabel: needYou > 0 ? (needYou == 1 ? "1 game needs you" : $"{needYou} games need you") : null),
+            DotLabel: needYou > 0 ? (needYou == 1 ? "1 conflict" : $"{needYou} conflicts") : null),
         new RailItem("log", "terminal", "Console"),
         new RailItem("settings", "settings", "Settings", Bottom: true),
     ];

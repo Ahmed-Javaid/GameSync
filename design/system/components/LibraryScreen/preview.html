@@ -40,6 +40,8 @@ var HERO_AMBER = "data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/200
 var C = ["data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%20200%20300%27%3E%3Crect%20width%3D%27200%27%20height%3D%27300%27%20fill%3D%27%232b2220%27/%3E%3Ccircle%20cx%3D%27140%27%20cy%3D%2790%27%20r%3D%2738%27%20fill%3D%27%23e0b36a%27%20opacity%3D%27.5%27/%3E%3Cpath%20d%3D%27M0%20220%20L70%20160%20L130%20210%20L200%20150%20V300%20H0Z%27%20fill%3D%27%23e0b36a%27%20opacity%3D%27.35%27/%3E%3C/svg%3E", "data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%20200%20300%27%3E%3Crect%20width%3D%27200%27%20height%3D%27300%27%20fill%3D%27%231d2a24%27/%3E%3Ccircle%20cx%3D%27140%27%20cy%3D%2790%27%20r%3D%2738%27%20fill%3D%27%237fd1a6%27%20opacity%3D%27.5%27/%3E%3Cpath%20d%3D%27M0%20220%20L70%20160%20L130%20210%20L200%20150%20V300%20H0Z%27%20fill%3D%27%237fd1a6%27%20opacity%3D%27.35%27/%3E%3C/svg%3E", "data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%20200%20300%27%3E%3Crect%20width%3D%27200%27%20height%3D%27300%27%20fill%3D%27%23221f33%27/%3E%3Ccircle%20cx%3D%27140%27%20cy%3D%2790%27%20r%3D%2738%27%20fill%3D%27%23b9a3ff%27%20opacity%3D%27.5%27/%3E%3Cpath%20d%3D%27M0%20220%20L70%20160%20L130%20210%20L200%20150%20V300%20H0Z%27%20fill%3D%27%23b9a3ff%27%20opacity%3D%27.35%27/%3E%3C/svg%3E", "data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%20200%20300%27%3E%3Crect%20width%3D%27200%27%20height%3D%27300%27%20fill%3D%27%231d2630%27/%3E%3Ccircle%20cx%3D%27140%27%20cy%3D%2790%27%20r%3D%2738%27%20fill%3D%27%237fe6f2%27%20opacity%3D%27.5%27/%3E%3Cpath%20d%3D%27M0%20220%20L70%20160%20L130%20210%20L200%20150%20V300%20H0Z%27%20fill%3D%27%237fe6f2%27%20opacity%3D%27.35%27/%3E%3C/svg%3E", "data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%20200%20300%27%3E%3Crect%20width%3D%27200%27%20height%3D%27300%27%20fill%3D%27%232c2519%27/%3E%3Ccircle%20cx%3D%27140%27%20cy%3D%2790%27%20r%3D%2738%27%20fill%3D%27%23f2b544%27%20opacity%3D%27.5%27/%3E%3Cpath%20d%3D%27M0%20220%20L70%20160%20L130%20210%20L200%20150%20V300%20H0Z%27%20fill%3D%27%23f2b544%27%20opacity%3D%27.35%27/%3E%3C/svg%3E", "data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%20200%20300%27%3E%3Crect%20width%3D%27200%27%20height%3D%27300%27%20fill%3D%27%2322262b%27/%3E%3Ccircle%20cx%3D%27140%27%20cy%3D%2790%27%20r%3D%2738%27%20fill%3D%27%23a4abb3%27%20opacity%3D%27.5%27/%3E%3Cpath%20d%3D%27M0%20220%20L70%20160%20L130%20210%20L200%20150%20V300%20H0Z%27%20fill%3D%27%23a4abb3%27%20opacity%3D%27.35%27/%3E%3C/svg%3E", "data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%20200%20300%27%3E%3Crect%20width%3D%27200%27%20height%3D%27300%27%20fill%3D%27%232a1f24%27/%3E%3Ccircle%20cx%3D%27140%27%20cy%3D%2790%27%20r%3D%2738%27%20fill%3D%27%23ff8a7d%27%20opacity%3D%27.5%27/%3E%3Cpath%20d%3D%27M0%20220%20L70%20160%20L130%20210%20L200%20150%20V300%20H0Z%27%20fill%3D%27%23ff8a7d%27%20opacity%3D%27.35%27/%3E%3C/svg%3E"];
 
 // rank: order of last play (0 = now); added: days since GameSync first found it. status null: found, not syncing yet.
+// Version 39 (ACH-02): how far each game's achievements are, as Steam on this PC keeps them; a ring on its cover, the medal at 100%.
+var ACH_DONE = {sekiro:{done:34,total:34},ror2:{done:123,total:171},core:{done:26,total:59},valheim:{done:1,total:53},apex:{done:12,total:12},terraria:{done:61,total:115},ds3:{done:28,total:43}};
 var GAMES = [
   {id:'sts2',name:'Slay the Spire 2',art:C[2],hero:HERO_CYAN,status:'playing',fav:true,hours:38,rank:0,last:'Now',added:3,store:'Steam'},
   {id:'sekiro',name:'Sekiro: Shadows Die Twice',art:C[0],hero:HERO_AMBER,status:'conflict',fav:true,hours:61,rank:1,last:'Today 21:04',added:40,store:'Steam'},
@@ -90,7 +92,8 @@ function rail(cur, onNav){return h(G.SideRail,{current:cur,onNavigate:onNav,item
   {id:'search',icon:'search',label:'Search'},
   {id:'home',icon:'home',label:'Home',sep:true},
   {id:'library',icon:'library',label:'Game library',dot:'play',dotLabel:'Slay the Spire 2 is running'},
-  {id:'saves',icon:'saves',label:'Save manager',sep:true,dot:'warn',dotLabel:'2 games need you'},
+  {id:'achievements',icon:'trophy',label:'Achievements'},
+  {id:'saves',icon:'saves',label:'Save manager',sep:true,dot:'warn',dotLabel:'2 conflicts'},
   {id:'log',icon:'terminal',label:'Console'},
   {id:'settings',icon:'settings',label:'Settings',bottom:true}]})}
 
@@ -256,11 +259,11 @@ function Covers(p){
   var favs = p.games.filter(function(g){return g.fav}), rest = p.games.filter(function(g){return !g.fav});
   function tiles(list){return h('div',{className:'lib-grid'},list.map(function(g){
     return h('div',{key:g.id,onContextMenu:function(e){e.preventDefault();p.onMenu(g,e)}},
-      h(G.GameTile,{name:g.name,art:g.art,status:g.status||undefined,statusLabel:g.statusLabel,meta:meta(g),onClick:function(){p.onOpen(g.id)}}));}))}
+      h(G.GameTile,{name:g.name,art:g.art,status:g.status||undefined,statusLabel:g.statusLabel,meta:meta(g),achievements:ACH_DONE[g.id],onClick:function(){p.onOpen(g.id)}}));}))}
   return h(React.Fragment,null,
     h('header',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',gap:16}},
       h('div',{style:{minWidth:0}},h('div',{style:{font:'600 15px/20px var(--font-sans)'}},'My games'),h('div',{className:'gs-faint',style:{fontSize:12}},GAMES.length+' games \u00b7 '+GAMES.filter(function(g){return g.installed!==false}).length+' installed')),
-      h(G.PillTabs,{label:'Library view',value:p.tab,onChange:p.onTab,items:[{id:'all',label:'All games'},{id:'installed',label:'Installed'},{id:'local',label:'Local'},{id:'attn',label:'Needs you',count:GAMES.filter(function(g){return NEEDS[g.status]}).length},{id:'software',label:'Software'},{id:'hidden',label:'Hidden'}]}),
+      h(G.PillTabs,{label:'Library view',value:p.tab,onChange:p.onTab,items:[{id:'all',label:'All games'},{id:'installed',label:'Installed'},{id:'local',label:'Local'},{id:'attn',label:'Conflicts',count:GAMES.filter(function(g){return NEEDS[g.status]}).length},{id:'software',label:'Software'},{id:'hidden',label:'Hidden'}]}),
       h(G.Button,{icon:'plus'},'Add game')),
     // Local: games in their own folders, started without a store's launcher; the folders to look in are the person's.
     p.tab === 'local' ? h('div',{className:'gs-card',style:{flexDirection:'row',alignItems:'center',gap:16,padding:'14px 20px'}},
@@ -297,7 +300,7 @@ function App(){
   var shown = sorted(inView.filter(function(g){return matches(g,q[0])}), sort[0]);
   var current = sel[0] ? all.filter(function(g){return g.id===sel[0]})[0] : null;
   var groups = [{id:'fav',label:'Favourites',games:shown.filter(function(g){return g.fav})},
-    {id:'rest',label:{all:'Games',installed:'Installed',local:'Local',attn:'Needs you',software:'Software',hidden:'Hidden'}[tab[0]],games:shown.filter(function(g){return !g.fav})}];
+    {id:'rest',label:{all:'Games',installed:'Installed',local:'Local',attn:'Conflicts',software:'Software',hidden:'Hidden'}[tab[0]],games:shown.filter(function(g){return !g.fav})}];
   var menuEl = null;
   if (menu[0]) {
     var m = menu[0], g = m.game;

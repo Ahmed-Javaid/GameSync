@@ -8,10 +8,18 @@ namespace GameSync.UI.Controls;
 /// </summary>
 public static class Motion
 {
+    /// <summary>Nothing moves, whatever Windows says: the snapshot tool, whose renders are each one still frame.</summary>
+    public static bool Still { get; set; }
+
     public static bool On
     {
         get
         {
+            if (Still)
+            {
+                return false;
+            }
+
             try
             {
                 return WindowsLook.AnimationsOn();

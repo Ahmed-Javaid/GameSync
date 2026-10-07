@@ -80,6 +80,12 @@ public sealed record LibraryEntry
     /// <summary>Identities of entries merged into this one, so rescans keep finding it (LIB-07).</summary>
     public IReadOnlyList<string> Aliases { get; init; } = [];
 
+    /// <summary>
+    /// KAN-61: folders a scan proposed whole of which only the live save was taken, the copies kept by hand beside it
+    /// left out; later scans that find them whole again don't offer them as more saves.
+    /// </summary>
+    public IReadOnlyList<string> LiveOnly { get; init; } = [];
+
     public GameId? MergedInto { get; init; }
 
     public DateTime FirstSeenUtc { get; init; }
@@ -116,7 +122,7 @@ public sealed record LibraryEntry
     public IReadOnlyList<Proposal> Suggestions =>
         Confirmed is null || State != LibraryState.Synced
             ? []
-            : Proposals.Where(p => !Confirmed.Rules.Any(r =>
+            : Proposals.Where(p => !LiveOnly.Contains(p.Root, StringComparer.OrdinalIgnoreCase) && !Confirmed.Rules.Any(r =>
                 r.Include == p.Include && Confirmed.Roots.TryGetValue(r.Root, out var folder) &&
                 folder.Replace('\\', '/').TrimEnd('/').Equals(p.Root.Replace('\\', '/').TrimEnd('/'), StringComparison.OrdinalIgnoreCase))).ToList();
 }
@@ -440,6 +446,39 @@ public static class Library
     }
 
     /// <summary>
+    /// KAN-61: confirms the game with only its live save from a folder the scan proposed whole (<paramref name="root"/>,
+    /// as the proposal has it): that proposal becomes the live save's folder below it (<paramref name="live"/>, with
+    /// '/'), so the copies kept by hand beside it never sync, and later scans don't offer the whole folder again.
+    /// </summary>
+    /// <param name="found">The live save's own files, bytes and newest change, which its place shows until its first backup (KAN-81).</param>
+    public static LibraryEntry ConfirmLive(LibraryEntry entry, string root, string live, GameMode? mode = null, GameDefaults? defaults = null,
+        (int Files, long Bytes, DateTime? NewestUtc)? found = null)
+    {
+        if (entry.Confirmed is not null)
+        {
+            // Its versions' files are laid out by the rules it has; taking a folder below one would leave them out.
+            throw new InvalidOperationException($"{entry.DisplayTitle} keeps its saves already, by the rules it has.");
+        }
+
+        var proposals = entry.Proposals
+            .Select(p => p.Root.Equals(root, StringComparison.OrdinalIgnoreCase) && p.Include == "**"
+                ? p with
+                {
+                    Root = $"{root.TrimEnd('/')}/{live.Trim('/')}",
+
+                    // KAN-81: what the live save holds, not the whole folder the scan counted (1,051 files for 34).
+                    Files = found?.Files ?? p.Files,
+                    Bytes = found?.Bytes ?? p.Bytes,
+                    NewestUtc = found is { } f ? f.NewestUtc : p.NewestUtc,
+                }
+                : p)
+            .DistinctBy(p => (p.Root, p.Include))
+            .ToList();
+        var confirmed = Confirm(entry with { Proposals = proposals }, mode, defaults);
+        return confirmed with { LiveOnly = [.. entry.LiveOnly.Where(r => !r.Equals(root, StringComparison.OrdinalIgnoreCase)), root] };
+    }
+
+    /// <summary>
     /// PC-04 and R8: takes up the rules another PC's saves used, exactly and with their root keys, so that PC's versions
     /// map here and both PCs take the same files. Whatever this PC found beyond them stays a suggestion. This PC's own
     /// choices, which the rules don't carry (settings files synced, screenshots, who wins), come from its defaults (SET-06).
@@ -460,6 +499,19 @@ public static class Library
                 ConflictPolicy = mine.Conflict,
             },
         };
+    }
+
+    /// <summary>
+    /// SHARE-13: a game from a shared zip that this PC's library doesn't have: Not installed, kept with the rules its saves
+    /// were taken with and backed up only, so they wait in its history until the game is found here. A scan finds it by
+    /// its title and keeps those rules (LIB-07, R8); it takes the zip's ID unless a game here has that one.
+    /// </summary>
+    public static LibraryEntry FromShared(GameId id, string title, PortableRules rules, IEnumerable<GameId> taken, GameDefaults? defaults, DateTime nowUtc)
+    {
+        var ids = taken.ToHashSet();
+        var entry = new LibraryEntry { Id = ids.Contains(id) ? NewId(title, ids) : id, Title = title, Installed = false, FirstSeenUtc = nowUtc, LastSeenUtc = nowUtc };
+        var adopted = Adopt(entry, rules, defaults);
+        return adopted with { Confirmed = adopted.Confirmed! with { Mode = GameMode.BackupOnly } };
     }
 
     /// <summary>

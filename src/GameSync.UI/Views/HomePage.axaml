@@ -27,17 +27,56 @@
       </Style>
     </ControlTheme>
   </UserControl.Resources>
-  <!-- The launcher home (design system → Launcher home): the top bar, the last-played game, then Needs you, Jump back in and
+  <UserControl.Styles>
+    <!-- KAN-125: Home's pager, a glass pill at the banner's top right -->
+    <Style Selector="Border.hero-pager">
+      <Setter Property="Background" Value="{DynamicResource glass}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource glass-edge}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="999" />
+      <Setter Property="Padding" Value="4" />
+    </Style>
+    <Style Selector="Button.hero-dot">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Padding" Value="5" />
+      <Setter Property="MinWidth" Value="0" />
+      <Setter Property="MinHeight" Value="0" />
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="FocusAdorner" Value="{StaticResource PillFocus}" />
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Border Background="Transparent" Padding="{TemplateBinding Padding}">
+            <ContentPresenter Content="{TemplateBinding Content}" />
+          </Border>
+        </ControlTemplate>
+      </Setter>
+    </Style>
+    <Style Selector="Button.hero-dot Ellipse">
+      <Setter Property="Fill" Value="{DynamicResource on-art}" />
+      <Setter Property="Opacity" Value="0.45" />
+    </Style>
+    <Style Selector="Button.hero-dot:pointerover Ellipse">
+      <Setter Property="Opacity" Value="0.8" />
+    </Style>
+    <Style Selector="Button.hero-dot.current Ellipse">
+      <Setter Property="Opacity" Value="1" />
+    </Style>
+  </UserControl.Styles>
+  <!-- The launcher home (design system → Launcher home): the top bar, the last-played game, then Achievements, Jump back in and
        Activity. HomeLayout fills any window: the cards take what their content needs and the banner the rest. -->
   <c:HomeLayout Margin="24,20" Spacing="16">
     <Grid ColumnDefinitions="*,Auto,*">
       <StackPanel VerticalAlignment="Center">
-        <TextBlock Text="{Binding Greeting}" FontSize="15" LineHeight="20" FontWeight="SemiBold" />
+        <TextBlock Text="{Binding Greeting}" FontSize="{DynamicResource fs-15}" LineHeight="{DynamicResource lh-20}" FontWeight="SemiBold" />
         <TextBlock Classes="caption faint" Text="{Binding Subtitle}" TextTrimming="CharacterEllipsis" />
       </StackPanel>
       <c:GsPillTabs Grid.Column="1" ItemsSource="{Binding Tabs}" SelectedId="{Binding SelectedTab, Mode=TwoWay}" />
       <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
-        <c:GsIconButton Icon="sync" Label="Sync now" Command="{Binding SyncNowCommand}" />
+        <!-- PKG-03 (design system version 53, #update): a newer GameSync is downloaded and checked -->
+        <c:GsButton Classes="sm" Icon="download" Content="Restart to update" Command="{Binding RestartToUpdateCommand}" IsVisible="{Binding ShowsUpdate}"
+                    IsEnabled="{Binding CanUpdate}" ToolTip.Tip="{Binding UpdateReady}" ToolTip.ShowOnDisabled="True" VerticalAlignment="Center" />
+        <c:GsIconButton Icon="sync" Label="Sync now" Command="{Binding SyncNowCommand}" IsBusy="{Binding IsSyncing}" BusyLabel="Syncing" />
         <!-- Where the saves go and which PCs sync: what the app is doing, a click away, with the way to their settings -->
         <!-- First run skipped the cloud: every version is kept on this PC until one is connected (design system → ConnectCloudDialog) -->
         <c:GsButton Classes="sm" Icon="cloud" Content="Connect the cloud" Command="{Binding ConnectCloudCommand}" IsVisible="{Binding NoCloud}"
@@ -79,66 +118,93 @@
     </Grid>
 
     <Panel>
+    <!-- KAN-125, KAN-126: the banner shows the game playing now or played last, then the next ones played (the pager at its top
+         right, the wheel, or Left and Right with it focused); a click on it, or Enter, opens the game's page -->
     <c:GsHeroBanner MinHeight="0" Art="{Binding HeroArt}" Logo="{Binding HeroLogo}" Title="{Binding HeroTitle}"
                     Eyebrow="{Binding HeroEyebrow}" Chip="{Binding HeroChip}" Status="{Binding HeroStatus}" StatusLabel="{Binding HeroStatusLabel}"
                     Blurb="{Binding HeroBlurb}" PlayLabel="{Binding HeroPlayLabel}" PlayCommand="{Binding PlayCommand}" ShowsPlay="{Binding HeroShowsPlay}" IsPlaying="{Binding HeroIsPlaying}" IsVisible="{Binding HasHero}"
-                    SavesCommand="{Binding OpenHeroSavesCommand}" SettingsCommand="{Binding OpenHeroPropertiesCommand}" />
+                    IsStarting="{Binding HeroStarting}"
+                    SavesCommand="{Binding OpenHeroSavesCommand}" SettingsCommand="{Binding OpenHeroPropertiesCommand}"
+                    OpenCommand="{Binding OpenHeroCommand}" NextCommand="{Binding NextHeroCommand}" PreviousCommand="{Binding PreviousHeroCommand}"
+                    AutomationProperties.Name="{Binding HeroSpoken}" ToolTip.Tip="Open its page">
+      <c:GsHeroBanner.Pager>
+        <Border Classes="hero-pager" IsVisible="{Binding HasHeroPages}">
+          <StackPanel Orientation="Horizontal" Spacing="2">
+            <c:GsIconButton Classes="glass sm" Icon="chevronLeft" Label="The game before" Command="{Binding PreviousHeroCommand}" />
+            <ItemsControl ItemsSource="{Binding HeroDots}" VerticalAlignment="Center" Margin="4,0">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                  <StackPanel Orientation="Horizontal" Spacing="2" />
+                </ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:HeroDot">
+                  <Button Classes="hero-dot" Classes.current="{Binding IsCurrent}" Command="{Binding Show}"
+                          AutomationProperties.Name="{Binding Name}" ToolTip.Tip="{Binding Name}">
+                    <Ellipse Width="8" Height="8" />
+                  </Button>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <c:GsIconButton Classes="glass sm" Icon="chevronRight" Label="The next game" Command="{Binding NextHeroCommand}" />
+          </StackPanel>
+        </Border>
+      </c:GsHeroBanner.Pager>
+    </c:GsHeroBanner>
     <c:GsCard Title="No games yet" Subtitle="GameSync hasn't found any games on this PC." IsVisible="{Binding NoGames}">
       <c:GsNote Icon="search" MaxWidth="640" HorizontalAlignment="Left" VerticalAlignment="Top"
                 Text="Games outside Steam, Epic and EA are found in the folders you give GameSync: the library's Local view scans one, such as G:\ or E:\Games. The scan only reads, and nothing syncs until you choose." />
     </c:GsCard>
     </Panel>
 
-    <!-- Needs you and Activity keep a readable width; Jump back in takes the rest and shows more covers on wider screens -->
+    <!-- Achievements and Activity keep a readable width; Jump back in takes the rest and shows more covers on wider screens -->
     <Grid ColumnSpacing="16">
       <Grid.ColumnDefinitions>
         <ColumnDefinition Width="0.95*" MinWidth="280" MaxWidth="440" />
         <ColumnDefinition Width="1.5*" />
         <ColumnDefinition Width="0.95*" MinWidth="280" MaxWidth="440" />
       </Grid.ColumnDefinitions>
-      <c:GsCard Title="Needs you">
+      <!-- The hero game's achievements, or the last game played that has some (the owner, 3 Oct 2026; design system version 33):
+           its ring, tiers and Zenith, and the last two unlocked; the arrow opens every one. Version 41's coins and Zenith strip
+           went in version 46 (the owner: "The home achievement card should be the one before that. Without the zenith card.
+           Where it was more simple"). Conflicts live in the save manager: the top bar's pill and the rail's caution mark lead there. -->
+      <c:GsCard Title="Achievements" Subtitle="{Binding Achievements.Subtitle, FallbackValue={x:Null}}">
         <c:GsCard.Action>
-          <c:GsIconButton Icon="chevronRight" Label="Open the save manager" Command="{Binding OpenSavesCommand}" />
+          <c:GsIconButton Icon="chevronRight" Label="{Binding Achievements.OpenLabel, FallbackValue=Achievements}" Command="{Binding OpenAchievementsCommand}"
+                          IsVisible="{Binding HasAchievements}" />
         </c:GsCard.Action>
-        <DockPanel>
-          <c:GsProgress DockPanel.Dock="Bottom" Value="{Binding SyncedPercent}" Label="{Binding SyncedLabel}" Right="{Binding SyncedRight}" Margin="0,12,0,0"
-                        IsVisible="{Binding AnySyncing}" />
-          <StackPanel DockPanel.Dock="Bottom" Spacing="12" IsVisible="{Binding NoneSyncing}">
-            <TextBlock Classes="mono-small muted" Text="{Binding SyncedLabel}" />
-            <c:GsButton Classes="sm" Icon="check" Content="Choose games to sync" Command="{Binding OpenLibraryCommand}" IsVisible="{Binding CanChoose}" />
+        <Panel>
+          <c:GsNote Icon="trophy" Text="Achievements show here for the games you play: what you've unlocked and when, from Steam on this PC or a copy's own record."
+                    IsVisible="{Binding NoAchievements}" VerticalAlignment="Top" />
+          <StackPanel Spacing="16" IsVisible="{Binding HasAchievements}">
+            <c:GsAchievementsOverview IsSmall="True" Done="{Binding Achievements.Progress.Done, FallbackValue=0}" Total="{Binding Achievements.Progress.Total, FallbackValue=0}"
+                                      Gold="{Binding Achievements.Progress.Gold, FallbackValue=0}" Silver="{Binding Achievements.Progress.Silver, FallbackValue=0}"
+                                      Bronze="{Binding Achievements.Progress.Bronze, FallbackValue=0}"
+                                      CompletedOn="{Binding Achievements.Progress.CompletedOn, FallbackValue={x:Null}}"
+                                      PlaysMoment="{Binding CelebratesZenith}" MomentPlayedCommand="{Binding SeeZenithCommand}" />
+            <StackPanel Spacing="10" IsVisible="{Binding Achievements.HasLatest, FallbackValue=False}">
+              <TextBlock Classes="overline faint" Text="LAST UNLOCKED" />
+              <ItemsControl ItemsSource="{Binding Achievements.Latest, FallbackValue={x:Null}}">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate>
+                    <StackPanel Spacing="10" />
+                  </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:AchievementItem">
+                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12" Background="Transparent" ToolTip.Tip="{Binding Tip}" AutomationProperties.Name="{Binding Tip}">
+                      <c:GsAchievementBadge Size="sm" Icon="{Binding Icon}" State="{Binding State}" Tier="{Binding Tier}" VerticalAlignment="Center" />
+                      <TextBlock Grid.Column="1" Text="{Binding Name}" FontSize="{DynamicResource fs-13}" LineHeight="{DynamicResource lh-18}" FontWeight="Medium"
+                                 TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                      <TextBlock Grid.Column="2" Classes="caption faint" Text="{Binding When}" VerticalAlignment="Center" />
+                    </Grid>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </StackPanel>
+            <TextBlock Classes="caption faint" Text="None unlocked yet." IsVisible="{Binding Achievements.NoneUnlocked, FallbackValue=False}" />
           </StackPanel>
-          <Panel>
-            <c:GsNote Icon="check" Text="Nothing needs you. Every game that syncs is fine." IsVisible="{Binding AllFine}" VerticalAlignment="Top" />
-            <c:GsNote Icon="info" Text="No game syncs yet. Pick the ones whose saves you want backed up and kept in step between your PCs."
-                      IsVisible="{Binding NoneSyncing}" VerticalAlignment="Top" />
-            <ItemsControl ItemsSource="{Binding NeedsYou}">
-              <ItemsControl.ItemsPanel>
-                <ItemsPanelTemplate>
-                  <StackPanel Spacing="12" />
-                </ItemsPanelTemplate>
-              </ItemsControl.ItemsPanel>
-              <ItemsControl.ItemTemplate>
-                <DataTemplate x:DataType="vm:NeedsYouItem">
-                  <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
-                    <Border Width="36" Height="48" CornerRadius="8" ClipToBounds="True" Background="{DynamicResource bg-300}">
-                      <Panel>
-                        <TextBlock Text="{Binding Initial}" FontWeight="SemiBold" FontSize="13" Foreground="{DynamicResource ink-muted}"
-                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
-                        <c:GsCoverImage Source="{Binding Art}" />
-                      </Panel>
-                    </Border>
-                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                      <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                      <c:GsStatusBadge Status="{Binding Status}" Plain="True" />
-                    </StackPanel>
-                    <c:GsButton Grid.Column="2" Classes="sm" Content="{Binding Action}" VerticalAlignment="Center"
-                                Command="{Binding $parent[UserControl].((vm:HomeViewModel)DataContext).OpenGameSavesCommand}" CommandParameter="{Binding Id}" />
-                  </Grid>
-                </DataTemplate>
-              </ItemsControl.ItemTemplate>
-            </ItemsControl>
-          </Panel>
-        </DockPanel>
+        </Panel>
       </c:GsCard>
 
       <c:GsCard Grid.Column="1" Title="Jump back in">
@@ -154,21 +220,22 @@
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="vm:TileItem">
               <c:GsGameTile Classes="compact" Width="NaN" Title="{Binding Title}" Art="{Binding Art}" Status="{Binding Status}" StatusLabel="{Binding StatusLabel}" MarkLabel="{Binding MarkLabel}" Meta="{Binding Meta}"
+                    AchievementsDone="{Binding AchievementsDone}" AchievementsTotal="{Binding AchievementsTotal}"
                           Command="{Binding $parent[UserControl].((vm:HomeViewModel)DataContext).OpenGameCommand}" CommandParameter="{Binding Id}">
               <c:GsGameTile.ContextMenu>
                 <ContextMenu IsVisible="{Binding HasMenu}">
-                  <MenuItem Header="Play" Command="{Binding PlayCommand}" IsVisible="{Binding PlayCommand, Converter={x:Static ObjectConverters.IsNotNull}}">
-                    <MenuItem.Icon><c:GsIcon Icon="play" Size="16" /></MenuItem.Icon>
-                  </MenuItem>
+                  <c:GsMenuItem Header="Play" Command="{Binding PlayCommand}" IsVisible="{Binding PlayCommand, Converter={x:Static ObjectConverters.IsNotNull}}">
+                    <c:GsMenuItem.Icon><c:GsIcon Icon="play" Size="16" /></c:GsMenuItem.Icon>
+                  </c:GsMenuItem>
                   <Separator IsVisible="{Binding PlayCommand, Converter={x:Static ObjectConverters.IsNotNull}}" />
-                  <MenuItem Header="{Binding FavouriteLabel}" Command="{Binding ToggleFavourite}">
-                    <MenuItem.Icon><c:GsIcon Icon="star" Size="16" Filled="{Binding IsFavourite}" /></MenuItem.Icon>
-                  </MenuItem>
-                  <MenuItem Header="{Binding HideLabel}" Command="{Binding ToggleHidden}" />
+                  <c:GsMenuItem Header="{Binding FavouriteLabel}" Command="{Binding ToggleFavourite}">
+                    <c:GsMenuItem.Icon><c:GsIcon Icon="star" Size="16" Filled="{Binding IsFavourite}" /></c:GsMenuItem.Icon>
+                  </c:GsMenuItem>
+                  <c:GsMenuItem Header="{Binding HideLabel}" Command="{Binding ToggleHidden}" />
                   <Separator IsVisible="{Binding HasProperties}" />
-                  <MenuItem Header="Properties" Command="{Binding PropertiesCommand}" IsVisible="{Binding HasProperties}">
-                    <MenuItem.Icon><c:GsIcon Icon="settings" Size="16" /></MenuItem.Icon>
-                  </MenuItem>
+                  <c:GsMenuItem Header="Properties" Command="{Binding PropertiesCommand}" IsVisible="{Binding HasProperties}">
+                    <c:GsMenuItem.Icon><c:GsIcon Icon="settings" Size="16" /></c:GsMenuItem.Icon>
+                  </c:GsMenuItem>
                 </ContextMenu>
               </c:GsGameTile.ContextMenu>
             </c:GsGameTile>
@@ -203,7 +270,7 @@
                           <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
                             <Border Width="24" Height="32" CornerRadius="6" ClipToBounds="True" Background="{DynamicResource bg-300}">
                               <Panel>
-                                <TextBlock Text="{Binding Initial}" FontWeight="SemiBold" FontSize="11" Foreground="{DynamicResource ink-muted}"
+                                <TextBlock Text="{Binding Initial}" FontWeight="SemiBold" FontSize="{DynamicResource fs-11}" Foreground="{DynamicResource ink-muted}"
                                            HorizontalAlignment="Center" VerticalAlignment="Center" />
                                 <c:GsCoverImage Source="{Binding Art}" />
                               </Panel>

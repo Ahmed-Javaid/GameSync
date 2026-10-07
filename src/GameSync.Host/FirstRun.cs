@@ -54,7 +54,11 @@ public enum SetupGroupKind
 /// <param name="FoundBy">How: "save list", "engine rule", "name search".</param>
 /// <param name="Bytes">What its saves come to now, for the first backup's size.</param>
 /// <param name="AntiCheat">The anti-cheat it ships, when it has one (ONB-05).</param>
-public sealed record SetupGame(GameId Id, string Title, string? CoverPath, string? SavePath, string? FoundBy, long Bytes, string? AntiCheat);
+/// <param name="Kept">
+/// KAN-61: what's beside its live save when its folder holds copies kept by hand ("38 copies kept by hand beside it come
+/// in as named saves"); the path and size are then the live save's alone.
+/// </param>
+public sealed record SetupGame(GameId Id, string Title, string? CoverPath, string? SavePath, string? FoundBy, long Bytes, string? AntiCheat, string? Kept = null);
 
 public sealed record SetupGroup(SetupGroupKind Kind, IReadOnlyList<SetupGame> Games);
 
@@ -74,7 +78,16 @@ public sealed record SetupChoice
 }
 
 /// <summary>What finishing first run did: the games that sync or are backed up, and anything to tell the person.</summary>
-public sealed record SetupResult(int Syncing, int BackedUp, IReadOnlyList<string> Notes);
+public sealed record SetupResult(int Syncing, int BackedUp, IReadOnlyList<string> Notes)
+{
+    /// <summary>KAN-61: games whose live save alone now syncs, with copies kept by hand beside it to bring in as named saves.</summary>
+    public IReadOnlyList<SetupKept> Kept { get; init; } = [];
+}
+
+/// <summary>A game first run kept by its live save alone (KAN-61), and where the copies beside it are.</summary>
+/// <param name="Folder">The folder the live save and its copies are in, where Import kept saves looks.</param>
+/// <param name="Root">The game's root key for the live save, which the copies come in under.</param>
+public sealed record SetupKept(GameId Game, string Title, string Folder, string Root, int Copies);
 
 /// <summary>What starts GameSync at sign-in and runs the daily backup (BG-01, BG-02); tests give their own.</summary>
 public interface ISetupSchedule
@@ -186,14 +199,18 @@ public static class FirstRun
 
             var best = entry.Proposals.OrderByDescending(p => p.Category == SaveCategory.Save).ThenByDescending(p => p.Files).FirstOrDefault();
             var registry = entry.RegistryProposals.FirstOrDefault();
+
+            // KAN-61: a folder holding the live save beside copies kept by hand syncs the live save alone.
+            var kept = group != SetupGroupKind.NotInstalled ? KeptSaves.Find(entry, engine.Here.Resolver) : null;
             var game = new SetupGame(
                 entry.Id,
                 entry.DisplayTitle,
                 art.FindOwn(entry.Id, ArtKind.Cover) ?? (steamId is { } app ? art.Find(app, ArtKind.Cover) : null),
-                best is not null ? Friendly(best.Root) : registry is not null ? $"Registry: {registry.Key.Replace('/', '\\')}" : null,
+                kept is not null ? Friendly(KeptSaves.LiveRoot(kept)) : best is not null ? Friendly(best.Root) : registry is not null ? $"Registry: {registry.Key.Replace('/', '\\')}" : null,
                 best is not null ? Layer(best.FoundBy) : registry is not null ? Layer(registry.FoundBy) : null,
-                entry.Proposals.Sum(p => p.Bytes),
-                entry.HasAntiCheat ? entry.AntiCheat ?? "an anti-cheat" : null);
+                kept is not null ? entry.Proposals.Where(p => !KeptSaves.IsWhole(p, kept)).Sum(p => p.Bytes) + kept.LiveBytes : entry.Proposals.Sum(p => p.Bytes),
+                entry.HasAntiCheat ? entry.AntiCheat ?? "an anti-cheat" : null,
+                kept is not null ? $"{KeptSaves.CopiesText(kept)} kept by hand beside it come in as named saves." : null);
             if (!groups.TryGetValue(group, out var list))
             {
                 groups[group] = list = [];
@@ -304,6 +321,7 @@ public static class FirstRun
         (existing is null ? new AppConfig { Remote = choice.Remote } : existing with { Remote = choice.Remote }).Save(dataDir);
 
         int syncing = 0, backedUp = 0;
+        var bring = new List<SetupKept>();
         using (var engineLock = await EngineLock.AcquireAsync(dataDir, null, ct))
         using (var engine = Engine.Open(dataDir))
         {
@@ -317,12 +335,20 @@ public static class FirstRun
                     continue;
                 }
 
-                var next = Library.Confirm(entry, defaults: defaults);
+                // KAN-61: the live save alone when copies kept by hand are beside it; they come in as named saves after.
+                var kept = entry.Installed ? KeptSaves.Find(entry, engine.Here.Resolver) : null;
+                var next = kept is not null ? Library.ConfirmLive(entry, kept.Root, kept.Live, defaults: defaults, found: (kept.LiveFiles, kept.LiveBytes, kept.LiveNewestUtc)) : Library.Confirm(entry, defaults: defaults);
                 var portable = next.Confirmed!;
                 if (Cli.Problems(portable, engine.Here.Resolver.Resolve(portable), engine.Here) is [var problem, ..])
                 {
                     notes.Add($"{entry.DisplayTitle} doesn't sync yet: {problem}");
                     continue;
+                }
+
+                if (kept is not null)
+                {
+                    bring.Add(new SetupKept(entry.Id, entry.DisplayTitle, kept.Folder, KeptSaves.RootKey(portable, kept), kept.Copies));
+                    notes.Add($"{entry.DisplayTitle} syncs its live save alone; the {KeptSaves.CopiesText(kept)} kept by hand beside it come in as named saves.");
                 }
 
                 confirmed.Add(next);
@@ -341,7 +367,7 @@ public static class FirstRun
 
         notes.Add(schedule.StartAtSignIn(choice.StartAtSignIn) ?? "");
         notes.Add(schedule.Daily(choice.DailyAt) ?? "");
-        return new SetupResult(syncing, backedUp, notes.Where(n => n.Length > 0).ToList());
+        return new SetupResult(syncing, backedUp, notes.Where(n => n.Length > 0).ToList()) { Kept = bring };
     }
 
     /// <summary>

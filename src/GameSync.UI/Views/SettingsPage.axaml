@@ -5,9 +5,9 @@
              xmlns:v="using:GameSync.UI.Views"
              x:Class="GameSync.UI.Views.SettingsPage"
              x:DataType="vm:SettingsViewModel">
-  <!-- Settings (design system → SettingsScreen, version 26): the sections down the left, one at a time on the right, and
-       the version with Copy diagnostics at the foot of the column. Not shown until they're built: where shared zips go
-       (with sharing), snapshots of long sessions (PLAY-10) and learn mode's admin (with learn mode). -->
+  <!-- Settings (design system → SettingsScreen, version 26; Updates since version 53): the sections down the left, one at a
+       time on the right, and the version with Copy diagnostics at the foot of the column. Not shown until they're built:
+       snapshots of long sessions (PLAY-10) and learn mode's admin (with the tracer), both after v1. -->
   <UserControl.DataTemplates>
 
     <!-- Appearance (LOOK-01 to LOOK-07, LOOK-10, LOOK-17) -->
@@ -47,7 +47,7 @@
               </c:GsSettingsRow>
             </StackPanel>
             <c:GsNote Icon="info" Margin="0,8,0,0"
-                      Text="Status colours never change: Synced, Needs you, Playing and Blocked keep their colours in every theme, with an icon and a word. Custom colours come later." />
+                      Text="Status colours never change: Synced, Conflict, Playing and Blocked keep their colours in every theme, with an icon and a word. Custom colours come later." />
           </StackPanel>
         </c:GsCard>
       </StackPanel>
@@ -82,6 +82,15 @@
           </c:GsCard>
         </Grid>
         <c:GsNote Icon="info" Text="{Binding Note.Text}" Classes.warn="{Binding Note.Failed}" IsVisible="{Binding HasNote}" />
+        <c:GsCard Title="Shared zips">
+          <StackPanel>
+            <c:GsFolderField Path="{Binding ShareFolder}" Meta="Where Share saves puts its zip files" Margin="0,0,0,12"
+                             ChangeCommand="{Binding $parent[v:SettingsPage].PickShareFolderCommand}" OpenCommand="{Binding OpenShareFolderCommand}" />
+            <c:GsSettingsRow Title="Ask where to save each time" Classes="after">
+              <c:GsSwitch IsChecked="{Binding ShareAsk}" AutomationProperties.Name="Ask where to save each time" />
+            </c:GsSettingsRow>
+          </StackPanel>
+        </c:GsCard>
       </StackPanel>
     </DataTemplate>
 
@@ -330,6 +339,71 @@
       </StackPanel>
     </DataTemplate>
 
+    <!-- Achievements (ACH-09, ACH-10; design system version 35, #achievements; version 41): the popup over a game when one
+         unlocks, its sound and corner, Try the popup, and Achievements by game, every game counted or left out and its popup -->
+    <DataTemplate DataType="vm:AchievementSettings">
+      <StackPanel Spacing="16">
+        <StackPanel Spacing="4" Margin="0,0,0,4">
+          <TextBlock Classes="page-title" Text="Achievements" />
+          <TextBlock Classes="muted" TextWrapping="Wrap" Text="What you see and hear when you unlock one while playing, and which games count." />
+        </StackPanel>
+        <c:GsCard Title="When you unlock one while playing">
+          <StackPanel>
+            <c:GsSettingsRow Title="Show a popup"
+                             Description="GameSync's own small window over the game for a few seconds. It never takes focus or a click. Over a game in exclusive fullscreen only the sound plays, and the popups wait until you quit.">
+              <c:GsSwitch IsChecked="{Binding Popups}" AutomationProperties.Name="Show a popup" />
+            </c:GsSettingsRow>
+            <c:GsSettingsRow Title="Play a sound" Description="A short chime with each popup, brighter for rarer ones; a Zenith has its own.">
+              <c:GsSwitch IsChecked="{Binding Sound}" AutomationProperties.Name="Play a sound" />
+            </c:GsSettingsRow>
+            <!-- KAN-120 (the owner: "The popup sound is too loud, it needs to be softer. Give me options i can choose from") -->
+            <c:GsSettingsRow Title="Sound" Description="Picking one plays it." IsEnabled="{Binding Sound}">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <c:GsSelect Options="{Binding ChimeOptions}" Value="{Binding Chime}" Label="Sound" />
+                <c:GsIconButton Icon="volume" Label="Hear it" Command="{Binding HearCommand}" ToolTip.Tip="Hear it, at the volume picked" />
+              </StackPanel>
+            </c:GsSettingsRow>
+            <c:GsSettingsRow Title="Volume" Description="Under Windows' own volume. Soft unless you change it." IsEnabled="{Binding Sound}">
+              <c:GsSelect Options="{Binding VolumeOptions}" Value="{Binding Volume}" Label="Volume" />
+            </c:GsSettingsRow>
+            <c:GsSettingsRow Title="Where it shows" Description="The corner of the screen the game is on." IsEnabled="{Binding Popups}">
+              <c:GsSelect Options="{Binding CornerOptions}" Value="{Binding Corner}" Label="Where it shows" />
+            </c:GsSettingsRow>
+            <c:GsSettingsRow Title="Try the popup" Description="{Binding TryLine}">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <c:GsButton Classes="sm" Icon="trophy" Content="Show it now" Command="{Binding TryNowCommand}"
+                            ToolTip.Tip="One of your own unlocked achievements, as it shows over a game" />
+                <c:GsButton Classes="ghost sm" Icon="clock" Content="In 10 seconds" Command="{Binding TryLaterCommand}"
+                            ToolTip.Tip="Time to switch to a game and see it over it" />
+              </StackPanel>
+            </c:GsSettingsRow>
+            <c:GsNote Icon="info" Margin="0,12,0,0"
+                      Text="GameSync sees unlocks in Steam's files on this PC, and in the records of the copies below. Steam shows its own popup for its games, so GameSync's is off for each until you turn it on in Achievements by game; a copy of its own has GameSync's." />
+          </StackPanel>
+        </c:GsCard>
+        <!-- KAN-123 (design system version 48; the owner: "As long as my offline games also have achievements"): the folders
+             where copies Steam doesn't run keep their own records of what's unlocked, one folder per game by its Steam number -->
+        <c:GsCard Title="Copies Steam doesn't run" Subtitle="Copies that keep their own record of what's unlocked. Kept on this PC only.">
+          <StackPanel Spacing="12">
+            <c:GsFolderList Items="{Binding RecordFolders}" AddCommand="{Binding $parent[v:SettingsPage].AddRecordFolderCommand}" AddLabel="Add a folder"
+                            RemoveCommand="{Binding RemoveRecordFolderCommand}" Empty="None yet. A copy that isn't Steam's shows Steam's list at 0 on its page." />
+            <c:GsNote Icon="info" Text="{Binding RecordNote.Text, FallbackValue={x:Null}}" Classes.warn="{Binding RecordNote.Failed, FallbackValue=False}"
+                      IsVisible="{Binding RecordNote, Converter={x:Static ObjectConverters.IsNotNull}}" />
+            <c:GsNote Icon="info"
+                      Text="Add the folder holding one folder per game, named by its Steam number, with the copy's record inside. GameSync only reads the records; each achievement's name, icon and how rare it is come from Steam's list. Their unlocks count on the Achievements page and Home, and pop up while you play." />
+          </StackPanel>
+        </c:GsCard>
+        <!-- Version 41 (KAN-131; the owner: "Game in your achievements makes no sense. Also it needs to be either a popup or a new
+             window"): one row saying how many count and have GameSync's popup; Choose games… opens Achievements by game -->
+        <c:GsCard Title="Games">
+          <c:GsSettingsRow Title="Achievements by game" Description="{Binding GamesLine}">
+            <c:GsButton Classes="sm" Icon="trophy" Content="Choose games…" Command="{Binding ChooseGamesCommand}" IsEnabled="{Binding HasGames}"
+                        ToolTip.Tip="Every game with achievements: whether it counts, and whether GameSync shows its popup" />
+          </c:GsSettingsRow>
+        </c:GsCard>
+      </StackPanel>
+    </DataTemplate>
+
     <!-- Safety -->
     <DataTemplate DataType="vm:SafetySettings">
       <StackPanel Spacing="16">
@@ -342,14 +416,74 @@
         </c:GsCard>
       </StackPanel>
     </DataTemplate>
+
+    <!-- Updates (PKG-03, R19; design system version 53, #updates): the version this PC runs, a newer one ready with what's new
+         and Restart to update, or that there's none or why it couldn't tell; and Check for updates every day -->
+    <DataTemplate DataType="vm:UpdateSettings">
+      <StackPanel Spacing="16">
+        <StackPanel Spacing="4" Margin="0,0,0,4">
+          <TextBlock Classes="page-title" Text="Updates" />
+          <TextBlock Classes="muted" TextWrapping="Wrap" Text="GameSync checks GitHub for a new version once a day and gets it ready. It installs when you restart GameSync." />
+        </StackPanel>
+        <c:GsCard Title="{Binding Title}" Subtitle="{Binding Where}">
+          <StackPanel Spacing="12">
+            <c:GsSettingsRow Title="{Binding Headline}" Description="{Binding Line}">
+              <Panel>
+                <c:GsButton Classes="primary sm" Icon="reset" Content="Restart to update" Command="{Binding RestartCommand}" IsVisible="{Binding IsReady}"
+                            IsEnabled="{Binding CanRestart}" ToolTip.Tip="{Binding RestartTip}" ToolTip.ShowOnDisabled="True" BusyText="Restarting" />
+                <c:GsButton Classes="sm" Icon="sync" Content="Check now" Command="{Binding CheckNowCommand}" IsVisible="{Binding ShowsCheck}" IsBusy="{Binding IsChecking}"
+                            BusyText="Checking" ToolTip.Tip="Ask GitHub now for GameSync's latest release" />
+                <c:GsButton Classes="sm" Icon="sync" Content="Try again" Command="{Binding CheckNowCommand}" IsVisible="{Binding IsRefused}"
+                            ToolTip.Tip="Get it again from GitHub; it installs only if it passes GameSync's check" />
+              </Panel>
+            </c:GsSettingsRow>
+            <c:GsProgress Value="{Binding Progress}" Label="{Binding ProgressLabel}" Right="{Binding ProgressRight}" IsVisible="{Binding IsDownloading}" />
+            <c:GsNote Classes="warn" Icon="alert" Text="{Binding Warning}" IsVisible="{Binding IsRefused}" />
+            <Border BorderBrush="{DynamicResource line-100}" BorderThickness="0,1,0,0" Padding="0,12,0,0" IsVisible="{Binding HasNotes}">
+              <StackPanel Spacing="8">
+                <TextBlock Classes="overline faint" Text="{Binding NotesTitle}" />
+                <ItemsControl ItemsSource="{Binding Notes}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="x:String">
+                      <Grid ColumnDefinitions="18,*" Margin="0,0,0,4">
+                        <TextBlock Classes="muted" Text="•" FontSize="{DynamicResource fs-13}" LineHeight="{DynamicResource lh-19}" />
+                        <TextBlock Grid.Column="1" Classes="muted" Text="{Binding}" FontSize="{DynamicResource fs-13}" LineHeight="{DynamicResource lh-19}" TextWrapping="Wrap" />
+                      </Grid>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <c:GsButton Classes="ghost sm" Icon="external" Content="Release notes on GitHub" Command="{Binding ReleaseNotesCommand}" IsVisible="{Binding HasPage}"
+                            HorizontalAlignment="Left" />
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </c:GsCard>
+        <c:GsCard Title="Checking">
+          <StackPanel>
+            <c:GsSettingsRow Title="Check for updates every day"
+                             Description="GameSync asks GitHub for its latest release once a day and gets it in the background. Nothing installs until you restart it. Off, Check now still works.">
+              <c:GsSwitch IsChecked="{Binding Daily}" AutomationProperties.Name="Check for updates every day" />
+            </c:GsSettingsRow>
+            <c:GsNote Icon="shield" Margin="0,12,0,0"
+                      Text="GameSync isn't code-signed, so Windows may warn the first time you run it. Every update is checked against GameSync's own release signature before it installs, and anything else is refused." />
+          </StackPanel>
+        </c:GsCard>
+        <c:GsNote Icon="info" Text="{Binding Note.Text, FallbackValue={x:Null}}" Classes.warn="{Binding Note.Failed, FallbackValue=False}" IsVisible="{Binding HasNote}" />
+      </StackPanel>
+    </DataTemplate>
   </UserControl.DataTemplates>
 
-  <Grid ColumnDefinitions="248,*">
+  <Grid>
+    <!-- The sections grow a little with Windows' text size (A11Y-04) -->
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="{DynamicResource col-settings-nav}" />
+      <ColumnDefinition Width="*" />
+    </Grid.ColumnDefinitions>
 
     <!-- The sections, and the version with Copy diagnostics at the foot (SET-05) -->
     <Border BorderBrush="{DynamicResource line-100}" BorderThickness="0,0,1,0" Padding="12,8,12,20">
       <DockPanel>
-        <TextBlock DockPanel.Dock="Top" Text="Settings" FontSize="15" LineHeight="20" FontWeight="SemiBold" Margin="12,0,12,16" />
+        <TextBlock DockPanel.Dock="Top" Text="Settings" FontSize="{DynamicResource fs-15}" LineHeight="{DynamicResource lh-20}" FontWeight="SemiBold" Margin="12,0,12,16" />
         <StackPanel DockPanel.Dock="Bottom" Spacing="8" Margin="12,16,12,0">
           <TextBlock Classes="caption faint" Text="{Binding Footer}" TextWrapping="Wrap" />
           <c:GsButton Classes="sm" Icon="{Binding CopyIcon}" Content="{Binding CopyLabel}" Command="{Binding CopyDiagnosticsCommand}" HorizontalAlignment="Left"

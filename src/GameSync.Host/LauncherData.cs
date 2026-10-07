@@ -119,6 +119,21 @@ public static class LauncherData
         state.SetSetting(Launcher.SortKey, sort.ToString());
     }
 
+    /// <summary>KAN-82: how a game's named saves are listed on this PC: <c>newest</c> first (the default) or by <c>name</c>.</summary>
+    public const string NamedSortKey = "named.sort";
+
+    public static string ReadNamedSort(string dataDir)
+    {
+        using var state = new GameSync.Core.State.StateStore(dataDir);
+        return state.GetSetting(NamedSortKey) == "name" ? "name" : "newest";
+    }
+
+    public static void SetNamedSort(string dataDir, string sort)
+    {
+        using var state = new GameSync.Core.State.StateStore(dataDir);
+        state.SetSetting(NamedSortKey, sort == "name" ? "name" : "newest");
+    }
+
     /// <summary>KAN-47: the library's Installed only on this PC; off until the person ticks it.</summary>
     public static bool ReadInstalledOnly(string dataDir)
     {

@@ -24,11 +24,11 @@ public sealed class GsBackdrop : Control
 {
     public static readonly StyledProperty<IImage?> SourceProperty = AvaloniaProperty.Register<GsBackdrop, IImage?>(nameof(Source));
 
-    private Held? _now;
+    private HeldImage? _now;
     private IImage? _nowFrom;
     private PixelSize _nowAt;
 
-    private Held? _next;
+    private HeldImage? _next;
     private IImage? _nextFrom;
     private Point _centre;
     private double _far;
@@ -195,7 +195,7 @@ public sealed class GsBackdrop : Control
     /// The picture as a Skia image at this control's pixel size, scaled and cropped as CSS's <c>cover</c> does, with high
     /// quality once; null for a picture that isn't a bitmap GameSync made.
     /// </summary>
-    private Held? Prepare(IImage image)
+    private HeldImage? Prepare(IImage image)
     {
         if (image is not Bitmap bitmap || bitmap.PixelSize.Width <= 0 || bitmap.PixelSize.Height <= 0 || Bounds.Width <= 0 || Bounds.Height <= 0)
         {
@@ -221,7 +221,7 @@ public sealed class GsBackdrop : Control
             double shownW = target.Width / scale, shownH = target.Height / scale;
             var from = SKRect.Create((float)((w - shownW) / 2), (float)((h - shownH) / 2), (float)shownW, (float)shownH);
             surface.Canvas.DrawImage(small, from, SKRect.Create(target.Width, target.Height), new SKSamplingOptions(SKCubicResampler.Mitchell));
-            return new Held(surface.Snapshot(), target);
+            return new HeldImage(surface.Snapshot(), target);
         }
         finally
         {
@@ -235,32 +235,8 @@ public sealed class GsBackdrop : Control
         (_now, _nowFrom) = (null, null);
     }
 
-    /// <summary>A prepared picture, held by the backdrop and by the drawings of it the renderer still keeps; let go when none holds it.</summary>
-    private sealed class Held(SKImage image, PixelSize size)
-    {
-        private int _holders = 1;
-
-        public SKImage Image { get; } = image;
-
-        public PixelSize Size { get; } = size;
-
-        public Held Take()
-        {
-            Interlocked.Increment(ref _holders);
-            return this;
-        }
-
-        public void Release()
-        {
-            if (Interlocked.Decrement(ref _holders) == 0)
-            {
-                Image.Dispose();
-            }
-        }
-    }
-
     /// <summary>One frame of the backdrop, drawn by the renderer: the picture copied, and the next one's light over it.</summary>
-    private sealed class Draw(Rect bounds, Held now, Held? next, Point centre, double radius, double brightness) : ICustomDrawOperation
+    private sealed class Draw(Rect bounds, HeldImage now, HeldImage? next, Point centre, double radius, double brightness) : ICustomDrawOperation
     {
         private static readonly SKColor[] LightColours = [SKColors.White, SKColors.White, new SKColor(255, 255, 255, 0x70), SKColors.Transparent];
         private static readonly float[] LightStops = [0f, 0.4f, 0.7f, 1f];

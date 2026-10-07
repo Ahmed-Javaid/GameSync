@@ -88,6 +88,14 @@ internal static class Schedule
 
     public static bool Exists(string name) => Run("/Query", "/TN", name).Code == 0;
 
+    /// <summary>The program a task runs, or null when there's no such task (PKG-05: the uninstaller removes only this copy's).</summary>
+    public static string? CommandOf(string name)
+    {
+        var (code, output) = Run("/Query", "/TN", name, "/XML", "ONE");
+        var command = code == 0 ? System.Text.RegularExpressions.Regex.Match(output, "<Command>(.*?)</Command>", System.Text.RegularExpressions.RegexOptions.Singleline) : null;
+        return command is { Success: true } ? System.Net.WebUtility.HtmlDecode(command.Groups[1].Value.Trim()) : null;
+    }
+
     /// <summary>The program's arguments: the command, and the data folder when it isn't the usual one.</summary>
     public static string Arguments(string command, string dataDir) =>
         Path.GetFullPath(dataDir).Equals(Path.GetFullPath(Engine.DefaultDataDir), StringComparison.OrdinalIgnoreCase) ? command : $"--data \"{dataDir}\" {command}";

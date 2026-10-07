@@ -120,15 +120,30 @@
       "gamesync.storage.drive": {
         "type": "Project",
         "dependencies": {
-          "GameSync.Core": "[1.0.0, )",
+          "GameSync.Core": "[0.5.0, )",
           "Google.Apis.Drive.v3": "[1.76.0.4273, )"
         }
       },
       "gamesync.windows": {
         "type": "Project",
         "dependencies": {
-          "GameSync.Core": "[1.0.0, )",
+          "GameSync.Core": "[0.5.0, )",
           "System.Security.Cryptography.ProtectedData": "[10.0.12, )"
+        }
+      }
+    },
+    "net10.0-windows7.0/win-x64": {
+      "SQLitePCLRaw.lib.e_sqlite3": {
+        "type": "Transitive",
+        "resolved": "2.1.12",
+        "contentHash": "fWi8Dbknuhgg72fWinIdjXVaqO1hHL4YBBwVLnr7e1c9TAZwJ0QE38j9syW1hwx6HaqEVTwI+O07WPdZn8Rp0w=="
+      },
+      "System.Management": {
+        "type": "Transitive",
+        "resolved": "7.0.2",
+        "contentHash": "/qEUN91mP/MUQmJnM5y5BdT7ZoPuVrtxnFlbJ8a3kBJGhe2wCzBfnPFtK2wTtEEcf3DMGR9J00GZZfg6HRI6yA==",
+        "dependencies": {
+          "System.CodeDom": "7.0.0"
         }
       }
     }

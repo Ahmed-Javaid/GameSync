@@ -15,7 +15,8 @@ function rail(cur){return h(G.SideRail,{current:cur,items:[
   {id:'search',icon:'search',label:'Search'},
   {id:'home',icon:'home',label:'Home',sep:true},
   {id:'library',icon:'library',label:'Game library',dot:'play',dotLabel:'Ghost of Tsushima is running'},
-  {id:'saves',icon:'saves',label:'Save manager',sep:true,dot:'warn',dotLabel:'1 game needs you'},
+  {id:'achievements',icon:'trophy',label:'Achievements'},
+  {id:'saves',icon:'saves',label:'Save manager',sep:true,dot:'warn',dotLabel:'1 conflict'},
   {id:'log',icon:'terminal',label:'Console'},
   {id:'settings',icon:'settings',label:'Settings',bottom:true}]})}
 function topbar(title,sub,tabs,right){return h('header',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',gap:16}},h('div',null,h('div',{style:{font:'600 15px/20px var(--font-sans)'}},title),h('div',{className:'gs-faint',style:{fontSize:12}},sub)),tabs,h('div',{className:'gs-row',style:{flexWrap:'nowrap'}},right));}
@@ -41,7 +42,7 @@ function App(){
      h(G.PillTabs,{label:'Save manager view',value:'plan',items:[{id:'saves',label:'Saves',icon:'saves'},{id:'plan',label:'Plan',icon:'chevronsRight'},{id:'versions',label:'Versions',icon:'clock'},{id:'log',label:'Log',icon:'terminal'}]}),
      [h(G.Button,{key:1,variant:'secondary',icon:'sync'},'Check again'),
       h(G.Button,{key:2,variant:'primary',icon:'chevronsRight',disabled:!n},n?'Run '+n+(n===1?' change':' changes'):'Nothing to run')]),
-   h('div',{style:{display:'flex',gap:48,padding:'4px 4px 0'}},h(Stat,{k:'Will run',v:String(n)}),h(Stat,{k:'Needs you',v:'1'}),h(Stat,{k:'Waiting',v:'2'}),h(Stat,{k:'In sync',v:'6'}),h(Stat,{k:'To move',v:G.formatBytes(RUN.filter(function(r){return sel[0].indexOf(r.id)>=0}).reduce(function(a,r){return a+r.size},0))})),
+   h('div',{style:{display:'flex',gap:48,padding:'4px 4px 0'}},h(Stat,{k:'Will run',v:String(n)}),h(Stat,{k:'Conflicts',v:'1'}),h(Stat,{k:'Waiting',v:'2'}),h(Stat,{k:'In sync',v:'6'}),h(Stat,{k:'To move',v:G.formatBytes(RUN.filter(function(r){return sel[0].indexOf(r.id)>=0}).reduce(function(a,r){return a+r.size},0))})),
    h(G.ConsoleTable,{command:'plan',toolbar:h('span',null,n+' of '+RUN.length+' will run · untick a game to skip it this time'),selected:sel[0],onSelect:sel[1],rows:RUN,columns:[
      {key:'name',label:'Game'},
      {key:'action',label:'Action',render:function(r){return h('span',{className:'gs-row',style:{gap:6,flexWrap:'nowrap'}},h(G.Icon,{name:ACT[r.action][0],size:14}),ACT[r.action][1]);}},

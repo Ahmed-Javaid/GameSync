@@ -20,6 +20,11 @@ public static class Icons
         ["zip"] = ["M5 3h10l4 4v14H5z", "M10 3v2h2v2h-2v2h2v2h-2v2", "M9 15h4v4H9z"],
         ["folder"] = ["M3 6h6l2 2h10v11H3z"],
         ["cloud"] = ["M7 18h11a4 4 0 0 0 .5-8A6 6 0 0 0 7 9a4.5 4.5 0 0 0 0 9z"],
+        // Design system version 35: Synced (the owner, 3 Oct 2026: "tick could mean anything"), the Zenith's diamond, the popup's sound.
+        ["cloudCheck"] = ["M7 18h11a4 4 0 0 0 .5-8A6 6 0 0 0 7 9a4.5 4.5 0 0 0 0 9z", "M9 13.2l2.2 2.2 4.3-4.4"],
+        // The Zenith's (design system version 38): a flag planted on a mountain's summit, in place of the diamond.
+        ["zenith"] = ["M2.5 21.5L12 10.5l3 3.6 1.7-2 4.8 9.4z", "M12 1.4l.91 2.35 2.51.14-1.95 1.59.65 2.43L12 6.55 9.88 7.91l.65-2.43-1.95-1.59 2.51-.14z"],
+        ["volume"] = ["M4 9.5h3.5L12 6v12l-4.5-3.5H4z", "M15.5 9a4 4 0 0 1 0 6", "M18 6.5a7.5 7.5 0 0 1 0 11"],
         ["upload"] = ["M12 16V5", "M7 10l5-5 5 5", "M5 19h14"],
         ["download"] = ["M12 5v11", "M7 11l5 5 5-5", "M5 19h14"],
         ["check"] = ["M5 12.5l4.5 4.5L19 7.5"],

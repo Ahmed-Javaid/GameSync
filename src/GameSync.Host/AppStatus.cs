@@ -60,7 +60,8 @@ public sealed record TrayStatus(TrayMood Mood, string Tooltip)
 {
     /// <param name="cloud">Why the cloud couldn't be used in the latest sync, if it couldn't.</param>
     /// <param name="playing">The game being played, if one is.</param>
-    public static TrayStatus From(bool setUp, SyncCounts counts, bool working, CloudErrorKind? cloud, string? playing)
+    /// <param name="moving">KAN-80: an upload or download under way, said in place of "syncing": "uploading 37% Bloodborne GOTY".</param>
+    public static TrayStatus From(bool setUp, SyncCounts counts, bool working, CloudErrorKind? cloud, string? playing, string? moving = null)
     {
         if (!setUp)
         {
@@ -71,13 +72,13 @@ public sealed record TrayStatus(TrayMood Mood, string Tooltip)
         {
             (CloudErrorKind.SignInExpired, _, _, _) => (TrayMood.NeedsYou, "sign in to Google Drive again"),
             (CloudErrorKind.StorageFull, _, _, _) => (TrayMood.NeedsYou, "your Google Drive is full"),
-            (_, { NeedYou: 1 }, _, _) => (TrayMood.NeedsYou, "1 game needs you"),
-            (_, { NeedYou: > 1 }, _, _) => (TrayMood.NeedsYou, $"{Number(counts.NeedYou)} games need you"),
+            (_, { NeedYou: 1 }, _, _) => (TrayMood.NeedsYou, "1 conflict"),
+            (_, { NeedYou: > 1 }, _, _) => (TrayMood.NeedsYou, $"{Number(counts.NeedYou)} conflicts"),
             (CloudErrorKind.Offline, _, _, _) => (TrayMood.Offline, "offline, saves wait on this PC"),
             (_, _, { } game, _) => (TrayMood.Playing, $"playing {game}"),
             // Skip for now in first run: saves are kept on this PC, as asked; nothing is wrong and nothing is being tried.
             (CloudErrorKind.NotConnected, _, _, false) => (TrayMood.Synced, "every version is kept on this PC; no cloud is connected yet"),
-            (_, _, _, true) => (TrayMood.Working, "syncing"),
+            (_, _, _, true) => (TrayMood.Working, moving ?? "syncing"),
             (_, { Waiting: > 0 }, _, _) => (TrayMood.Working, "trying the upload again soon"),
             (_, { Syncing: 0 }, _, _) => (TrayMood.Synced, "no games sync yet"),
             _ => (TrayMood.Synced, "all synced"),
@@ -91,7 +92,7 @@ public sealed record TrayStatus(TrayMood Mood, string Tooltip)
 
         if (counts.NeedYou > 0)
         {
-            parts.Add(counts.NeedYou == 1 ? "1 needs you" : $"{Number(counts.NeedYou)} need you");
+            parts.Add(counts.NeedYou == 1 ? "1 conflict" : $"{Number(counts.NeedYou)} conflicts");
         }
 
         if (counts.Waiting > 0)

@@ -62,14 +62,20 @@
       <Border BorderBrush="{DynamicResource line-100}" BorderThickness="0,0,0,1">
         <Grid>
           <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto" MinWidth="44" SharedSizeGroup="Pick" />
             <ColumnDefinition Width="2*" MinWidth="160" />
-            <ColumnDefinition Width="Auto" SharedSizeGroup="Status" />
+            <ColumnDefinition Width="Auto" MinWidth="170" SharedSizeGroup="Status" />
             <ColumnDefinition Width="3*" />
-            <ColumnDefinition Width="Auto" SharedSizeGroup="Ver" />
-            <ColumnDefinition Width="Auto" SharedSizeGroup="Size" />
-            <ColumnDefinition Width="Auto" SharedSizeGroup="Backup" />
+            <ColumnDefinition Width="Auto" MinWidth="60" SharedSizeGroup="Ver" />
+            <ColumnDefinition Width="Auto" MinWidth="90" SharedSizeGroup="Size" />
+            <ColumnDefinition Width="Auto" MinWidth="130" SharedSizeGroup="Backup" />
           </Grid.ColumnDefinitions>
-          <Button Theme="{StaticResource SortHeading}" Command="{Binding SortCommand}" CommandParameter="Name" AutomationProperties.Name="{Binding GameHeadingName}"
+          <!-- MGR-02: Select all, over the Syncing table's ticks; a dash while only some are ticked -->
+          <CheckBox MinWidth="0" Margin="12,0,0,0" VerticalAlignment="Center" IsVisible="{Binding Selectable}"
+                    IsChecked="{Binding $parent[UserControl].((vm:SaveManagerViewModel)DataContext).AllSelected, Mode=OneWay}"
+                    Command="{Binding $parent[UserControl].((vm:SaveManagerViewModel)DataContext).SelectAllCommand}"
+                    AutomationProperties.Name="Select every game to share" ToolTip.Tip="Ticks every game here, or none once they all are" />
+          <Button Grid.Column="1" Theme="{StaticResource SortHeading}" Command="{Binding SortCommand}" CommandParameter="Name" AutomationProperties.Name="{Binding GameHeadingName}"
                   ToolTip.Tip="Sort this table by name; again reverses it">
             <StackPanel Orientation="Horizontal">
               <TextBlock Classes="th" Text="GAME" Foreground="{Binding $parent[Button].Foreground}" Margin="12,10,6,10" />
@@ -81,7 +87,7 @@
               </c:GsIcon>
             </StackPanel>
           </Button>
-          <Button Grid.Column="1" Theme="{StaticResource SortHeading}" Command="{Binding SortCommand}" CommandParameter="Status"
+          <Button Grid.Column="2" Theme="{StaticResource SortHeading}" Command="{Binding SortCommand}" CommandParameter="Status"
                   AutomationProperties.Name="{Binding StatusHeadingName}" ToolTip.Tip="Sort this table by status, what needs you first; again reverses it">
             <StackPanel Orientation="Horizontal" Margin="0,0,12,0">
               <TextBlock Classes="th" Text="STATUS" Foreground="{Binding $parent[Button].Foreground}" Margin="12,10,6,10" />
@@ -93,48 +99,99 @@
               </c:GsIcon>
             </StackPanel>
           </Button>
-          <TextBlock Grid.Column="2" Classes="th" Text="SAVE PATH" />
-          <TextBlock Grid.Column="3" Classes="th num" Text="VER" />
-          <TextBlock Grid.Column="4" Classes="th num" Text="SIZE" />
-          <TextBlock Grid.Column="5" Classes="th num" Text="LAST BACKUP" />
+          <TextBlock Grid.Column="3" Classes="th" Text="SAVE PATH" />
+          <TextBlock Grid.Column="4" Classes="th num" Text="VER" />
+          <TextBlock Grid.Column="5" Classes="th num" Text="SIZE" />
+          <TextBlock Grid.Column="6" Classes="th num" Text="LAST BACKUP" />
         </Grid>
       </Border>
     </DataTemplate>
+
+    <!-- A table's heading (KAN-114, the owner: "it should be more clear what the top table is and what the bottom table is"):
+         its icon, its name with its count, and a line on what it holds -->
+    <ControlTheme x:Key="TableHeading" TargetType="HeaderedContentControl">
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+            <Border Name="PART_Icon" Width="36" Height="36" CornerRadius="10" Background="{DynamicResource ok-soft}" VerticalAlignment="Top">
+              <c:GsIcon Icon="{TemplateBinding Tag}" Size="20" StrokeWidth="2" Foreground="{DynamicResource ok}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Border>
+            <ContentPresenter Grid.Column="1" Content="{TemplateBinding Content}" VerticalAlignment="Center" />
+          </Grid>
+        </ControlTemplate>
+      </Setter>
+      <Style Selector="^.all /template/ Border#PART_Icon">
+        <Setter Property="Background" Value="{DynamicResource bg-300}" />
+      </Style>
+      <Style Selector="^.all /template/ c|GsIcon">
+        <Setter Property="Foreground" Value="{DynamicResource ink-muted}" />
+      </Style>
+    </ControlTheme>
 
     <DataTemplate x:Key="SaveRowTemplate" x:DataType="vm:SaveRow">
       <Button Theme="{StaticResource SaveRowButton}" AutomationProperties.Name="{Binding}"
               Command="{Binding $parent[UserControl].((vm:SaveManagerViewModel)DataContext).OpenCommand}" CommandParameter="{Binding Id}">
         <Grid>
           <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto" MinWidth="44" SharedSizeGroup="Pick" />
             <ColumnDefinition Width="2*" MinWidth="160" />
-            <ColumnDefinition Width="Auto" SharedSizeGroup="Status" />
+            <ColumnDefinition Width="Auto" MinWidth="170" SharedSizeGroup="Status" />
             <ColumnDefinition Width="3*" />
-            <ColumnDefinition Width="Auto" SharedSizeGroup="Ver" />
-            <ColumnDefinition Width="Auto" SharedSizeGroup="Size" />
-            <ColumnDefinition Width="Auto" SharedSizeGroup="Backup" />
+            <ColumnDefinition Width="Auto" MinWidth="60" SharedSizeGroup="Ver" />
+            <ColumnDefinition Width="Auto" MinWidth="90" SharedSizeGroup="Size" />
+            <ColumnDefinition Width="Auto" MinWidth="130" SharedSizeGroup="Backup" />
           </Grid.ColumnDefinitions>
-          <TextBlock Classes="td" Text="{Binding Title}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Title}" />
-          <c:GsStatusBadge Grid.Column="1" Plain="True" Status="{Binding Status}" Label="{Binding StatusLabel}" Margin="12,0" FontFamily="{DynamicResource font-mono}" />
-          <TextBlock Grid.Column="2" Classes="td path" Text="{Binding Path}" ToolTip.Tip="{Binding Path}" TextTrimming="LeadingCharacterEllipsis" />
-          <TextBlock Grid.Column="3" Classes="td num" Text="{Binding Versions}" />
-          <TextBlock Grid.Column="4" Classes="td num" Text="{Binding Size}" />
-          <TextBlock Grid.Column="5" Classes="td num" Text="{Binding LastBackup}" />
+          <!-- SHARE-01: tick games that sync, for Share selected; the box takes its own click, so the row doesn't open -->
+          <CheckBox MinWidth="0" Margin="12,0,0,0" VerticalAlignment="Center" IsVisible="{Binding Selectable}" IsChecked="{Binding Selected, Mode=OneWay}"
+                    Command="{Binding $parent[UserControl].((vm:SaveManagerViewModel)DataContext).SelectCommand}" CommandParameter="{Binding Id}"
+                    AutomationProperties.Name="{Binding Title, StringFormat='Select {0} to share'}" />
+          <TextBlock Grid.Column="1" Classes="td" Text="{Binding Title}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Title}" />
+          <c:GsStatusBadge Grid.Column="2" Plain="True" Status="{Binding Status}" Label="{Binding StatusLabel}" Margin="12,0" FontFamily="{DynamicResource font-mono}" />
+          <TextBlock Grid.Column="3" Classes="td path" Text="{Binding Path}" ToolTip.Tip="{Binding Path}" TextTrimming="LeadingCharacterEllipsis" />
+          <TextBlock Grid.Column="4" Classes="td num" Text="{Binding Versions}" />
+          <TextBlock Grid.Column="5" Classes="td num" Text="{Binding Size}" />
+          <TextBlock Grid.Column="6" Classes="td num" Text="{Binding LastBackup}" />
         </Grid>
       </Button>
     </DataTemplate>
   </UserControl.Resources>
+  <UserControl.Styles>
+    <!-- The tables' headings (KAN-114): the name, and its count in a pill -->
+    <Style Selector="TextBlock.table-heading">
+      <Setter Property="FontSize" Value="{DynamicResource fs-16}" />
+      <Setter Property="LineHeight" Value="{DynamicResource lh-22}" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Foreground" Value="{DynamicResource ink}" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Border.table-count">
+      <Setter Property="Background" Value="{DynamicResource bg-300}" />
+      <Setter Property="CornerRadius" Value="9" />
+      <Setter Property="Padding" Value="8,1" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Border.table-count > TextBlock">
+      <Setter Property="FontFamily" Value="{DynamicResource font-mono}" />
+      <Setter Property="FontSize" Value="{DynamicResource fs-12}" />
+      <Setter Property="LineHeight" Value="{DynamicResource lh-16}" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Foreground" Value="{DynamicResource ink-muted}" />
+    </Style>
+  </UserControl.Styles>
 
   <Panel Margin="24,20">
     <DockPanel IsVisible="{Binding !HasPage}">
       <!-- The top bar: the view's tabs, and its buttons: Sync now; on Plan, Check again and Run; on Versions, the game and
            the PC shown; on Log, Copy the log -->
-      <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto,*" ColumnSpacing="16" MinHeight="40" Margin="0,0,0,16">
+      <!-- A11Y-04: one row while it fits; with big text in a small window, the tabs go under the title -->
+      <c:GsTopBar DockPanel.Dock="Top" Spacing="16" MinHeight="40" Margin="0,0,0,16">
         <StackPanel VerticalAlignment="Center">
-          <TextBlock Text="{Binding Title}" FontSize="15" LineHeight="20" FontWeight="SemiBold" />
+          <TextBlock Text="{Binding Title}" FontSize="{DynamicResource fs-15}" LineHeight="{DynamicResource lh-20}" FontWeight="SemiBold" />
           <TextBlock Classes="caption faint" Text="{Binding TopSubtitle}" TextTrimming="CharacterEllipsis" />
         </StackPanel>
-        <c:GsPillTabs Grid.Column="1" ItemsSource="{Binding Tabs}" SelectedId="{Binding Tab, Mode=TwoWay}" AutomationProperties.Name="Save manager view" />
-        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" VerticalAlignment="Center">
+        <c:GsPillTabs ItemsSource="{Binding Tabs}" SelectedId="{Binding Tab, Mode=TwoWay}" AutomationProperties.Name="Save manager view" />
+        <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" VerticalAlignment="Center">
+          <c:GsIconButton Icon="download" Label="Import saves" Click="PickZip" IsVisible="{Binding ShowsTable}" ToolTip.Tip="Saves someone shared with you, from a zip" />
           <c:GsButton Classes="primary" Icon="sync" Content="Sync now" Command="{Binding SyncNowCommand}" IsVisible="{Binding ShowsTable}"
                       ToolTip.Tip="Every game syncs in a moment; a game you're playing, once you quit" />
           <c:GsButton Icon="sync" Content="Check again" Command="{Binding Plan.CheckCommand}" IsVisible="{Binding ShowsPlan}" IsEnabled="{Binding !Plan.Busy}"
@@ -146,7 +203,7 @@
           <c:GsButton Icon="copy" Content="Copy the log" Click="CopyLog" IsVisible="{Binding ShowsLog}" IsEnabled="{Binding LogTab.HasLines}"
                       ToolTip.Tip="Puts the lines shown on the clipboard, for a bug report: never sign-in tokens or save files" />
         </StackPanel>
-      </Grid>
+      </c:GsTopBar>
 
       <Panel>
       <!-- Every game's saves -->
@@ -171,25 +228,68 @@
 
       <c:GsConsoleLog DockPanel.Dock="Bottom" Lines="{Binding Log}" Live="True" Height="168" Margin="0,16,0,0" AutomationProperties.Name="What GameSync is doing" />
 
-      <!-- KAN-49: the games that sync, then every game, in one scroll; a heading sorts both -->
+      <!-- KAN-49: the games that sync, then every game, in one scroll; a heading sorts both. PERF-03: each table makes only
+           the rows in view (500 games opened in 1.8 s when it made them all), and its columns start at their usual widths. -->
       <ScrollViewer Classes="page" HorizontalScrollBarVisibility="Disabled">
-        <StackPanel Spacing="16" Grid.IsSharedSizeScope="True">
-          <c:GsConsole Command="{Binding SyncingSort.CommandLine}" IsVisible="{Binding HasSyncingRows}" AutomationProperties.Name="Syncing">
+        <StackPanel Spacing="12" Grid.IsSharedSizeScope="True">
+          <HeaderedContentControl Theme="{StaticResource TableHeading}" Tag="cloudCheck" IsVisible="{Binding HasSyncingRows}">
+            <StackPanel Spacing="2">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Classes="table-heading" Text="Syncing between your PCs" />
+                <Border Classes="table-count" AutomationProperties.Name="{Binding SyncingCount, StringFormat='{}{0} games'}">
+                  <TextBlock Text="{Binding SyncingCount}" />
+                </Border>
+              </StackPanel>
+              <TextBlock Classes="caption muted" Text="{Binding SyncingSub}" TextWrapping="Wrap" />
+            </StackPanel>
+          </HeaderedContentControl>
+          <c:GsConsole Command="{Binding SyncingSort.CommandLine}" IsVisible="{Binding HasSyncingRows}" AutomationProperties.Name="Syncing between your PCs">
             <c:GsConsole.Toolbar>
-              <TextBlock Text="Syncing: the games GameSync backs up and syncs" />
+              <!-- SHARE-01, SHARE-04: sharing, beside the ticks it uses -->
+              <StackPanel Orientation="Horizontal" Spacing="12">
+                <TextBlock Text="Tick games to share them" VerticalAlignment="Center" />
+                <c:GsButton Classes="sm" Icon="share" Content="{Binding ShareSelectedLabel}" Command="{Binding ShareSelectedCommand}" IsEnabled="{Binding HasSelection}"
+                            ToolTip.Tip="Puts the ticked games' saves in a zip to share" />
+                <c:GsButton Classes="sm" Icon="zip" Content="Share all" Command="{Binding ShareAllCommand}"
+                            ToolTip.Tip="The current save of every game that can be shared, in one zip" />
+              </StackPanel>
             </c:GsConsole.Toolbar>
             <StackPanel>
               <ContentControl Content="{Binding SyncingSort}" ContentTemplate="{StaticResource SaveHeader}" />
-              <ItemsControl ItemsSource="{Binding SyncingRows}" ItemTemplate="{StaticResource SaveRowTemplate}" />
+              <ItemsControl ItemsSource="{Binding SyncingRows}" ItemTemplate="{StaticResource SaveRowTemplate}" KeyboardNavigation.TabNavigation="Once">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate>
+                    <VirtualizingStackPanel />
+                  </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+              </ItemsControl>
             </StackPanel>
           </c:GsConsole>
-          <c:GsConsole Command="{Binding AllSort.CommandLine}" AutomationProperties.Name="Every game">
+          <HeaderedContentControl Theme="{StaticResource TableHeading}" Classes="all" Tag="saves" Margin="0,10,0,0">
+            <StackPanel Spacing="2">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Classes="table-heading" Text="Every game with saves on this PC" />
+                <Border Classes="table-count" AutomationProperties.Name="{Binding AllCount, StringFormat='{}{0} games'}">
+                  <TextBlock Text="{Binding AllCount}" />
+                </Border>
+              </StackPanel>
+              <TextBlock Classes="caption muted" Text="Everything the scan found, syncing or not. A game's row opens its saves, where Sync these saves starts one syncing."
+                         TextWrapping="Wrap" />
+            </StackPanel>
+          </HeaderedContentControl>
+          <c:GsConsole Command="{Binding AllSort.CommandLine}" AutomationProperties.Name="Every game with saves on this PC">
             <c:GsConsole.Toolbar>
-              <TextBlock Text="Every game with saves on this PC · a game's row opens its saves" />
+              <TextBlock Text="A game's row opens its saves" />
             </c:GsConsole.Toolbar>
             <StackPanel>
               <ContentControl Content="{Binding AllSort}" ContentTemplate="{StaticResource SaveHeader}" />
-              <ItemsControl ItemsSource="{Binding Rows}" ItemTemplate="{StaticResource SaveRowTemplate}" />
+              <ItemsControl ItemsSource="{Binding Rows}" ItemTemplate="{StaticResource SaveRowTemplate}" KeyboardNavigation.TabNavigation="Once">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate>
+                    <VirtualizingStackPanel />
+                  </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+              </ItemsControl>
             </StackPanel>
           </c:GsConsole>
         </StackPanel>
@@ -381,7 +481,15 @@
           </c:GsConsole.Toolbar>
           <DockPanel>
             <Border DockPanel.Dock="Top" BorderBrush="{DynamicResource line-100}" BorderThickness="0,0,0,1">
-              <Grid ColumnDefinitions="148,2*,104,3*,64,96">
+              <Grid>
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="{DynamicResource cw-148}" />
+                  <ColumnDefinition Width="2*" />
+                  <ColumnDefinition Width="{DynamicResource cw-104}" />
+                  <ColumnDefinition Width="3*" />
+                  <ColumnDefinition Width="{DynamicResource cw-64}" />
+                  <ColumnDefinition Width="{DynamicResource cw-96}" />
+                </Grid.ColumnDefinitions>
                 <TextBlock Classes="th" Text="SAVED" />
                 <TextBlock Grid.Column="1" Classes="th" Text="GAME" />
                 <TextBlock Grid.Column="2" Classes="th" Text="PC" />
@@ -394,7 +502,8 @@
               <c:GsNote Icon="search" Text="{Binding EmptyText}" IsVisible="{Binding IsEmpty}" VerticalAlignment="Top" Margin="12" FontFamily="{DynamicResource font-sans}" />
               <!-- Rows are made only as they scroll into view, however many versions there are -->
               <ScrollViewer HorizontalScrollBarVisibility="Disabled" IsVisible="{Binding HasRows}">
-                <ItemsControl ItemsSource="{Binding Rows}">
+                <!-- A11Y-02: one Tab stop, Up and Down from version to version -->
+                <ItemsControl ItemsSource="{Binding Rows}" KeyboardNavigation.TabNavigation="Once">
                   <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>
                       <VirtualizingStackPanel />
@@ -405,14 +514,22 @@
                       <Button Theme="{StaticResource SaveRowButton}" AutomationProperties.Name="{Binding}"
                               Command="{Binding $parent[UserControl].((vm:SaveManagerViewModel)DataContext).Versions.OpenCommand}" CommandParameter="{Binding}"
                               ToolTip.Tip="Opens its game's saves, where Restore is">
-                        <Grid ColumnDefinitions="148,2*,104,3*,64,96">
+                        <Grid>
+                          <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="{DynamicResource cw-148}" />
+                            <ColumnDefinition Width="2*" />
+                            <ColumnDefinition Width="{DynamicResource cw-104}" />
+                            <ColumnDefinition Width="3*" />
+                            <ColumnDefinition Width="{DynamicResource cw-64}" />
+                            <ColumnDefinition Width="{DynamicResource cw-96}" />
+                          </Grid.ColumnDefinitions>
                           <TextBlock Classes="td" Text="{Binding Saved}" />
                           <TextBlock Grid.Column="1" Classes="td" Text="{Binding Game}" TextTrimming="CharacterEllipsis" />
                           <TextBlock Grid.Column="2" Classes="td" Text="{Binding Pc}" TextTrimming="CharacterEllipsis" />
-                          <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="6" Margin="12,0" ClipToBounds="True">
-                            <c:GsIcon Icon="{Binding Icon}" Size="14" Foreground="{DynamicResource ink-muted}" VerticalAlignment="Center" />
+                          <DockPanel Grid.Column="3" Margin="12,0" ClipToBounds="True">
+                            <c:GsIcon DockPanel.Dock="Left" Icon="{Binding Icon}" Size="14" Foreground="{DynamicResource ink-muted}" VerticalAlignment="Center" Margin="0,0,6,0" />
                             <TextBlock Classes="td" Padding="0" Text="{Binding Why}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-                          </StackPanel>
+                          </DockPanel>
                           <TextBlock Grid.Column="4" Classes="td num" Text="{Binding Files}" />
                           <TextBlock Grid.Column="5" Classes="td num" Text="{Binding Size}" />
                         </Grid>

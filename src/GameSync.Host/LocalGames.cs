@@ -138,8 +138,19 @@ public static class LocalGames
             throw new UsageException(refused);
         }
 
-        engine.Library.SaveAll([Library.Locate(entry, folder, Fingerprinter.Read(folder), DateTime.UtcNow)]);
-        GameLaunch.SetProgram(engine.State, game, full);
+        var located = Library.Locate(entry, folder, Fingerprinter.Read(folder), DateTime.UtcNow);
+        engine.Library.SaveAll([located]);
+
+        // R15: a game with an anti-cheat starts only through its anti-cheat's own launcher, never the program picked.
+        if (located.HasAntiCheat && !GameLaunch.IsAntiCheatLauncher(full))
+        {
+            GameLaunch.SetProgram(engine.State, game, null);
+            return GameLaunch.AntiCheatLauncher(folder) is { } launcher
+                ? $"{entry.DisplayTitle} is on this PC, in {folder}. It has an anti-cheat, so Play starts it through {System.IO.Path.GetFileName(launcher)}."
+                : $"{entry.DisplayTitle} is on this PC, in {folder}. It has an anti-cheat, so start it from its launcher; GameSync backs up its saves when you've played.";
+        }
+
+        GameLaunch.SetProgram(engine.State, game, full, located.HasAntiCheat);
         return $"{entry.DisplayTitle} is on this PC, in {folder}. Play starts {System.IO.Path.GetFileName(full)} from there.";
     }
 

@@ -18,7 +18,9 @@
           <StackPanel Spacing="2" VerticalAlignment="Center">
             <TextBlock Classes="mono" Text="{Binding FolderText}" TextTrimming="LeadingCharacterEllipsis" ToolTip.Tip="{Binding FolderText}" IsVisible="{Binding ShowsFolder}" />
             <TextBlock Classes="mono" Text="{Binding Portable}" TextTrimming="LeadingCharacterEllipsis" ToolTip.Tip="{Binding Portable}" IsVisible="{Binding !ShowsFolder}" />
-            <TextBlock Classes="caption faint" Text="{Binding Evidence}" TextTrimming="CharacterEllipsis" />
+            <TextBlock Classes="caption faint" Text="{Binding Caption}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Caption}" />
+            <!-- R2 (version 51): a program found here, never backed up, says so in warn -->
+            <c:GsNote Icon="alert" Classes="warn" Text="{Binding ProgramNote}" IsVisible="{Binding HasProgramNote}" Margin="0,4,0,0" />
           </StackPanel>
           <c:GsTag Grid.Column="1" Text="{Binding Tag}" Background="{DynamicResource bg-400}" IsVisible="{Binding HasTag}" VerticalAlignment="Center" />
           <c:GsIconButton Grid.Column="2" Classes="sm" Icon="folder" Label="Open the save folder" Command="{Binding OpenFolder}" IsVisible="{Binding CanOpen}"
@@ -40,7 +42,7 @@
         <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
           <Button Theme="{StaticResource CrumbButton}" Content="{Binding Root}" Command="{Binding BackCommand}" />
           <c:GsIcon Icon="chevronRight" Size="14" Foreground="{DynamicResource ink-muted}" VerticalAlignment="Center" />
-          <TextBlock Text="{Binding Title}" FontSize="13" FontWeight="Medium" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+          <TextBlock Text="{Binding Title}" FontSize="{DynamicResource fs-13}" FontWeight="Medium" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
         </StackPanel>
       </StackPanel>
       <!-- The save work, for every game (KAN-63, KAN-64): on a game not syncing yet, each says first that GameSync starts
@@ -49,7 +51,10 @@
       <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" IsVisible="{Binding HasDetail}">
         <c:GsButton Classes="ghost" Icon="download" Content="Import kept saves…" Command="{Binding OpenImportKeptCommand}" IsVisible="{Binding Syncing}"
                     ToolTip.Tip="Copies of its saves you kept by hand become named saves; the copies aren't changed" />
-        <c:GsButton Classes="ghost" Icon="download" Content="Import kept saves…" IsVisible="{Binding NotSyncing}"
+        <!-- KAN-61: a live save beside copies kept by hand: the buttons open KeptCopiesDialog, which backs up the live save only -->
+        <c:GsButton Classes="ghost" Icon="download" Content="Import kept saves…" Command="{Binding OpenKeptCommand}" CommandParameter="backup"
+                    IsVisible="{Binding NotSyncingKept}" ToolTip.Tip="The copies beside the live save become named saves; the copies aren't changed" />
+        <c:GsButton Classes="ghost" Icon="download" Content="Import kept saves…" IsVisible="{Binding NotSyncingPlain}"
                     ToolTip.Tip="Copies of its saves you kept by hand become named saves; the copies aren't changed">
           <c:GsButton.Flyout>
             <Flyout Placement="BottomEdgeAlignedRight">
@@ -62,9 +67,16 @@
             </Flyout>
           </c:GsButton.Flyout>
         </c:GsButton>
+        <!-- KAN-84: its current save, or any of its saves, in a zip a friend can import -->
+        <c:GsButton Classes="ghost" Icon="share" Content="Share…" Command="{Binding ShareCommand}" IsEnabled="{Binding CanShare}" IsVisible="{Binding Syncing}"
+                    ToolTip.Tip="{Binding ShareTip}" ToolTip.ShowOnDisabled="True" />
         <c:GsButton Classes.primary="{Binding !NeedsYou}" Icon="upload" Content="Back up now" Command="{Binding BackUpNowCommand}"
-                    IsEnabled="{Binding !IsPlaying}" ToolTip.Tip="{Binding BackUpTip}" IsVisible="{Binding Syncing}" />
-        <c:GsButton Classes="primary" Icon="upload" Content="Back up now" IsEnabled="{Binding !IsPlaying}" IsVisible="{Binding NotSyncing}">
+                    ToolTip.Tip="{Binding BackUpTip}" IsVisible="{Binding Syncing}"
+                    IsBusy="{Binding BackUpNowCommand.IsRunning}" BusyText="Backing up" />
+        <c:GsButton Classes="primary" Icon="upload" Content="Back up now" Command="{Binding OpenKeptCommand}" CommandParameter="backup"
+                    IsVisible="{Binding NotSyncingKept}" ToolTip.Tip="Backs up the live save, and the copies beside it as named saves" />
+        <c:GsButton Classes="primary" Icon="upload" Content="Back up now" IsVisible="{Binding NotSyncingPlain}" ToolTip.Tip="{Binding BackUpTip}"
+                    IsBusy="{Binding BackUpNowCommand.IsRunning}" BusyText="Backing up">
           <c:GsButton.Flyout>
             <Flyout Placement="BottomEdgeAlignedRight">
               <StackPanel Width="300" Spacing="12" Margin="8">
@@ -86,17 +98,20 @@
                 BoxShadow="{DynamicResource lift-card}" CornerRadius="{DynamicResource radius-lg}" Padding="20,14">
           <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="16">
             <c:GsStatusBadge Status="{Binding Status}" Label="{Binding StatusLabel}" VerticalAlignment="Center" />
-            <TextBlock Grid.Column="1" Classes="muted" Text="{Binding Sentence}" FontSize="13" LineHeight="19" TextWrapping="Wrap" VerticalAlignment="Center" />
+            <TextBlock Grid.Column="1" Classes="muted" Text="{Binding Sentence}" FontSize="{DynamicResource fs-13}" LineHeight="{DynamicResource lh-19}" TextWrapping="Wrap" VerticalAlignment="Center" />
             <c:GsButton Grid.Column="2" Classes="primary" Icon="alert" Content="Resolve" Command="{Binding ResolveCommand}" IsVisible="{Binding IsConflict}"
                         ToolTip.Tip="Both saves side by side, to choose the one to carry on with" />
             <c:GsButton Grid.Column="2" Classes="primary" Icon="sync" Content="Retry" Command="{Binding RetryCommand}" IsVisible="{Binding IsFilesInUse}"
                         ToolTip.Tip="Sync it again, once the program holding its files lets go" />
             <c:GsButton Grid.Column="2" Classes="primary" Icon="plus" Content="Add a place…" Command="{Binding OpenAddPlaceCommand}" IsVisible="{Binding IsSavesMissing}"
                         ToolTip.Tip="Set where its saves are by hand" />
+            <!-- FIND-04: learn mode found where it saves -->
+            <c:GsButton Grid.Column="2" Classes="primary" Icon="search" Content="See what it found" Command="{Binding SeeLearnFindsCommand}" IsVisible="{Binding SeesLearnFinds}"
+                        ToolTip.Tip="The places it wrote to while learn mode watched; nothing syncs until you choose" />
             <c:GsButton Grid.Column="2" Classes="primary" Icon="sync" Content="Sync between PCs" Command="{Binding SyncGameCommand}" IsVisible="{Binding IsKeptOnly}"
-                        ToolTip.Tip="Keeps its saves in step on every PC from now on" />
+                        ToolTip.Tip="Keeps its saves in step on every PC from now on" IsBusy="{Binding SyncGameCommand.IsRunning}" BusyText="Syncing" />
             <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" IsVisible="{Binding IsHeld}">
-              <c:GsButton Icon="reset" Content="Restore the previous save">
+              <c:GsButton Icon="reset" Content="Restore the previous save" ToolTip.Tip="Brings back the save from before the change; the changed one stays in the history">
                 <c:GsButton.Flyout>
                   <Flyout Placement="BottomEdgeAlignedRight">
                     <StackPanel Width="280" Spacing="12" Margin="8">
@@ -107,25 +122,37 @@
                   </Flyout>
                 </c:GsButton.Flyout>
               </c:GsButton>
-              <c:GsButton Classes="primary" Icon="check" Content="Keep the new save" Command="{Binding ApproveCommand}" />
+              <c:GsButton Classes="primary" Icon="check" Content="Keep the new save" Command="{Binding ApproveCommand}"
+                          ToolTip.Tip="Keeps the changed save as its current one, and syncs it; the one before stays in the history" />
             </StackPanel>
           </Grid>
         </Border>
 
-        <!-- KAN-51: a restore under way, then that it's in place, or why it couldn't be -->
-        <c:GsNote Icon="sync" Text="{Binding RestoreNote}" IsVisible="{Binding Restoring}" Margin="4,0" />
+        <!-- KAN-80: its upload or download as it goes, here whether or not the dialog that started it is still open -->
+        <c:GsJobProgress Classes="boxed" IsVisible="{Binding Transfer.IsShown, FallbackValue=False}" Title="{Binding Transfer.Title}" Value="{Binding Transfer.Value}"
+                         Detail="{Binding Transfer.Detail}" Speed="{Binding Transfer.Speed}" Left="{Binding Transfer.Left}" State="{Binding Transfer.State, FallbackValue=running}"
+                         Note="{Binding Transfer.Note}" />
+
+        <!-- KAN-51: a restore under way, then that it's in place, or why it couldn't be; moving while it runs (KAN-80) -->
+        <c:GsNote Icon="sync" Text="{Binding RestoreNote}" IsVisible="{Binding Restoring}" IsBusy="True" Margin="4,0" />
         <c:GsNote Icon="check" Text="{Binding RestoreNote}" IsVisible="{Binding RestoreDone}" Foreground="{DynamicResource ok}" Margin="4,0" />
         <c:GsNote Icon="alert" Text="{Binding RestoreNote}" IsVisible="{Binding RestoreFailed}" Foreground="{DynamicResource danger}" Margin="4,0" />
+        <c:GsNote Icon="folder" Text="{Binding ExportNote}" IsVisible="{Binding Exporting}" IsBusy="True" Margin="4,0" />
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12" Margin="4,0" IsVisible="{Binding ExportDone}">
+          <c:GsNote Icon="check" Text="{Binding ExportNote}" Foreground="{DynamicResource ok}" VerticalAlignment="Center" />
+          <c:GsButton Grid.Column="1" Classes="ghost sm" Icon="folder" Content="Open" Command="{Binding OpenExportedCommand}" ToolTip.Tip="Opens the folder in Explorer" />
+        </Grid>
+        <c:GsNote Icon="alert" Text="{Binding ExportNote}" IsVisible="{Binding ExportFailed}" Foreground="{DynamicResource danger}" Margin="4,0" />
 
         <!-- The last conflict, settled while its winner is current: which save is, with See both and Swap (SYNC-04) -->
         <Border Background="{DynamicResource bg-200}" BorderBrush="{DynamicResource edge-card}" BorderThickness="1" BackgroundSizing="OuterBorderEdge"
                 BoxShadow="{DynamicResource lift-card}" CornerRadius="{DynamicResource radius-lg}" Padding="20,14" IsVisible="{Binding ShowsSettled}">
           <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
             <c:GsIcon Icon="sync" Size="16" Foreground="{DynamicResource ink-muted}" VerticalAlignment="Center" />
-            <TextBlock Grid.Column="1" Classes="muted" Text="{Binding SettledText}" FontSize="13" LineHeight="19" TextWrapping="Wrap" VerticalAlignment="Center" />
+            <TextBlock Grid.Column="1" Classes="muted" Text="{Binding SettledText}" FontSize="{DynamicResource fs-13}" LineHeight="{DynamicResource lh-19}" TextWrapping="Wrap" VerticalAlignment="Center" />
             <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8">
-              <c:GsButton Classes="ghost sm" Content="See both" Command="{Binding ResolveCommand}" />
-              <c:GsButton Classes="sm" Icon="sync" Content="{Binding SwapLabel}">
+              <c:GsButton Classes="ghost sm" Content="See both" Command="{Binding ResolveCommand}" ToolTip.Tip="Both saves side by side" />
+              <c:GsButton Classes="sm" Icon="sync" Content="{Binding SwapLabel}" ToolTip.Tip="Puts the other PC's save in place; this one is kept first">
                 <c:GsButton.Flyout>
                   <Flyout Placement="BottomEdgeAlignedRight">
                     <StackPanel Width="280" Spacing="12" Margin="8">
@@ -140,121 +167,152 @@
           </Grid>
         </Border>
 
-        <!-- A game that syncs: named saves and where the saves are, then its history and log -->
+        <!-- A game that syncs: named saves, and where the saves are with the current save; then its history and log -->
         <Grid ColumnDefinitions="*,*" ColumnSpacing="16" IsVisible="{Binding Syncing}">
-          <c:GsCard Title="Named saves" Subtitle="On every PC, and back in one step." VerticalAlignment="Top">
+          <!-- KAN-82: the count in the heading, a search and a sort kept per PC, and a list that scrolls inside the card;
+               KAN-83: no pin (every named save is pinned); KAN-85: Export beside Restore; KAN-87: where it's kept, in More -->
+          <c:GsCard Title="{Binding NamedTitle}" Subtitle="On every PC, and back in one step." VerticalAlignment="Top">
             <!-- The owner, 1 Oct 2026: making one is where they're listed -->
             <c:GsCard.Action>
-            <c:GsButton Classes="sm" Icon="plus" Content="New named save…" ToolTip.Tip="Keeps this save under a name, on every PC">
-              <c:GsButton.Flyout>
-                <Flyout Placement="BottomEdgeAlignedRight">
-                  <StackPanel Width="300" Spacing="12" Margin="8">
-                    <TextBlock Text="Keep this save under a name" FontWeight="SemiBold" />
-                    <TextBlock Classes="caption muted" TextWrapping="Wrap"
-                               Text="It's kept on every PC and never thinned, and comes back in one step: before a boss, or a big choice." />
-                    <TextBox Text="{Binding SaveName}" PlaceholderText="Before Lady Maria" AutomationProperties.Name="Name for this save" MaxLength="100">
-                      <TextBox.KeyBindings>
-                        <KeyBinding Gesture="Enter" Command="{Binding SaveAsCommand}" />
-                      </TextBox.KeyBindings>
-                    </TextBox>
-                    <c:GsButton Classes="primary sm" Icon="pin" Content="Save" HorizontalAlignment="Right" Command="{Binding SaveAsCommand}" Click="CloseFlyout" />
-                  </StackPanel>
-                </Flyout>
-              </c:GsButton.Flyout>
-            </c:GsButton>
-            </c:GsCard.Action>
-            <Panel>
-              <c:GsNote Icon="info" IsVisible="{Binding NoNamedSaves}" Text="None yet. New named save… keeps this save under a name, on every PC: before a boss or a big choice." />
-              <ItemsControl ItemsSource="{Binding NamedSaves}" IsVisible="{Binding HasNamedSaves}">
-                <ItemsControl.ItemsPanel>
-                  <ItemsPanelTemplate>
-                    <StackPanel Spacing="12" />
-                  </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-                <ItemsControl.ItemTemplate>
-                  <DataTemplate x:DataType="vm:NamedSaveItem">
-                    <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="12" AutomationProperties.Name="{Binding}">
-                      <c:GsIcon Icon="pin" Size="16" VerticalAlignment="Center" Foreground="{DynamicResource ink-muted}" />
-                      <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                        <TextBlock Classes="mono-small faint" Text="{Binding Meta}" />
-                      </StackPanel>
-                      <!-- KAN-51: the named save whose files are the game's now says so, instead of offering Restore -->
-                      <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" Margin="0,0,10,0" IsVisible="{Binding IsInPlace}"
-                                  ToolTip.Tip="These are the game's save files now">
-                        <c:GsIcon Icon="check" Size="14" StrokeWidth="2" Foreground="{DynamicResource ok}" VerticalAlignment="Center" />
-                        <TextBlock Classes="caption" Text="In place" Foreground="{DynamicResource ok}" VerticalAlignment="Center" />
-                      </StackPanel>
-                      <c:GsButton Grid.Column="2" Classes="ghost sm" Icon="reset" Content="Restore" AutomationProperties.Name="{Binding Name, StringFormat='Restore {0}'}"
-                                  IsVisible="{Binding CanRestore}">
-                        <c:GsButton.Flyout>
-                          <Flyout Placement="BottomEdgeAlignedRight">
-                            <StackPanel Width="280" Spacing="12" Margin="8">
-                              <TextBlock Text="{Binding Name, StringFormat='Bring back “{0}”?'}" FontWeight="SemiBold" TextWrapping="Wrap" />
-                              <TextBlock Classes="caption muted" TextWrapping="Wrap" Text="Your files now are kept as a version first, so you can go back to them." />
-                              <c:GsButton Classes="primary sm" Icon="reset" Content="Restore" HorizontalAlignment="Right" Click="CloseFlyout"
-                                          Command="{Binding $parent[v:GameSavesPage].((vm:GameSavesViewModel)DataContext).RestoreCommand}" CommandParameter="{Binding}" />
-                            </StackPanel>
-                          </Flyout>
-                        </c:GsButton.Flyout>
-                      </c:GsButton>
-                      <!-- Rename, and Remove the name: the save stays in the history (BAK-18) -->
-                      <c:GsIconButton Grid.Column="3" Classes="sm" Icon="more" Label="{Binding Name, StringFormat='More for {0}'}" VerticalAlignment="Center">
-                        <c:GsIconButton.Flyout>
-                          <Flyout Placement="BottomEdgeAlignedRight">
-                            <StackPanel Width="300" Spacing="12" Margin="8">
-                              <TextBlock Text="Give this save a new name" FontWeight="SemiBold" />
-                              <TextBox Text="{Binding NewName}" MaxLength="100" AutomationProperties.Name="{Binding Name, StringFormat='New name for {0}'}">
-                                <TextBox.KeyBindings>
-                                  <KeyBinding Gesture="Enter" Command="{Binding $parent[v:GameSavesPage].((vm:GameSavesViewModel)DataContext).RenameSaveCommand}"
-                                              CommandParameter="{Binding}" />
-                                </TextBox.KeyBindings>
-                              </TextBox>
-                              <c:GsButton Classes="primary sm" Icon="pencil" Content="Rename" HorizontalAlignment="Right" Click="CloseFlyout"
-                                          Command="{Binding $parent[v:GameSavesPage].((vm:GameSavesViewModel)DataContext).RenameSaveCommand}" CommandParameter="{Binding}" />
-                              <Border Height="1" Background="{DynamicResource line-100}" />
-                              <TextBlock Classes="caption muted" TextWrapping="Wrap"
-                                         Text="Without its name, the save stays in the history, where it comes back like any version." />
-                              <c:GsButton Classes="sm" Icon="x" Content="Remove the name" HorizontalAlignment="Left" Click="CloseFlyout"
-                                          Command="{Binding $parent[v:GameSavesPage].((vm:GameSavesViewModel)DataContext).ForgetSaveCommand}" CommandParameter="{Binding}" />
-                            </StackPanel>
-                          </Flyout>
-                        </c:GsIconButton.Flyout>
-                      </c:GsIconButton>
-                    </Grid>
-                  </DataTemplate>
-                </ItemsControl.ItemTemplate>
-              </ItemsControl>
-            </Panel>
-          </c:GsCard>
-
-          <c:GsCard Grid.Column="1" Title="Where the saves are" Subtitle="{Binding FoundBy}" VerticalAlignment="Top">
-            <c:GsCard.Action>
-              <c:GsButton Classes="ghost sm" Icon="settings" Content="Choose files…" Command="{Binding ChooseFilesCommand}" />
+              <c:GsButton Classes="sm" Icon="plus" Content="New named save…" Command="{Binding OpenNamedSaveCommand}"
+                          ToolTip.Tip="Keeps the save as it is now under a name, on every PC" />
             </c:GsCard.Action>
             <StackPanel Spacing="8">
-              <ItemsControl ItemsSource="{Binding Places}" ItemTemplate="{StaticResource PlaceRow}">
-                <ItemsControl.ItemsPanel>
-                  <ItemsPanelTemplate>
-                    <StackPanel Spacing="8" />
-                  </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-              </ItemsControl>
-              <c:GsButton Classes="sm" Icon="plus" Content="Add a place…" Command="{Binding OpenAddPlaceCommand}" HorizontalAlignment="Left" Margin="0,4,0,0"
-                          ToolTip.Tip="A folder or file where it keeps saves GameSync didn't find" />
-              <StackPanel Spacing="8" IsVisible="{Binding HasSuggestions}" Margin="0,4,0,0">
-                <TextBlock Classes="caption muted" TextWrapping="Wrap" Text="A later scan found these too. They don't sync until you add them." />
-                <ItemsControl ItemsSource="{Binding Suggestions}" ItemTemplate="{StaticResource PlaceRow}">
+              <c:GsNote Icon="info" IsVisible="{Binding NoNamedSaves}" Text="None yet. New named save… keeps this save under a name, on every PC: before a boss or a big choice." />
+              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" IsVisible="{Binding HasNamedTools}">
+                <TextBox Classes="search clearButton" PlaceholderText="Find a named save" Text="{Binding NamedSearch}" AutomationProperties.Name="Find a named save">
+                  <TextBox.InnerLeftContent>
+                    <c:GsIcon Icon="search" Size="16" Margin="12,0,0,0" Foreground="{DynamicResource ink-faint}" VerticalAlignment="Center" />
+                  </TextBox.InnerLeftContent>
+                </TextBox>
+                <c:GsSelect Grid.Column="1" Label="Sort" Options="{Binding NamedSortOptions}" Value="{Binding NamedSort, Mode=TwoWay}" VerticalAlignment="Center"
+                            ToolTip.Tip="Newest first, or by name; kept on this PC" />
+              </Grid>
+              <c:GsNote Icon="search" Text="{Binding NoMatchText}" IsVisible="{Binding NoNamedMatch}" />
+              <!-- The scroll bar in the middle of the card's own gutter, clear of each row's More (the owner, 3 Oct 2026; KAN-71) -->
+              <ScrollViewer MaxHeight="364" HorizontalScrollBarVisibility="Disabled" IsVisible="{Binding HasNamedSaves}" Margin="0,0,-16,0" Padding="0,0,16,0">
+                <!-- A11Y-02: one Tab stop, Up and Down between saves, Left and Right between a save's buttons -->
+                <ItemsControl Name="NamedList" ItemsSource="{Binding ShownNamedSaves}" AutomationProperties.Name="Named saves" KeyboardNavigation.TabNavigation="Once">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:NamedSaveItem">
+                      <Border BorderBrush="{DynamicResource line-100}" BorderThickness="0,0,0,1" MinHeight="52" AutomationProperties.Name="{Binding}">
+                        <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="4" VerticalAlignment="Center">
+                          <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Name}" />
+                            <TextBlock Classes="mono-small faint" Text="{Binding Meta}" />
+                          </StackPanel>
+                          <!-- KAN-51: the named save whose files are the game's now says so, instead of offering Restore -->
+                          <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" Margin="0,0,10,0" IsVisible="{Binding IsInPlace}"
+                                      ToolTip.Tip="These are the game's save files now">
+                            <c:GsIcon Icon="check" Size="14" StrokeWidth="2" Foreground="{DynamicResource ok}" VerticalAlignment="Center" />
+                            <TextBlock Classes="caption" Text="In place" Foreground="{DynamicResource ok}" VerticalAlignment="Center" />
+                          </StackPanel>
+                          <c:GsButton Grid.Column="1" Classes="ghost sm" Icon="reset" Content="Restore" AutomationProperties.Name="{Binding Name, StringFormat='Restore {0}'}"
+                                      IsVisible="{Binding CanRestore}" IsBusy="{Binding IsRestoring}" BusyText="Restoring"
+                                      ToolTip.Tip="Puts this save in place of your current one; your current save is kept first">
+                            <c:GsButton.Flyout>
+                              <!-- KAN-89: it asks first, saying what it does; KAN-91: and what to expect while the game runs -->
+                              <Flyout Placement="BottomEdgeAlignedRight">
+                                <StackPanel Width="320" Spacing="12" Margin="8">
+                                  <TextBlock Text="{Binding Question}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                  <TextBlock Classes="caption muted" TextWrapping="Wrap" Text="{Binding Detail}" />
+                                  <c:GsNote Icon="play" Foreground="{DynamicResource warn}" Text="{Binding $parent[v:GameSavesPage].((vm:GameSavesViewModel)DataContext).RunningNote}"
+                                            IsVisible="{Binding $parent[v:GameSavesPage].((vm:GameSavesViewModel)DataContext).HasRunningNote}" />
+                                  <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+                                    <c:GsButton Classes="ghost sm" Content="Cancel" Click="CloseFlyout" />
+                                    <c:GsButton Classes="primary sm" Icon="reset" Content="Restore" Click="CloseFlyout"
+                                                Command="{Binding $parent[v:GameSavesPage].((vm:GameSavesViewModel)DataContext).RestoreCommand}" CommandParameter="{Binding}" />
+                                  </StackPanel>
+                                </StackPanel>
+                              </Flyout>
+                            </c:GsButton.Flyout>
+                          </c:GsButton>
+                          <c:GsButton Grid.Column="2" Classes="ghost sm" Content="Export" AutomationProperties.Name="{Binding Name, StringFormat='Export {0}'}"
+                                      Command="{Binding $parent[v:GameSavesPage].((vm:GameSavesViewModel)DataContext).ExportCommand}" CommandParameter="{Binding}"
+                                      ToolTip.Tip="Puts this save in a zip to share; More exports it as a plain folder" />
+                          <!-- Rename, where it's kept with Export as a folder (KAN-87), and Remove the name: the save stays in the history (BAK-18) -->
+                          <c:GsIconButton Grid.Column="3" Classes="sm" Icon="more" Label="{Binding Name, StringFormat='More for {0}'}" VerticalAlignment="Center">
+                            <c:GsIconButton.Flyout>
+                              <Flyout Placement="BottomEdgeAlignedRight">
+                                <StackPanel Width="340" Spacing="10" Margin="8">
+                                  <TextBlock Text="Give this save a new name" FontWeight="SemiBold" />
+                                  <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                    <TextBox Text="{Binding NewName}" MaxLength="100" AutomationProperties.Name="{Binding Name, StringFormat='New name for {0}'}">
+                                      <TextBox.KeyBindings>
+                                        <KeyBinding Gesture="Enter" Command="{Binding $parent[v:GameSavesPage].((vm:GameSavesViewModel)DataContext).RenameSaveCommand}"
+                                                    CommandParameter="{Binding}" />
+                                      </TextBox.KeyBindings>
+                                    </TextBox>
+                                    <c:GsButton Grid.Column="1" Classes="primary sm" Icon="pencil" Content="Rename" Click="CloseFlyout" ToolTip.Tip="Renames it on every PC"
+                                                Command="{Binding $parent[v:GameSavesPage].((vm:GameSavesViewModel)DataContext).RenameSaveCommand}" CommandParameter="{Binding}" />
+                                  </Grid>
+                                  <Border Height="1" Background="{DynamicResource line-100}" />
+                                  <TextBlock Text="Where it's kept" FontWeight="SemiBold" />
+                                  <TextBlock Classes="caption muted" TextWrapping="Wrap" Text="{x:Static vm:NamedSaveItem.WhereKept}" />
+                                  <WrapPanel ItemSpacing="8" LineSpacing="8">
+                                    <c:GsButton Classes="sm" Icon="folder" Content="Export as a folder…" Click="ExportFolder"
+                                                ToolTip.Tip="Copies its files into a folder you pick, named after it, as the game keeps them" />
+                                    <c:GsButton Classes="ghost sm" Icon="external" Content="Open the backup folder" Click="CloseFlyout"
+                                                Command="{Binding $parent[v:GameSavesPage].((vm:GameSavesViewModel)DataContext).OpenBackupCommand}"
+                                                ToolTip.Tip="Opens the backup folder in Explorer; its files there are stored by content, not as a save" />
+                                  </WrapPanel>
+                                  <Border Height="1" Background="{DynamicResource line-100}" />
+                                  <TextBlock Classes="caption muted" TextWrapping="Wrap"
+                                             Text="Without its name, the save stays in the history, where it comes back like any version." />
+                                  <c:GsButton Classes="sm" Icon="x" Content="Remove the name" HorizontalAlignment="Left" Click="CloseFlyout"
+                                              Command="{Binding $parent[v:GameSavesPage].((vm:GameSavesViewModel)DataContext).ForgetSaveCommand}" CommandParameter="{Binding}"
+                                              ToolTip.Tip="Takes the name away; the save stays in the history" />
+                                </StackPanel>
+                              </Flyout>
+                            </c:GsIconButton.Flyout>
+                          </c:GsIconButton>
+                        </Grid>
+                      </Border>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </ScrollViewer>
+            </StackPanel>
+          </c:GsCard>
+
+          <StackPanel Grid.Column="1" Spacing="16" VerticalAlignment="Top">
+            <c:GsCard Title="Where the saves are" Subtitle="{Binding FoundBy}">
+              <c:GsCard.Action>
+                <c:GsButton Classes="ghost sm" Icon="settings" Content="Choose files…" Command="{Binding ChooseFilesCommand}" ToolTip.Tip="Which of its files are backed up" />
+              </c:GsCard.Action>
+              <StackPanel Spacing="8">
+                <ItemsControl ItemsSource="{Binding Places}" ItemTemplate="{StaticResource PlaceRow}">
                   <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>
                       <StackPanel Spacing="8" />
                     </ItemsPanelTemplate>
                   </ItemsControl.ItemsPanel>
                 </ItemsControl>
-                <c:GsButton Classes="sm" Icon="plus" Content="Add these places" Command="{Binding SyncGameCommand}" HorizontalAlignment="Left" />
+                <c:GsButton Classes="sm" Icon="plus" Content="Add a place…" Command="{Binding OpenAddPlaceCommand}" HorizontalAlignment="Left" Margin="0,4,0,0"
+                            ToolTip.Tip="A folder or file where it keeps saves GameSync didn't find" />
+                <StackPanel Spacing="8" IsVisible="{Binding HasSuggestions}" Margin="0,4,0,0">
+                  <TextBlock Classes="caption muted" TextWrapping="Wrap" Text="A later scan found these too. They don't sync until you add them." />
+                  <ItemsControl ItemsSource="{Binding Suggestions}" ItemTemplate="{StaticResource PlaceRow}">
+                    <ItemsControl.ItemsPanel>
+                      <ItemsPanelTemplate>
+                        <StackPanel Spacing="8" />
+                      </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                  </ItemsControl>
+                  <c:GsButton Classes="sm" Icon="plus" Content="Add these places" Command="{Binding SyncGameCommand}" HorizontalAlignment="Left"
+                              ToolTip.Tip="Its rules take these places too, from now on" />
+                </StackPanel>
               </StackPanel>
-            </StackPanel>
-          </c:GsCard>
+            </c:GsCard>
+
+            <!-- KAN-92 (the owner's drawing): the live save as the game has it now -->
+            <c:GsCard Title="Current save" Subtitle="As the game has it now, on this PC." IsVisible="{Binding HasCurrent}">
+              <StackPanel Spacing="8">
+                <c:GsFacts ItemsSource="{Binding CurrentFacts}" />
+                <c:GsNote Icon="lock" Text="{Binding CurrentInUse}" IsVisible="{Binding HasCurrentInUse}" />
+              </StackPanel>
+            </c:GsCard>
+          </StackPanel>
         </Grid>
 
         <c:GsConsole Command="{Binding HistoryCommand}" IsVisible="{Binding Syncing}">
@@ -298,24 +356,36 @@
                       <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" Margin="12,0" VerticalAlignment="Center">
                         <c:GsTag Text="Current" Background="{DynamicResource secondary-soft}" Foreground="{DynamicResource ink}" IsVisible="{Binding IsCurrent}" />
                         <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding ShowsNote}">
-                          <c:GsIcon Icon="pin" Size="14" Foreground="{DynamicResource ink-muted}" VerticalAlignment="Center" IsVisible="{Binding ShowsPin}" />
+                          <c:GsIcon Icon="pin" Size="14" Foreground="{DynamicResource ink-muted}" VerticalAlignment="Center" IsVisible="{Binding ShowsPin}"
+                                    ToolTip.Tip="Kept forever: never thinned" />
                           <TextBlock Classes="td path" Margin="0" Text="{Binding Note}" />
                         </StackPanel>
                       </StackPanel>
                       <TextBlock Grid.Column="3" Classes="td num" Text="{Binding Size}" />
-                      <c:GsButton Grid.Column="4" Classes="ghost sm" Content="Restore" Margin="0,0,8,0" FontFamily="{DynamicResource font-sans}"
-                                  IsVisible="{Binding CanRestore}" AutomationProperties.Name="{Binding Saved, StringFormat='Restore the save from {0}'}">
+                      <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="4" Margin="0,0,8,0">
+                      <c:GsButton Classes="ghost sm" Content="Export" FontFamily="{DynamicResource font-sans}"
+                                  Command="{Binding $parent[v:GameSavesPage].((vm:GameSavesViewModel)DataContext).ExportCommand}" CommandParameter="{Binding}"
+                                  AutomationProperties.Name="{Binding Saved, StringFormat='Export the save from {0}'}" ToolTip.Tip="Puts this save in a zip to share" />
+                      <c:GsButton Classes="ghost sm" Content="Restore" FontFamily="{DynamicResource font-sans}" IsBusy="{Binding IsRestoring}" BusyText="Restoring"
+                                  IsVisible="{Binding CanRestore}" AutomationProperties.Name="{Binding Saved, StringFormat='Restore the save from {0}'}"
+                                  ToolTip.Tip="Puts this save in place of your current one; your current save is kept first">
                         <c:GsButton.Flyout>
                           <Flyout Placement="BottomEdgeAlignedRight">
-                            <StackPanel Width="280" Spacing="12" Margin="8">
-                              <TextBlock Text="{Binding Saved, StringFormat='Bring back the save from {0}?'}" FontWeight="SemiBold" TextWrapping="Wrap" />
-                              <TextBlock Classes="caption muted" TextWrapping="Wrap" Text="Your files now are kept as a version first, so you can go back to them." />
-                              <c:GsButton Classes="primary sm" Icon="reset" Content="Restore" HorizontalAlignment="Right" Click="CloseFlyout"
-                                          Command="{Binding $parent[v:GameSavesPage].((vm:GameSavesViewModel)DataContext).RestoreCommand}" CommandParameter="{Binding}" />
+                            <StackPanel Width="320" Spacing="12" Margin="8">
+                              <TextBlock Text="{Binding Question}" FontWeight="SemiBold" TextWrapping="Wrap" FontFamily="{DynamicResource font-sans}" />
+                              <TextBlock Classes="caption muted" TextWrapping="Wrap" Text="{Binding Detail}" FontFamily="{DynamicResource font-sans}" />
+                              <c:GsNote Icon="play" Foreground="{DynamicResource warn}" Text="{Binding $parent[v:GameSavesPage].((vm:GameSavesViewModel)DataContext).RunningNote}"
+                                        IsVisible="{Binding $parent[v:GameSavesPage].((vm:GameSavesViewModel)DataContext).HasRunningNote}" FontFamily="{DynamicResource font-sans}" />
+                              <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+                                <c:GsButton Classes="ghost sm" Content="Cancel" Click="CloseFlyout" />
+                                <c:GsButton Classes="primary sm" Icon="reset" Content="Restore" Click="CloseFlyout"
+                                            Command="{Binding $parent[v:GameSavesPage].((vm:GameSavesViewModel)DataContext).RestoreCommand}" CommandParameter="{Binding}" />
+                              </StackPanel>
                             </StackPanel>
                           </Flyout>
                         </c:GsButton.Flyout>
                       </c:GsButton>
+                      </StackPanel>
                     </Grid>
                   </Border>
                 </DataTemplate>
@@ -324,17 +394,68 @@
           </StackPanel>
         </c:GsConsole>
 
+        <!-- FIND-04 (design system version 43): learn mode waiting for the next session, watching, or what it found -->
+        <c:GsCard Title="Learn mode" Subtitle="{Binding LearnSubtitle}" IsVisible="{Binding ShowsLearn}">
+          <c:GsCard.Action>
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <c:GsButton Classes="ghost sm" Content="Turn off learn mode" Command="{Binding TurnOffLearnCommand}" IsVisible="{Binding LearnCanTurnOff}"
+                          ToolTip.Tip="GameSync stops watching it; Add a place… still sets where its saves are" />
+              <c:GsButton Classes="sm" Icon="search" Content="Turn on learn mode" Command="{Binding TurnOnLearnCommand}" IsVisible="{Binding LearnCanTurnOn}"
+                          ToolTip.Tip="Watches the next time you play it, and shows you where it saved" />
+              <c:GsButton Classes="sm" Icon="search" Content="See what it found…" Command="{Binding SeeLearnFindsCommand}" IsVisible="{Binding LearnFound}"
+                          ToolTip.Tip="Every place it wrote to; nothing syncs until you choose" />
+            </StackPanel>
+          </c:GsCard.Action>
+          <StackPanel Spacing="8">
+            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10" IsVisible="{Binding HasLearnNote}">
+              <c:GsSpinner Size="16" IsVisible="{Binding LearnWatching}" VerticalAlignment="Top" Margin="0,2,0,0" />
+              <c:GsIcon Icon="search" Size="16" Foreground="{DynamicResource ink-muted}" IsVisible="{Binding !LearnWatching}" VerticalAlignment="Top" Margin="0,2,0,0" />
+              <TextBlock Grid.Column="1" Classes="muted" Text="{Binding LearnNote}" TextWrapping="Wrap" FontSize="{DynamicResource fs-13}" LineHeight="{DynamicResource lh-19}" />
+            </Grid>
+            <ItemsControl ItemsSource="{Binding LearnPlaces}">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                  <StackPanel Spacing="8" />
+                </ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:LearnPlaceRow">
+                  <Border Background="{DynamicResource surface-well}" BorderBrush="{DynamicResource edge-well}" BorderThickness="1" BackgroundSizing="OuterBorderEdge"
+                          CornerRadius="{DynamicResource radius-md}" Padding="12,8" ToolTip.Tip="{Binding Path}">
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                      <StackPanel Spacing="2">
+                        <TextBlock Classes="mono" Text="{Binding Portable}" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Classes="caption muted" Text="{Binding Meta}" TextTrimming="CharacterEllipsis" />
+                      </StackPanel>
+                      <c:GsTag Grid.Column="1" Text="{Binding Tag}" Background="{DynamicResource bg-400}" IsVisible="{Binding HasTag}" VerticalAlignment="Center" />
+                    </Grid>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <TextBlock Classes="caption faint" Text="{Binding LearnMore}" IsVisible="{Binding HasLearnMore}" TextWrapping="Wrap" />
+          </StackPanel>
+        </c:GsCard>
+
         <!-- A game not syncing yet: the saves found, with Sync these saves -->
         <c:GsCard Title="Saves found" Subtitle="{Binding FoundBy}" IsVisible="{Binding NotSyncing}">
           <c:GsCard.Action>
             <StackPanel Orientation="Horizontal" Spacing="8">
-              <c:GsButton Classes="ghost sm" Content="Choose files…" Command="{Binding ChooseFilesCommand}" IsVisible="{Binding HasPlaces}" />
-              <c:GsButton Classes="primary sm" Icon="check" Content="Sync these saves" Command="{Binding SyncGameCommand}" IsVisible="{Binding HasPlaces}" />
+              <c:GsButton Classes="ghost sm" Content="Choose files…" Command="{Binding ChooseFilesCommand}" IsVisible="{Binding ChoosesFiles}"
+                          ToolTip.Tip="Which of its files are backed up" />
+              <!-- KAN-23: a place by hand starts it syncing with that place -->
+              <c:GsButton Classes="sm" Icon="plus" Content="Add a place…" Command="{Binding OpenAddPlaceCommand}" IsVisible="{Binding NotSyncingPlain}"
+                          ToolTip.Tip="Where it keeps saves GameSync didn't find; it starts syncing with that place" />
+              <c:GsButton Classes="primary sm" Icon="check" Content="Sync these saves" Command="{Binding SyncGameCommand}" IsVisible="{Binding HasPlaces}"
+                          ToolTip.Tip="Keeps every version, on this PC and in the cloud, and brings the newest to your other PCs"
+                          IsBusy="{Binding SyncGameCommand.IsRunning}" BusyText="Syncing" />
             </StackPanel>
           </c:GsCard.Action>
           <StackPanel Spacing="8">
-            <c:GsNote Icon="search" IsVisible="{Binding NothingFound}"
-                      Text="No saves were found for it on this PC yet. They're looked for again at every scan." />
+            <c:GsNote Icon="search" IsVisible="{Binding NothingFoundNote}"
+                      Text="No saves were found for it on this PC yet. They're looked for again at every scan, or Add a place… sets where they are." />
+            <c:GsNote Icon="info" IsVisible="{Binding LearnNothingFoundNote}"
+                      Text="Not found yet: nothing GameSync knows as saves, and the save list doesn't know this copy. Learn mode finds them by watching; Add a place… sets them if you know where they are." />
             <ItemsControl ItemsSource="{Binding Places}" ItemTemplate="{StaticResource PlaceRow}">
               <ItemsControl.ItemsPanel>
                 <ItemsPanelTemplate>
@@ -342,6 +463,18 @@
                 </ItemsPanelTemplate>
               </ItemsControl.ItemsPanel>
             </ItemsControl>
+            <!-- KAN-61: the copies kept by hand beside the live save, with Bring them in… -->
+            <Border Background="{DynamicResource surface-well}" BorderBrush="{DynamicResource edge-well}" BorderThickness="1" BackgroundSizing="OuterBorderEdge"
+                    CornerRadius="{DynamicResource radius-md}" Padding="12,8,8,8" IsVisible="{Binding NotSyncingKept}">
+              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                <StackPanel VerticalAlignment="Center" Spacing="2">
+                  <TextBlock Text="{Binding KeptTitle}" FontSize="{DynamicResource fs-13}" />
+                  <TextBlock Classes="caption muted" Text="{Binding KeptMeta}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding KeptMeta}" />
+                </StackPanel>
+                <c:GsButton Grid.Column="1" Classes="ghost sm" Content="Bring them in…" Command="{Binding OpenKeptCommand}" CommandParameter="sync"
+                            VerticalAlignment="Center" ToolTip.Tip="Syncs the live save and brings the copies in as named saves" />
+              </Grid>
+            </Border>
             <c:GsNote Icon="shield" IsVisible="{Binding HasPlaces}"
                       Text="Not syncing yet: nothing is backed up until you say so. Only save data ever moves, never the game's own files." />
           </StackPanel>
@@ -350,24 +483,7 @@
         <!-- Named saves before syncing (KAN-63): New named save… and Import kept saves… work now, keeping its saves without syncing them -->
         <c:GsCard Title="Named saves" Subtitle="On every PC, and back in one step." IsVisible="{Binding NotSyncing}">
           <c:GsCard.Action>
-            <c:GsButton Classes="sm" Icon="plus" Content="New named save…" ToolTip.Tip="Keeps this save under a name, on every PC">
-              <c:GsButton.Flyout>
-                <Flyout Placement="BottomEdgeAlignedRight">
-                  <StackPanel Width="300" Spacing="12" Margin="8">
-                    <TextBlock Text="Keep this save under a name" FontWeight="SemiBold" />
-                    <TextBlock Classes="caption muted" TextWrapping="Wrap"
-                               Text="It's kept on every PC and never thinned, and comes back in one step: before a boss, or a big choice." />
-                    <TextBlock Classes="caption muted" TextWrapping="Wrap" Text="{Binding KeepLine}" />
-                    <TextBox Text="{Binding SaveName}" PlaceholderText="Before Lady Maria" AutomationProperties.Name="Name for this save" MaxLength="100">
-                      <TextBox.KeyBindings>
-                        <KeyBinding Gesture="Enter" Command="{Binding SaveAsCommand}" />
-                      </TextBox.KeyBindings>
-                    </TextBox>
-                    <c:GsButton Classes="primary sm" Icon="pin" Content="Save" HorizontalAlignment="Right" Command="{Binding SaveAsCommand}" Click="CloseFlyout" />
-                  </StackPanel>
-                </Flyout>
-              </c:GsButton.Flyout>
-            </c:GsButton>
+            <c:GsButton Classes="sm" Icon="plus" Content="New named save…" Command="{Binding OpenNamedSaveCommand}" ToolTip.Tip="Keeps this save under a name, on every PC" />
           </c:GsCard.Action>
           <c:GsNote Icon="info"
                     Text="None yet. New named save… keeps this save under a name, like Before Orphan of Kos, and Import kept saves… brings in copies you kept by hand. Either starts GameSync keeping its saves, backed up but not synced between your PCs." />
