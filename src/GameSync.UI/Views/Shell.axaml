@@ -19,6 +19,9 @@
       </Panel>
     </DockPanel>
 
+    <!-- ONB-08: the tour over the window, the page dimmed but for what each stop points at -->
+    <v:TourOverlay DataContext="{Binding Tour}" IsVisible="{Binding $parent[v:Shell].((vm:ShellViewModel)DataContext).HasTour, FallbackValue=False}" />
+
     <!-- A dialog (a game's Properties) over the whole window: the page behind dims and waits until it closes -->
     <Border Name="DialogLayer" Background="{DynamicResource scrim}" IsVisible="{Binding HasDialog}" Padding="24,48,24,24">
       <ContentControl Content="{Binding Dialog}" HorizontalAlignment="Center" VerticalAlignment="Center" />

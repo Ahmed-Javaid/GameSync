@@ -1,14 +1,26 @@
-<!-- @dsCard group="Screens" height=800 width=1280 page=true subtitle="Game library: the list with search, sort and favourites beside the covers; a game's page opens beside the list" -->
+<!-- @dsCard group="Screens" height=800 width=1280 page=true subtitle="Game library: the view and the order as dropdowns atop the list, the covers beside it; a game's page opens beside the list" -->
 <!doctype html>
 <html lang="en">
 <head><meta charset="utf-8"><title>preview</title>
 <style>
 html,body{margin:0;background:var(--bg-100);}
-.lib-pane{width:272px;flex-shrink:0;padding:12px;gap:12px;min-height:0}
+.lib-pane{width:288px;flex-shrink:0;padding:12px;gap:12px;min-height:0}
 .lib-scroll{flex:1;min-height:0;overflow:auto;margin:0 -6px;padding:0 6px;scrollbar-width:thin;scrollbar-color:var(--bg-400) transparent}
 .lib-content{flex:1;min-width:0;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:16px;padding-right:4px;scrollbar-width:thin;scrollbar-color:var(--bg-400) transparent}
 .lib-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:20px 16px}
 .lib-grid .gs-tile{width:100%}
+.lib-saves{position:relative}
+.lib-saves .gs-tile-art{filter:grayscale(.9) brightness(.55)}
+.lib-saves-tag{position:absolute;left:8px;top:8px;z-index:1;display:inline-flex;align-items:center;gap:5px;height:22px;padding:0 8px;border-radius:var(--radius-pill);background:rgba(10,12,16,.82);border:1px solid rgba(255,255,255,.18);color:#e8edf2;font:600 10px/14px var(--font-sans);letter-spacing:.08em;text-transform:uppercase;pointer-events:none}
+.lib-notice{display:flex;align-items:center;gap:14px;padding:12px 16px;border-radius:var(--radius-lg);border:1px solid var(--line-200);background:var(--bg-300)}
+.lib-notice.is-done{background:var(--primary-soft);border-color:var(--primary)}
+.lib-notice.is-problem{background:var(--warn-soft);border-color:var(--warn)}
+.lib-notice-mark{width:32px;height:32px;border-radius:16px;flex-shrink:0;align-self:flex-start;display:grid;place-items:center;background:var(--bg-400);color:var(--ink)}
+.lib-notice.is-done .lib-notice-mark{background:var(--primary);color:var(--on-primary)}
+.lib-notice.is-problem .lib-notice-mark{background:var(--bg-100);color:var(--warn)}
+.lib-notice-text{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.lib-notice-title{font:600 14px/20px var(--font-sans);color:var(--ink)}
+.lib-notice-detail{font:400 13px/19px var(--font-sans);color:var(--ink-muted)}
 .lib-crumb{display:flex;align-items:center;gap:6px;font:500 13px/20px var(--font-sans);min-width:0}
 .lib-crumb button{border:0;background:none;padding:0;color:var(--ink-muted);font:inherit;cursor:pointer}
 .lib-crumb button:hover{color:var(--ink);text-decoration:underline}
@@ -95,7 +107,7 @@ function rail(cur, onNav){return h(G.SideRail,{current:cur,onNavigate:onNav,item
   {id:'achievements',icon:'trophy',label:'Achievements'},
   {id:'saves',icon:'saves',label:'Save manager',sep:true,dot:'warn',dotLabel:'2 conflicts'},
   {id:'log',icon:'terminal',label:'Console'},
-  {id:'settings',icon:'settings',label:'Settings',bottom:true}]})}
+  {id:'guide',icon:'help',label:'Guide',bottom:true},{id:'settings',icon:'settings',label:'Settings',bottom:true}]})}
 
 /* ---------- What GameSync knows about each game: Steam's store page (one request per new game), this PC, its saves ---------- */
 var INFO = {
@@ -257,29 +269,68 @@ function GamePage(p){
 /* ---------- The covers ---------- */
 function Covers(p){
   var favs = p.games.filter(function(g){return g.fav}), rest = p.games.filter(function(g){return !g.fav});
+  // Version 57 (the friend: "Games with detected saves should be displayed different to installed games"): a game not
+  // installed here, whose saves GameSync keeps, is greyed with a Saves only tag on its cover.
   function tiles(list){return h('div',{className:'lib-grid'},list.map(function(g){
-    return h('div',{key:g.id,onContextMenu:function(e){e.preventDefault();p.onMenu(g,e)}},
-      h(G.GameTile,{name:g.name,art:g.art,status:g.status||undefined,statusLabel:g.statusLabel,meta:meta(g),achievements:ACH_DONE[g.id],onClick:function(){p.onOpen(g.id)}}));}))}
+    var savesOnly = g.installed===false;
+    return h('div',{key:g.id,className:savesOnly?'lib-saves':null,onContextMenu:function(e){e.preventDefault();p.onMenu(g,e)}},
+      savesOnly?h('span',{className:'lib-saves-tag'},h(G.Icon,{name:'saves',size:12,strokeWidth:2}),'Saves only'):null,
+      h(G.GameTile,{name:g.name,art:g.art,status:g.status||undefined,statusLabel:g.statusLabel,meta:savesOnly?'Not installed here \u00b7 saves kept':meta(g),achievements:ACH_DONE[g.id],onClick:function(){p.onOpen(g.id)}}));}))}
   return h(React.Fragment,null,
     h('header',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',gap:16}},
       h('div',{style:{minWidth:0}},h('div',{style:{font:'600 15px/20px var(--font-sans)'}},'My games'),h('div',{className:'gs-faint',style:{fontSize:12}},GAMES.length+' games \u00b7 '+GAMES.filter(function(g){return g.installed!==false}).length+' installed')),
-      h(G.PillTabs,{label:'Library view',value:p.tab,onChange:p.onTab,items:[{id:'all',label:'All games'},{id:'installed',label:'Installed'},{id:'local',label:'Local'},{id:'attn',label:'Conflicts',count:GAMES.filter(function(g){return NEEDS[g.status]}).length},{id:'software',label:'Software'},{id:'hidden',label:'Hidden'}]}),
-      h(G.Button,{icon:'plus'},'Add game')),
+      h('div',{className:'gs-row',style:{gap:8,flexWrap:'nowrap'}},
+        h(G.Button,{variant:'secondary',icon:'folder',title:'A folder your games are in: you pick which of what\u2019s inside are games',onClick:p.onScan},'Add game folder'),
+        h(G.Button,{icon:'plus',title:'One game, or a folder of your own such as a server\u2019s world'},'Add game'))),
+    // The views are a dropdown atop the list since version 59. What Add game folder is doing, found, or why it couldn't is a
+    // notice under the header, in any view, until it's closed (the owner, 18 Oct 2026, of version 58's plain line: "That
+    // information line is too bare. it need to be apparent that this is something we want you to see").
+    p.notice ? h(Notice,{kind:p.notice,onShow:p.onShowFound,onClose:p.onCloseNotice}) : null,
+    // Saves only: games whose saves GameSync keeps, not installed on this PC (version 57).
+    p.tab === 'saves' ? h('div',{className:'gs-card',style:{flexDirection:'row',alignItems:'center',gap:16,padding:'14px 20px'}},
+      h(G.Icon,{name:'saves',size:18}),
+      h('p',{className:'gs-muted',style:{margin:0,flex:1,fontSize:13,lineHeight:'19px'}},'Games whose saves GameSync keeps, but that aren\u2019t installed on this PC: from your other PCs, a friend\u2019s zip, or a game you uninstalled. Install one, and its saves are ready.')) : null,
+    // Hidden: what the person hid, and what a later scan found in a game folder that doesn't look like a game (LIB-30).
+    p.tab === 'hidden' ? h('div',{className:'gs-card',style:{flexDirection:'row',alignItems:'center',gap:16,padding:'14px 20px'}},
+      h(G.Icon,{name:'info',size:18}),
+      h('p',{className:'gs-muted',style:{margin:0,flex:1,fontSize:13,lineHeight:'19px'}},'Games you hid, and anything new in a game folder that doesn\u2019t look like a game, such as an app. Show in the launcher brings one back.')) : null,
     // Local: games in their own folders, started without a store's launcher; the folders to look in are the person's.
     p.tab === 'local' ? h('div',{className:'gs-card',style:{flexDirection:'row',alignItems:'center',gap:16,padding:'14px 20px'}},
       h(G.Icon,{name:'folder',size:18}),
       h('p',{className:'gs-muted',style:{margin:0,flex:1,fontSize:13,lineHeight:'19px'}},'Games in their own folders, started without a store\u2019s launcher. GameSync finds them in the folders you give it, such as G:\\ or E:\\Games.'),
-      h(G.Button,{size:'sm',variant:'secondary',icon:'search'},'Scan a folder for games\u2026')) : null,
+      h(G.Button,{size:'sm',variant:'secondary',icon:'search',onClick:p.onScan},'Scan a folder for games\u2026')) : null,
     p.games.length === 0 ? h('div',{className:'gs-note',style:{fontSize:13}},h(G.Icon,{name:'search',size:16}),'No game here matches \u201c'+p.query+'\u201d.')
-    : favs.length ? [h('div',{key:'fh',className:'gs-overline'},'Favourites'),h('div',{key:'ft'},tiles(favs)),rest.length?h('div',{key:'rh',className:'gs-overline'},p.tab==='all'?'All games':'The rest'):null,h('div',{key:'rt'},tiles(rest))]
+    : favs.length ? [h('div',{key:'fh',className:'gs-overline'},'Favourites'),h('div',{key:'ft'},tiles(favs)),rest.length?h('div',{key:'rh',className:'gs-overline'},p.tab==='all'?'All games':p.tab==='installed'?'Installed':'The rest'):null,h('div',{key:'rt'},tiles(rest))]
     : tiles(rest));
+}
+
+// The library's views, each a choice in the dropdown atop the list (version 59; the owner, 18 Oct 2026, of version 58's row of
+// pills: "Make it into a dropdown next to name with all these settings"). Software and Hidden only when there are any.
+var VIEWS = [{id:'installed',label:'Installed'},{id:'saves',label:'Saves only'},{id:'all',label:'All games'},{id:'local',label:'Local'},{id:'software',label:'Software'},{id:'hidden',label:'Hidden'}];
+function inViewOf(view, g){ return view==='software'?!!g.software:view==='hidden'?!!g.hidden
+  : view==='saves'?g.installed===false&&!g.software&&!g.hidden
+  : view==='installed'?g.installed!==false&&!g.software&&!g.hidden : view==='local'?!!g.loose&&g.installed!==false&&!g.hidden : !g.software&&!g.hidden; }
+// What Add game folder is doing, found, or why it couldn't, as the app says it (#notice:looking, #notice:found, #notice:problem).
+var NOTICES = {
+  looking:{title:'Looking for games in G:\\',detail:'GameSync scans the rest of this PC with it, which takes a minute or so.'},
+  found:{title:'Found 2 games in G:\\, 1 of them new',detail:'Black Myth: Wukong, Ghost of Tsushima. They\u2019re in the Local view, and Play starts each from its folder.'},
+  problem:{title:'Couldn\u2019t look in G:\\',detail:'There\u2019s no folder G:\\.'}};
+function Notice(p){
+  var n = NOTICES[p.kind], done = p.kind==='found', problem = p.kind==='problem';
+  return h('div',{className:'lib-notice'+(done?' is-done':problem?' is-problem':''),role:'status','aria-live':'polite','aria-label':n.title+'. '+n.detail},
+    h('span',{className:'lib-notice-mark'},p.kind==='looking'?h(G.Spinner,{size:18}):h(G.Icon,{name:done?'check':'alert',size:18,strokeWidth:done?2.4:2.2})),
+    h('div',{className:'lib-notice-text'},h('div',{className:'lib-notice-title'},n.title),h('div',{className:'lib-notice-detail'},n.detail)),
+    p.kind==='looking'?null:h('div',{className:'gs-row',style:{gap:4,flexWrap:'nowrap'}},
+      done?h(G.Button,{size:'sm',onClick:p.onShow,title:'The Local view: games in their own folders, which Play starts from there'},'Show them'):null,
+      h(G.IconButton,{size:'sm',icon:'x',label:'Close this notice',onClick:p.onClose})));
 }
 
 function App(){
   var games = useState(GAMES.concat(SOFTWARE, HIDDEN)), all = games[0];
   // A render can open a game, and its Properties: #core, or #ror2/saves; or a view of the covers: #view:local.
   var hash = (location.hash || '').slice(1).split('/'), view = hash[0].indexOf('view:') === 0 ? hash[0].slice(5) : null;
-  var sel = useState(view ? null : hash[0] || INITIAL), tab = useState(view || 'all'), sort = useState('recent'), q = useState(''), menu = useState(null), props = useState(hash[1] ? {section:hash[1]} : null);
+  var shownNotice = hash[0].indexOf('notice:') === 0 ? hash[0].slice(7) : null, note = useState(NOTICES[shownNotice] ? shownNotice : null), timer = useRef(null);
+  var sel = useState(view || shownNotice ? null : hash[0] || INITIAL), tab = useState(view || 'installed'), sort = useState('recent'), q = useState(''), menu = useState(null), props = useState(hash[1] ? {section:hash[1]} : null);
   var frame = useRef(null), search = useRef(null);
   function back(){ sel[1](null); }
   useEffect(function(){
@@ -295,24 +346,29 @@ function App(){
   function update(g, change){ games[1](all.map(function(x){return x.id===g.id?Object.assign({},x,change):x})); }
   function at(e){ var r = frame.current.getBoundingClientRect(); return {x:Math.min(e.clientX-r.left,1280-240),y:Math.min(e.clientY-r.top,800-230)}; }
   function openMenu(kind, g, e){ e.stopPropagation(); var p = at(e); menu[1]({kind:kind,game:g,x:p.x,y:p.y}); }
-  var inView = all.filter(function(g){ return tab[0]==='software'?g.software:tab[0]==='hidden'?g.hidden:tab[0]==='attn'?NEEDS[g.status]&&!g.hidden
-    : tab[0]==='installed'?g.installed!==false&&!g.software&&!g.hidden : tab[0]==='local'?!!g.loose&&g.installed!==false&&!g.hidden : !g.software&&!g.hidden; });
+  var inView = all.filter(function(g){ return inViewOf(tab[0], g); });
+  function count(view){ return all.filter(function(g){ return inViewOf(view, g); }).length; }
+  var viewLabel = VIEWS.filter(function(v){return v.id===tab[0]})[0].label, sortLabel = SORTS.filter(function(s){return s.id===sort[0]})[0].label;
+  // Add game folder: the notice says it's looking, then what it found (in the app, once What's in it has been answered).
+  function scan(){ clearTimeout(timer.current); note[1]('looking'); timer.current = setTimeout(function(){ note[1]('found'); }, 1800); }
   var shown = sorted(inView.filter(function(g){return matches(g,q[0])}), sort[0]);
   var current = sel[0] ? all.filter(function(g){return g.id===sel[0]})[0] : null;
   var groups = [{id:'fav',label:'Favourites',games:shown.filter(function(g){return g.fav})},
-    {id:'rest',label:{all:'Games',installed:'Installed',local:'Local',attn:'Conflicts',software:'Software',hidden:'Hidden'}[tab[0]],games:shown.filter(function(g){return !g.fav})}];
+    {id:'rest',label:{all:'Games',installed:'Installed',saves:'Saves only',local:'Local',attn:'Conflicts',software:'Software',hidden:'Hidden'}[tab[0]],games:shown.filter(function(g){return !g.fav})}];
   var menuEl = null;
   if (menu[0]) {
     var m = menu[0], g = m.game;
     var items = m.kind==='sort' ? [{heading:'Sort by'}].concat(SORTS.map(function(s){return {id:s.id,label:s.label,checked:s.id===sort[0]}}))
+      : m.kind==='view' ? VIEWS.filter(function(v){return (v.id!=='software'&&v.id!=='hidden')||count(v.id)>0}).map(function(v){return {id:v.id,label:v.label+' \u00b7 '+count(v.id),checked:v.id===tab[0]}})
       : m.kind==='more' ? [{id:'hide',label:g.hidden?'Show in the library':'Hide from the library'},{id:'art',label:'Change the art\u2026',icon:'palette'}].concat(g.installed===false?[]:[{id:'folder',label:'Open the game\u2019s folder',icon:'folder'}],
           [{id:'saves-folder',label:'Open the save folder',icon:'saves'},{sep:true},{id:'props',label:'Properties',icon:'settings'}])
       : (g.installed===false ? [] : [{id:'play',label:'Play',icon:'play'},{sep:true}]).concat([
          {id:'fav',label:g.fav?'Remove from favourites':'Add to favourites',icon:'star',filled:!!g.fav},
          {id:'hide',label:g.hidden?'Show in the library':'Hide from the library'},{sep:true},{id:'props',label:'Properties',icon:'settings'}]);
     menuEl = h('div',{onClick:function(e){e.stopPropagation()},style:{position:'absolute',left:m.x,top:m.y,zIndex:20}},
-      h(G.Menu,{label:m.kind==='sort'?'Sort by':g.name,items:items,onPick:function(id){
+      h(G.Menu,{label:m.kind==='sort'?'Sort by':m.kind==='view'?'Library view':g.name,items:items,onPick:function(id){
         if(m.kind==='sort') sort[1](id);
+        else if(m.kind==='view') tab[1](id);
         else if(id==='fav') update(g,{fav:!g.fav});
         else if(id==='hide') update(g,{hidden:!g.hidden});
         else if(id==='props'){ sel[1](g.id); props[1]({section:'general'}); }
@@ -325,16 +381,20 @@ function App(){
       h('main',{style:{flex:1,minWidth:0,padding:'20px 24px',display:'flex',gap:16}},
         h('aside',{className:'gs-card lib-pane','aria-label':'Your games'},
           h(G.SearchField,{value:q[0],onChange:q[1],placeholder:'Search your games',hint:'Ctrl F',inputRef:search,onSubmit:function(){ if(shown[0]) sel[1](shown[0].id); }}),
-          h('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8}},
-            h('span',{className:'gs-faint',style:{fontSize:12}},q[0]?shown.length+' of '+inView.length+' games':inView.length+' games'),
-            h(G.Button,{size:'sm',variant:'ghost',icon:'sort',iconAfter:'chevronDown','aria-haspopup':'menu','aria-label':'Sort by: '+SORTS.filter(function(s){return s.id===sort[0]})[0].label,
-              onClick:function(e){openMenu('sort',null,e)}},SORTS.filter(function(s){return s.id===sort[0]})[0].label)),
+          // The view and the order side by side, each a dropdown naming its choice (version 59). The view's menu has each
+          // view's count; the covers' header has the count of the one shown.
+          h('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',gap:4,margin:'-2px -4px'}},
+            h(G.Button,{size:'sm',variant:'ghost',iconAfter:'chevronDown','aria-haspopup':'menu','aria-label':'Library view: '+viewLabel,title:'Which games the list and the covers show',
+              onClick:function(e){openMenu('view',null,e)}},viewLabel),
+            h(G.Button,{size:'sm',variant:'ghost',iconAfter:'chevronDown','aria-haspopup':'menu','aria-label':'Sort by: '+sortLabel,title:'The order of the list and the covers',
+              onClick:function(e){openMenu('sort',null,e)}},sortLabel)),
           h('div',{className:'lib-scroll'},h(G.GameList,{groups:groups,selected:sel[0],onSelect:sel[1],onMenu:function(g,e){openMenu('row',g,e)},
             empty:'No game matches \u201c'+q[0]+'\u201d.'}))),
         h('section',{className:'lib-content','aria-label':current?current.name:'My games'},
           current ? h(GamePage,{key:current.id,game:current,onBack:back,onFav:function(g){update(g,{fav:!g.fav})},onMore:function(g,e){openMenu('more',g,e)},
               onProps:function(section){props[1]({section:section})},onSaves:function(){}})
-          : h(Covers,{games:shown,tab:tab[0],onTab:tab[1],query:q[0],onOpen:sel[1],onMenu:function(g,e){openMenu('tile',g,e)}})))),
+          : h(Covers,{games:shown,tab:tab[0],onTab:tab[1],query:q[0],onOpen:sel[1],onMenu:function(g,e){openMenu('tile',g,e)},
+              notice:note[0],onScan:scan,onShowFound:function(){ note[1](null); q[1](''); tab[1]('local'); },onCloseNotice:function(){ note[1](null); }})))),
     menuEl,
     props[0] && current ? h('div',{className:'gs-scrim',style:{position:'absolute',inset:0,zIndex:30},onClick:function(){props[1](null)}},
       h('div',{onClick:function(e){e.stopPropagation()}},h(G.GamePropertiesDialog,{key:current.id+props[0].section,game:propsOf(current),section:props[0].section,

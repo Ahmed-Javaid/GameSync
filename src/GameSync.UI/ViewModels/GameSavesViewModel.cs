@@ -64,8 +64,15 @@ public sealed record PlaceItem(string Portable, string? Folder, string? Tag, str
 }
 
 /// <summary>A named save: its name, when and on which PC it was saved, and the new name typed to rename it.</summary>
-public sealed partial class NamedSaveItem(string name, VersionId version, string when, string pc, bool inPlace = false, string game = "The game") : ObservableObject
+/// <param name="tag">SHARE-10 (design system version 57): the tag it was imported with, shown after the PC's name.</param>
+public sealed partial class NamedSaveItem(string name, VersionId version, string when, string pc, bool inPlace = false, string game = "The game", string? tag = null)
+    : ObservableObject
 {
+    /// <summary>The tag it was imported with, such as the friend's name; null for none.</summary>
+    public string? Tag { get; } = tag;
+
+    public bool HasTag => Tag is not null;
+
     /// <summary>KAN-89: Restore's ask: "Restore Bloodborne GOTY's save to “befo ludwig”?".</summary>
     public string Question => $"Restore {game}'s save to “{Name}”?";
 
@@ -78,8 +85,17 @@ public sealed partial class NamedSaveItem(string name, VersionId version, string
 
     public string Name { get; } = name;
 
-    /// <summary>Its files are the game's save now (KAN-51): it says In place instead of offering Restore.</summary>
-    public bool IsInPlace { get; } = inPlace;
+    /// <summary>
+    /// Its files are the game's save now (KAN-51): it says In place instead of offering Restore, from the moment a restore of
+    /// it ends (the owner's friend, 8 Oct 2026: the row read Restore again until the page read the game afresh).
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanRestore))]
+    private bool _isInPlace = inPlace;
+
+    /// <summary>Another save is being restored: this one's Restore waits, so a second press never goes nowhere.</summary>
+    [ObservableProperty]
+    private bool _waiting;
 
     public bool CanRestore => !IsInPlace;
 
@@ -99,17 +115,25 @@ public sealed partial class NamedSaveItem(string name, VersionId version, string
     public static string WhereKept =>
         "In GameSync's history: its files are stored once, by their contents, in the backup folder on this PC and in the cloud, so saves that share files take their space once. It has no folder of its own; Export as a folder puts a plain copy wherever you choose.";
 
-    public override string ToString() => $"{Name}, saved {When} on {Pc}{(IsInPlace ? ", in place now" : "")}";
+    public override string ToString() => $"{Name}, saved {When} on {Pc}{(Tag is null ? "" : $", tagged {Tag}")}{(IsInPlace ? ", in place now" : "")}";
 }
 
 /// <summary>A version in a game's history: when it was saved, the PC, what sets it apart, its size.</summary>
 public sealed record VersionItem(VersionId Id, string Saved, string Pc, string? Note, bool IsCurrent, bool IsPinned, string Size, bool Uploaded)
 {
+    /// <summary>SHARE-10 (design system version 57): the tag it was imported with, shown after the PC's name.</summary>
+    public string? Tag { get; init; }
+
+    public bool HasTag => Tag is not null;
+
     /// <summary>The version the Versions tab opened these saves on (MGR-08), marked where its Restore is.</summary>
     public bool IsPicked { get; init; }
 
     /// <summary>KAN-80: being restored now: its Restore says Restoring….</summary>
     public bool IsRestoring { get; init; }
+
+    /// <summary>Another save is being restored: this one's Restore waits.</summary>
+    public bool Waiting { get; init; }
 
     /// <summary>KAN-89: Restore's ask: "Restore Lantern Keep's save to the one from 23 Sep 21:02?".</summary>
     public string Question { get; init; } = $"Restore the save from {Saved}?";
@@ -123,7 +147,7 @@ public sealed record VersionItem(VersionId Id, string Saved, string Pc, string? 
 
     public bool CanRestore => !IsCurrent;
 
-    public override string ToString() => string.Join(", ", new[] { Saved, Pc, IsCurrent ? "current" : null, Note, Size, Uploaded ? null : "not uploaded yet" }.OfType<string>());
+    public override string ToString() => string.Join(", ", new[] { Saved, Pc, Tag is null ? null : $"tagged {Tag}", IsCurrent ? "current" : null, Note, Size, Uploaded ? null : "not uploaded yet" }.OfType<string>());
 }
 
 /// <summary>
@@ -717,6 +741,15 @@ public sealed partial class GameSavesViewModel : ObservableObject, IPageSurface
         Busy(item, true);
         (Restoring, RestoreFailed, RestoreNote) = (true, false, $"Bringing back {what}");
         var problem = await restore(Id, version, name);
+        if (problem is null && item is NamedSaveItem restored)
+        {
+            // In place at once, as the files are.
+            foreach (var named in NamedSaves)
+            {
+                named.IsInPlace = ReferenceEquals(named, restored);
+            }
+        }
+
         Busy(item, false);
         (Restoring, RestoreFailed) = (false, problem is not null);
         RestoreNote = problem ?? $"{char.ToUpperInvariant(what[0])}{what[1..]} is back in place. The files it replaced are kept in the history, so you can go back to them.";
@@ -725,15 +758,22 @@ public sealed partial class GameSavesViewModel : ObservableObject, IPageSurface
     /// <summary>The row whose Restore was pressed says Restoring… while it runs.</summary>
     private void Busy(object? item, bool restoring)
     {
-        switch (item)
+        if (item is NamedSaveItem busy)
         {
-            case NamedSaveItem named:
-                named.IsRestoring = restoring;
-                break;
-            case VersionItem version:
-                Versions = Versions.Select(v => v.Id == version.Id ? v with { IsRestoring = restoring } : v).ToList();
-                break;
+            busy.IsRestoring = restoring;
         }
+
+        // Every other Restore waits while one runs (the owner's friend, 8 Oct 2026, pressed again, unsure the first had gone).
+        foreach (var named in NamedSaves)
+        {
+            named.Waiting = restoring && !ReferenceEquals(named, item);
+        }
+
+        Versions = Versions.Select(v => v with
+        {
+            IsRestoring = item is VersionItem version && v.Id == version.Id ? restoring : v.IsRestoring,
+            Waiting = restoring && !(item is VersionItem picked && v.Id == picked.Id),
+        }).ToList();
     }
 
     /// <summary>Marks a version in the history, where its Restore is, as a row of the Versions tab opens it (MGR-08).</summary>
@@ -755,12 +795,13 @@ public sealed partial class GameSavesViewModel : ObservableObject, IPageSurface
             p.Folder is { } folder && _actions?.OpenFolder is { } open ? new RelayCommand(() => open(folder)) : null) { Programs = p.Programs };
         Places = detail.Places.Select(Place).ToList();
         Suggestions = detail.Suggestions.Select(Place).ToList();
-        NamedSaves = detail.NamedSaves.Select(n => new NamedSaveItem(n.Name, n.Version, When(n.SavedUtc, nowLocal), n.Pc.ToUpperInvariant(), n.InPlace, Title)).ToList();
+        NamedSaves = detail.NamedSaves.Select(n => new NamedSaveItem(n.Name, n.Version, When(n.SavedUtc, nowLocal), n.Pc.ToUpperInvariant(), n.InPlace, Title, n.Tag)).ToList();
         Versions = detail.Versions.Select(v => new VersionItem(v.Id, When(v.SavedUtc, nowLocal), v.Pc.ToUpperInvariant(), v.Note, v.IsCurrent, v.IsPinned,
             Cli.FormatSize(v.Bytes), v.Uploaded)
         {
             IsPicked = v.Id == Picked,
             Question = $"Restore {Title}'s save to the one from {When(v.SavedUtc, nowLocal)}?",
+            Tag = v.Tag,
         }).ToList();
         _current = detail.Versions.FirstOrDefault(v => v.IsCurrent)?.Id;
         HistorySummary = detail.Versions.Count == 0 ? "no versions yet"

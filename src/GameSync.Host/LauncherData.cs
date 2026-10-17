@@ -74,8 +74,10 @@ public static class LauncherData
     {
         using var engine = Engine.OpenForSetup(dataDir);
         var list = new SaveListStore(dataDir).Load();
-        return engine.Library.All()
-            .Where(e => e.MergedInto is null && e.State != LibraryState.Ignored && e.Installed && e.InstallDir is not null && Launcher.SteamIdOf(e, list) is null)
+        var entries = engine.Library.All();
+        var taken = Launcher.ListedSteamIds(entries, list);
+        return entries
+            .Where(e => e.MergedInto is null && e.State != LibraryState.Ignored && e.Installed && e.InstallDir is not null && Launcher.SteamIdOf(e, list, taken) is null)
             .Sum(e => art.CopyLocal(e.Id, e.InstallDir, e.Store == StoreKind.Loose
                 ? GameLaunch.Program(e.InstallDir, engine.State.GetSetting(GameLaunch.ProgramKey(e.Id)))
                 : null));
@@ -86,13 +88,22 @@ public static class LauncherData
     {
         using var engine = Engine.OpenForSetup(dataDir);
         var saveList = new SaveListStore(dataDir).Load();
-        return engine.Library.All().Where(e => e.State != LibraryState.Ignored && e.MergedInto is null)
-            .Select(e => Launcher.SteamIdOf(e, saveList))
+        var entries = engine.Library.All();
+        var taken = Launcher.ListedSteamIds(entries, saveList);
+        return entries.Where(e => e.State != LibraryState.Ignored && e.MergedInto is null)
+            .Select(e => Launcher.SteamIdOf(e, saveList, taken))
             .Concat(engine.Config.Games.Select(g => saveList?.ByTitle(g.Title)?.SteamIds.FirstOrDefault()))
             .OfType<long>().Where(id => id > 0).Distinct().ToList();
     }
 
     /// <summary>Hides a game from Home and the game library on this PC, or shows it again; its saves sync as before.</summary>
+    /// <summary>The backup folder, as Settings → Storage and folders has it, for the Guide (ONB-08).</summary>
+    public static string BackupFolder(string dataDir)
+    {
+        using var state = new GameSync.Core.State.StateStore(dataDir);
+        return Cli.HistoryFolder(state, dataDir);
+    }
+
     public static void SetHidden(string dataDir, GameSync.Core.Model.GameId game, bool hidden)
     {
         using var state = new GameSync.Core.State.StateStore(dataDir);
@@ -134,17 +145,20 @@ public static class LauncherData
         state.SetSetting(NamedSortKey, sort == "name" ? "name" : "newest");
     }
 
-    /// <summary>KAN-47: the library's Installed only on this PC; off until the person ticks it.</summary>
-    public static bool ReadInstalledOnly(string dataDir)
+    /// <summary>
+    /// LIB-31: the view the library opens on, on this PC: <c>installed</c> until the person picks <c>all</c> (a friend, 8 Oct
+    /// 2026: "Default view should be installed games"). It replaced Installed only, KAN-47's tick box.
+    /// </summary>
+    public static string ReadView(string dataDir)
     {
         using var state = new GameSync.Core.State.StateStore(dataDir);
-        return state.GetSetting(Launcher.InstalledOnlyKey) == "true";
+        return state.GetSetting(Launcher.ViewKey) == "all" ? "all" : "installed";
     }
 
-    public static void SetInstalledOnly(string dataDir, bool installedOnly)
+    public static void SetView(string dataDir, string view)
     {
         using var state = new GameSync.Core.State.StateStore(dataDir);
-        state.SetSetting(Launcher.InstalledOnlyKey, installedOnly ? "true" : "false");
+        state.SetSetting(Launcher.ViewKey, view == "all" ? "all" : "installed");
     }
 
     /// <summary>

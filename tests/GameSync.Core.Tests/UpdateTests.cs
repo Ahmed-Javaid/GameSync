@@ -178,6 +178,40 @@ public class UpdateTests
     }
 
     [Fact]
+    public void PKG_03_a_ready_update_installs_as_GameSync_starts_with_Windows_unless_turned_off_or_a_game_is_played()
+    {
+        // The owner, 9 Oct 2026: yes to a downloaded update installing by itself at sign-in, so friends never have to click.
+        using var world = new TestWorld();
+        var data = Path.Combine(world.Root, "data");
+        using (var state = new GameSync.Core.State.StateStore(data))
+        {
+            Assert.True(Updates.IsAtSignIn(state));
+        }
+
+        var ready = new ReadyUpdate(Next, "GameSync-Setup-1.0.1.exe", "GameSync-Setup-1.0.1.sig", "", []);
+        Assert.True(Updates.InstallsAtSignIn(ready, atSignIn: true, installedCopy: true, playing: false));
+        Assert.False(Updates.InstallsAtSignIn(null, atSignIn: true, installedCopy: true, playing: false));
+        Assert.False(Updates.InstallsAtSignIn(ready, atSignIn: true, installedCopy: true, playing: true));
+        Assert.False(Updates.InstallsAtSignIn(ready, atSignIn: true, installedCopy: false, playing: false));
+
+        Updates.SetAtSignIn(data, false);
+        using (var state = new GameSync.Core.State.StateStore(data))
+        {
+            Assert.False(Updates.IsAtSignIn(state));
+        }
+
+        using (var updates = new Updates(data))
+        {
+            Assert.False(updates.Read().AtSignIn);
+        }
+        Updates.SetAtSignIn(data, true);
+        using (var updates = new Updates(data))
+        {
+            Assert.True(updates.Read().AtSignIn);
+        }
+    }
+
+    [Fact]
     public void PKG_03_whats_new_is_the_release_notes_bullets_in_plain_words()
     {
         Assert.Equal(["Restores say which file", "See the docs", "A gamesync verb"],

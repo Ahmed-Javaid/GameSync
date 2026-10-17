@@ -27,6 +27,12 @@ public sealed class NoCloud : ICloud, IBlobStore, IVersionLog
 
     public Task WriteRestoreKitAsync(CancellationToken ct) => Task.FromException(NotConnected());
 
+    public Task<IReadOnlyList<CloudFileTag>> ListAchievementFilesAsync(CancellationToken ct) => Task.FromException<IReadOnlyList<CloudFileTag>>(NotConnected());
+
+    public Task<byte[]?> GetAchievementFileAsync(DeviceId device, long largest, CancellationToken ct) => Task.FromException<byte[]?>(NotConnected());
+
+    public Task SaveAchievementFileAsync(DeviceId device, byte[] content, CancellationToken ct) => Task.FromException(NotConnected());
+
     Task<bool> IBlobStore.ExistsAsync(GameId game, BlobId id, CancellationToken ct) => Task.FromException<bool>(NotConnected());
 
     Task IBlobStore.PutAsync(GameId game, BlobId id, Stream content, CancellationToken ct) => Task.FromException(NotConnected());

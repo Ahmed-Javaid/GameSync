@@ -181,6 +181,7 @@ public static class FirstRun
         using var art = new ArtCache(dataDir);
         var saveList = new SaveListStore(dataDir).Load();
         var groups = new Dictionary<SetupGroupKind, List<SetupGame>>();
+        var taken = Launcher.ListedSteamIds(engine.Library.All(), saveList);
         foreach (var entry in engine.Library.All().Where(e => e.MergedInto is null && e.State != LibraryState.Ignored))
         {
             var found = entry.Proposals.Count + entry.RegistryProposals.Count > 0;
@@ -189,7 +190,7 @@ public static class FirstRun
                 : !entry.Installed ? SetupGroupKind.NotInstalled
                 : entry.StoreCloud ? SetupGroupKind.StoreCloud
                 : SetupGroupKind.Sync;
-            var steamId = Launcher.SteamIdOf(entry, saveList);
+            var steamId = Launcher.SteamIdOf(entry, saveList, taken);
             if (kind is not { } group || (steamId is { } id && art.IsSoftware(id)))
             {
                 // Steam's software (Wallpaper Engine, 3DMark) stays in the library's Software tab, where its page can
@@ -223,6 +224,18 @@ public static class FirstRun
             .Where(groups.ContainsKey)
             .Select(kind => new SetupGroup(kind, groups[kind].OrderBy(g => g.Title, StringComparer.CurrentCultureIgnoreCase).ToList()))
             .ToList();
+    }
+
+    /// <summary>
+    /// LIB-30: what the person picked from a game folder in first run: left out, it stays out of the library and Choose
+    /// saves; ticked again, it comes back. Applied once the scan with the folder has finished.
+    /// </summary>
+    public static void Pick(string dataDir, FolderPicks picks)
+    {
+        using var engine = Engine.OpenForSetup(dataDir);
+        var library = engine.Library.All();
+        var picked = Library.Pick(library, picks.LeaveOut, picks.TakeBack);
+        engine.Library.SaveAll(picked.Where(e => !library.Contains(e)).ToList());
     }
 
     /// <summary>Adds a folder of games to every scan (LIB-05), as Scan this PC's Add a game folder does; returns why not, or null.</summary>

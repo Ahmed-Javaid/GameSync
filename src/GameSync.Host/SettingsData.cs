@@ -18,6 +18,9 @@ public sealed record SaveFolderSummary(string Path, string? Full, bool ById, boo
 /// <summary>KAN-123: a folder of copies' records of achievements, and how many games have a record in it.</summary>
 public sealed record RecordFolderSummary(string Path, int Games, bool Missing);
 
+/// <summary>Design system version 54: a copy's own record of achievements GameSync found by itself, and its game.</summary>
+public sealed record FoundRecordSummary(string Path, string Game);
+
 /// <summary>A PC that syncs with this cloud (PC-01): its name, when it was last seen and its GameSync; this PC has no last seen.</summary>
 public sealed record PcSummary(string Name, DateTime? LastSeenUtc, string? AppVersion, bool ThisPc);
 
@@ -112,6 +115,15 @@ public sealed record SettingsView
 
     /// <summary>KAN-123: the folders where copies Steam doesn't run keep their records of what's unlocked.</summary>
     public IReadOnlyList<RecordFolderSummary> AchievementFolders { get; init; } = [];
+
+    /// <summary>Design system version 54: the records of copies Steam doesn't run that GameSync found by itself.</summary>
+    public IReadOnlyList<FoundRecordSummary> AchievementRecordsFound { get; init; } = [];
+
+    /// <summary>When GameSync last looked for copies' records; null before it has.</summary>
+    public DateTime? AchievementsLookedUtc { get; init; }
+
+    /// <summary>Version 54: GameSync's record of achievements is kept in the cloud, so every PC shows the same.</summary>
+    public bool AchievementsInCloud { get; init; } = true;
 }
 
 /// <summary>
@@ -251,6 +263,14 @@ public static class SettingsData
             AchievementFolders = GameSync.Host.Achievements.RecordFolders(state)
                 .Select(f => new RecordFolderSummary(f, CopyAchievements.CountIn(f), !Directory.Exists(f)))
                 .ToList(),
+            AchievementRecordsFound = GameSync.Host.Achievements.FoundRecords(state)
+                .Select(f => new FoundRecordSummary(f.Value,
+                    state.GetSetting(GameSync.Host.Achievements.FoundGameKey(f.Key)) is { Length: > 0 } game ? game : $"Steam game {f.Key.ToString(CultureInfo.InvariantCulture)}"))
+                .OrderBy(f => f.Game, StringComparer.CurrentCultureIgnoreCase)
+                .ToList(),
+            AchievementsLookedUtc = state.GetSetting(GameSync.Host.Achievements.LookedKey) is { Length: > 0 } looked &&
+                DateTime.TryParse(looked, CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out var lookedUtc) ? lookedUtc : null,
+            AchievementsInCloud = AchievementShare.IsOn(state),
             AntiCheat = library.Where(e => e.HasAntiCheat && e.State != LibraryState.Ignored)
                 .Select(e => new AntiCheatGame(e.Id, e.DisplayTitle, e.AntiCheatByHand == true && e.AntiCheat is null ? "Marked by you" : e.AntiCheat ?? "Anti-cheat"))
                 .OrderBy(g => g.Title, StringComparer.OrdinalIgnoreCase)

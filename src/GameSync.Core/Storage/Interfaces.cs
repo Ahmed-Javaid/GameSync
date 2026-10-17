@@ -71,7 +71,22 @@ public interface ICloud
 
     /// <summary>Writes <c>HOW-TO-RESTORE.txt</c> and <c>restore.ps1</c> at the top of the cloud folder when they're missing or out of date.</summary>
     Task WriteRestoreKitAsync(CancellationToken ct);
+
+    /// <summary>
+    /// Design system version 54: every PC's file of GameSync's record of achievements (<c>achievements/&lt;device&gt;.json</c>),
+    /// each with a tag that changes whenever the file does, so only changed files are read.
+    /// </summary>
+    Task<IReadOnlyList<CloudFileTag>> ListAchievementFilesAsync(CancellationToken ct);
+
+    /// <summary>One PC's file of the record; null when there's none. One larger than <paramref name="largest"/> bytes isn't read.</summary>
+    Task<byte[]?> GetAchievementFileAsync(DeviceId device, long largest, CancellationToken ct);
+
+    /// <summary>This PC's file of the record, created or replaced. Each PC writes only its own, so two never clash.</summary>
+    Task SaveAchievementFileAsync(DeviceId device, byte[] content, CancellationToken ct);
 }
+
+/// <summary>A PC's file in the cloud, and a tag that changes whenever the file does.</summary>
+public sealed record CloudFileTag(DeviceId Device, string Tag);
 
 /// <summary><paramref name="Where"/> is a folder path or a link to open; the rest is null when the backend doesn't know it.</summary>
 public sealed record CloudInfo(string Where, string? Account, long? UsedBytes, long? TotalBytes, DateTime? ServerTimeUtc);

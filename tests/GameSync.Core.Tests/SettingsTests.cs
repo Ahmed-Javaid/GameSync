@@ -185,6 +185,63 @@ public class SettingsTests
     }
 
     [Fact]
+    public async Task SET_05_Report_a_problem_opens_a_new_issue_with_the_persons_words_and_the_diagnostics_on_the_clipboard()
+    {
+        // Design system version 57 (a friend, 8 Oct 2026: "add a report a bug tool").
+        var opened = new List<string>();
+        var copied = new List<string>();
+        var closed = 0;
+        var actions = new SettingsActions
+        {
+            Diagnostics = _ => Task.FromResult("GameSync 0.5.0 · the logs"),
+            OpenLink = opened.Add,
+            OpenDialog = _ => { },
+            CloseDialog = () => closed++,
+        };
+        var report = new ReportProblemViewModel(actions, copied.Add);
+        Assert.False(report.CanOpen);
+        report.Words = "Dark Souls III shows Not backed up\nbut I ticked it in first run.";
+        Assert.True(report.CanOpen);
+        await report.OpenCommand.ExecuteAsync(null);
+
+        // GitHub's new issue, the first line its title, the words in its body; the diagnostics on the clipboard to paste in.
+        var link = Assert.Single(opened);
+        Assert.StartsWith("https://github.com/Ahmed-Javaid/GameSync/issues/new?title=Dark%20Souls%20III%20shows%20Not%20backed%20up&body=", link, StringComparison.Ordinal);
+        Assert.Contains(Uri.EscapeDataString("but I ticked it in first run."), link, StringComparison.Ordinal);
+        Assert.DoesNotContain(Uri.EscapeDataString("the logs"), link, StringComparison.Ordinal);
+        Assert.Equal(["GameSync 0.5.0 · the logs"], copied);
+        Assert.True(report.IsDone);
+        Assert.Contains("paste them under Diagnostics", report.Done, StringComparison.Ordinal);
+        report.CloseCommand.Execute(null);
+        Assert.Equal(1, closed);
+
+        // Unticked, nothing goes on the clipboard; words too long for one link go on it whole, and the link says so.
+        var (plain, none) = ReportProblemViewModel.Link(actions.IssuesUrl, "It stopped.", null);
+        Assert.Null(none);
+        Assert.DoesNotContain("Diagnostics", Uri.UnescapeDataString(plain), StringComparison.Ordinal);
+        var (shortLink, whole) = ReportProblemViewModel.Link(actions.IssuesUrl, new string('漢', 900), "the logs");
+        Assert.True(shortLink.Length < 1900);
+        Assert.Contains("the logs", whole, StringComparison.Ordinal);
+        Assert.Contains(new string('漢', 900), whole, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void LOOK_28_Appearance_says_so_when_Windows_animation_effects_are_off()
+    {
+        var off = false;
+        var opened = new List<string>();
+        var settings = new SettingsViewModel(new SettingsActions { AnimationsOff = () => off, OpenLink = opened.Add }, new Look());
+        Assert.False(settings.Appearance.AnimationsOff);
+
+        // Turned off in Windows while GameSync runs: the page says so the next time it reads its settings.
+        off = true;
+        settings.Appearance.CheckMotion();
+        Assert.True(settings.Appearance.AnimationsOff);
+        settings.Appearance.OpenVisualEffectsCommand.Execute(null);
+        Assert.Equal(["ms-settings:easeofaccess-visualeffects"], opened);
+    }
+
+    [Fact]
     public async Task SET_05_diagnostics_hold_the_settings_games_and_logs_but_never_a_sign_in_token()
     {
         using var world = new TestWorld();

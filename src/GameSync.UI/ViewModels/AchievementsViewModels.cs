@@ -19,9 +19,17 @@ namespace GameSync.UI.ViewModels;
 /// <param name="WhenFull">"26 Sep, 22:41"; "Not yet" while it's locked.</param>
 /// <param name="State"><c>unlocked</c>, <c>locked</c> or <c>hidden</c> (hidden and still locked).</param>
 /// <param name="Tier"><c>gold</c>, <c>silver</c> or <c>bronze</c>, once its rarity is known.</param>
+/// <param name="Marked">Marked unlocked by the person (design system version 54).</param>
+/// <param name="OnPc">The PC it was unlocked on, when GameSync didn't see it on this one (version 54).</param>
+/// <param name="Seen">Where GameSync saw it unlocked, for the details' Seen: "In Steam on this PC", "On LAPTOP", "Marked by you".</param>
 public sealed record AchievementItem(string Id, string Name, string? Description, string When, string WhenFull, IImage? Icon, string State, string? Tier,
-    double? Percent, DateTime? UnlockedUtc, string Tip)
+    double? Percent, DateTime? UnlockedUtc, string Tip, bool Marked = false, string? OnPc = null, string? Seen = null)
 {
+    /// <summary>A row's word after its day when GameSync didn't see it here itself: "· marked by you", "· LAPTOP" (version 54).</summary>
+    public string WhenBy => !IsUnlocked ? "" : Marked ? " · marked by you" : OnPc is { } pc ? $" · {pc}" : "";
+
+    public bool HasWhenBy => WhenBy.Length > 0;
+
     /// <summary>Steam's icons are 64px pictures: decoded as they are, whatever size a badge shows them.</summary>
     public const int IconSize = 64;
 
@@ -62,11 +70,12 @@ public sealed record AchievementItem(string Id, string Name, string? Description
     public static string PercentOf(double value) =>
         (value < 10 ? value.ToString("0.0", CultureInfo.InvariantCulture) : Math.Round(value).ToString(CultureInfo.InvariantCulture)) + "%";
 
-    public static AchievementItem Of(AchievementShown a, DateTime nowLocal)
+    /// <param name="from">Where the game's unlocks come from on this PC, for an unlocked one's Seen (version 54).</param>
+    public static AchievementItem Of(AchievementShown a, DateTime nowLocal, AchievementsFrom from = AchievementsFrom.Steam)
     {
         var state = a.Unlocked ? "unlocked" : a.Secret ? "hidden" : "locked";
         var when = a.KnownUnlockUtc is { } at ? Day(at, nowLocal) : a.Unlocked ? "Unlocked" : "";
-        var full = a.KnownUnlockUtc is { } time ? DayAndTime(time, nowLocal) : a.Unlocked ? "Unlocked, on a day Steam didn't keep" : "Not yet";
+        var full = a.KnownUnlockUtc is { } time ? DayAndTime(time, nowLocal) : a.Unlocked ? "Unlocked, on a day that wasn't kept" : "Not yet";
         var tier = a.Tier switch
         {
             AchievementTier.Gold => "gold",
@@ -83,8 +92,19 @@ public sealed record AchievementItem(string Id, string Name, string? Description
         }
 
         var what = a.Description is { Length: > 0 } description ? $"{a.Name}: {description}" : a.Name;
-        var tip = $"{what} ({(a.Unlocked ? $"unlocked {(a.KnownUnlockUtc is null ? "" : when)}".TrimEnd() : "locked")}{players})";
-        return new AchievementItem(a.Id, a.Name, a.Description, when, full, ArtImages.Load(a.Icon, IconSize), state, tier, a.Percent, a.UnlockedUtc, tip);
+        var by = !a.Unlocked ? "" : a.Marked ? ", marked by you" : a.OnPc is { } pc ? $", on {pc}" : "";
+        var tip = $"{what} ({(a.Unlocked ? $"unlocked {(a.KnownUnlockUtc is null ? "" : when)}".TrimEnd() : "locked")}{by}{players})";
+        var seen = !a.Unlocked ? null
+            : a.Marked ? "Marked by you"
+            : a.OnPc is { } on ? $"On {on}"
+            : from switch
+            {
+                AchievementsFrom.CopyRecord => "In this copy's own record",
+                AchievementsFrom.Steam => "In Steam on this PC",
+                _ => "On this PC",
+            };
+        return new AchievementItem(a.Id, a.Name, a.Description, when, full, ArtImages.LoadIcon(a.Icon, IconSize), state, tier, a.Percent, a.UnlockedUtc, tip,
+            a.Marked, a.OnPc, seen);
     }
 
     /// <summary>"Today", "Yesterday", "26 Sep", or "26 Sep 2025" in another year.</summary>
@@ -132,12 +152,14 @@ public sealed record Crumb(string Label, ICommand Command, string? Spoken = null
     public override string ToString() => Spoken ?? Label;
 }
 
-/// <summary>What the Achievements page reads: what's kept, what's kept after asking Steam for what isn't, or rarity asked again now.</summary>
+/// <summary>
+/// What the Achievements page reads: what's kept, or what's kept after asking Steam for what isn't. Asking rarity again now
+/// is Settings' since design system version 55.
+/// </summary>
 public enum AchievementsLoad
 {
     Read,
     Fetch,
-    Refresh,
 }
 
 /// <summary>
@@ -195,8 +217,35 @@ public sealed partial class AchievementsViewModel : ObservableObject
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasPicked), nameof(PickedText), nameof(PickedWhen), nameof(PickedPlayers), nameof(PickedBar), nameof(PickedRarity),
-        nameof(PickedRank), nameof(HasPickedRank), nameof(PickedTier), nameof(HasPickedTier), nameof(PickedGold), nameof(PickedSilver), nameof(PickedBronze))]
+        nameof(PickedRank), nameof(HasPickedRank), nameof(PickedTier), nameof(HasPickedTier), nameof(PickedGold), nameof(PickedSilver), nameof(PickedBronze),
+        nameof(PickedName), nameof(PickedState), nameof(PickedSeen), nameof(HasPickedSeen), nameof(CanMarkPicked), nameof(CanUnmarkPicked), nameof(CanRevealPicked))]
     private AchievementItem? _picked;
+
+    /// <summary>
+    /// Design system version 54 (the owner: "Yes but only for games that write nothing down"): a copy that writes its
+    /// unlocks nowhere GameSync can find, whose achievements the person marks by hand here.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanMarkPicked), nameof(CanRevealPicked))]
+    private bool _canMark;
+
+    /// <summary>The hidden one shown on purpose, to be marked: its name and what it asks, for this look only.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(PickedName), nameof(PickedText), nameof(PickedState), nameof(CanMarkPicked), nameof(CanRevealPicked))]
+    private string? _revealed;
+
+    /// <summary>
+    /// Design system version 55 (the owner, 8 Oct 2026: "have a little question mark on the achivement page for the game that
+    /// when hovered it explains why the game is prolly not being picked up"): why GameSync can't see what's unlocked in a copy
+    /// whose achievements are marked by hand, for the ? after the header's words.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasWhy), nameof(WhyText), nameof(WhyPath), nameof(HasWhyPath))]
+    private AchievementsWhy? _why;
+
+    /// <summary>A mark being made or taken off, so the buttons say so and aren't pressed twice.</summary>
+    [ObservableProperty]
+    private bool _marking;
 
     /// <summary>What the list says when nothing is in it.</summary>
     [ObservableProperty]
@@ -224,6 +273,82 @@ public sealed partial class AchievementsViewModel : ObservableObject
                 Sort = id;
             }
         });
+        MarkCommand = new AsyncRelayCommand(() => MarkAsync(true));
+        UnmarkCommand = new AsyncRelayCommand(() => MarkAsync(false));
+        RevealCommand = new RelayCommand(() => Revealed = Picked?.Id);
+    }
+
+    /// <summary>Mark as unlocked: the one picked, unlocked today and marked by the person (version 54).</summary>
+    public IAsyncRelayCommand MarkCommand { get; }
+
+    /// <summary>Unmark: takes the person's mark off the one picked, on every PC.</summary>
+    public IAsyncRelayCommand UnmarkCommand { get; }
+
+    /// <summary>Show it to mark it: a hidden one's name and what it asks, so the person can find the one they earned.</summary>
+    public ICommand RevealCommand { get; }
+
+    /// <summary>The ?'s name, and its tooltip's first line.</summary>
+    public const string WhyTitle = "Why GameSync can't see them";
+
+    public bool HasWhy => Why is not null;
+
+    public string WhyText => Why?.Text ?? "";
+
+    /// <summary>The file or folder it's about, able to wrap after each of its folders.</summary>
+    public string? WhyPath => Why?.Path?.Replace(@"\", "\\​", StringComparison.Ordinal);
+
+    public bool HasWhyPath => Why?.Path is not null;
+
+    /// <summary>The note over the list of a copy whose achievements are marked by hand.</summary>
+    public static string MarkNote => "This copy writes its unlocks nowhere GameSync can find, so mark each one as you earn it. GameSync looks for a record again each time you play it.";
+
+    /// <summary>The words of the hidden ones, kept out of their rows: only shown on purpose, to mark one.</summary>
+    private IReadOnlyDictionary<string, (string Name, string? Description)> _secrets = new Dictionary<string, (string, string?)>();
+
+    private bool PickedRevealed => Picked is { IsSecret: true } a && a.Id == Revealed && _secrets.ContainsKey(a.Id);
+
+    /// <summary>The one picked's name; a hidden one's stays "Hidden achievement" unless shown on purpose.</summary>
+    public string PickedName => PickedRevealed ? _secrets[Picked!.Id].Name : Picked?.Name ?? "";
+
+    /// <summary>Its badge's state: a hidden one shown on purpose is drawn as any locked one.</summary>
+    public string PickedState => PickedRevealed ? "locked" : Picked?.State ?? "unlocked";
+
+    /// <summary>Where GameSync saw the one picked unlocked (version 54).</summary>
+    public string? PickedSeen => Picked?.Seen;
+
+    public bool HasPickedSeen => Picked is { IsUnlocked: true, Seen: not null };
+
+    public bool CanMarkPicked => CanMark && Picked is { } a && (a.State == "locked" || PickedRevealed);
+
+    public bool CanUnmarkPicked => Picked is { IsUnlocked: true, Marked: true };
+
+    public bool CanRevealPicked => CanMark && Picked is { IsSecret: true } && !PickedRevealed;
+
+    private async Task MarkAsync(bool unlocked)
+    {
+        if (Picked is not { } a || Marking || _actions?.MarkAchievement is not { } mark)
+        {
+            return;
+        }
+
+        Marking = true;
+        try
+        {
+            if (await mark(Game, a.Id, unlocked, CancellationToken.None) is { } view)
+            {
+                Revealed = null;
+                Show(view, DateTime.Now);
+                Pick(a.Id);
+            }
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or OperationCanceledException or InvalidOperationException)
+        {
+            // Nothing changed: the button can be pressed again.
+        }
+        finally
+        {
+            Marking = false;
+        }
     }
 
     public GameId Game { get; }
@@ -260,10 +385,11 @@ public sealed partial class AchievementsViewModel : ObservableObject
 
     public bool HasPicked => Picked is not null;
 
-    /// <summary>What it asks; a hidden one's stays secret.</summary>
+    /// <summary>What it asks; a hidden one's stays secret, unless shown on purpose to mark it.</summary>
     public string PickedText => Picked switch
     {
         null => "",
+        { IsSecret: true } when PickedRevealed => _secrets[Picked.Id].Description is { Length: > 0 } secret ? secret : "Steam gives no description for it.",
         { IsSecret: true } => "Its name and what it asks stay secret until you unlock it.",
         { Description: { Length: > 0 } description } => description,
         _ => "Steam gives no description for it.",
@@ -335,24 +461,24 @@ public sealed partial class AchievementsViewModel : ObservableObject
     /// <summary>The game's achievements as read now; the tab, the search, the sort and the one picked stay.</summary>
     public void Show(GameAchievementsView view, DateTime nowLocal)
     {
-        _all = view.All.Select(a => AchievementItem.Of(a, nowLocal)).ToList();
+        // Version 54: a copy whose achievements are marked by hand, with none marked yet, opens on Locked, to mark the ones earned.
+        var first = _all.Count == 0;
+        _all = view.All.Select(a => AchievementItem.Of(a, nowLocal, view.From)).ToList();
+        if (first && view is { CanMark: true, Unlocked: 0 } && _all.Any(a => a.State == "locked"))
+        {
+            Tab = LockedTab;
+        }
+
+        _secrets = view.All.Where(a => a.Secret).ToDictionary(a => a.Id, a => (a.Name, a.Description));
         _ranks = _all.Where(a => a is { IsUnlocked: true, Percent: not null })
             .OrderBy(a => a.Percent)
             .Select((a, i) => (a.Id, Rank: i + 1))
             .ToDictionary(r => r.Id, r => r.Rank);
         Progress = AchievementsProgress.Of(view, nowLocal);
         HasRarity = _all.Any(a => a.Percent is not null);
-        Subtitle = view.From switch
-        {
-            // KAN-111: a game Steam here holds none for shows Steam's list, every one locked.
-            AchievementsFrom.ListNotSteamCopy => "Steam's list · this copy isn't Steam's, so nothing shows as unlocked here",
-            AchievementsFrom.ListNotPlayedHere => "Steam's list · Steam on this PC hasn't seen you play it yet",
-            // KAN-123: a copy Steam doesn't run, from its own record; the names, icons and rarity are Steam's.
-            AchievementsFrom.CopyRecord when HasRarity => "From this copy's own record · how rare each is, from Steam's players this week",
-            AchievementsFrom.CopyRecord => "From this copy's own record · how rare each is comes once Steam has been asked",
-            _ when HasRarity => "From Steam on this PC · how rare each is, from Steam's players this week",
-            _ => "From Steam on this PC · how rare each is comes once Steam has been asked",
-        };
+        CanMark = view.CanMark;
+        Why = view.CanMark ? view.Why : null;
+        Subtitle = SubtitleOf(view, HasRarity);
         var counts = (
             All: _all.Count,
             Unlocked: _all.Count(a => a.IsUnlocked),
@@ -380,6 +506,28 @@ public sealed partial class AchievementsViewModel : ObservableObject
         }
 
         Rebuild();
+    }
+
+    /// <summary>
+    /// Where a game's achievements come from, as the header says it: since design system version 54 "Kept by GameSync" and
+    /// where GameSync saw them ("seen in Steam on this PC and on LAPTOP", "seen in this copy's own record", "marked by you"),
+    /// then where rarity comes from; Steam's list at 0 says why nothing shows as unlocked (KAN-111).
+    /// </summary>
+    public static string SubtitleOf(GameAchievementsView view, bool hasRarity)
+    {
+        var rarity = hasRarity ? "how rare each is, from Steam's players this week" : "how rare each is comes once Steam has been asked";
+        var elsewhere = view.KeptOn is { Count: > 0 } pcs ? " and on " + string.Join(" and ", pcs) : "";
+        return view.From switch
+        {
+            AchievementsFrom.Steam => $"Kept by GameSync · seen in Steam on this PC{elsewhere} · {rarity}",
+            AchievementsFrom.CopyRecord => $"Kept by GameSync · seen in this copy's own record{elsewhere} · {rarity}",
+            // Version 55: last, so the ? after the words follows what it explains.
+            _ when view.CanMark => $"Kept by GameSync · {rarity} · {(view.Marked > 0 ? "marked by you" : "nothing written down yet")}",
+            AchievementsFrom.Kept when view.KeptOn is { Count: > 0 } on => $"Kept by GameSync · unlocked on {string.Join(" and ", on)} · {rarity}",
+            AchievementsFrom.Kept => $"Kept by GameSync · seen on this PC before · {rarity}",
+            AchievementsFrom.ListNotPlayedHere => "Steam's list · none of your PCs has unlocked one yet",
+            _ => "Steam's list · nothing writes this copy's unlocks down yet",
+        };
     }
 
     /// <summary>Picks an achievement by its id, as a click on it in the Achievements page's recent unlocks does.</summary>
@@ -613,10 +761,6 @@ public sealed partial class TrophyRoomViewModel : ObservableObject, IPageSurface
     [NotifyPropertyChangedFor(nameof(Arrow))]
     private bool _reversed;
 
-    /// <summary>Refresh rarity is asking Steam.</summary>
-    [ObservableProperty]
-    private bool _refreshing;
-
     public TrophyRoomViewModel(LauncherActions? actions = null)
     {
         _actions = actions;
@@ -646,18 +790,6 @@ public sealed partial class TrophyRoomViewModel : ObservableObject, IPageSurface
 
             Rows = Order(_all);
         });
-        RefreshRarityCommand = new AsyncRelayCommand(async () =>
-        {
-            Refreshing = true;
-            try
-            {
-                await LoadAsync(AchievementsLoad.Refresh);
-            }
-            finally
-            {
-                Refreshing = false;
-            }
-        });
     }
 
     /// <summary>
@@ -684,8 +816,6 @@ public sealed partial class TrophyRoomViewModel : ObservableObject, IPageSurface
 
     public bool HasReach => Reach.Count > 0;
 
-    public bool CanRefresh => _actions?.LoadAllAchievements is not null;
-
     /// <summary>A game's achievements, on this page; from Closest to Zenith, the Zeniths and Every game.</summary>
     public ICommand OpenGameCommand { get; }
 
@@ -694,9 +824,6 @@ public sealed partial class TrophyRoomViewModel : ObservableObject, IPageSurface
 
     /// <summary>A heading's click: sorts Every game by it; a second click reverses it.</summary>
     public ICommand SortCommand { get; }
-
-    /// <summary>Asks Steam again how rare each achievement is, for every game.</summary>
-    public IAsyncRelayCommand RefreshRarityCommand { get; }
 
     public bool ByGame => By == TrophySort.Game;
 
@@ -808,7 +935,7 @@ public sealed partial class TrophyRoomViewModel : ObservableObject, IPageSurface
         Rarest = unlocks.Where(u => u.Achievement.Percent is not null).OrderBy(u => u.Achievement.Percent).Take(1).ToList() is [var rarest]
             ? new TrophyUnlock(rarest.View.Game, TitleOf(rarest.View), AchievementItem.Of(rarest.Achievement, nowLocal))
             : null;
-        GamesSubtitle = $"{Count(games.Count)} with achievements on this PC";
+        GamesSubtitle = $"{Count(games.Count)} with achievements";
         Rows = Order(games);
         OnPropertyChanged(nameof(HasZeniths));
         OnPropertyChanged(nameof(HasClosest));

@@ -186,21 +186,21 @@ public sealed partial class SaveManagerViewModel : ObservableObject, IPageSurfac
 
     /// <summary>The game whose saves are open; null shows every game's.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowsTable), nameof(ShowsNeeds), nameof(ShowsPlan), nameof(ShowsVersions), nameof(ShowsLog), nameof(HasPage), nameof(Page), nameof(BackdropArt))]
+    [NotifyPropertyChangedFor(nameof(ShowsTable), nameof(ShowsNeeds), nameof(ShowsLog), nameof(HasPage), nameof(Page), nameof(BackdropArt))]
     private GameSavesViewModel? _game;
 
     /// <summary>A game's conflict, open over its saves or on its own (SYNC-10).</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowsTable), nameof(ShowsNeeds), nameof(ShowsPlan), nameof(ShowsVersions), nameof(ShowsLog), nameof(HasPage), nameof(Page), nameof(BackdropArt))]
+    [NotifyPropertyChangedFor(nameof(ShowsTable), nameof(ShowsNeeds), nameof(ShowsLog), nameof(HasPage), nameof(Page), nameof(BackdropArt))]
     private ConflictViewModel? _conflict;
 
     /// <summary>
-    /// The view: <c>saves</c>, every game's saves; <c>needs</c>, the games that need you (KAN-46); <c>plan</c>, what the
-    /// next sync would do (SYNC-14); <c>versions</c>, every version of every game (MGR-08); or <c>log</c>, everything
-    /// GameSync did (MGR-09).
+    /// The view: <c>saves</c>, every game's saves; <c>needs</c>, the games that need you (KAN-46); or <c>log</c>, everything
+    /// GameSync did (MGR-09). The Plan and Versions tabs were taken out on 9 Oct 2026 (the owner's friend: "What on earth is
+    /// the plan tab", "What is the point of the versions tab?"): a game's saves list every version, and gamesync plan stays.
     /// </summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowsTable), nameof(ShowsNeeds), nameof(ShowsPlan), nameof(ShowsVersions), nameof(ShowsLog), nameof(TopSubtitle))]
+    [NotifyPropertyChangedFor(nameof(ShowsTable), nameof(ShowsNeeds), nameof(ShowsLog), nameof(TopSubtitle))]
     private string _tab = "saves";
 
     /// <summary>The Needs you tab's games, what needs you first as the table has them.</summary>
@@ -208,7 +208,7 @@ public sealed partial class SaveManagerViewModel : ObservableObject, IPageSurfac
     [NotifyPropertyChangedFor(nameof(HasNeeds), nameof(NoNeeds), nameof(TopSubtitle))]
     private IReadOnlyList<NeedsRow> _needsRows = [];
 
-    /// <summary>The save manager's views, as the design system's PillTabs: Saves, Needs you (with its count), Plan, Versions and Log.</summary>
+    /// <summary>The save manager's views, as the design system's PillTabs: Saves, Conflicts (with its count) and Log.</summary>
     [ObservableProperty]
     private IReadOnlyList<Controls.NavItem> _tabs = TabsWith(0);
 
@@ -220,25 +220,6 @@ public sealed partial class SaveManagerViewModel : ObservableObject, IPageSurfac
     {
         _actions = actions;
         Log = log ?? [];
-        Plan = new SyncPlanViewModel(actions, (id, conflict) =>
-        {
-            if (conflict)
-            {
-                OpenConflict(id);
-            }
-            else
-            {
-                Open(id);
-            }
-        });
-        Versions = new VersionsViewModel(actions, OpenVersion);
-        Versions.PropertyChanged += (_, e) =>
-        {
-            if (e.PropertyName == nameof(VersionsViewModel.Subtitle))
-            {
-                OnPropertyChanged(nameof(TopSubtitle));
-            }
-        };
         LogTab = new LogViewModel(actions);
         OpenCommand = new RelayCommand<GameId>(id => Open(id));
         SyncingSort = new TableSort("syncing", () => Rebuild(DateTime.Now));
@@ -328,7 +309,7 @@ public sealed partial class SaveManagerViewModel : ObservableObject, IPageSurfac
 
     public string Title => "Save manager";
 
-    public bool ShowsTable => Game is null && Conflict is null && Tab is not (NeedsTab or "plan" or "versions" or "log");
+    public bool ShowsTable => Game is null && Conflict is null && Tab is not (NeedsTab or "log");
 
     public bool ShowsNeeds => Game is null && Conflict is null && Tab == NeedsTab;
 
@@ -368,10 +349,6 @@ public sealed partial class SaveManagerViewModel : ObservableObject, IPageSurfac
     /// <summary>A Needs you row's button: Resolve opens the game's conflict, the others its saves, where the details are.</summary>
     public ICommand NeedsCommand { get; }
 
-    public bool ShowsPlan => Game is null && Conflict is null && Tab == "plan";
-
-    public bool ShowsVersions => Game is null && Conflict is null && Tab == "versions";
-
     public bool ShowsLog => Game is null && Conflict is null && Tab == "log";
 
     /// <summary>The top bar's line under the title, as each view's design has it.</summary>
@@ -383,7 +360,6 @@ public sealed partial class SaveManagerViewModel : ObservableObject, IPageSurfac
             1 => "1 conflict",
             var n => $"{n.ToString(CultureInfo.InvariantCulture)} conflicts",
         },
-        "versions" => Versions.Subtitle,
         "log" => "Everything GameSync did, per game, newest first",
         _ => Subtitle,
     };
@@ -394,8 +370,6 @@ public sealed partial class SaveManagerViewModel : ObservableObject, IPageSurfac
     [
         new("saves", "Saves", "saves"),
         new(NeedsTab, "Conflicts", "alert", needYou > 0 ? needYou.ToString(CultureInfo.InvariantCulture) : null),
-        new("plan", "Plan", "chevronsRight"),
-        new("versions", "Versions", "clock"),
         new("log", "Log", "terminal"),
     ];
 
@@ -412,12 +386,6 @@ public sealed partial class SaveManagerViewModel : ObservableObject, IPageSurfac
         Tab = Tabs.Any(t => t.Id == tab) ? tab : "saves";
     }
 
-    /// <summary>The Plan tab: made the first time it's shown, and again on Check again.</summary>
-    public SyncPlanViewModel Plan { get; }
-
-    /// <summary>The Versions tab: read each time it's shown, and as the games refresh while it shows.</summary>
-    public VersionsViewModel Versions { get; }
-
     /// <summary>The Log tab, the whole of the log the Saves tab shows live: read each time it's shown, and as the games refresh.</summary>
     public LogViewModel LogTab { get; }
 
@@ -425,23 +393,10 @@ public sealed partial class SaveManagerViewModel : ObservableObject, IPageSurfac
     {
         switch (value)
         {
-            case "plan":
-                Plan.CheckIfFirst();
-                break;
-            case "versions":
-                _ = Versions.LoadAsync();
-                break;
             case "log":
                 _ = LogTab.LoadAsync();
                 break;
         }
-    }
-
-    /// <summary>A row of the Versions tab: the game's saves, with that version picked where Restore is (MGR-08).</summary>
-    public void OpenVersion(GameId id, VersionId version)
-    {
-        Open(id);
-        Game?.Pick(version);
     }
 
     /// <summary>What shows instead of the table: a game's conflict, or its saves.</summary>
@@ -573,11 +528,7 @@ public sealed partial class SaveManagerViewModel : ObservableObject, IPageSurfac
 
         Rebuild(DateTime.Now);
         LoadSummaries();
-        if (ShowsVersions)
-        {
-            _ = Versions.LoadAsync();
-        }
-        else if (ShowsLog)
+        if (ShowsLog)
         {
             _ = LogTab.LoadAsync();
         }

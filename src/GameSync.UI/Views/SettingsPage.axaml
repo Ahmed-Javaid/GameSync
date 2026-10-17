@@ -17,6 +17,14 @@
           <TextBlock Classes="page-title" Text="Appearance" />
           <TextBlock Classes="muted" TextWrapping="Wrap" Text="Changes apply straight away and are saved on this PC only." />
         </StackPanel>
+        <!-- LOOK-28 (version 57): Windows' Animation effects are off, so GameSync doesn't animate either -->
+        <c:GsCard Title="Motion" IsVisible="{Binding AnimationsOff}">
+          <c:GsSettingsRow Title="Animations are off in Windows"
+                           Description="Windows' Animation effects are off on this PC, so GameSync doesn't animate either: looks change at once and nothing moves. Turn them on in Windows Settings, Accessibility, Visual effects.">
+            <c:GsButton Classes="sm" Icon="external" Content="Open Visual effects" Command="{Binding OpenVisualEffectsCommand}"
+                        ToolTip.Tip="Windows' own Visual effects page, where Animation effects is" />
+          </c:GsSettingsRow>
+        </c:GsCard>
         <c:GsCard Title="Theme" Subtitle="{Binding ThemeNote}">
           <c:GsCard.Action>
             <c:GsPillTabs ItemsSource="{Binding Modes}" SelectedId="{Binding Mode, Mode=TwoWay}" AutomationProperties.Name="Mode" />
@@ -82,9 +90,9 @@
           </c:GsCard>
         </Grid>
         <c:GsNote Icon="info" Text="{Binding Note.Text}" Classes.warn="{Binding Note.Failed}" IsVisible="{Binding HasNote}" />
-        <c:GsCard Title="Shared zips">
+        <c:GsCard Title="Sharing saves with friends">
           <StackPanel>
-            <c:GsFolderField Path="{Binding ShareFolder}" Meta="Where Share saves puts its zip files" Margin="0,0,0,12"
+            <c:GsFolderField Path="{Binding ShareFolder}" Meta="Where the zips you make to share saves with a friend are saved" Margin="0,0,0,12"
                              ChangeCommand="{Binding $parent[v:SettingsPage].PickShareFolderCommand}" OpenCommand="{Binding OpenShareFolderCommand}" />
             <c:GsSettingsRow Title="Ask where to save each time" Classes="after">
               <c:GsSwitch IsChecked="{Binding ShareAsk}" AutomationProperties.Name="Ask where to save each time" />
@@ -345,8 +353,21 @@
       <StackPanel Spacing="16">
         <StackPanel Spacing="4" Margin="0,0,0,4">
           <TextBlock Classes="page-title" Text="Achievements" />
-          <TextBlock Classes="muted" TextWrapping="Wrap" Text="What you see and hear when you unlock one while playing, and which games count." />
+          <TextBlock Classes="muted" TextWrapping="Wrap" Text="GameSync keeps every achievement you unlock, on every PC; what you see and hear when one unlocks; and which games count." />
         </StackPanel>
+        <!-- Design system version 54 (the owner, 8 Oct 2026: "The achievement system needs to work even without steam", then yes
+             to keeping it in the Drive folder): GameSync's own record of what's unlocked, and Keep them in the cloud -->
+        <c:GsCard Title="Kept by GameSync" Subtitle="Every achievement GameSync sees unlocked stays, with its day, whether Steam, the copy or the PC is still there or not.">
+          <StackPanel>
+            <c:GsSettingsRow Title="Keep them in the cloud" Description="{Binding CloudLine}" IsEnabled="{Binding HasCloud}">
+              <c:GsSwitch IsChecked="{Binding KeepInCloud}" AutomationProperties.Name="Keep them in the cloud" />
+            </c:GsSettingsRow>
+            <c:GsNote Icon="info" Text="{Binding CloudNote.Text, FallbackValue={x:Null}}" Classes.warn="{Binding CloudNote.Failed, FallbackValue=False}" Margin="0,12,0,0"
+                      IsVisible="{Binding CloudNote, Converter={x:Static ObjectConverters.IsNotNull}}" />
+            <c:GsNote Icon="info" Margin="0,12,0,0"
+                      Text="GameSync sees unlocks in Steam's files on any of your PCs and in the records copies keep themselves, which it finds by itself. For a copy that writes nothing down, you mark them on its page. Steam's list names them." />
+          </StackPanel>
+        </c:GsCard>
         <c:GsCard Title="When you unlock one while playing">
           <StackPanel>
             <c:GsSettingsRow Title="Show a popup"
@@ -378,19 +399,30 @@
               </StackPanel>
             </c:GsSettingsRow>
             <c:GsNote Icon="info" Margin="0,12,0,0"
-                      Text="GameSync sees unlocks in Steam's files on this PC, and in the records of the copies below. Steam shows its own popup for its games, so GameSync's is off for each until you turn it on in Achievements by game; a copy of its own has GameSync's." />
+                      Text="Steam shows its own popup for its games, so GameSync's is off for each until you turn it on in Achievements by game; a copy of its own has GameSync's." />
           </StackPanel>
         </c:GsCard>
-        <!-- KAN-123 (design system version 48; the owner: "As long as my offline games also have achievements"): the folders
-             where copies Steam doesn't run keep their own records of what's unlocked, one folder per game by its Steam number -->
-        <c:GsCard Title="Copies Steam doesn't run" Subtitle="Copies that keep their own record of what's unlocked. Kept on this PC only.">
+        <!-- KAN-123 (design system version 48; the owner: "As long as my offline games also have achievements"); since version 54
+             ("Tracking by itself", then "find them itself") GameSync finds the records copies Steam doesn't run keep themselves, by
+             the game's achievements named inside them; a folder is added only for records kept anywhere else -->
+        <c:GsCard Title="Copies Steam doesn't run" Subtitle="GameSync finds the records they keep of what's unlocked by itself.">
           <StackPanel Spacing="12">
+            <c:GsSettingsRow Title="{Binding FoundTitle}" Description="{Binding FoundLine}">
+              <c:GsButton Classes="sm" Icon="sync" Content="Look again" Command="{Binding LookAgainCommand}" IsBusy="{Binding Looking}" BusyText="Looking"
+                          ToolTip.Tip="Looks again in AppData, Documents, Public Documents and each game's own folder" />
+            </c:GsSettingsRow>
+            <c:GsFolderList Items="{Binding RecordsFound}" IsVisible="{Binding HasFound}" />
+            <c:GsNote Icon="info" Text="None found yet. A copy that writes nothing down can have its achievements marked on its page."
+                      IsVisible="{Binding !HasFound}" />
+            <Panel>
+              <c:GsSettingsRow Title="Other folders" Description="For records kept anywhere else: a folder with one folder per game, named by its Steam number." />
+            </Panel>
             <c:GsFolderList Items="{Binding RecordFolders}" AddCommand="{Binding $parent[v:SettingsPage].AddRecordFolderCommand}" AddLabel="Add a folder"
-                            RemoveCommand="{Binding RemoveRecordFolderCommand}" Empty="None yet. A copy that isn't Steam's shows Steam's list at 0 on its page." />
+                            RemoveCommand="{Binding RemoveRecordFolderCommand}" Empty="None added." />
             <c:GsNote Icon="info" Text="{Binding RecordNote.Text, FallbackValue={x:Null}}" Classes.warn="{Binding RecordNote.Failed, FallbackValue=False}"
                       IsVisible="{Binding RecordNote, Converter={x:Static ObjectConverters.IsNotNull}}" />
             <c:GsNote Icon="info"
-                      Text="Add the folder holding one folder per game, named by its Steam number, with the copy's record inside. GameSync only reads the records; each achievement's name, icon and how rare it is come from Steam's list. Their unlocks count on the Achievements page and Home, and pop up while you play." />
+                      Text="GameSync knows a record by the game's achievements named inside it, so no list of where such records live comes with GameSync. It only reads them; each achievement's name, icon and how rare it is come from Steam's list. Their unlocks count on the Achievements page and Home, and pop up while you play." />
           </StackPanel>
         </c:GsCard>
         <!-- Version 41 (KAN-131; the owner: "Game in your achievements makes no sense. Also it needs to be either a popup or a new
@@ -400,6 +432,19 @@
             <c:GsButton Classes="sm" Icon="trophy" Content="Choose games…" Command="{Binding ChooseGamesCommand}" IsEnabled="{Binding HasGames}"
                         ToolTip.Tip="Every game with achievements: whether it counts, and whether GameSync shows its popup" />
           </c:GsSettingsRow>
+        </c:GsCard>
+        <!-- Design system version 55 (the owner, 8 Oct 2026: "Refresh rarity shouldn't be on the main achievements page, but in
+             settings"): how rare each one is, asked of Steam once a week by itself, or now -->
+        <c:GsCard Title="Rarity">
+          <StackPanel>
+            <c:GsSettingsRow Title="How rare each one is"
+                             Description="The share of Steam's players who have each achievement, which sets its tier. GameSync asks Steam once a week by itself.">
+              <c:GsButton Classes="sm" Icon="sync" Content="Refresh now" Command="{Binding RefreshRarityCommand}" IsBusy="{Binding RefreshingRarity}"
+                          BusyText="Asking Steam" ToolTip.Tip="Asks Steam again now, for every game with achievements" />
+            </c:GsSettingsRow>
+            <c:GsNote Icon="info" Text="{Binding RarityNote.Text, FallbackValue={x:Null}}" Classes.warn="{Binding RarityNote.Failed, FallbackValue=False}" Margin="0,12,0,0"
+                      IsVisible="{Binding RarityNote, Converter={x:Static ObjectConverters.IsNotNull}}" />
+          </StackPanel>
         </c:GsCard>
       </StackPanel>
     </DataTemplate>
@@ -461,8 +506,13 @@
         <c:GsCard Title="Checking">
           <StackPanel>
             <c:GsSettingsRow Title="Check for updates every day"
-                             Description="GameSync asks GitHub for its latest release once a day and gets it in the background. Nothing installs until you restart it. Off, Check now still works.">
+                             Description="GameSync asks GitHub for its latest release once a day and gets it in the background. Off, Check now still works.">
               <c:GsSwitch IsChecked="{Binding Daily}" AutomationProperties.Name="Check for updates every day" />
+            </c:GsSettingsRow>
+            <!-- PKG-03 (9 Oct 2026, the owner): friends never have to click Restart to update -->
+            <c:GsSettingsRow Title="Install updates when GameSync starts with Windows"
+                             Description="A ready update installs as you sign in, before you play, in a few seconds. Off, it waits for Restart to update.">
+              <c:GsSwitch IsChecked="{Binding AtSignIn}" AutomationProperties.Name="Install updates when GameSync starts with Windows" />
             </c:GsSettingsRow>
             <c:GsNote Icon="shield" Margin="0,12,0,0"
                       Text="GameSync isn't code-signed, so Windows may warn the first time you run it. Every update is checked against GameSync's own release signature before it installs, and anything else is refused." />
@@ -486,6 +536,9 @@
         <TextBlock DockPanel.Dock="Top" Text="Settings" FontSize="{DynamicResource fs-15}" LineHeight="{DynamicResource lh-20}" FontWeight="SemiBold" Margin="12,0,12,16" />
         <StackPanel DockPanel.Dock="Bottom" Spacing="8" Margin="12,16,12,0">
           <TextBlock Classes="caption faint" Text="{Binding Footer}" TextWrapping="Wrap" />
+          <!-- SET-05 (version 57): a new issue on GameSync's GitHub, with the diagnostics -->
+          <c:GsButton Classes="sm primary" Icon="alert" Content="Report a problem…" Command="{Binding ReportProblemCommand}" HorizontalAlignment="Left"
+                      ToolTip.Tip="Say what happened; GameSync opens a new issue on its GitHub with it, for you to post" />
           <c:GsButton Classes="sm" Icon="{Binding CopyIcon}" Content="{Binding CopyLabel}" Command="{Binding CopyDiagnosticsCommand}" HorizontalAlignment="Left"
                       AutomationProperties.Name="Copy diagnostics" />
           <TextBlock Classes="caption faint" TextWrapping="Wrap" Text="For a bug report: the logs and each game's versions. Never your sign-in or your saves." />

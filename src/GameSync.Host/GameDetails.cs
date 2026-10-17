@@ -24,11 +24,13 @@ public sealed record GamePlace(string Portable, string? Folder, string? Tag, str
 /// <summary>A version of a game's save, from any PC, as its history lists it.</summary>
 /// <param name="Note">What sets it apart: a named save's name, "Before update to build …", a conflict's other side.</param>
 /// <param name="Uploaded">False while it waits on this PC for the cloud.</param>
-public sealed record GameVersion(VersionId Id, DateTime SavedUtc, string Pc, string? Note, bool IsCurrent, bool IsPinned, long Bytes, bool Uploaded);
+/// <param name="Tag">SHARE-10 (design system version 57): the tag put on it as it was imported, shown after the PC's name.</param>
+public sealed record GameVersion(VersionId Id, DateTime SavedUtc, string Pc, string? Note, bool IsCurrent, bool IsPinned, long Bytes, bool Uploaded, string? Tag = null);
 
 /// <summary>A named save (BAK-18): a pinned version with a name, on every PC.</summary>
 /// <param name="InPlace">Its files are the game's current save: the one restored last, or saved and not played since (KAN-51).</param>
-public sealed record GameNamedSave(string Name, VersionId Version, DateTime SavedUtc, string Pc, bool Uploaded, bool InPlace = false);
+/// <param name="Tag">SHARE-10 (design system version 57): the tag put on it as it was imported, shown after the PC's name.</param>
+public sealed record GameNamedSave(string Name, VersionId Version, DateTime SavedUtc, string Pc, bool Uploaded, bool InPlace = false, string? Tag = null);
 
 /// <summary>
 /// KAN-92: the live save as the game has it now, on this PC: its files, size and newest change; the newest version holding
@@ -98,6 +100,12 @@ public sealed record GameAbout
 
     /// <summary>How GameSync found the game on this PC: "Steam's library", "a folder you added", "you".</summary>
     public string? FoundBy { get; init; }
+
+    /// <summary>
+    /// LIB-24 (design system version 57): what the program picked for a game in its own folder says it is, while the game
+    /// is in the folder it was checked in; null for any other game.
+    /// </summary>
+    public ProgramCheck? Check { get; init; }
 }
 
 /// <summary>
@@ -226,7 +234,7 @@ public static class GameDetails
             // a restore), it can be restored again, though nothing is backed up until the game closes. When the live
             // save can't be read, the newest version stands for it.
             NamedSaves = live is { InUse: null } ? detail.NamedSaves.Select(n => n with { InPlace = live.SameVersions.Contains(n.Version) }).ToList() : detail.NamedSaves,
-            About = About(dataDir, game, entry, engine.State, folder, steamAppId),
+            About = About(dataDir, game, entry, engine.State, folder, steamAppId) with { Check = ProgramChecks.ForLocated(dataDir, engine, entry, folder) },
             Conflict = conflict,
             Current = live,
             BackupFolder = Directory.Exists(gameHistory) ? gameHistory : historyFolder,
@@ -360,7 +368,9 @@ public static class GameDetails
     {
         var heads = VersionGraph.Heads(versions).Select(v => v.Id).ToHashSet();
         var current = versions.Where(v => heads.Contains(v.Id)).MaxBy(v => v.CreatedUtc);
-        string Pc(VersionRecord v) => pcs.GetValueOrDefault(v.Device.Id, v.Device.Name);
+        // A save someone shared was made on their PC, which it names (SHARE-10); every other on the PC that stored it.
+        string Pc(VersionRecord v) => v.SharedFrom is { } from ? SyncService.CleanTag(from, 40) ?? "another PC" : pcs.GetValueOrDefault(v.Device.Id, v.Device.Name);
+        string? Tag(VersionRecord v) => SyncService.CleanTag(v.Tag);
 
         var syncs = definition is not null;
         var places = syncs ? Places(definition!, current, entry, programs ?? []) : Found(entry, resolver);
@@ -386,7 +396,7 @@ public static class GameDetails
             NamedSaves = pins.Values
                 .Where(p => p.Named)
                 .Select(p => versions.FirstOrDefault(v => v.Id == p.Version) is { } v ? new GameNamedSave(p.Label, v.Id, SavedAt(v), Pc(v), !pending.Contains(v.Id),
-                    current is not null && FileSet.SameContent(current.Files, v.Files)) : null)
+                    current is not null && FileSet.SameContent(current.Files, v.Files), Tag(v)) : null)
                 .OfType<GameNamedSave>()
                 .OrderByDescending(s => s.SavedUtc)
                 .ToList(),
@@ -397,7 +407,7 @@ public static class GameDetails
                 .ThenByDescending(v => v.CreatedUtc)
                 .ThenByDescending(v => v.Id)
                 .Select(v => new GameVersion(v.Id, SavedAt(v), Pc(v), Note(v, pins.GetValueOrDefault(v.Id), waiting: v.CreatedUtc > current?.CreatedUtc), v.Id == current?.Id,
-                    v.Pinned || pins.ContainsKey(v.Id), FileSet.TotalSize(v.Files), !pending.Contains(v.Id)))
+                    v.Pinned || pins.ContainsKey(v.Id), FileSet.TotalSize(v.Files), !pending.Contains(v.Id), Tag(v)))
                 .ToList(),
             HistoryBytes = versions.SelectMany(v => v.Files).DistinctBy(f => f.Hash).Sum(f => f.Size),
             Log = events.Select(e => new GameLogLine(e.AtUtc, e.Level, e.Message, e.Tag)).ToList(),
@@ -488,7 +498,9 @@ public static class GameDetails
             var folder = definition.Roots.GetValueOrDefault(rules.Key);
             var patterns = rules.Select(r => r.Include).Where(i => i != "**").Distinct().ToList();
             var shown = patterns.Count == 0 ? portable : $"{portable}  ({string.Join(", ", patterns)})";
-            var tag = rules.All(r => r.Category == SaveCategory.Save) ? null : TagOf(rules.First(r => r.Category != SaveCategory.Save).Category);
+            // A folder holding the game's saves beside its settings is its save folder (the owner's Dark Souls II and III, 8 Oct
+            // 2026, read SETTINGS on the one place they sync their saves from); only a folder of settings alone says so.
+            var tag = rules.Any(r => r.Category == SaveCategory.Save) ? null : TagOf(rules.First().Category);
             var files = current?.Files.Where(f => f.Path.StartsWith(rules.Key + "/", StringComparison.Ordinal)).ToList() ?? [];
             var found = entry?.Proposals.FirstOrDefault(p => SameFolder(p.Root, portable));
             var evidence = files.Count > 0 ? Evidence(files.Count, FileSet.TotalSize(files), files.Max(f => f.ModifiedUtc))

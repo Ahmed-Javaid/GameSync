@@ -15,6 +15,7 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Storage\RestoreKit\*" LogicalName="GameSync.RestoreKit.%(Filename)%(Extension)" />
+    <EmbeddedResource Include="Storage\BackupFolderReadme.txt" LogicalName="GameSync.BackupFolderReadme.txt" />
   </ItemGroup>
 
 </Project>

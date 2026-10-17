@@ -64,6 +64,48 @@ public class LauncherTests
     }
 
     [Fact]
+    public void PLAY_09_a_game_played_while_GameSync_wasnt_watching_was_last_played_when_its_saves_were_written()
+    {
+        // The owner's Ghost of Tsushima (8 Oct 2026): played from July to 27 Sep, before GameSync watched it, in a copy
+        // Steam doesn't run, so its page said "Last played: Never".
+        using var world = new TestWorld();
+        using var state = new StateStore(Path.Combine(world.Root, "data"));
+        DateTime At(int day, int hour) => new DateTime(2026, 9, day, hour, 0, 0, DateTimeKind.Local).ToUniversalTime();
+        Proposal Place(SaveCategory category, DateTime? newest) => new(FoundBy.SaveList, "<documents>/Game", "*/**", category, 17, 5_200_000, newest);
+        var saves = new[] { Place(SaveCategory.Save, At(20, 2)), Place(SaveCategory.Save, At(11, 3)), Place(SaveCategory.Config, At(20, 4)) };
+        var fnfStart = Now.AddHours(-1).ToUniversalTime();
+        state.AddSession(GameId.Parse("fnf"), new SessionInfo(fnfStart, fnfStart.AddMinutes(30)));
+        var plays = new Dictionary<long, SteamPlay> { [105600] = new(105600, Now.AddDays(-12).ToUniversalTime(), TimeSpan.FromHours(10)) };
+
+        var games = Launcher.Games(
+        [
+            Entry("ghost-of-tsushima", "Ghost of Tsushima", StoreKind.Loose, null) with { Proposals = saves },
+            Entry("terraria", "Terraria", StoreKind.Steam, "105600") with { Proposals = [Place(SaveCategory.Save, At(27, 12))] },
+            Entry("fnf", "FNF", StoreKind.Loose, null) with { Proposals = [Place(SaveCategory.Save, At(27, 12))] },
+            Entry("server-world", "Server world", StoreKind.Loose, null) with { OwnFolder = @"D:\Server\world", Proposals = [Place(SaveCategory.Save, At(26, 12))] },
+            Entry("rounds", "Rounds", StoreKind.Loose, null) with { Proposals = [Place(SaveCategory.Save, null), Place(SaveCategory.Save, new DateTime(1980, 1, 1, 0, 0, 0, DateTimeKind.Utc))] },
+        ], [], state, null, plays, null);
+
+        // Its saves' newest write, never a settings file's or a time out of reason.
+        var ghost = games.Single(g => g.Title == "Ghost of Tsushima");
+        Assert.Equal((At(20, 2), true), (ghost.LastPlayedUtc, ghost.LastPlayedFromSaves));
+        Assert.Equal("20 Sep", Launcher.Meta(ghost, Now));
+        Assert.Equal((Now.AddDays(-12).ToUniversalTime(), false), (games.Single(g => g.Title == "Terraria").LastPlayedUtc, games.Single(g => g.Title == "Terraria").LastPlayedFromSaves));
+        Assert.Equal((fnfStart.AddMinutes(30), false), (games.Single(g => g.Title == "FNF").LastPlayedUtc, games.Single(g => g.Title == "FNF").LastPlayedFromSaves));
+        Assert.Null(games.Single(g => g.Title == "Server world").LastPlayedUtc);
+        Assert.Null(games.Single(g => g.Title == "Rounds").LastPlayedUtc);
+
+        // Home and the library place it by that day, and its page says where the day came from and that no time was counted.
+        var home = Launcher.Home(games, state, Now);
+        Assert.Equal(["FNF", "Ghost of Tsushima", "Terraria"], home.JumpBackIn.Prepend(home.Hero!).Take(3).Select(g => g.Title));
+        var stats = UI.ViewModels.GameViewModel.StatsOf(ghost, Now);
+        Assert.Equal(["Last played: 20 Sep", "Play time: Not recorded"], stats.Take(2).Select(s => s.ToString()));
+        Assert.All(stats.Take(2), s => Assert.NotNull(s.Tip));
+        Assert.All(UI.ViewModels.GameViewModel.StatsOf(games.Single(g => g.Title == "FNF"), Now), s => Assert.Null(s.Tip));
+        Assert.Equal(["Last played: Never", "Play time: None yet"], UI.ViewModels.GameViewModel.StatsOf(games.Single(g => g.Title == "Rounds"), Now).Take(2).Select(s => s.ToString()));
+    }
+
+    [Fact]
     public void ART_01_an_Epic_or_loose_copy_of_a_Steam_game_gets_its_Steam_ID_from_the_save_list()
     {
         var saveList = new SaveList([new SaveListGame { Title = "Grand Theft Auto V Enhanced", SteamIds = [3240220] }], "test", DateTime.UtcNow);
@@ -74,6 +116,46 @@ public class LauncherTests
         }, saveList));
         Assert.Equal(730, Launcher.SteamIdOf(Entry("cs2", "Counter-Strike 2", StoreKind.Steam, "730"), saveList));
         Assert.Null(Launcher.SteamIdOf(Entry("og", "OG", StoreKind.Loose, null), saveList));
+    }
+
+    [Fact]
+    public void KAN_170_a_copy_the_save_list_doesnt_know_gets_its_art_from_the_Steam_ID_its_folder_declares()
+    {
+        // A friend's notes, 8 Oct 2026: "Non steam launchers art, achievement etc not being captured."
+        using var world = new TestWorld();
+        var folder = Path.Combine(world.Root, "Games", "Some Indie");
+        Directory.CreateDirectory(folder);
+        File.WriteAllText(Path.Combine(folder, "SomeIndie.exe"), "MZ");
+        File.WriteAllText(Path.Combine(folder, "steam_appid.txt"), "999001");
+        var spacewar = Path.Combine(world.Root, "Games", "Played Together");
+        Directory.CreateDirectory(spacewar);
+        File.WriteAllText(Path.Combine(spacewar, "steam_appid.txt"), "480");
+        DiscoveredGame Found(string dir, string title) => new()
+        {
+            Installed = new InstalledGame { Store = StoreKind.Loose, Title = title, InstallDir = dir },
+            Title = title,
+            Print = Fingerprinter.Read(dir),
+        };
+
+        // The scan keeps what the folder says, but never Valve's test app, which copies say to play together.
+        var library = Library.Reconcile([], [Found(folder, "Some Indie"), Found(spacewar, "Played Together")], DateTime.UtcNow);
+        Assert.Equal(999001, library.Single(e => e.Title == "Some Indie").DeclaredSteamId);
+        Assert.Null(library.Single(e => e.Title == "Played Together").DeclaredSteamId);
+
+        // Its art and store page come from that ID; one that another game has as its own isn't taken, so a copy pointed at
+        // the wrong game never wears that game's art.
+        var saveList = new SaveList([new SaveListGame { Title = "Risk of Rain 2", SteamIds = [632360] }], "test", DateTime.UtcNow);
+        using var state = new StateStore(Path.Combine(world.Root, "data"));
+        var games = Launcher.Games(
+        [
+            .. library,
+            Entry("risk-of-rain-2", "Risk of Rain 2", StoreKind.Steam, "632360"),
+            Entry("not-ror2", "Not Risk of Rain 2", StoreKind.Loose, null) with { DeclaredSteamId = 632360 },
+        ], [], state, saveList, new Dictionary<long, SteamPlay>(), null);
+        Assert.Equal(999001, games.Single(g => g.Title == "Some Indie").SteamAppId);
+        Assert.Null(games.Single(g => g.Title == "Not Risk of Rain 2").SteamAppId);
+        Assert.Null(games.Single(g => g.Title == "Played Together").SteamAppId);
+        Assert.Equal(632360, games.Single(g => g.Title == "Risk of Rain 2").SteamAppId);
     }
 
     [Fact]

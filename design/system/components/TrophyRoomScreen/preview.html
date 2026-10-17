@@ -106,8 +106,9 @@ function App(){
   return [rail(),
     h('main',{key:'m',className:'tr-page'},
       h('header',{className:'tr-top'},
-        h('div',null,h('div',{style:{font:'600 15px/20px var(--font-sans)'}},'Achievements'),h('div',{className:'gs-faint',style:{fontSize:12}},'Every game’s: from Steam on this PC, and your other copies’ own records')),
-        h(G.Button,{size:'sm',variant:'ghost',icon:'sync',title:'Asks Steam again how rare each is, for every game'},'Refresh rarity')),
+        // Version 55 (the owner, 8 Oct 2026: "Refresh rarity shouldn't be on the main achievements page, but in settings"):
+        // the header is the page's name alone; Refresh now is in Settings, Achievements, Rarity.
+        h('div',null,h('div',{style:{font:'600 15px/20px var(--font-sans)'}},'Achievements'),h('div',{className:'gs-faint',style:{fontSize:12}},'Every game’s, kept by GameSync on every PC'))),
       h('section',{className:'tr-band','aria-label':'Your achievements in all'},
         h(G.TrophyRise),
         h(G.ProgressRing,{value:avg,size:132,label:avg+'%',sub:'average',ariaLabel:'Average completion of the games you’ve started: '+avg+'%'}),
@@ -151,7 +152,7 @@ function App(){
               h(G.AchievementBadge,{icon:achIcon(r.i),name:r.name,state:'locked',size:'sm'}),
               h('div',{className:'tr-recent-text'},h('span',{className:'tr-recent-name'},r.name),h('span',{className:'tr-recent-game'},r.game)),
               h('span',{className:'tr-reach-pct'},A.percent(r.pct))); }))),
-      h(G.Card,{title:'Every game',subtitle:GAMES.length+' games with achievements on this PC'},
+      h(G.Card,{title:'Every game',subtitle:GAMES.length+' games with achievements'},
         h('table',{className:'tr-table'},
           h('thead',null,h('tr',null,h('th',null,'Game'),h('th',null,'Progress'),h('th',null,'Unlocked'),h('th',null,'Tiers'),h('th',null,'Last unlocked'))),
           h('tbody',null,GAMES.slice().sort(function(a,b){return b.done/b.total-a.done/a.total}).map(function(g){ var p=Math.floor(100*g.done/g.total), all=g.done>=g.total;

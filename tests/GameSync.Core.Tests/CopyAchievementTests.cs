@@ -121,8 +121,10 @@ public class CopyAchievementTests
         Assert.True(view.All.Single(a => a.Id == "ACH_SECRET").Secret);
         Assert.Equal(3, view.All.Count);
 
-        // A Steam copy of the same game is Steam's to say: the record is for copies Steam doesn't run.
-        Assert.Equal(AchievementsFrom.ListNotPlayedHere, Achievements.For(data, copy with { Store = StoreKind.Steam }, steam)!.From);
+        // A Steam copy of the same game never reads the record, but since design system version 54 what GameSync saw in it is
+        // kept for the game: Steam's copy here shows it too, and can't be marked by hand (Steam writes its unlocks down).
+        var steamCopy = Achievements.For(data, copy with { Store = StoreKind.Steam }, steam)!;
+        Assert.Equal((AchievementsFrom.Kept, 2, false), (steamCopy.From, steamCopy.Unlocked, steamCopy.CanMark));
 
         // Counted on the Achievements page and Home, and in Achievements by game with GameSync's popup on, as no launcher shows one.
         Assert.Equal(["Cuphead"], Achievements.ForAll(data, games, steam).Select(v => v.Title));
@@ -141,9 +143,11 @@ public class CopyAchievementTests
         });
         Assert.Equal([(records, "Records for 1 game", "trophy"), (@"D:\Gone", "Not there right now", "trophy")], section.RecordFolders.Select(f => (f.Path, f.Meta, f.Icon)));
 
-        // Taken off again: Steam's list at 0 once more.
-        Assert.Equal($"Removed {records}: its games show Steam's list at 0 again.", Achievements.RemoveRecordFolder(data, records));
-        Assert.Equal(AchievementsFrom.ListNotSteamCopy, Achievements.For(data, copy, steam)!.From);
+        // Taken off again: GameSync no longer reads it, and keeps what it saw there (version 54); with nothing writing its
+        // unlocks down now, the copy's achievements can be marked by hand.
+        Assert.Equal($"Removed {records}: GameSync no longer reads it, and keeps what it saw there.", Achievements.RemoveRecordFolder(data, records));
+        var afterwards = Achievements.For(data, copy, steam)!;
+        Assert.Equal((AchievementsFrom.Kept, 2, true), (afterwards.From, afterwards.Unlocked, afterwards.CanMark));
         Assert.Throws<UsageException>(() => Achievements.RemoveRecordFolder(data, records));
     }
 

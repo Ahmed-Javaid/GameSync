@@ -7,7 +7,7 @@
              x:DataType="vm:TileItem" ClipToBounds="False">
   <!-- A cover in the library: a click opens the game's page beside the list; a right-click offers Play, favourite and hide. -->
   <c:GsGameTile Width="NaN" Title="{Binding Title}" Art="{Binding Art}" Status="{Binding Status}" StatusLabel="{Binding StatusLabel}" MarkLabel="{Binding MarkLabel}" Meta="{Binding Meta}"
-                    AchievementsDone="{Binding AchievementsDone}" AchievementsTotal="{Binding AchievementsTotal}"
+                AchievementsDone="{Binding AchievementsDone}" AchievementsTotal="{Binding AchievementsTotal}" SavesOnly="{Binding SavesOnly}"
                 Command="{Binding $parent[v:LibraryPage].((vm:LibraryViewModel)DataContext).OpenCommand}" CommandParameter="{Binding Id}">
     <c:GsGameTile.ContextMenu>
       <ContextMenu IsVisible="{Binding HasMenu}">

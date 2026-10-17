@@ -225,6 +225,43 @@ public static partial class Fingerprinter
         }
     }
 
+    /// <summary>
+    /// LIB-24 (design system version 57): which game a program picked for a game in its own folder is, from its own record:
+    /// its folder's GOG record or <c>steam_appid.txt</c>, then the program's own name and description, then its folder's
+    /// name; with what said so, in a sentence's words ("its Steam app ID"). No game when nothing names one.
+    /// </summary>
+    public static (SaveListGame? Game, string Evidence) Identify(string program, string folder, SaveList? list)
+    {
+        if (list is null)
+        {
+            return (null, "");
+        }
+
+        if (Gog(folder)?.Id is { } gogId && list.ByGogId(gogId) is { } byGog)
+        {
+            return (byGog, "its GOG record");
+        }
+
+        if (SteamAppIdIn(folder) is { } appId && list.BySteamId(appId) is { } bySteam)
+        {
+            return (bySteam, "its Steam app ID");
+        }
+
+        var info = VersionInfo(program);
+        foreach (var name in new[] { Path.GetFileNameWithoutExtension(program), Plain(info?.ProductName), Plain(info?.FileDescription) })
+        {
+            if (name.Length > 0 && list.ByTitle(name) is { } byName)
+            {
+                return (byName, "its own record");
+            }
+        }
+
+        var folderName = Path.GetFileName(Path.TrimEndingDirectorySeparator(folder));
+        return list.ByInstallDir(folderName) is [var byFolder] ? (byFolder, "its folder's name")
+            : list.ByTitle(folderName) is { } byTitle ? (byTitle, "its folder's name")
+            : (null, "");
+    }
+
     /// <summary>A name without the marks and notes around it: "Call of Duty(R): Black Ops II" is "Call of Duty: Black Ops II".</summary>
     internal static string Plain(string? name) =>
         string.Join(' ', Bracketed().Replace(name ?? "", " ").Replace("™", "", StringComparison.Ordinal).Replace("®", "", StringComparison.Ordinal)
@@ -236,7 +273,7 @@ public static partial class Fingerprinter
     private static string SafeName(string name) =>
         string.Concat(name.Select(c => Path.GetInvalidFileNameChars().Contains(c) ? '_' : c));
 
-    private static IEnumerable<string> Find(string folder, string pattern, int depth) =>
+    internal static IEnumerable<string> Find(string folder, string pattern, int depth) =>
         Directory.Exists(folder)
             ? Directory.EnumerateFiles(folder, pattern, Options(depth))
             : [];

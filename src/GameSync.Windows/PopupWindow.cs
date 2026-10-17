@@ -66,10 +66,11 @@ public static class PopupWindow
     }
 
     /// <summary>
-    /// The screen the person is using, in physical pixels: the one with the window in front (the game). A game covering
-    /// its screen gets the whole screen; anything else the screen less the taskbar.
+    /// The screen the person is using, in physical pixels, and its scale (1.5 at 150%): the one with the window in front (the
+    /// game). A game covering its screen gets the whole screen; anything else the screen less the taskbar. Two screens can
+    /// have different scales (the owner's friend's 1440p and 4K, 8 Oct 2026), so a window sized for one lands wrong on the other.
     /// </summary>
-    public static (int Left, int Top, int Right, int Bottom)? ForegroundScreen()
+    public static (int Left, int Top, int Right, int Bottom, double Scale)? ForegroundScreen()
     {
         try
         {
@@ -85,7 +86,7 @@ public static class PopupWindow
             var covers = front != IntPtr.Zero && GetWindowRect(front, out var rect) &&
                 rect.Left <= whole.Left && rect.Top <= whole.Top && rect.Right >= whole.Right && rect.Bottom >= whole.Bottom;
             var area = covers ? whole : info.Work;
-            return (area.Left, area.Top, area.Right, area.Bottom);
+            return (area.Left, area.Top, area.Right, area.Bottom, ScaleOf(monitor));
         }
         catch (Exception e) when (e is DllNotFoundException or EntryPointNotFoundException)
         {
@@ -123,6 +124,23 @@ public static class PopupWindow
 
     [DllImport("user32.dll")]
     private static extern IntPtr GetForegroundWindow();
+
+    /// <summary>A screen's scale, as Windows gives windows on it (its effective DPI over 96); 1 when Windows can't say.</summary>
+    private static double ScaleOf(IntPtr monitor)
+    {
+        try
+        {
+            return GetDpiForMonitor(monitor, 0, out var dpi, out _) == 0 && dpi > 0 ? dpi / 96.0 : 1;
+        }
+        catch (Exception e) when (e is DllNotFoundException or EntryPointNotFoundException)
+        {
+            return 1;
+        }
+    }
+
+    /// <summary>MDT_EFFECTIVE_DPI is 0.</summary>
+    [DllImport("shcore.dll")]
+    private static extern int GetDpiForMonitor(IntPtr monitor, int type, out uint dpiX, out uint dpiY);
 
     [DllImport("user32.dll")]
     private static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint flags);

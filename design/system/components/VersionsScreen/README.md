@@ -1,3 +1,5 @@
+**Taken out of the app on 9 Oct 2026** (the owner, after a friend's "What is the point of the versions tab?"): a game's saves list every version from every PC, where Restore is. Kept here as it was drawn.
+
 Showcase of the Versions tab of the save manager: every version of every game, newest first, from every PC, so what GameSync kept lately, and why, is one look away. Built only from the components above.
 
 - It's a tab of the save manager (Saves, Plan, Versions, Log). The top bar's right side holds two `Select`s: the game (All games, then each game by name) and the PC (Every PC, then each PC by name).

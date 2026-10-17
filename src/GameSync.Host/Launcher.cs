@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using GameSync.Core.Art;
 using GameSync.Core.Discovery;
 using GameSync.Core.Model;
@@ -39,6 +39,12 @@ public sealed record LauncherGame
 
     public DateTime? LastPlayedUtc { get; init; }
 
+    /// <summary>
+    /// PLAY-09: <see cref="LastPlayedUtc"/> is when its saves were last written, as the latest scan saw them: neither
+    /// GameSync nor Steam on this PC saw it played (the owner's Ghost of Tsushima, played before GameSync watched it).
+    /// </summary>
+    public bool LastPlayedFromSaves { get; init; }
+
     public string? CoverPath { get; init; }
 
     public string? HeroPath { get; init; }
@@ -53,6 +59,9 @@ public sealed record LauncherGame
 
     /// <summary>A favourite on this PC: first in the library's list and covers (LIB-17).</summary>
     public bool IsFavourite { get; init; }
+
+    /// <summary>PLAY-16: Windows refused to start it without administrator rights, so Play lets Windows ask (Play as admin).</summary>
+    public bool NeedsAdmin { get; init; }
 
     /// <summary>When GameSync first found it on this PC, for Recently added (LIB-16); unknown for games added by hand.</summary>
     public DateTime? AddedUtc { get; init; }
@@ -164,9 +173,11 @@ public static class Launcher
     {
         var marks = new Marks(state.GetSettings(HiddenPrefix), state.GetSettings(FavouritePrefix));
         var games = new List<LauncherGame>();
-        foreach (var entry in library.Where(e => e.State != LibraryState.Ignored && e.MergedInto is null))
+        var shown = library.Where(e => e.State != LibraryState.Ignored && e.MergedInto is null).ToList();
+        var taken = ListedSteamIds(shown, saveList);
+        foreach (var entry in shown)
         {
-            var steamId = SteamIdOf(entry, saveList);
+            var steamId = SteamIdOf(entry, saveList, taken);
             var game = Describe(entry.Id, entry.DisplayTitle, entry.State == LibraryState.Synced, entry.Installed, entry.Store, steamId, state, steamPlay, art, marks) with
             {
                 AddedUtc = entry.FirstSeenUtc == default ? null : entry.FirstSeenUtc,
@@ -176,6 +187,14 @@ public static class Launcher
                 IsFolder = entry.IsOwnFolder,
                 StoreSyncs = entry.StoreCloud,
             };
+
+            // PLAY-09: a game neither GameSync nor Steam saw played, whose saves are here, was played while GameSync wasn't
+            // watching it (the owner's Ghost of Tsushima, 8 Oct 2026): when its saves were last written, not "Never".
+            if (game.LastPlayedUtc is null && !game.IsFolder && SavesWrittenUtc(entry) is { } written)
+            {
+                game = game with { LastPlayedUtc = written, LastPlayedFromSaves = true };
+            }
+
             games.Add(game.IsFolder ? game with { Playtime = TimeSpan.Zero } : game);
         }
 
@@ -266,8 +285,11 @@ public static class Launcher
     /// <summary>The setting that keeps the library's order on this PC (LIB-16).</summary>
     public const string SortKey = "library.sort";
 
-    /// <summary>The setting that keeps the library's Installed only on this PC (KAN-47).</summary>
-    public const string InstalledOnlyKey = "library.installed-only";
+    /// <summary>
+    /// The setting that keeps the library's view on this PC, Installed or All games (LIB-31). Not <c>library.view</c>, which
+    /// 29 Sep 2026's builds kept and KAN-47 dropped: a value left from then would skip the new default.
+    /// </summary>
+    public const string ViewKey = "library.opens-on";
 
     private const string HiddenPrefix = "hidden.";
     private const string FavouritePrefix = "favourite.";
@@ -385,7 +407,28 @@ public static class Launcher
         string.Join(" · ", new[] { PlaytimeText(game.Playtime), game.IsRunning ? "Now" : WhenText(game.LastPlayedUtc, nowLocal) }
             .Where(s => s is not null)) is { Length: > 0 } meta ? meta : null;
 
-    internal static long? SteamIdOf(LibraryEntry entry, SaveList? saveList)
+    /// <summary>
+    /// When a game's saves were last written, as the latest scan saw them: its places of saves, not of settings or
+    /// screenshots; none before 2000 or days ahead. Null when the scan found none.
+    /// </summary>
+    internal static DateTime? SavesWrittenUtc(LibraryEntry entry) =>
+        entry.Proposals.Where(p => p.Category == SaveCategory.Save && p.NewestUtc is { } at && at > new DateTime(2000, 1, 1, 0, 0, 0, DateTimeKind.Utc) &&
+                                   at < DateTime.UtcNow.AddDays(2))
+            .Max(p => p.NewestUtc);
+
+    /// <summary>
+    /// A game's Steam app ID for its art, store page and play (ART-01): its store's, the save list's, then, for a copy
+    /// neither knows, the one its folder declares (KAN-170), unless another game of the library has that ID as its own
+    /// (<paramref name="taken"/>, from <see cref="ListedSteamIds"/>), so two games never share one's art.
+    /// </summary>
+    internal static long? SteamIdOf(LibraryEntry entry, SaveList? saveList, IReadOnlySet<long>? taken = null) =>
+        ListedSteamIdOf(entry, saveList) ?? (entry.DeclaredSteamId is long declared && taken?.Contains(declared) != true ? declared : null);
+
+    /// <summary>KAN-170: the Steam app IDs the library's games have from their stores or the save list, which a copy's own word never takes.</summary>
+    internal static HashSet<long> ListedSteamIds(IEnumerable<LibraryEntry> entries, SaveList? saveList) =>
+        entries.Where(e => e.State != LibraryState.Ignored && e.MergedInto is null).Select(e => ListedSteamIdOf(e, saveList)).OfType<long>().ToHashSet();
+
+    private static long? ListedSteamIdOf(LibraryEntry entry, SaveList? saveList)
     {
         if (entry.Store == StoreKind.Steam && long.TryParse(entry.StoreId, NumberStyles.None, CultureInfo.InvariantCulture, out var appId))
         {
@@ -428,6 +471,7 @@ public static class Launcher
             IsSoftware = steamId is { } s && art?.IsSoftware(s) == true,
             IsHidden = marks.Hidden.ContainsKey(HiddenKey(id)),
             IsFavourite = marks.Favourites.ContainsKey(FavouriteKey(id)),
+            NeedsAdmin = GameLaunch.NeedsAdmin(state, id),
         };
     }
 

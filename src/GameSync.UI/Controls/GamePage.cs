@@ -8,7 +8,8 @@ namespace GameSync.UI.Controls;
 
 /// <summary>A fact on a game's play bar: LAST PLAYED over "25 Sep"; for SAVES, its status as a plain badge.</summary>
 /// <param name="IsStatus">The value is a status, shown with its icon and colour.</param>
-public sealed record PlayStat(string Label, string Value, bool IsStatus = false, GameStatus? Status = null)
+/// <param name="Tip">Where the value comes from, under the pointer, when it isn't what GameSync saw itself.</param>
+public sealed record PlayStat(string Label, string Value, bool IsStatus = false, GameStatus? Status = null, string? Tip = null)
 {
     public bool IsText => !IsStatus;
 

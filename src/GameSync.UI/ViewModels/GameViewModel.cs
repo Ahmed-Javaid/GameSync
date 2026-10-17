@@ -67,6 +67,10 @@ public sealed partial class GameViewModel : ObservableObject, IPageSurface
     [ObservableProperty]
     private string? _primaryTip;
 
+    /// <summary>PLAY-16: the game asks for administrator rights, so Play lets Windows ask, and a note under the bar says so.</summary>
+    [ObservableProperty]
+    private bool _needsAdmin;
+
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(PrimaryBusy), nameof(PrimaryBusyText))]
     private ICommand? _primaryCommand;
@@ -153,6 +157,22 @@ public sealed partial class GameViewModel : ObservableObject, IPageSurface
 
     [ObservableProperty]
     private IReadOnlyList<Fact> _pcFacts = [];
+
+    /// <summary>
+    /// LIB-24 (design system version 57): what the program picked for it says it is, while it's in that folder: another
+    /// game's in warn, this game's with a check, else a plain note; null for a game no one located.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ProgramCheckIsWarn), nameof(ProgramCheckIsOk), nameof(ProgramCheckIsPlain), nameof(ProgramCheckText))]
+    private ProgramCheck? _programCheck;
+
+    public string? ProgramCheckText => ProgramCheck?.Sentence;
+
+    public bool ProgramCheckIsWarn => ProgramCheck is { Fit: ProgramFit.OtherGame };
+
+    public bool ProgramCheckIsOk => ProgramCheck is { Fit: ProgramFit.Fits };
+
+    public bool ProgramCheckIsPlain => ProgramCheck is { Fit: ProgramFit.Unclear };
 
     [ObservableProperty]
     private string? _gameFolder;
@@ -419,6 +439,7 @@ public sealed partial class GameViewModel : ObservableObject, IPageSurface
                 new Fact("Starts", about.StoreLink is not null ? $"Through {StoreNames.Name(about.Store) ?? "its store"}" : "Its own program"),
                 new Fact("Options", options ?? "None", Mono: options is not null))
             : [];
+        ProgramCheck = Installed ? about.Check : null;
         (Eyebrow, StoreIcon, StoreTip) = EyebrowOf(_game, detail);
     }
 
@@ -488,12 +509,21 @@ public sealed partial class GameViewModel : ObservableObject, IPageSurface
             PrimaryIcon = "upload";
             PrimaryCommand = BackUpNowCommand;
         }
+        else if (game.NeedsAdmin)
+        {
+            PrimaryLabel = "Play as admin";
+            PrimaryIcon = "shield";
+            PrimaryTip = "This game asks for administrator rights. Windows asks you before it starts.";
+            PrimaryCommand = PlayCommand;
+        }
         else
         {
             PrimaryLabel = "Play";
             PrimaryIcon = "play";
             PrimaryCommand = PlayCommand;
         }
+
+        NeedsAdmin = game is { NeedsAdmin: true, Installed: true, IsRunning: false, IsFolder: false };
 
         OnPropertyChanged(nameof(BackdropArt));
         OnPropertyChanged(nameof(IsPlaying));
@@ -515,37 +545,52 @@ public sealed partial class GameViewModel : ObservableObject, IPageSurface
         HasAchievements = !_game.IsFolder;
         AchievementsLeftOut = leftOut;
         ShowsAchievementsOverview = !leftOut && view is { Total: > 0 };
+        // Since design system version 54 what's unlocked is GameSync's own record, and the card says where GameSync saw it
+        // when that's not Steam on this PC: this copy's own record, found by GameSync itself; another PC; the person's marks.
         string Count(int n) => n.ToString(CultureInfo.InvariantCulture);
+        var pcs = view?.KeptOn is { Count: > 0 } on ? string.Join(" and ", on) : null;
+        var unlocked = view is { IsComplete: true } ? "Every achievement unlocked" : view is null ? "" : $"{Count(view.Unlocked)} of {Count(view.Total)} unlocked";
         AchievementsSubtitle = leftOut ? "Left out of your achievements" : view switch
         {
             null => null,
-            { From: AchievementsFrom.ListNotSteamCopy } => $"0 of {Count(view.Total)} · Steam's list",
-            { From: AchievementsFrom.ListNotPlayedHere } => $"0 of {Count(view.Total)} · none unlocked on this PC",
+            { From: AchievementsFrom.ListNotSteamCopy } => $"0 of {Count(view.Total)} · nothing written down yet",
+            { From: AchievementsFrom.ListNotPlayedHere } => $"0 of {Count(view.Total)} · none unlocked yet",
             { From: AchievementsFrom.NoneOnSteam } => "0 achievements on Steam",
-            { From: AchievementsFrom.CopyRecord, IsComplete: true } => "Every achievement unlocked · this copy's record",
-            { From: AchievementsFrom.CopyRecord } => $"{Count(view.Unlocked)} of {Count(view.Total)} unlocked · this copy's record",
-            { IsComplete: true } => "Every achievement unlocked on Steam",
-            _ => $"{Count(view.Unlocked)} of {Count(view.Total)} unlocked on Steam",
+            { From: AchievementsFrom.CopyRecord } => $"{unlocked} · this copy's own record",
+            { From: AchievementsFrom.Kept, CanMark: true, Marked: > 0 } => $"{unlocked} · marked by you",
+            { From: AchievementsFrom.Kept } when pcs is not null => $"{unlocked} · on {pcs}",
+            _ => unlocked,
         };
-        AchievementsNote = leftOut ? null : view?.From switch
+        AchievementsNote = leftOut ? null : view switch
         {
-            AchievementsFrom.ListNotSteamCopy => "This copy isn't Steam's, so what you unlock in it doesn't show here: if it keeps its own record, add the folder in Settings, Achievements. The list is Steam's, with how rare each one is.",
-            AchievementsFrom.CopyRecord => "This copy isn't Steam's, so what you've unlocked comes from its own record, in a folder added in Settings, Achievements. Each one's name, icon and how rare it is are Steam's.",
-            AchievementsFrom.ListNotPlayedHere => "Steam on this PC hasn't seen you play it, so nothing shows as unlocked yet; once you play it here, what you unlock does.",
-            AchievementsFrom.NoneOnSteam => _game.Store == StoreKind.Steam
+            { From: AchievementsFrom.ListNotSteamCopy } => "This copy writes its unlocks nowhere GameSync has found. It watches for a record the next time you play; until there is one, mark each achievement as you earn it.",
+            { From: AchievementsFrom.CopyRecord } => "This copy isn't Steam's. GameSync found its own record of what's unlocked and keeps what it sees there; each one's name, icon and how rare it is are Steam's.",
+            { From: AchievementsFrom.Kept, CanMark: true, Marked: > 0 } => "This copy writes its unlocks nowhere GameSync can find, so you mark them in View all. GameSync keeps them like any other, on every PC.",
+            { From: AchievementsFrom.Kept } when pcs is not null => $"Unlocked on {pcs}. GameSync keeps your achievements in the cloud, so every PC of yours shows them, played there or not.",
+            { From: AchievementsFrom.Kept } => "Seen on this PC before. GameSync keeps every achievement it sees unlocked, whether Steam or the copy is still here or not.",
+            { From: AchievementsFrom.ListNotPlayedHere } => "Steam on this PC hasn't seen you play it, and none of your PCs has unlocked one yet. Once you play it, what you unlock shows here.",
+            { From: AchievementsFrom.NoneOnSteam } => _game.Store == StoreKind.Steam
                 ? "Steam lists no achievements for this game."
                 : "Steam lists no achievements for this game. A game with its own launcher, such as Ubisoft Connect, may keep them there; GameSync reads Steam's for now.",
-            AchievementsFrom.Steam => null,
+            { From: AchievementsFrom.Steam } => null,
             _ => _game.SteamAppId is not null
                 ? "Its list of achievements comes from Steam the next time GameSync can ask."
-                : "GameSync can't read this game's achievements yet: it reads Steam's for now.",
+                : "GameSync names achievements from Steam's lists, and Steam has no list for this game.",
         };
         AchievementsProgress = view is null || leftOut ? AchievementsProgress.None : AchievementsProgress.Of(view, nowLocal);
-        LatestAchievements = leftOut ? [] : view?.Latest(5).Select(a => AchievementItem.Of(a, nowLocal)).ToList() ?? [];
-        RarestAchievement = !leftOut && view?.Rarest is { } rarest ? AchievementItem.Of(rarest, nowLocal) : null;
+        LatestAchievements = leftOut ? [] : view?.Latest(5).Select(a => AchievementItem.Of(a, nowLocal, view.From)).ToList() ?? [];
+        RarestAchievement = !leftOut && view?.Rarest is { } rarest ? AchievementItem.Of(rarest, nowLocal, view.From) : null;
         NoneUnlocked = !leftOut && view is { IsTracked: true, Unlocked: 0 };
         OnPropertyChanged(nameof(CanViewAllAchievements));
+        OnPropertyChanged(nameof(CanMarkAchievements));
     }
+
+    /// <summary>
+    /// Version 54: Mark achievements… on a copy with nothing written down yet: opens every achievement on Locked, to mark
+    /// the ones the person has earned.
+    /// </summary>
+    public bool CanMarkAchievements => !AchievementsLeftOut && AchievementsView is { CanMark: true, From: AchievementsFrom.ListNotSteamCopy, Total: > 0 } &&
+        _actions?.OpenAchievements is not null;
 
     /// <summary>
     /// Version 49 (the owner, 5 Oct 2026: "I really want players to feel awarded when they hit 100%"): this game's 100% is
@@ -635,21 +680,26 @@ public sealed partial class GameViewModel : ObservableObject, IPageSurface
             return [new PlayStat("Last changed", changed is { } when ? Launcher.WhenText(when, nowLocal) ?? "Not yet" : "Not yet"), saves];
         }
 
+        // PLAY-09: played while GameSync on this PC wasn't watching (the owner's Ghost of Tsushima): last played when its
+        // saves were last written, and its time not recorded rather than none.
+        var unseen = game is { LastPlayedFromSaves: true, IsRunning: false };
         return
         [
-            new PlayStat("Last played", game.IsRunning ? "Playing now" : game.LastPlayedUtc is { } at ? Launcher.WhenText(at, nowLocal) ?? "Never" : "Never"),
-            new PlayStat("Play time", game.Playtime <= TimeSpan.Zero ? "None yet"
+            new PlayStat("Last played", game.IsRunning ? "Playing now" : game.LastPlayedUtc is { } at ? Launcher.WhenText(at, nowLocal) ?? "Never" : "Never",
+                Tip: unseen ? "When its saves were last written. GameSync on this PC hasn't seen it played." : null),
+            new PlayStat("Play time", game.Playtime <= TimeSpan.Zero ? unseen ? "Not recorded" : "None yet"
                 : game.Playtime.TotalHours >= 1 ? Math.Round(game.Playtime.TotalHours) is var hours && hours == 1 ? "1 hour" : $"{hours.ToString(CultureInfo.InvariantCulture)} hours"
-                : Math.Max(1, (int)Math.Round(game.Playtime.TotalMinutes)) is var minutes && minutes == 1 ? "1 minute" : $"{minutes} minutes"),
+                : Math.Max(1, (int)Math.Round(game.Playtime.TotalMinutes)) is var minutes && minutes == 1 ? "1 minute" : $"{minutes} minutes",
+                Tip: unseen && game.Playtime <= TimeSpan.Zero ? "GameSync counts play time once it sees a game played on this PC." : null),
             .. achievements is null ? Array.Empty<PlayStat>()
                 : [new PlayStat("Achievements", $"{achievements.Unlocked.ToString(CultureInfo.InvariantCulture)} of {achievements.Total.ToString(CultureInfo.InvariantCulture)}")],
             saves,
         ];
     }
 
-    /// <summary>The status in a word or two: "Synced", "Synced by Steam", "Held for review", "Not syncing yet".</summary>
+    /// <summary>The status in a word or two: "Synced", "Synced by Steam", "Held for review", "Not backed up".</summary>
     public static string StatusWord(LauncherGame game) =>
-        !game.Syncs ? "Not syncing yet" : HomeViewModel.StatusLabel(game) ?? GsStatusBadge.Describe(game.Status ?? GameStatus.Synced).Word;
+        !game.Syncs ? "Not backed up" : HomeViewModel.StatusLabel(game) ?? GsStatusBadge.Describe(game.Status ?? GameStatus.Synced).Word;
 
     /// <summary>The Saves card's sentence: what's true of the game's saves, shortly.</summary>
     public static string SentenceOf(LauncherGame game) => game switch

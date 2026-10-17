@@ -128,12 +128,19 @@ public static partial class Cli
                                      update is checked against GameSync's own release signature first, and anything
                                      else is refused
           daily [--if-missed]        the daily backup now; the background app runs it when it's running
-          achievements [game] [--fetch]  each Steam game's achievements here, from Steam's own files; one game's in full;
-                                     --fetch asks Steam for their icons and how rare each is
+          achievements [game] [--fetch]  each game's achievements, kept by GameSync from Steam's files, copies' own
+                                     records, your other PCs and your marks; one game's in full; --fetch asks Steam
+                                     for their icons and how rare each is
+          achievements find          looks for the records copies Steam doesn't run keep themselves, in AppData,
+                                     Documents, Public Documents and each game's own folder
+          achievements mark <game> <achievement>  /  achievements unmark <game> <achievement>
+                                     marks one unlocked by hand, or takes the mark off, for a copy that writes its
+                                     unlocks nowhere GameSync can find
+          achievements cloud on|off  keeps GameSync's record of achievements in the cloud, so every PC shows the
+                                     same (on by default), or on this PC only
           add-achievement-folder <folder>  /  remove-achievement-folder <folder>
-                                     where copies Steam doesn't run keep their own record of what's unlocked: one
-                                     folder per game, named by its Steam number. Their achievements then count like
-                                     Steam's. Kept on this PC only; the records are read, never changed
+                                     a folder of copies' own records kept anywhere GameSync doesn't look: one
+                                     folder per game, named by its Steam number. The records are read, never changed
           achievements popup [--tier gold|silver|bronze|hidden|zenith] [--in <seconds>]
                                      shows the popup GameSync puts over a game when you unlock one, with its chime,
                                      after a moment to switch to the game; GameSync must be running

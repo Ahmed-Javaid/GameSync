@@ -464,8 +464,20 @@ public class SafetyAuditTests
             var text = File.ReadAllText(file);
             Assert.DoesNotContain("requireAdministrator", text, StringComparison.Ordinal);
             Assert.DoesNotContain("highestAvailable", text, StringComparison.Ordinal);
-            Assert.DoesNotContain("\"runas\"", text, StringComparison.OrdinalIgnoreCase);
+            if (Path.GetFileName(file) != "GameLaunch.cs")
+            {
+                Assert.DoesNotContain("\"runas\"", text, StringComparison.OrdinalIgnoreCase);
+            }
         }
+
+        // PLAY-16 (the owner, 9 Oct 2026: "Should it let Windows ask for permission instead? Yes it should"): a game that
+        // itself asks for administrator rights starts through Windows' own prompt, which the person answers. That's the
+        // one "runas", it starts the game and never GameSync, and only for a game Windows refused without them.
+        var launch = File.ReadAllText(Path.Combine(root, "src", "GameSync.Host", "GameLaunch.cs"));
+        Assert.Equal(2, launch.Split("\"runas\"").Length);
+        var play = File.ReadAllText(Path.Combine(root, "src", "GameSync.Host", "Cli.Play.cs"));
+        Assert.Contains("e.NativeErrorCode == GameLaunch.ElevationRequired", play, StringComparison.Ordinal);
+        Assert.Equal(2, play.Split("GameLaunch.AsAdmin(start)").Length - 1);
 
         // Started as an administrator anyway, the app says so and closes, before it takes its place as the running app.
         var program = File.ReadAllText(Path.Combine(root, "src", "GameSync.Tray", "Program.cs"));

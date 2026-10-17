@@ -6,6 +6,7 @@ using GameSync.Core.Model;
 using GameSync.Core.State;
 using GameSync.Core.Sync;
 using GameSync.Host;
+using GameSync.UI.ViewModels;
 
 namespace GameSync.Core.Tests;
 
@@ -134,7 +135,7 @@ public class SharingTests
         // Brought in while GameSync didn't know the game has one (not installed then, or found later). It's kept with the
         // zip's rules (R8), which on this one test PC name the first PC's folder: the folder its restores write to.
         var (friend, _) = FriendWith(world, e => e);
-        Assert.StartsWith("Added 1 save to 1 game, pinned", await Sharing.ImportAsync(friend, zipPath, [Lantern], new Quiet(), Ct));
+        Assert.StartsWith("Imported 1 save into 1 game as named saves.", await Sharing.ImportAsync(friend, zipPath, [Lantern], new Quiet(), Ct));
         var shared = Assert.Single((await GameDetails.ReadAsync(friend, Lantern, Ct))!.Versions, v => v.Note?.StartsWith("Imported ", StringComparison.Ordinal) == true);
         var slot = Path.Combine(saves, "slot1.sav");
         File.WriteAllText(slot, "the friend's run");
@@ -159,6 +160,57 @@ public class SharingTests
         Assert.Equal("the friend's run", File.ReadAllText(slot));
     }
 
+    [Fact]
+    public async Task SHARE_12_a_shared_save_goes_into_this_PCs_account_folder_and_never_takes_another_accounts_away()
+    {
+        // The owner's friend's Dark Souls, 8 Oct 2026: a save shared from another PC sat in that PC's Steam ID folder, so
+        // restoring it put it where this PC's game never looks, and took this PC's own save, in its own folder, away.
+        using var world = new TestWorld();
+        var saves = Path.Combine(world.Root, "Lantern Keep", "Saves");
+        var data = Path.Combine(world.Root, "data");
+        new AppConfig { Remote = world.Cloud, Games = [] }.Save(data);
+        Write(Path.Combine(saves, "0110000100000666", "slot1.sav"), "the sharer's run");
+        using (var library = new LibraryStore(data))
+        {
+            library.SaveAll([Entry(RootResolver.ToPortable(saves, Cli.FoldersForThisPc()))]);
+        }
+
+        Assert.True(await AppActions.SyncGameAsync(data, Lantern, new Quiet(), Ct));
+        await AppActions.BackUpNowAsync(data, Lantern, new Quiet(), Ct);
+        var game = Assert.Single(await Sharing.ListAsync(data, Ct));
+        var zipPath = Path.Combine(world.Root, "shared.zip");
+        await Sharing.PackAsync(data, [new SharePick(Lantern, [game.Latest!.Id])], zipPath, null, new Quiet(), Ct);
+
+        // The friend's PC: the same folder holds only their own account's save.
+        Directory.Delete(Path.Combine(saves, "0110000100000666"), recursive: true);
+        Write(Path.Combine(saves, "76561198000000001", "slot1.sav"), "the friend's run");
+        var friend = Path.Combine(world.Root, "friend");
+        new AppConfig { Remote = Directory.CreateDirectory(Path.Combine(world.Root, "friend-cloud")).FullName, Games = [] }.Save(friend);
+        using (var library = new LibraryStore(friend))
+        {
+            library.SaveAll([Entry(RootResolver.ToPortable(saves, Cli.FoldersForThisPc()))]);
+        }
+
+        Assert.True(await AppActions.SyncGameAsync(friend, Lantern, new Quiet(), Ct));
+        await AppActions.BackUpNowAsync(friend, Lantern, new Quiet(), Ct);
+        Assert.StartsWith("Imported 1 save into 1 game", await Sharing.ImportAsync(friend, zipPath, [Lantern], new Quiet(), Ct));
+        var shared = Assert.Single((await GameDetails.ReadAsync(friend, Lantern, Ct))!.Versions, v => v.Note?.StartsWith("Imported ", StringComparison.Ordinal) == true);
+
+        // Restored: in the friend's own account folder, which their game reads, with no folder of the sharer's.
+        Assert.Null(await AppActions.RestoreAsync(friend, Lantern, shared.Id, null, new Quiet(), Ct));
+        Assert.Equal("the sharer's run", File.ReadAllText(Path.Combine(saves, "76561198000000001", "slot1.sav")));
+        Assert.False(Directory.Exists(Path.Combine(saves, "0110000100000666")));
+
+        // With two accounts here, which one is the friend's can't be told: it goes into its own folder, and neither account's
+        // save is taken away.
+        Write(Path.Combine(saves, "76561198000000002", "slot1.sav"), "a sibling's run");
+        File.WriteAllText(Path.Combine(saves, "76561198000000001", "slot1.sav"), "the friend's next run");
+        Assert.Null(await AppActions.RestoreAsync(friend, Lantern, shared.Id, null, new Quiet(), Ct));
+        Assert.Equal("the sharer's run", File.ReadAllText(Path.Combine(saves, "0110000100000666", "slot1.sav")));
+        Assert.Equal("the friend's next run", File.ReadAllText(Path.Combine(saves, "76561198000000001", "slot1.sav")));
+        Assert.Equal("a sibling's run", File.ReadAllText(Path.Combine(saves, "76561198000000002", "slot1.sav")));
+    }
+
     /// <summary>A friend's PC that has Lantern Keep with a save of its own, not kept by GameSync yet, its entry changed by <paramref name="change"/>.</summary>
     private static (string Data, string Saves) FriendWith(TestWorld world, Func<LibraryEntry, LibraryEntry> change)
     {
@@ -173,6 +225,114 @@ public class SharingTests
         }
 
         return (friend, friendSaves);
+    }
+
+    [Fact]
+    public async Task SHARE_10_imports_are_named_saves_with_a_tag_and_one_used_now_goes_in_after_the_save_there_is_kept()
+    {
+        // Design system version 57 (a friend, 8 Oct 2026: "would you like to backup your current save? and then you can
+        // replace the save or import as named save. It should be additive", and a tag such as "jawad" after the PC's name).
+        using var world = new TestWorld();
+        var (data, saves) = await SyncedGame(world, "data");
+        Assert.Null(await AppActions.SaveAsAsync(data, Lantern, "Before the Warden", new Quiet(), Ct));
+        var game = Assert.Single(await Sharing.ListAsync(data, Ct));
+        var zipPath = Path.Combine(world.Root, "shared.zip");
+        await Sharing.PackAsync(data, [new SharePick(Lantern, [game.Latest!.Id])], zipPath, null, new Quiet(), Ct);
+
+        // The friend's PC keeps the game already, in the same folder as the sharer's (as Documents\My Games is on every PC),
+        // with their own save in it, which a save used now goes into.
+        var friend = Path.Combine(world.Root, "laptop");
+        new AppConfig { Remote = Directory.CreateDirectory(Path.Combine(world.Root, "laptop-cloud")).FullName, Games = [] }.Save(friend);
+        var friendSaves = saves;
+        Write(Path.Combine(friendSaves, "slot1.sav"), "the friend's own run");
+        using (var library = new LibraryStore(friend))
+        {
+            library.SaveAll([Entry(RootResolver.ToPortable(friendSaves, Cli.FoldersForThisPc()))]);
+        }
+
+        var told = new Recorded();
+        Assert.True(await AppActions.SyncGameAsync(friend, Lantern, told, Ct), string.Join(" | ", told.NeedsYouLines));
+        await AppActions.BackUpNowAsync(friend, Lantern, new Quiet(), Ct);
+        var preview = Sharing.Preview(friend, zipPath);
+        Assert.True(Assert.Single(preview.Games).CanUseNow);
+        var said = await Sharing.ImportAsync(friend, zipPath, [Lantern], new Quiet(), Ct, useNow: [Lantern], tag: "  Sam\n ");
+        Assert.Equal("Imported 1 save into 1 game as named saves, tagged Sam. Lantern Keep is using the imported save now; your own is kept as a named save, Before the import.", said);
+
+        // The shared save is in place, named as the sharer named it, tagged, from the sharer's PC; the friend's own save is
+        // the named save Before the import, which brings it back.
+        var slot = Path.Combine(friendSaves, "slot1.sav");
+        Assert.Equal("at the lighthouse", File.ReadAllText(slot));
+        var detail = (await GameDetails.ReadAsync(friend, Lantern, Ct))!;
+        var shared = Assert.Single(detail.NamedSaves, n => n.Name == "Before the Warden");
+        Assert.Equal(("Sam", preview.PackedOn), (shared.Tag, shared.Pc));
+        Assert.Equal("Sam", Assert.Single(detail.Versions, v => v.Id == shared.Version).Tag);
+        var before = Assert.Single(detail.NamedSaves, n => n.Name == Sharing.BeforeImport);
+        Assert.Null(before.Tag);
+        Assert.Null(await AppActions.RestoreAsync(friend, Lantern, before.Version, before.Name, new Quiet(), Ct));
+        Assert.Equal("the friend's own run", File.ReadAllText(slot));
+
+        // Imported again: nothing new, but used now it still goes in place, the friend's save kept first once more.
+        said = await Sharing.ImportAsync(friend, zipPath, [Lantern], new Quiet(), Ct, useNow: [Lantern]);
+        Assert.StartsWith("Nothing new was added: the saves were in their histories already. Lantern Keep is using the imported save now;", said);
+        Assert.Equal("at the lighthouse", File.ReadAllText(slot));
+
+        // Kept as a named save, the default: nothing replaces the save there.
+        using var otherWorld = new TestWorld();
+        var (other, otherSaves) = FriendWith(otherWorld, e => e);
+        Assert.StartsWith("Imported 1 save into 1 game as named saves. None of them replaces a save you have", await Sharing.ImportAsync(other, zipPath, [Lantern], new Quiet(), Ct));
+        Assert.Equal("the friend's own run", File.ReadAllText(Path.Combine(otherSaves, "slot1.sav")));
+        Assert.Single((await GameDetails.ReadAsync(other, Lantern, Ct))!.NamedSaves, n => n.Name == "Before the Warden");
+        Assert.Equal("Sam", SyncService.CleanTag(" Sam\t"));
+        Assert.Equal(new string('x', 24), SyncService.CleanTag(new string('x', 30)));
+        Assert.Null(SyncService.CleanTag(" \n "));
+    }
+
+    [Fact]
+    public void SHARE_10_the_import_dialog_offers_use_it_now_for_an_installed_game_here_and_a_tag()
+    {
+        var here = new ImportGamePreview(Lantern, Lantern, "Lantern Keep", ImportMatch.Matched, 1, 2048, null, 0);
+        var two = new ImportGamePreview(GameId.Parse("terraria"), GameId.Parse("terraria"), "Terraria", ImportMatch.Matched, 2, 4096, null, 0);
+        var away = new ImportGamePreview(GameId.Parse("hades"), GameId.Parse("hades"), "Hades", ImportMatch.NotSyncing, 1, 1024, null, 0, Installed: false);
+        var missing = new ImportGamePreview(GameId.Parse("celeste"), null, "Celeste", ImportMatch.NotInstalled, 1, 1024, null, 0);
+        (IReadOnlyList<GameId> Games, IReadOnlyCollection<GameId> UseNow, string? Tag)? asked = null;
+        var actions = new ShareActions
+        {
+            Preview = (zip, _) => Task.FromResult(new ImportPreview(zip, DateTime.UtcNow, "SAM-PC", [here, two, away, missing])),
+            Import = (_, games, useNow, tag) =>
+            {
+                asked = (games, useNow, tag);
+                return Task.FromResult(new Outcome("Imported."));
+            },
+        };
+        var dialog = new ImportSavesViewModel(actions, "shared.zip");
+        dialog.Load();
+
+        Assert.Equal([true, true, false, false], dialog.Rows.Select(r => r.ShowsUse));
+        Assert.Equal("Kept as a named save · from SAM-PC", dialog.Rows[0].Meta);
+        Assert.Equal("2 saves, kept as named saves", dialog.Rows[1].Meta);
+        Assert.Equal("Not installed here · kept as a named save · backed up from now on", dialog.Rows[2].Meta);
+        Assert.Equal("Not installed here · kept as a named save until the game is found", dialog.Rows[3].Meta);
+        Assert.Equal(("4 games · 5 saves, kept as named saves", "Import 5 saves"), (dialog.Summary, dialog.AddLabel));
+        Assert.EndsWith("Nothing replaces your current saves.", dialog.Note);
+
+        dialog.Rows[1].Use = ImportRow.Now;
+        Assert.Equal("2 saves, the newest used now · your save in place is kept first, as a named save", dialog.Rows[1].Meta);
+        Assert.Equal("4 games · 5 saves, 1 used now", dialog.Summary);
+        Assert.EndsWith("A save used now is put in place only after your own is kept as a named save.", dialog.Note);
+
+        // + Add a tag opens the field; Done keeps it as a chip, Change opens it again.
+        Assert.Equal(("Add a tag", "plus", false), (dialog.TagLabel, dialog.TagIcon, dialog.ShowsTagChip));
+        dialog.ToggleTagCommand.Execute(null);
+        dialog.Tag = "  Jawad ";
+        Assert.Equal(("Done", "check"), (dialog.TagLabel, dialog.TagIcon));
+        dialog.ToggleTagCommand.Execute(null);
+        Assert.Equal(("Jawad", true, "Change", "pencil"), (dialog.TagShown, dialog.ShowsTagChip, dialog.TagLabel, dialog.TagIcon));
+
+        dialog.Rows[3].Ticked = false;
+        dialog.AddCommand.Execute(null);
+        Assert.Equal([Lantern, GameId.Parse("terraria"), GameId.Parse("hades")], asked!.Value.Games);
+        Assert.Equal([GameId.Parse("terraria")], asked.Value.UseNow);
+        Assert.Equal("Jawad", asked.Value.Tag);
     }
 
     [Fact]
@@ -202,7 +362,7 @@ public class SharingTests
         var preview = Sharing.Preview(friend, zipPath);
         var item = Assert.Single(preview.Games);
         Assert.Equal((ImportMatch.NotSyncing, 1), (item.Match, item.Versions));
-        Assert.StartsWith("Added 1 save to 1 game, pinned", await Sharing.ImportAsync(friend, zipPath, [Lantern], new Quiet(), Ct));
+        Assert.StartsWith("Imported 1 save into 1 game as named saves.", await Sharing.ImportAsync(friend, zipPath, [Lantern], new Quiet(), Ct));
         var detail = (await GameDetails.ReadAsync(friend, Lantern, Ct))!;
         var imported = Assert.Single(detail.Versions);
         Assert.StartsWith("Imported ", imported.Note);
@@ -224,7 +384,7 @@ public class SharingTests
         var item = Assert.Single(Sharing.Preview(friend, zipPath).Games);
         Assert.Equal((ImportMatch.NotInstalled, (GameId?)null, (string?)null), (item.Match, item.LocalId, item.Warn));
         var said = await Sharing.ImportAsync(friend, zipPath, [Lantern], new Quiet(), Ct);
-        Assert.StartsWith("Added 1 save to 1 game, pinned", said);
+        Assert.StartsWith("Imported 1 save into 1 game as named saves.", said);
         Assert.Contains("Lantern Keep isn't installed here, so its saves wait in GameSync", said);
         Assert.StartsWith("Imported ", Assert.Single((await GameDetails.ReadAsync(friend, Lantern, Ct))!.Versions).Note);
         Assert.Equal("at the lighthouse", File.ReadAllText(Path.Combine(saves, "slot1.sav")));

@@ -430,6 +430,11 @@ public sealed partial class SyncService
             throw new InvalidOperationException($"Version {version} was thinned; its files are gone.");
         }
 
+        // Which save, in the person's words, never its version's ID (the owner's friend, 8 Oct 2026, read "Restored from
+        // 2026-10-07T21-44-48Z_DESKTOP_e36767" in the history): a named save's name, or the day and time its files were written.
+        shown = name is not null ? shown
+            : $"the save from {target.Files.Select(f => f.ModifiedUtc).DefaultIfEmpty(target.CreatedUtc).Max().ToLocalTime().ToString("d MMM HH:mm", System.Globalization.CultureInfo.InvariantCulture)}";
+
         // R16: a save someone shared never goes into a game whose saves stay with the account that made them, even one
         // brought in before GameSync knew it had an anti-cheat (a game not installed then).
         if (target.SharedFrom is not null && _options.StaysWithAccount?.Invoke(stream.Game.Id) is { } staysWith)
@@ -452,14 +457,17 @@ public sealed partial class SyncService
         await KeepIfNotStoredAsync(stream, snapshot.Files, versions, VersionOrigin.KeptBeforeRestore,
             $"{Device.Name}'s save before restoring {shown}", state.Base?.Id, ct);
 
+        // A save someone shared goes into this PC's own account folder, not the one it was made in, and never takes another
+        // account's files away (the owner's friend's Dark Souls, 8 Oct 2026).
+        var shared = target.SharedFrom is not null;
+        var files = shared ? AccountFolders.OntoThisPc(target.Files, snapshot.Files) : target.Files;
         var heads = VersionGraph.Heads(versions);
-        var current = NewVersion(stream, target.Files, VersionKind.Normal, VersionOrigin.Restore,
+        var current = NewVersion(stream, files, VersionKind.Normal, VersionOrigin.Restore,
             heads.FirstOrDefault()?.Id, heads.Skip(1).Select(h => h.Id).ToList(), pinned: false, $"Restored from {shown}");
-        await RestoreFilesAsync(stream, current, snapshot.Files, ct);
+        await RestoreFilesAsync(stream, current, snapshot.Files, ct, keep: shared ? AccountFolders.OthersHere(files, snapshot.Files) : null);
 
         // In the log's plain, per-game voice (MGR-09): which save, not its version's ID.
-        var restored = name is null ? $"the save from {target.Files.Select(f => f.ModifiedUtc).DefaultIfEmpty(target.CreatedUtc).Max().ToLocalTime().ToString("d MMM HH:mm", System.Globalization.CultureInfo.InvariantCulture)}" : shown;
-        _state.Log(stream.Id, "info", $"Restored {restored}; the files it replaced stay in its history.", EventTags.Restore);
+        _state.Log(stream.Id, "info", $"Restored {shown}; the files it replaced stay in its history.", EventTags.Restore);
         var result = new GameResult(stream.Id, stream.Definition.Title, SyncAction.Download, StatusFor(stream),
             $"Restored {shown}. Your previous files are kept in history.")
         {
@@ -1371,7 +1379,7 @@ public sealed partial class SyncService
     /// <param name="open">Where the files' contents come from; by default this PC's save folders.</param>
     private async Task<VersionRecord> UploadAsync(SyncStream stream, IReadOnlyList<FileEntry> files, VersionKind kind, VersionOrigin origin,
         VersionId? parent, IReadOnlyList<VersionId> supersedes, bool pinned, string? label, CancellationToken ct, Func<FileEntry, Stream>? open = null,
-        string? sharedFrom = null)
+        string? sharedFrom = null, string? tag = null)
     {
         await Parallel.ForEachAsync(files.DistinctBy(f => f.Hash), new ParallelOptions { MaxDegreeOfParallelism = Parallelism, CancellationToken = ct },
             async (file, token) =>
@@ -1386,13 +1394,13 @@ public sealed partial class SyncService
             });
 
         CrashPoints.Hit(CrashPoints.AfterBlobsBeforeRecord);
-        return await AppendAsync(stream, files, kind, origin, parent, supersedes, pinned, label, ct, sharedFrom);
+        return await AppendAsync(stream, files, kind, origin, parent, supersedes, pinned, label, ct, sharedFrom, tag);
     }
 
     private async Task<VersionRecord> AppendAsync(SyncStream stream, IReadOnlyList<FileEntry> files, VersionKind kind, VersionOrigin origin,
-        VersionId? parent, IReadOnlyList<VersionId> supersedes, bool pinned, string? label, CancellationToken ct, string? sharedFrom = null)
+        VersionId? parent, IReadOnlyList<VersionId> supersedes, bool pinned, string? label, CancellationToken ct, string? sharedFrom = null, string? tag = null)
     {
-        var version = NewVersion(stream, files, kind, origin, parent, supersedes, pinned, label) with { SharedFrom = sharedFrom };
+        var version = NewVersion(stream, files, kind, origin, parent, supersedes, pinned, label) with { SharedFrom = sharedFrom, Tag = tag };
         await _log.AppendAsync(stream.Id, version, ct);
         return version;
     }
@@ -1438,7 +1446,9 @@ public sealed partial class SyncService
 
     // ---- restores (BAK-08, BAK-09, R1, R3, R6, R8) ----
 
-    private async Task RestoreFilesAsync(SyncStream stream, VersionRecord target, IReadOnlyList<FileEntry> currentLocal, CancellationToken ct)
+    /// <param name="keep">This PC's files a restore never takes away, though the version doesn't hold them: another account's, beside a shared save.</param>
+    private async Task RestoreFilesAsync(SyncStream stream, VersionRecord target, IReadOnlyList<FileEntry> currentLocal, CancellationToken ct,
+        IReadOnlySet<string>? keep = null)
     {
         var definition = stream.Definition;
         var journalId = $"{DateTime.UtcNow:yyyyMMddHHmmssfff}_{stream.Id.Value}";
@@ -1457,7 +1467,7 @@ public sealed partial class SyncService
         }
 
         // A version taken with fewer rules than this PC's knows nothing about the other files, so they stay (R8).
-        foreach (var file in currentLocal.Where(f => stream.Includes(f.Category) && (target.Rules is null || target.Rules.Takes(f.Path))))
+        foreach (var file in currentLocal.Where(f => stream.Includes(f.Category) && (target.Rules is null || target.Rules.Takes(f.Path)) && keep?.Contains(f.Path) != true))
         {
             var full = LocalPath(definition, file);
             if (!targetPaths.Contains(full))

@@ -181,7 +181,7 @@ public sealed class AchievementWatch : IDisposable
             if (_progressFile is not null)
             {
                 _progressChanged = File.GetLastWriteTimeUtc(_progressFile);
-                _known = new HashSet<string>(CopyAchievements.Read(_progressFile)?.Keys ?? [], StringComparer.OrdinalIgnoreCase);
+                _known = new HashSet<string>(CopyAchievements.Read(_progressFile, ListOf(copied))?.Keys ?? [], StringComparer.OrdinalIgnoreCase);
             }
 
             return;
@@ -257,6 +257,12 @@ public sealed class AchievementWatch : IDisposable
         // Once seen unlocked, never new again while the game runs: a file read half-written, with fewer unlocked, can't
         // bring the same popup back.
         _known.UnionWith(unlocked.Select(a => a.Id));
+        if (fresh.Count > 0)
+        {
+            // Design system version 54: kept in GameSync's own record as it's seen.
+            Achievements.KeepSeen(_dataDir, app, UnlockSeen.Steam, fresh.Select(a => (a.Id, a.UnlockedUtc)));
+        }
+
         if (fresh.Count == 0 || _gameOf(app) is not { } game)
         {
             return;
@@ -301,13 +307,13 @@ public sealed class AchievementWatch : IDisposable
             if (File.GetCreationTimeUtc(_progressFile) < _since - TimeSpan.FromSeconds(2))
             {
                 _progressChanged = File.GetLastWriteTimeUtc(_progressFile);
-                _known = new HashSet<string>(CopyAchievements.Read(_progressFile)?.Keys ?? [], StringComparer.OrdinalIgnoreCase);
+                _known = new HashSet<string>(CopyAchievements.Read(_progressFile, ListOf(app))?.Keys ?? [], StringComparer.OrdinalIgnoreCase);
                 return;
             }
         }
 
         var changed = File.GetLastWriteTimeUtc(_progressFile);
-        if (changed == _progressChanged || CopyAchievements.Read(_progressFile) is not { } record)
+        if (changed == _progressChanged || CopyAchievements.Read(_progressFile, ListOf(app)) is not { } record)
         {
             // Unchanged, or being written: looked at again next second.
             return;
@@ -328,6 +334,9 @@ public sealed class AchievementWatch : IDisposable
 
         var rarity = cache.Rarity(app);
         var named = list.All.GroupBy(a => a.Id, StringComparer.OrdinalIgnoreCase).ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+
+        // Design system version 54: kept in GameSync's own record as it's seen, one the record keeps no time for as unlocked now.
+        Achievements.KeepSeen(_dataDir, app, UnlockSeen.Record, fresh.Where(named.ContainsKey).Select(id => (named[id].Id, (DateTime?)(record[id] ?? now))));
         var done = list.All.Count(a => record.ContainsKey(a.Id));
         foreach (var id in fresh)
         {
@@ -341,6 +350,13 @@ public sealed class AchievementWatch : IDisposable
             var shown = new AchievementShown(a.Id, a.Name, a.Description, a.Hidden, record[id] ?? now, cache.Icon(app, file), file, percent);
             Unlocked?.Invoke(new AchievementUnlock(game.Game, game.Title, app, shown, done, list.All.Count, BySteam: false));
         }
+    }
+
+    /// <summary>The game's achievements by Steam's names, as kept: what names a record keyed by checksums (ACH-18).</summary>
+    private List<string>? ListOf(long app)
+    {
+        using var cache = new AchievementCache(_dataDir);
+        return cache.List(app)?.All.Select(a => a.Id).ToList();
     }
 
     /// <summary>How close to now an unlock's time must be to count as just unlocked.</summary>

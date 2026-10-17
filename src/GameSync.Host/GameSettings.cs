@@ -47,6 +47,9 @@ public sealed record GameProperties
 
     public string? InstallDir { get; init; }
 
+    /// <summary>LIB-13: one of the person's own folders with no program, such as a server's world: no program to change.</summary>
+    public bool IsFolder { get; init; }
+
     public GameAbout About { get; init; } = new();
 
     public GameMode Mode { get; init; }
@@ -84,6 +87,12 @@ public sealed record GamePropertiesChange
     public string? LaunchOptions { get; init; }
 
     public string? Program { get; init; }
+
+    /// <summary>
+    /// LIB-24 (design system version 57): Installed files' Change…: the game's program, which sets its folder as Locate the
+    /// game… does, checked against the program's own record.
+    /// </summary>
+    public string? Locate { get; init; }
 
     public GameMode? Mode { get; init; }
 
@@ -155,6 +164,7 @@ public static class GameSettings
             Syncs = resolved is not null,
             Installed = entry?.Installed ?? true,
             InstallDir = detail.InstallDir,
+            IsFolder = entry?.IsOwnFolder == true,
             About = detail.About,
             Mode = portable?.Mode ?? (entry?.StoreCloud == true ? GameMode.BackupOnly : GameMode.Sync),
             Conflict = portable?.ConflictPolicy ?? ConflictPolicy.NewestWins,
@@ -172,6 +182,8 @@ public static class GameSettings
     /// </summary>
     public static async Task<string> ApplyAsync(string dataDir, GameId game, GamePropertiesChange change, Action waiting, CancellationToken ct)
     {
+        // The save list says which game a program is (LIB-24); read before the lock, as it takes a moment.
+        var list = change.Locate is null ? null : new SaveListStore(dataDir).Load();
         using var engineLock = await EngineLock.AcquireAsync(dataDir, waiting, ct);
         using var engine = Engine.Open(dataDir);
         var entry = engine.Library.All().FirstOrDefault(e => e.Id == game && e.MergedInto is null);
@@ -189,6 +201,27 @@ public static class GameSettings
         if (change.Program is { } newProgram)
         {
             GameLaunch.CheckProgram(newProgram, antiCheat);
+        }
+
+        // LIB-24: a program picked in Installed files that can't set the game's folder is refused before anything changes.
+        var located = change.Locate is { } locate ? Path.GetFullPath(locate) : null;
+        if (located is not null)
+        {
+            if (entry is null || !located.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) || !File.Exists(located))
+            {
+                throw new UsageException($"{located} isn't a program on this PC. Pick the game's .exe in its folder.");
+            }
+
+            var folder = LooseScanner.GameFolderOf(located);
+            if (ProgramChecks.Check(engine, entry, located, folder, list) is { Refused: true } check)
+            {
+                throw new UsageException(check.Sentence);
+            }
+
+            if (LocalGames.ProgramRefusal(folder, engine, game) is { } refused)
+            {
+                throw new UsageException(refused);
+            }
         }
 
         // ART-06: pictures are read and checked before anything changes, so a bad one changes nothing.
@@ -215,6 +248,14 @@ public static class GameSettings
         {
             GameLaunch.SetProgram(engine.State, game, program, antiCheat);
             said.Add("a new program to start");
+        }
+
+        // LIB-24: its folder, from the program picked in Installed files, with what the program's own record says.
+        if (located is not null && entry is not null)
+        {
+            LocalGames.Locate(engine, entry, located, LooseScanner.GameFolderOf(located), list);
+            entry = engine.Library.All().First(e => e.Id == game && e.MergedInto is null);
+            said.Add($"in {LooseScanner.GameFolderOf(located)}");
         }
 
         var newTitle = change.Title?.Trim();

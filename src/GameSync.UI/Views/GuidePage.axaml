@@ -1,0 +1,112 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="using:GameSync.UI.Controls"
+             xmlns:vm="using:GameSync.UI.ViewModels"
+             x:Class="GameSync.UI.Views.GuidePage"
+             x:DataType="vm:GuideViewModel">
+  <!-- The Guide (ONB-08; design system version 56, GuideScreen): how GameSync works, a topic at a time -->
+  <UserControl.Styles>
+    <Style Selector="TextBlock.top">
+      <Setter Property="FontWeight" Value="Medium" />
+    </Style>
+    <Style Selector="TextBlock.guide">
+      <Setter Property="TextWrapping" Value="Wrap" />
+      <Setter Property="MaxWidth" Value="720" />
+      <Setter Property="HorizontalAlignment" Value="Left" />
+      <Setter Property="FontSize" Value="{DynamicResource fs-14}" />
+      <Setter Property="LineHeight" Value="{DynamicResource lh-21}" />
+    </Style>
+  </UserControl.Styles>
+  <DockPanel Margin="24,20">
+    <StackPanel DockPanel.Dock="Top" Margin="0,0,0,16">
+      <TextBlock Text="Guide" FontSize="{DynamicResource fs-15}" LineHeight="{DynamicResource lh-20}" FontWeight="SemiBold" />
+      <TextBlock Classes="caption faint" Text="How GameSync works, in a few minutes" />
+    </StackPanel>
+    <Grid ColumnSpacing="24">
+      <!-- The topics widen a little with Windows' text size, as Settings' sections do (A11Y-04) -->
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="{DynamicResource col-settings-nav}" />
+        <ColumnDefinition Width="*" />
+      </Grid.ColumnDefinitions>
+      <c:GsCard Padding="8,12" VerticalAlignment="Top">
+        <c:GsSettingsNav ItemsSource="{Binding Topics}" SelectedId="{Binding Topic, Mode=TwoWay}" AutomationProperties.Name="Guide topics" />
+      </c:GsCard>
+      <ScrollViewer Grid.Column="1" HorizontalScrollBarVisibility="Disabled">
+        <Panel>
+          <!-- What GameSync keeps -->
+          <StackPanel Spacing="16" IsVisible="{Binding IsKeeps}">
+            <c:GsCard Title="Saves, not games">
+              <StackPanel Spacing="10">
+                <TextBlock Classes="guide" Text="A game's saves are the small files it writes when you save: your character, your items, how far you've got. GameSync finds them for every game on this PC and keeps a copy each time you stop playing. It never copies, moves or changes the game itself; install a game on each PC from its store, and GameSync brings the saves." />
+                <TextBlock Classes="guide" Text="It knows where each game keeps its saves from PCGamingWiki's list. For a game not on it, it looks in the usual places; and if it still can't find them, it watches where the game writes the next time you play (learn mode), and asks you." />
+              </StackPanel>
+            </c:GsCard>
+            <c:GsCard Title="Settings stay on each PC">
+              <TextBlock Classes="guide" Text="A game's settings, like its resolution and key bindings, often differ between a desktop and a laptop. GameSync backs them up on each PC, but doesn't sync them, unless you turn that on in the game's Properties." />
+            </c:GsCard>
+          </StackPanel>
+
+          <!-- What each status means -->
+          <c:GsCard Title="What each status means" Subtitle="Every game shows one, on its cover, its page and in the save manager." IsVisible="{Binding IsStatuses}">
+            <ItemsControl ItemsSource="{Binding Statuses}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:GuideStatus">
+                  <Border BorderBrush="{DynamicResource line-100}" BorderThickness="0,1,0,0" Padding="0,10">
+                    <Grid ColumnDefinitions="200,*" ColumnSpacing="16">
+                      <c:GsStatusBadge Status="{Binding Status}" Label="{Binding Label}" Cloudless="{Binding Cloudless}" HorizontalAlignment="Left" VerticalAlignment="Top" />
+                      <TextBlock Grid.Column="1" TextWrapping="Wrap" Text="{Binding Meaning}" />
+                    </Grid>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </c:GsCard>
+
+          <!-- Your backup folder -->
+          <c:GsCard Title="Your backup folder" Subtitle="{Binding BackupFolderLine}" IsVisible="{Binding IsFolder}">
+            <StackPanel Spacing="12">
+              <TextBlock Classes="guide" Text="Each game has a folder of its own. A game with settings on this PC has a second one, ending in --pc- and this PC's mark: its settings, kept here and never synced." />
+              <Border Background="{DynamicResource surface-well}" BorderBrush="{DynamicResource edge-well}" BorderThickness="1" CornerRadius="{DynamicResource radius-md}" Padding="16,12">
+                <ItemsControl ItemsSource="{Binding FolderRows}" Grid.IsSharedSizeScope="True">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:GuideFolderRow">
+                      <Grid Margin="0,2">
+                        <Grid.ColumnDefinitions>
+                          <ColumnDefinition Width="Auto" SharedSizeGroup="Path" />
+                          <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Classes="mono-small" Classes.muted="{Binding !Top}" Classes.top="{Binding Top}" Text="{Binding Path}" Margin="0,0,24,0" />
+                        <TextBlock Grid.Column="1" Classes="caption muted" Text="{Binding Meaning}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                      </Grid>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </Border>
+              <TextBlock Classes="guide" Text="In your cloud, Google Drive or a folder, each game also has a latest folder: a plain copy of its newest save, which you can copy back by hand. HOW-TO-RESTORE.txt there says how." />
+            </StackPanel>
+          </c:GsCard>
+
+          <!-- Setting up another PC -->
+          <c:GsCard Title="Setting up another PC" IsVisible="{Binding IsSecond}">
+            <TextBlock Classes="guide" Text="Install GameSync there and choose the same place for your saves: sign in with the same Google account, or pick the same folder. It finds the saves your other PCs keep, and offers each game's back when you install it there." />
+          </c:GsCard>
+
+          <!-- Going back to an earlier save -->
+          <c:GsCard Title="Going back to an earlier save" IsVisible="{Binding IsBack}">
+            <TextBlock Classes="guide" Text="Open a game's saves (its page, Saves, or the save manager). Every version is there, newest first, from every PC. Restore puts one back; GameSync keeps the save you had first, so nothing is lost. Before a boss, New named save… keeps the save under a name you choose." />
+          </c:GsCard>
+
+          <!-- Sharing saves with a friend -->
+          <c:GsCard Title="Sharing saves with a friend" IsVisible="{Binding IsShare}">
+            <TextBlock Classes="guide" Text="In the save manager, tick games and Share selected: GameSync makes a zip. Your friend opens it with Import saves in their GameSync, or drops it on the window, and each save comes in kept aside, for them to restore when they like. Games with an anti-cheat can't be shared." />
+          </c:GsCard>
+
+          <!-- Take the tour again -->
+          <c:GsCard Title="Take the tour again" Subtitle="A minute, over Home: where your games, your saves and the top bar's buttons are." IsVisible="{Binding IsTour}">
+            <c:GsButton Classes="primary" Icon="play" Content="Start the tour" Command="{Binding StartTourCommand}" HorizontalAlignment="Left" />
+          </c:GsCard>
+        </Panel>
+      </ScrollViewer>
+    </Grid>
+  </DockPanel>
+</UserControl>

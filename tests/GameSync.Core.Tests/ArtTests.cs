@@ -223,18 +223,26 @@ public class ArtTests
     }
 
     [Fact]
-    public void PLAY_09_Steams_own_play_record_adds_up_across_accounts()
+    public void PLAY_09_Steams_own_play_record_is_the_signed_in_accounts_never_a_sum()
     {
+        // The owner's friend, 8 Oct 2026: Deadlock showed 1,810 hours for 868 played, two accounts' times added up.
         using var world = new TestWorld();
         var steam = Path.Combine(world.Root, "Steam");
         LocalConfig(steam, "111", ("105600", 1759000000, 600), ("814380", 1759500000, 3660));
         LocalConfig(steam, "222", ("105600", 1759200000, 120), ("480", 0, 0));
 
+        // Steam doesn't say who signs in: the account that played it last.
         var plays = SteamActivity.Read(steam);
-
         Assert.Equal(2, plays.Count);
-        Assert.Equal(DateTimeOffset.FromUnixTimeSeconds(1759200000).UtcDateTime, plays[105600].LastPlayedUtc);
-        Assert.Equal(TimeSpan.FromMinutes(720), plays[105600].Playtime);
+        Assert.Equal((DateTimeOffset.FromUnixTimeSeconds(1759200000).UtcDateTime, TimeSpan.FromMinutes(120)), (plays[105600].LastPlayedUtc, plays[105600].Playtime));
+        Assert.Equal(TimeSpan.FromMinutes(3660), plays[814380].Playtime);
+
+        // The account Steam signs in with, as Steam's own library shows it, whoever played it last; another account's game
+        // still counts when the signed-in one has never played it.
+        File.WriteAllText(Path.Combine(Directory.CreateDirectory(Path.Combine(steam, "config")).FullName, "loginusers.vdf"),
+            "\"users\"\n{\n\t\"76561197960265839\"\n\t{\n\t\t\"MostRecent\"\t\t\"1\"\n\t}\n\t\"76561197960265950\"\n\t{\n\t\t\"MostRecent\"\t\t\"0\"\n\t}\n}\n");
+        plays = SteamActivity.Read(steam);
+        Assert.Equal((DateTimeOffset.FromUnixTimeSeconds(1759000000).UtcDateTime, TimeSpan.FromMinutes(600)), (plays[105600].LastPlayedUtc, plays[105600].Playtime));
         Assert.Equal(TimeSpan.FromMinutes(3660), plays[814380].Playtime);
     }
 

@@ -389,6 +389,8 @@
     chevronsRight: ["M6 6l6 6-6 6", "M13 6l6 6-6 6"],
     x: ["M6 6l12 12", "M18 6L6 18"],
     info: ["M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18", "M12 11v6", "M12 7.5h.01"],
+    // Version 55: a question, beside words that need explaining (a game's achievements GameSync can't see, and why).
+    help: ["M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18", "M9.6 9.4a2.5 2.5 0 1 1 3.6 2.3c-.8.4-1.2 1-1.2 1.8v.3", "M12 16.9h.01"],
     copy: ["M8 8h12v12H8z", "M4 16V4h12"],
     monitor: ["M3 4h18v12H3z", "M8 20h8", "M12 16v4"],
     shield: ["M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z", "M8.5 12l2.5 2.5 4.5-5"],
@@ -552,7 +554,9 @@
   var STATUS = {
     synced: ["ok", "cloudCheck", "Synced"],
     playing: ["play", "play", "Playing"],
-    "upload-pending": ["ok", "upload", "Upload pending"],
+    // Version 57 (built from version 56): on its way to the cloud reads Sending; with no cloud on the PC, Not synced.
+    "upload-pending": ["ok", "upload", "Sending"],
+    "not-synced": ["neutral", "monitor", "Not synced"],
     "newer-in-cloud": ["ok", "download", "Newer in cloud"],
     conflict: ["warn", "alert", "Conflict"],
     held: ["warn", "pause", "Held for review"],
@@ -561,7 +565,7 @@
     "not-available": ["neutral", "unplug", "Not available"],
     blocked: ["danger", "block", "Blocked"],
     "backup-only": ["neutral", "shield", "Synced by its store"],
-    "not-syncing": ["neutral", "cloud", "Not syncing yet"]
+    "not-syncing": ["neutral", "cloud", "Not backed up"]
   };
   function StatusBadge(props) {
     var s = STATUS[props.status] || STATUS.synced;
@@ -1073,7 +1077,14 @@
               { label: "Found", value: g.foundBy }] }),
           g.installed === false ? null : h("div", { key: "b", className: "gs-row" },
             h(Button, { size: "sm", variant: "secondary", icon: "folder" }, "Open the folder"),
-            store && g.storeId ? h(Button, { size: "sm", variant: "ghost", iconAfter: "external" }, "Store page") : null)];
+            // Version 57 (KAN-167): a game in its own folder can be pointed at another program here, checked as Locate checks it.
+            !store ? h(Button, { size: "sm", variant: "secondary", icon: "search", title: "Pick the game's program; GameSync checks it's this game's" }, "Change\u2026") : null,
+            store && g.storeId ? h(Button, { size: "sm", variant: "ghost", iconAfter: "external" }, "Store page") : null),
+          // Version 57 (KAN-167; a friend, 8 Oct 2026, whose Dark Souls III was pointed at Dark Souls' program by mistake): what
+          // the check found stays on the page, in words, never a popup that shows once: a program that's another game's, or
+          // a folder another game has, in warn, with what to pick instead.
+          g.locate ? h("div", { key: "l", className: "gs-import-note" + (g.locate.state === "warn" ? " gs-import-warn" : "") },
+            h(Icon, { name: g.locate.state === "warn" ? "alert" : "check", size: 14, strokeWidth: 2 }), g.locate.text) : null];
       },
       saves: function () {
         return [
@@ -1234,9 +1245,17 @@
   }
 
   /* ---------- ImportSavesDialog ---------- */
+  // Version 57 (a friend, 8 Oct 2026: "When user imports a save it should ask that would you like to backup your current
+  // save? and then you can replace the save or import as named save. It should be additive. There should a plus button
+  // that a user can use to add a tag to imported saves"): each save of a game here comes in as a named save, or is used
+  // now, the save in place kept first as a named save; and a tag, such as the friend's name, goes on every save it brings.
   function ImportSavesDialog(props) {
     var items = props.items || [];
     var init = {};
+    var us = useState(props.use || {}), use = us[0];
+    var tg = useState(props.tag || ""), tag = tg[0];
+    var te = useState(!!props.tagOpen), tagOpen = te[0];
+    function useOf(it) { return use[it.id] || "named"; }
     // Version 51 (R16): a game with an anti-cheat, or that plays only online, is `blocked`: it can't be ticked and says why.
     function closed(it) { return it.match === "unknown" || !!it.blocked; }
     items.forEach(function (it) { if (!closed(it)) init[it.id] = true; });
@@ -1249,9 +1268,10 @@
     var rows = items.map(function (it) {
       var disabled = closed(it);
       var on = !!picked[it.id] && !disabled;
+      var now = it.match === "matched" && useOf(it) === "now";
       var line = it.blocked ? "Can't be imported"
-        : it.match === "matched" ? (it.versions || 1) + ((it.versions || 1) === 1 ? " version" : " versions") + " · added as pinned, not current"
-        : it.match === "not-installed" ? "Not installed here · waits until the game is found"
+        : it.match === "matched" ? (now ? "Used now · your save in place is kept first, as a named save" : ((it.versions || 1) === 1 ? "Kept as a named save" : (it.versions || 1) + " saves, kept as named saves")) + (it.from ? " · from " + it.from : "")
+        : it.match === "not-installed" ? "Not installed here · kept as a named save until the game is found"
         : "Not in your library · can't be imported";
       return h("div", { key: it.id, className: cx("gs-share-item", on && "is-on", disabled && "is-blocked"), onClick: function () { toggle(it, !on); } },
         h(Checkbox, { label: "Import " + it.name, checked: on, disabled: disabled, onChange: function (v) { toggle(it, v); } }),
@@ -1261,19 +1281,36 @@
           h("div", { className: "gs-share-meta" }, line),
           it.warn ? h("div", { className: "gs-import-note gs-import-warn" }, h(Icon, { name: "alert", size: 14, strokeWidth: 2 }), it.warn) : null,
           it.removed ? h("div", { className: "gs-import-note gs-import-removed" }, h(Icon, { name: "block", size: 14, strokeWidth: 2 }), it.removed) : null,
-          it.blocked ? h("div", { className: "gs-import-note gs-import-removed" }, h(Icon, { name: "shield", size: 14, strokeWidth: 2 }), it.blocked) : null),
+          it.blocked ? h("div", { className: "gs-import-note gs-import-removed" }, h(Icon, { name: "shield", size: 14, strokeWidth: 2 }), it.blocked) : null,
+          // A game here: a named save, or used now (its saves are in place at once; the one there is kept first).
+          on && it.match === "matched" ? h("div", { style: { marginTop: 6 }, onClick: function (e) { e.stopPropagation(); } },
+            h(PillTabs, { label: "How " + it.name + "'s save comes in", value: useOf(it), onChange: function (v) { var n = Object.assign({}, use); n[it.id] = v; us[1](n); },
+              items: [{ id: "named", label: "Keep as a named save" }, { id: "now", label: "Use it now" }] })) : null),
         h("div", { className: "gs-share-size" }, disabled ? "" : fmt(it.size || 0)),
         h("span"));
     });
+    var usedNow = chosen.filter(function (it) { return it.match === "matched" && useOf(it) === "now"; });
+    // The tag: a + to add one, a field while it's typed, then a chip that goes after the PC's name on each save (version 57).
+    var tagRow = h("div", { key: "t", className: "gs-row", style: { gap: 10, flexWrap: "nowrap" } },
+      h("span", { className: "gs-overline" }, "Tag"),
+      tag && !tagOpen ? h("span", { className: "gs-tag", style: { background: "var(--secondary-soft)", color: "var(--ink)" } }, tag) : null,
+      tagOpen ? h("input", { className: "gs-input", style: { width: 160, height: 30 }, value: tag, placeholder: "Jawad", "aria-label": "Tag for these saves",
+          onChange: function (e) { tg[1](e.target.value); }, onKeyDown: function (e) { if (e.key === "Enter") te[1](false); } }) : null,
+      h(Button, { size: "sm", variant: "ghost", icon: tagOpen ? "check" : tag ? "pencil" : "plus", onClick: function () { te[1](!tagOpen); } }, tagOpen ? "Done" : tag ? "Change" : "Add a tag"),
+      h("span", { className: "gs-faint", style: { fontSize: 12 } }, "Shows after the PC's name on each save, so you know whose it is."));
     var foot = stage === "review" ? [
-      h("div", { key: "s", className: "gs-share-summary" }, h("span", null, h("b", null, chosen.length + " games"), " · " + versions + " versions, added as pinned versions"), h("span", null, fmt(bytes))),
-      h("div", { key: "n", className: "gs-note" }, h(Icon, { name: "shield", size: 16 }), "Every file is checked like a restore: only into the game's own folders, scanned by your antivirus, no program files. Nothing replaces your current saves."),
+      tagRow,
+      h("div", { key: "s", className: "gs-share-summary" }, h("span", null, h("b", null, chosen.length + " games"), " · " + versions + (versions === 1 ? " save" : " saves") + (usedNow.length ? ", " + usedNow.length + " used now" : ", kept as named saves")), h("span", null, fmt(bytes))),
+      h("div", { key: "n", className: "gs-note" }, h(Icon, { name: "shield", size: 16 }), "Every file is checked like a restore: only into the game's own folders, scanned by your antivirus, no program files. " + (usedNow.length ? "A save used now is put in place only after your own is kept as a named save." : "Nothing replaces your current saves.")),
       h("div", { key: "a", className: "gs-dialog-actions" },
         h(Button, { variant: "ghost", onClick: props.onClose }, "Cancel"),
-        h(Button, { variant: "primary", icon: "download", disabled: !versions, onClick: function () { st[1]("done"); if (props.onImport) props.onImport(Object.keys(picked)); } }, "Add " + versions + " versions"))
+        h(Button, { variant: "primary", icon: "download", disabled: !versions, onClick: function () { st[1]("done"); if (props.onImport) props.onImport(Object.keys(picked), use, tag); } }, "Import " + versions + (versions === 1 ? " save" : " saves")))
     ] : [
       h("div", { key: "d", className: "gs-done" }, h(Icon, { name: "check", size: 20, className: "gs-done-icon" }),
-        h("div", null, h("div", null, "Added " + versions + " versions."), h("div", { className: "gs-muted", style: { fontSize: 12 } }, "Nothing was restored. Open a game's history and choose Restore to use one."))),
+        h("div", null, h("div", null, "Imported " + versions + (versions === 1 ? " save" : " saves") + (tag ? ", tagged " + tag : "") + "."),
+          h("div", { className: "gs-muted", style: { fontSize: 12 } }, usedNow.length
+            ? usedNow.map(function (it) { return it.name; }).join(" and ") + (usedNow.length === 1 ? " is" : " are") + " using the imported save now; your own is kept as a named save, Before the import."
+            : "They're named saves now: restore one from its game's saves when you want it."))),
       h("div", { key: "a", className: "gs-dialog-actions" }, h("span"), h(Button, { variant: "primary", onClick: props.onClose }, "Done"))
     ];
     return h("div", { className: "gs-dialog", role: "dialog", "aria-modal": "true", "aria-labelledby": "gs-import-title" },
@@ -2175,18 +2212,22 @@
 
   // A row of a game's achievements, as the list of every one shows them: its badge, name and description, and on the
   // right when it was unlocked, or how many players have it while it's locked. A hidden one keeps both secret.
+  // Version 54 (the owner, 8 Oct 2026: "The achievement system needs to work even without steam"): GameSync keeps its own
+  // record, so an unlock says when GameSync didn't see it here itself: `by` "you" for one marked by hand, or the PC it was
+  // unlocked on ("LAPTOP").
   function AchievementRow(props) {
     var a = props.item, state = a.state || (a.when ? "unlocked" : "locked"), tier = tierOf(a.pct);
     var hidden = state === "hidden";
+    var by = state === "unlocked" && a.by ? (a.by === "you" ? "marked by you" : a.by) : null;
     return h("button", { type: "button", className: cx("gs-achrow", props.selected && "is-selected", "is-" + state), onClick: props.onClick,
         "aria-pressed": props.selected ? "true" : "false",
-        "aria-label": hidden ? "Hidden achievement, locked" : a.name + (state === "unlocked" ? ", unlocked " + a.when : ", locked") + (a.pct != null ? ", " + pctText(a.pct) + " of players" : "") },
+        "aria-label": hidden ? "Hidden achievement, locked" : a.name + (state === "unlocked" ? ", unlocked " + a.when + (by ? (a.by === "you" ? ", marked by you" : ", on " + by) : "") : ", locked") + (a.pct != null ? ", " + pctText(a.pct) + " of players" : "") },
       h(AchievementBadge, { icon: a.icon, name: a.name, state: state, tier: tier, size: "sm" }),
       h("span", { className: "gs-achrow-text" },
         h("span", { className: "gs-achrow-name" }, hidden ? "Hidden achievement" : a.name),
         h("span", { className: "gs-achrow-desc" }, hidden ? "Keep playing to reveal it." : a.desc || "")),
       h("span", { className: "gs-achrow-side" },
-        state === "unlocked" ? h("span", { className: "gs-achrow-when" }, a.when) : null,
+        state === "unlocked" ? h("span", { className: "gs-achrow-when" }, a.when, by ? h("span", { className: "gs-achrow-by" }, " · " + by) : null) : null,
         a.pct != null ? h("span", { className: "gs-achrow-pct" }, tier && state === "unlocked" ? h("span", { className: "gs-tier-dot gs-tier--" + tier, "aria-hidden": "true" }) : null, pctText(a.pct)) : null));
   }
 

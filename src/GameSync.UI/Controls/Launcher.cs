@@ -213,6 +213,30 @@ public class GsGameTile : Button
         private set => SetAndRaise(ShowsMarkProperty, ref _showsMark, value);
     }
 
+    public static readonly StyledProperty<bool> SavesOnlyProperty = AvaloniaProperty.Register<GsGameTile, bool>(nameof(SavesOnly));
+
+    public static readonly DirectProperty<GsGameTile, IImage?> ShownArtProperty =
+        AvaloniaProperty.RegisterDirect<GsGameTile, IImage?>(nameof(ShownArt), t => t.ShownArt);
+
+    private IImage? _shownArt;
+
+    /// <summary>
+    /// LIB-31 (design system version 57): the game isn't installed on this PC, only its saves are here, so its cover is
+    /// greyed and darkened with a SAVES ONLY tag at its top left.
+    /// </summary>
+    public bool SavesOnly
+    {
+        get => GetValue(SavesOnlyProperty);
+        set => SetValue(SavesOnlyProperty, value);
+    }
+
+    /// <summary>The cover as drawn: the art, or its grey copy for a game whose saves only are here.</summary>
+    public IImage? ShownArt
+    {
+        get => _shownArt;
+        private set => SetAndRaise(ShownArtProperty, ref _shownArt, value);
+    }
+
     /// <summary>The first letter or digit of a title, for its title cover.</summary>
     public static string InitialOf(string? title) => title?.FirstOrDefault(char.IsLetterOrDigit) is { } c and not '\0' ? char.ToUpperInvariant(c).ToString() : "?";
 
@@ -222,6 +246,12 @@ public class GsGameTile : Button
         if (change.Property == TitleProperty)
         {
             Initial = InitialOf(Title);
+        }
+
+        if (change.Property == ArtProperty || change.Property == SavesOnlyProperty)
+        {
+            ShownArt = SavesOnly && Art is Avalonia.Media.Imaging.Bitmap picture ? ArtImages.Greyed(picture) : Art;
+            PseudoClasses.Set(":savesonly", SavesOnly);
         }
         else if (change.Property == StatusProperty || change.Property == MarkLabelProperty)
         {
@@ -245,12 +275,13 @@ public class GsGameTile : Button
         }
 
         if (change.Property == TitleProperty || change.Property == StatusProperty || change.Property == StatusLabelProperty || change.Property == MarkLabelProperty ||
-            change.Property == AchievementsDoneProperty || change.Property == AchievementsTotalProperty)
+            change.Property == AchievementsDoneProperty || change.Property == AchievementsTotalProperty || change.Property == SavesOnlyProperty)
         {
-            // What a screen reader says: the name, the badge's or the mark's words (A11Y-03), and how far its achievements are.
+            // What a screen reader says: the name, the badge's or the mark's words (A11Y-03), how far its achievements are,
+            // and that only its saves are here.
             var words = ShowsStatus ? StatusLabel ?? GsStatusBadge.Describe(Status).Word : ShowsMark ? MarkLabel : null;
-            var name = words is null ? Title : $"{Title}, {words}";
-            Avalonia.Automation.AutomationProperties.SetName(this, AchievementsWords is { } achieved ? $"{name}, {achieved}" : name);
+            var name = string.Join(", ", new[] { Title, words, AchievementsWords, SavesOnly ? "saves only, not installed on this PC" : null }.OfType<string>());
+            Avalonia.Automation.AutomationProperties.SetName(this, name);
         }
         else if (change.Property == ArtProperty)
         {

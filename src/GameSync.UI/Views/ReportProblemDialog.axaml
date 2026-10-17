@@ -1,0 +1,58 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="using:GameSync.UI.Controls"
+             xmlns:vm="using:GameSync.UI.ViewModels"
+             x:Class="GameSync.UI.Views.ReportProblemDialog"
+             x:DataType="vm:ReportProblemViewModel"
+             Width="{DynamicResource dw-640}">
+  <!-- Report a problem (design system → SettingsScreen #report; SET-05): what happened in the person's words, the
+       diagnostics added unless unticked, and Open on GitHub, which opens a new issue there; nothing is posted until the
+       person submits it on GitHub. -->
+  <Border Background="{DynamicResource surface-dialog}" BorderBrush="{DynamicResource edge-dialog}" BorderThickness="1" BackgroundSizing="OuterBorderEdge"
+          CornerRadius="16" BoxShadow="{DynamicResource shadow-dialog}" ClipToBounds="True">
+    <DockPanel>
+      <Border DockPanel.Dock="Top" Padding="24,20,24,8">
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
+          <StackPanel>
+            <TextBlock Classes="card-title" Text="Report a problem" />
+            <TextBlock Classes="muted" TextWrapping="Wrap"
+                       Text="Say what happened. GameSync opens a new issue on GitHub with it, the diagnostics ready to paste in; you post it there." />
+          </StackPanel>
+          <c:GsIconButton Grid.Column="1" Classes="sm" Icon="x" Label="Close Report a problem" Command="{Binding CloseCommand}" VerticalAlignment="Top" />
+        </Grid>
+      </Border>
+
+      <Border DockPanel.Dock="Bottom" BorderBrush="{DynamicResource line-100}" BorderThickness="0,1,0,0" Padding="24,14">
+        <Panel>
+          <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" IsVisible="{Binding IsWriting}">
+            <c:GsButton Classes="ghost" Content="Cancel" Command="{Binding CloseCommand}" />
+            <c:GsButton Classes="primary" Icon="external" Content="Open on GitHub" Command="{Binding OpenCommand}" IsEnabled="{Binding CanOpen}"
+                        IsBusy="{Binding Opening}" BusyText="Opening" ToolTip.Tip="{Binding OpenTip}" ToolTip.ShowOnDisabled="True" />
+          </StackPanel>
+          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16" IsVisible="{Binding IsDone}">
+            <Border Background="{DynamicResource primary-soft}" CornerRadius="{DynamicResource radius-md}" Padding="16,12">
+              <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                <c:GsIcon Icon="check" Size="20" Foreground="{DynamicResource primary}" VerticalAlignment="Center" />
+                <TextBlock Grid.Column="1" Text="{Binding Done}" TextWrapping="Wrap" />
+              </Grid>
+            </Border>
+            <c:GsButton Grid.Column="1" Classes="primary" Content="Done" Command="{Binding CloseCommand}" VerticalAlignment="Center" />
+          </Grid>
+        </Panel>
+      </Border>
+
+      <StackPanel Margin="24,12,24,20" Spacing="16" IsEnabled="{Binding IsWriting}">
+        <StackPanel Spacing="8">
+          <TextBlock Classes="field-label" Text="What happened" />
+          <TextBox x:Name="WordsBox" Text="{Binding Words}" PlaceholderText="Dark Souls III shows Not backed up, but I ticked it in first run." MaxLength="1000"
+                   AcceptsReturn="True" TextWrapping="Wrap" MinHeight="88" MaxHeight="200" AutomationProperties.Name="What happened" />
+        </StackPanel>
+        <CheckBox IsChecked="{Binding AddDiagnostics}" MinWidth="0" AutomationProperties.Name="Add the diagnostics: the logs and each game's versions, never your sign-in or your saves">
+          <TextBlock Text="Add the diagnostics: the logs and each game's versions, never your sign-in or your saves" TextWrapping="Wrap" />
+        </CheckBox>
+        <c:GsNote Icon="shield"
+                  Text="Nothing is posted until you submit the issue on GitHub. You need a GitHub account to post one; without one, Copy diagnostics and send it to whoever helps you." />
+      </StackPanel>
+    </DockPanel>
+  </Border>
+</UserControl>

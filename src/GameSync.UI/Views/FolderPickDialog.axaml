@@ -1,0 +1,74 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="using:GameSync.UI.Controls"
+             xmlns:vm="using:GameSync.UI.ViewModels"
+             x:Class="GameSync.UI.Views.FolderPickDialog"
+             x:DataType="vm:FolderPickViewModel"
+             Width="{DynamicResource dw-720}">
+  <!-- What's in a folder (LIB-30; design system version 56, OnboardingScreen #scan-folder): every program GameSync found in a
+       folder of games, Games ticked and Probably not games unticked, each with why; nothing joins the library until Add. -->
+  <UserControl.Resources>
+    <DataTemplate x:Key="PickRow" x:DataType="vm:FolderPickRow">
+      <Border Classes="pick" Classes.on="{Binding IsChecked}" CornerRadius="{DynamicResource radius-md}" Padding="12,6" AutomationProperties.Name="{Binding}">
+        <Grid ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="12">
+          <CheckBox IsChecked="{Binding IsChecked}" VerticalAlignment="Center" AutomationProperties.Name="{Binding Title, StringFormat='Add {0}'}" />
+          <Border Grid.Column="1" Width="28" Height="40" CornerRadius="6" Background="{DynamicResource bg-300}" VerticalAlignment="Center">
+            <TextBlock Text="{Binding Initial}" FontSize="{DynamicResource fs-12}" FontWeight="SemiBold" Foreground="{DynamicResource ink-muted}"
+                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+          </Border>
+          <StackPanel Grid.Column="2" VerticalAlignment="Center" Spacing="2">
+            <TextBlock Text="{Binding Title}" FontWeight="Medium" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Title}" />
+            <TextBlock Classes="mono-small faint" Text="{Binding Program}" TextTrimming="LeadingCharacterEllipsis" IsVisible="{Binding HasProgram}"
+                       ToolTip.Tip="{Binding Program}" />
+          </StackPanel>
+          <TextBlock Grid.Column="3" Classes="caption faint" Text="{Binding Why}" TextWrapping="Wrap" TextAlignment="Right" MaxWidth="260"
+                     VerticalAlignment="Center" />
+        </Grid>
+      </Border>
+    </DataTemplate>
+  </UserControl.Resources>
+  <UserControl.Styles>
+    <Style Selector="Border.pick:pointerover">
+      <Setter Property="Background" Value="{DynamicResource bg-300}" />
+    </Style>
+    <Style Selector="Border.pick.on">
+      <Setter Property="Background" Value="{DynamicResource secondary-soft}" />
+    </Style>
+  </UserControl.Styles>
+  <Border Background="{DynamicResource surface-dialog}" BorderBrush="{DynamicResource edge-dialog}" BorderThickness="1" BackgroundSizing="OuterBorderEdge"
+          CornerRadius="16" BoxShadow="{DynamicResource shadow-dialog}" ClipToBounds="True">
+    <DockPanel>
+      <Border DockPanel.Dock="Top" Padding="24,20,24,8">
+        <Grid ColumnDefinitions="*,Auto">
+          <StackPanel>
+            <TextBlock Classes="card-title" Text="{Binding Title}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Folder}" />
+            <TextBlock Classes="muted" Text="{Binding Subtitle}" TextWrapping="Wrap" />
+          </StackPanel>
+          <c:GsIconButton Grid.Column="1" Classes="sm" Icon="x" Label="Close without adding" Command="{Binding CancelCommand}" VerticalAlignment="Top" />
+        </Grid>
+      </Border>
+
+      <Border DockPanel.Dock="Bottom" BorderBrush="{DynamicResource line-100}" BorderThickness="0,1,0,0" Padding="24,14">
+        <StackPanel Spacing="12">
+          <c:GsNote Icon="info" Text="{Binding Note}" IsVisible="{Binding HasCandidates}" />
+          <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+            <c:GsButton Classes="ghost" Content="Cancel" Command="{Binding CancelCommand}" />
+            <c:GsButton Icon="folder" Content="Add the folder anyway" Command="{Binding AddAnywayCommand}" IsVisible="{Binding IsEmpty}" />
+            <c:GsButton Classes="primary" Icon="plus" Content="{Binding AddLabel}" Command="{Binding AddCommand}" IsVisible="{Binding HasCandidates}"
+                        ToolTip.Tip="Only what's ticked joins your library" ToolTip.ShowOnDisabled="True" />
+          </StackPanel>
+        </StackPanel>
+      </Border>
+
+      <ScrollViewer MaxHeight="400" Margin="12,4,12,8" HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Spacing="4" Margin="12,0">
+          <TextBlock Classes="muted" Text="{Binding EmptyText}" TextWrapping="Wrap" IsVisible="{Binding IsEmpty}" Margin="0,4,0,8" />
+          <TextBlock Classes="overline faint" Text="{Binding GamesHeading}" IsVisible="{Binding HasGames}" Margin="12,4,12,2" />
+          <ItemsControl ItemsSource="{Binding Games}" ItemTemplate="{StaticResource PickRow}" IsVisible="{Binding HasGames}" />
+          <TextBlock Classes="overline faint" Text="{Binding OthersHeading}" IsVisible="{Binding HasOthers}" Margin="12,12,12,2" />
+          <ItemsControl ItemsSource="{Binding Others}" ItemTemplate="{StaticResource PickRow}" IsVisible="{Binding HasOthers}" />
+        </StackPanel>
+      </ScrollViewer>
+    </DockPanel>
+  </Border>
+</UserControl>

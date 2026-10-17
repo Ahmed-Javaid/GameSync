@@ -69,6 +69,9 @@ public sealed class AppAgent(string dataDir, IAgentOutput output)
     /// <summary>KAN-88: the person did something that waits to upload (a named save, a restore): it goes up at the agent's next round.</summary>
     public void UploadNow() => _agent?.UploadSoon();
 
+    /// <summary>Design system version 54: GameSync's record of achievements changed here (a mark by hand) or its cloud copy was turned on: it goes to and from the cloud at the next round.</summary>
+    public void ShareAchievementsNow() => _agent?.ShareAchievementsSoon();
+
     /// <summary>GameSync was just set up here: the agent starts now rather than within the minute.</summary>
     public void Kick() => _kick.Release();
 }

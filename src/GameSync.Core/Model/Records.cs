@@ -105,6 +105,13 @@ public sealed record VersionRecord
     /// </summary>
     public string? SharedFrom { get; init; }
 
+    /// <summary>
+    /// SHARE-10 (design system version 57): a word the person put on a shared zip's saves as they imported them, such as
+    /// the friend's name, shown after the PC's name wherever the save is listed. Null for every other version; GameSync
+    /// before 18 Oct 2026 reads past it.
+    /// </summary>
+    public string? Tag { get; init; }
+
     public required IReadOnlyList<FileEntry> Files { get; init; }
 }
 

@@ -103,67 +103,6 @@ public class HistoryTests
     }
 
     [Fact]
-    public void MGR_08_the_versions_tab_filters_by_game_and_PC_and_a_row_opens_its_game_s_saves_on_that_version()
-    {
-        var now = new DateTime(2026, 9, 30, 22, 0, 0, DateTimeKind.Local);
-        var lantern = GameId.Parse("lantern-keep");
-        var quiet = GameId.Parse("quiet-game");
-        var versions = new List<SavedVersion>
-        {
-            Saved(lantern, "Lantern Keep", now.AddMinutes(-5), "DESKTOP", "After play · 47 min", KeptFor.Play),
-            Saved(quiet, "Quiet Game", now.AddMinutes(-10), "LAPTOP", "Named: Before the lighthouse", KeptFor.Kept, named: true, kept: true),
-            Saved(lantern, "Lantern Keep", now.AddMinutes(-20), "LAPTOP", "LAPTOP's save, replaced by DESKTOP's in a conflict", KeptFor.Kept, kept: true),
-        };
-        versions.AddRange(Enumerable.Range(1, 102).Select(i => Saved(lantern, "Lantern Keep", now.AddDays(-2).AddMinutes(-i), "DESKTOP", "After play", KeptFor.Play)));
-        var view = new VersionsView(versions, [new HistoryGame(GameId.Parse("hades"), "Hades"), new(lantern, "Lantern Keep"), new(quiet, "Quiet Game")],
-            "DESKTOP", ["DESKTOP", "LAPTOP"], 10, HasCloud: true);
-        var actions = new LauncherActions(_ => { }, () => { }, (_, _) => { }, (_, _) => { }) { LoadVersions = _ => Task.FromResult(view) };
-        var saves = new SaveManagerViewModel(actions);
-        saves.Update([Launcher(lantern, "Lantern Keep"), Launcher(quiet, "Quiet Game")]);
-
-        // The tab reads the versions when it's shown: the newest 100, and the rest behind Show N older.
-        saves.Tab = "versions";
-        var tab = saves.Versions;
-        tab.Show(view, now);
-        Assert.True(saves.ShowsVersions);
-        Assert.Equal("DESKTOP · 105 versions of 2 games, from DESKTOP and LAPTOP", saves.TopSubtitle);
-        Assert.Equal(["105", "1", "2", "105", "28 Sep"], tab.Stats.Select(s => s.Value));
-        Assert.Equal((100, "Show 5 older"), (tab.Rows.Count, tab.OlderLabel));
-        Assert.Equal(("Lantern Keep", "DESKTOP", "play"), (tab.Rows[0].Game, tab.Rows[0].Pc, tab.Rows[0].Icon));
-        Assert.Equal("A row opens its game's saves, where Restore is. Every version is kept: all of them in the cloud, and the last 10 of each game on this PC.", tab.Foot);
-        tab.ShowOlderCommand.Execute(null);
-        Assert.Equal((105, false), (tab.Rows.Count, tab.HasOlder));
-
-        // A PC, a game, then Named and kept only; the numbers follow the game and PC, not the tick.
-        tab.Pc = "LAPTOP";
-        Assert.Equal(["Quiet Game", "Lantern Keep"], tab.Rows.Select(r => r.Game));
-        tab.Game = lantern.Value;
-        Assert.Equal(["LAPTOP's save, replaced by DESKTOP's in a conflict"], tab.Rows.Select(r => r.Why));
-        tab.Pc = VersionsViewModel.All;
-        tab.KeptOnly = true;
-        Assert.Single(tab.Rows);
-        Assert.Equal("104", tab.Stats[0].Value);
-
-        // A filter that matches nothing says why.
-        tab.Game = "hades";
-        Assert.True(tab.IsEmpty);
-        Assert.Equal("No version of Hades yet: it hasn't synced since it was added.", tab.EmptyText);
-        tab.KeptOnly = false;
-        tab.Game = quiet.Value;
-        tab.Pc = "DESKTOP";
-        Assert.Equal("No version of Quiet Game came from DESKTOP.", tab.EmptyText);
-
-        // A row opens its game's saves with that version picked; Back leads back to the tab.
-        tab.Pc = VersionsViewModel.All;
-        var named = tab.Rows.Single();
-        tab.OpenCommand.Execute(named);
-        Assert.Equal((quiet, named.Version.Id), (saves.Game!.Id, saves.Game.Picked));
-        Assert.False(saves.ShowsVersions);
-        saves.BackCommand.Execute(null);
-        Assert.True(saves.ShowsVersions);
-    }
-
-    [Fact]
     public void MGR_09_the_log_tab_searches_filters_and_copies_the_lines_shown_without_sign_in_tokens()
     {
         var now = new DateTime(2026, 9, 30, 22, 0, 0, DateTimeKind.Local);
@@ -371,9 +310,16 @@ public class HistoryTests
         Assert.True(item.IsRestoring);
         page.RestoreCommand.Execute(item);
         Assert.Single(asked);
+
+        // Every other Restore waits meanwhile, so a second press can't go nowhere (the owner's friend, 8 Oct 2026).
+        Assert.All(page.Versions, v => Assert.True(v.Waiting));
         done.SetResult(null);
         Assert.True(page.RestoreDone);
         Assert.False(item.IsRestoring);
+
+        // In place at once, before the page reads the game again.
+        Assert.Equal((true, false), (item.IsInPlace, item.CanRestore));
+        Assert.All(page.Versions, v => Assert.False(v.Waiting));
         Assert.StartsWith("“Before the lighthouse” is back in place.", page.RestoreNote);
         page.Show(detail, DateTime.Now);
         Assert.False(Assert.Single(page.NamedSaves).CanRestore);

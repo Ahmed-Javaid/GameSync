@@ -1,3 +1,5 @@
+**Taken out of the app on 9 Oct 2026** (the owner, after a friend's "What on earth is the plan tab in saves"): the save manager has Saves, Conflicts and Log; `gamesync plan` still shows the plan. Kept here as it was drawn.
+
 Showcase of the Plan view in the save manager: what the next sync would do for each game and why, without doing anything until you run it. Built only from the components above.
 
 - Plan is a tab of the save manager (Saves, Plan, Versions, Log). Its top bar swaps Sync now for **Run N changes** (primary, counting the ticked games) and Check again (secondary).

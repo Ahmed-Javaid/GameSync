@@ -114,7 +114,10 @@ public sealed partial class SyncService
             case (null, SyncAction.NeedsYou):
                 warnings.Add($"A conflict waits for you: {plan.Decision!.Reason} Playing now carries on from this PC's save.");
                 break;
-            case (null, SyncAction.WaitForCloud):
+            // With no cloud connected the person chose to keep backups on this PC (first run's Skip for now), and Home offers
+            // Connect the cloud: nothing to warn of as a game starts (the owner's friend, 8 Oct 2026: a popup at the bottom
+            // right that vanished as the game went full screen).
+            case (null, SyncAction.WaitForCloud) when plan.Cloud.Problem?.Kind != CloudErrorKind.NotConnected:
                 warnings.Add(plan.Decision!.Reason);
                 break;
         }

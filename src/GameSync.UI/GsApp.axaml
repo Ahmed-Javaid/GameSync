@@ -39,6 +39,9 @@
     <DataTemplate DataType="vm:NamedSaveViewModel">
       <v:NamedSaveDialog />
     </DataTemplate>
+    <DataTemplate DataType="vm:ReportProblemViewModel">
+      <v:ReportProblemDialog />
+    </DataTemplate>
     <DataTemplate DataType="vm:AchievementGamesViewModel">
       <v:AchievementGamesDialog />
     </DataTemplate>
@@ -50,6 +53,9 @@
     </DataTemplate>
     <DataTemplate DataType="vm:AddOwnViewModel">
       <v:AddOwnDialog />
+    </DataTemplate>
+    <DataTemplate DataType="vm:FolderPickViewModel">
+      <v:FolderPickDialog />
     </DataTemplate>
     <DataTemplate DataType="vm:ImportKeptViewModel">
       <v:ImportKeptDialog />
@@ -65,6 +71,9 @@
     </DataTemplate>
     <DataTemplate DataType="vm:SettingsViewModel">
       <v:SettingsPage />
+    </DataTemplate>
+    <DataTemplate DataType="vm:GuideViewModel">
+      <v:GuidePage />
     </DataTemplate>
     <DataTemplate DataType="vm:ShareViewModel">
       <v:ShareDialog />

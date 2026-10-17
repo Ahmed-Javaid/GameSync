@@ -21,7 +21,7 @@
             <Panel>
             <Border Name="PART_Art" CornerRadius="16" ClipToBounds="True" Background="{DynamicResource bg-300}">
               <Panel>
-                <c:GsCoverImage Source="{TemplateBinding Art}" />
+                <c:GsCoverImage Source="{TemplateBinding ShownArt}" />
                 <Panel Name="PART_TitleCover">
                   <TextBlock Text="{TemplateBinding Initial}" FontSize="128" LineHeight="128" FontWeight="Bold" Foreground="{DynamicResource bg-400}"
                              HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,-4,-18" />
@@ -48,6 +48,14 @@
                 </Border>
                 <c:GsZenithMedal Width="26" Height="26" IsEarned="True" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="8"
                                  IsVisible="{TemplateBinding ShowsAchievementsMedal}" ToolTip.Tip="{TemplateBinding AchievementsWords}" />
+                <!-- LIB-31 (design system version 57): only its saves are here, the game isn't installed on this PC -->
+                <Border Name="PART_SavesOnly" Height="22" CornerRadius="11" Padding="8,0" Background="#D10A0C10" BorderBrush="#2EFFFFFF" BorderThickness="1"
+                        HorizontalAlignment="Left" VerticalAlignment="Top" Margin="8" IsVisible="{TemplateBinding SavesOnly}" IsHitTestVisible="False">
+                  <StackPanel Orientation="Horizontal" Spacing="5" VerticalAlignment="Center">
+                    <c:GsIcon Icon="saves" Size="12" StrokeWidth="2" Foreground="#E8EDF2" VerticalAlignment="Center" />
+                    <TextBlock Text="SAVES ONLY" FontSize="{DynamicResource fs-10}" LineHeight="{DynamicResource lh-14}" FontWeight="SemiBold" LetterSpacing="0.8" Foreground="#E8EDF2" VerticalAlignment="Center" />
+                  </StackPanel>
+                </Border>
               </Panel>
             </Border>
             <!-- Glossy's 1px ring just outside the art (clear in Solid), and the hover outline 2px further out, as in the design system -->
@@ -56,13 +64,19 @@
             </Panel>
           </c:AspectPanel>
           <TextBlock Name="PART_Name" Text="{TemplateBinding Title}" FontSize="{DynamicResource fs-13}" LineHeight="{DynamicResource lh-18}" FontWeight="Medium" TextTrimming="CharacterEllipsis" />
+          <!-- Two lines at most: "Not installed here · saves kept" wraps in a narrow cover, as the design draws it (LIB-31) -->
           <TextBlock Name="PART_Meta" Text="{TemplateBinding Meta}" FontSize="{DynamicResource fs-12}" LineHeight="{DynamicResource lh-16}" Foreground="{DynamicResource ink-faint}" Margin="0,-4,0,0"
+                     TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis"
                      IsVisible="{Binding $parent[c:GsGameTile].Meta, Converter={x:Static ObjectConverters.IsNotNull}}" />
         </StackPanel>
       </ControlTemplate>
     </Setter>
     <Style Selector="^:art /template/ Panel#PART_TitleCover">
       <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <!-- A title cover is greyed too when only the game's saves are here (LIB-31) -->
+    <Style Selector="^:savesonly /template/ Panel#PART_TitleCover">
+      <Setter Property="Opacity" Value="0.5" />
     </Style>
     <Style Selector="^.compact /template/ TextBlock#PART_Name">
       <Setter Property="FontSize" Value="{DynamicResource fs-12}" />
@@ -304,7 +318,8 @@
               </ItemsControl.ItemsPanel>
               <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="c:PlayStat">
-                  <StackPanel Spacing="2" AutomationProperties.Name="{Binding}">
+                  <StackPanel Spacing="2" AutomationProperties.Name="{Binding}" AutomationProperties.HelpText="{Binding Tip}" ToolTip.Tip="{Binding Tip}"
+                              Background="Transparent">
                     <TextBlock Classes="overline faint" Text="{Binding Label, Converter={x:Static c:UpperConverter.Instance}}" />
                     <TextBlock Text="{Binding Value}" FontSize="{DynamicResource fs-14}" LineHeight="{DynamicResource lh-20}" FontWeight="Medium" IsVisible="{Binding IsText}" />
                     <c:GsStatusBadge Plain="True" Status="{Binding Status}" Label="{Binding Value}" FontSize="{DynamicResource fs-14}" IsVisible="{Binding IsStatus}" />

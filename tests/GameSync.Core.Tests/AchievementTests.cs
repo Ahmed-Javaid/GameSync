@@ -112,19 +112,21 @@ public class AchievementTests
         var home = UI.ViewModels.HomeAchievements.Of(card, bloodborne, heroHasNone, [bloodborne, valheim], DateTime.Now);
         Assert.Equal("Valheim, played yesterday. Bloodborne GOTY has none GameSync can read.", home.Subtitle);
 
-        // A copy of a Steam game in its own folder, run without Steam (the owner's Sons of the Forest): Steam keeps nothing of
-        // it, and the card says so rather than that GameSync couldn't read it.
+        // A copy of a Steam game in its own folder, run without Steam (the owner's Sons of the Forest): nothing writes its
+        // unlocks down where GameSync has found, and since design system version 54 the card says they're marked on its page.
         var sons = new Host.LauncherGame { Id = Model.GameId.Parse("sons-of-the-forest"), Title = "Sons of the Forest", Store = StoreKind.Loose, SteamAppId = 1326470, Installed = true, LastPlayedUtc = DateTime.UtcNow };
         var (sonsCard, sonsHasNone, _) = Host.Achievements.ForHome(data, sons, [sons, valheim], steam);
         Assert.Equal(("Valheim", true), (sonsCard!.Title, sonsHasNone));
-        Assert.Equal("Valheim, played yesterday. Sons of the Forest isn't run by Steam here, so Steam keeps none of its achievements.",
+        Assert.Equal("Valheim, played yesterday. Sons of the Forest writes its unlocks nowhere GameSync has found, so you mark them on its page.",
             UI.ViewModels.HomeAchievements.Of(sonsCard, sons, sonsHasNone, [sons, valheim], DateTime.Now).Subtitle);
         Assert.Equal(["I Have Arrived!"], home.Latest.Select(a => a.Name));
         Assert.Equal(("50%", 1, false), (home.Progress.PercentText, home.Progress.ToGo, home.Progress.IsZenith));
 
-        // A Steam hero shows its own, and a copy in its own folder never shows Steam's (ACH-01).
+        // A Steam hero shows its own. Since version 54 what's unlocked is GameSync's record for the game, not Steam's to a
+        // copy: a copy in its own folder shows what Steam's copy unlocked, kept, and never reads Steam's files itself.
         Assert.Equal((card.Title, false), (Host.Achievements.ForHome(data, valheim, [valheim], steam).View!.Title, Host.Achievements.ForHome(data, valheim, [valheim], steam).HeroHasNone));
-        Assert.Null(Host.Achievements.For(data, copy, steam));
+        var kept = Host.Achievements.For(data, copy, steam)!;
+        Assert.Equal((Host.AchievementsFrom.Kept, 1, true, false), (kept.From, kept.Unlocked, kept.CanMark, kept.All.Single(a => a.Unlocked).Marked));
     }
 
     [Fact]

@@ -1,0 +1,30 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="using:GameSync.UI.Controls"
+             xmlns:vm="using:GameSync.UI.ViewModels"
+             x:Class="GameSync.UI.Views.TourOverlay"
+             x:DataType="vm:TourViewModel">
+  <!-- The tour (ONB-08; design system version 56, GuideScreen #tour): the window dimmed but for a hole round what the stop
+       points at, outlined in primary, and a box beside it -->
+  <Canvas Name="Stage" Background="Transparent">
+    <Path Name="Dim" Fill="#9E04080C" IsHitTestVisible="True" />
+    <Border Name="Hole" BorderBrush="{DynamicResource primary}" BorderThickness="2" CornerRadius="14" IsVisible="False" IsHitTestVisible="False" />
+    <Border Name="Bubble" Width="340" Background="{DynamicResource surface-dialog}" BorderBrush="{DynamicResource edge-dialog}" BorderThickness="1"
+            CornerRadius="16" BoxShadow="{DynamicResource shadow-dialog}" Padding="20,18,20,16">
+      <StackPanel Spacing="10">
+        <Grid ColumnDefinitions="*,Auto">
+          <TextBlock Classes="card-title" Text="{Binding Stop.Title}" FontSize="{DynamicResource fs-16}" TextWrapping="Wrap" />
+          <TextBlock Grid.Column="1" Classes="caption faint" Text="{Binding CountText}" IsVisible="{Binding HasCount}" VerticalAlignment="Center" />
+        </Grid>
+        <TextBlock Classes="muted" Text="{Binding Stop.Text}" TextWrapping="Wrap" />
+        <Grid ColumnDefinitions="*,Auto" Margin="0,4,0,0">
+          <c:GsButton Classes="ghost sm" Content="{Binding EndLabel}" Command="{Binding EndCommand}" HorizontalAlignment="Left" />
+          <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+            <c:GsButton Classes="ghost sm" Content="Back" Command="{Binding BackCommand}" IsVisible="{Binding CanGoBack}" />
+            <c:GsButton Name="NextButton" Classes="primary sm" Content="{Binding NextLabel}" Command="{Binding NextCommand}" />
+          </StackPanel>
+        </Grid>
+      </StackPanel>
+    </Border>
+  </Canvas>
+</UserControl>

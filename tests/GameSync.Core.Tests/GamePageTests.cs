@@ -68,6 +68,42 @@ public class GamePageTests
     }
 
     [Fact]
+    public void BAK_14_FIND_07_a_save_folder_beside_settings_is_no_settings_place_and_the_folder_round_it_no_move()
+    {
+        // The owner's Dark Souls III, 8 Oct 2026: its one place read SETTINGS, as the save list keeps its graphics settings in
+        // the folder round its save, and after a named save while playing, that folder was offered as where its saves moved.
+        var game = GameId.Parse("dark-souls-iii");
+        var definition = new GameDefinition
+        {
+            Id = game,
+            Title = "Dark Souls III",
+            Roots = new Dictionary<string, string> { ["roaming"] = @"C:\Users\You\AppData\Roaming\DarkSoulsIII" },
+            PortableRoots = new Dictionary<string, string> { ["roaming"] = "<roaming>/DarkSoulsIII" },
+            Rules = [new SaveRule { Root = "roaming", Include = "*/DS30000.sl2" }, new SaveRule { Root = "roaming", Include = "GraphicsConfig.xml", Category = SaveCategory.Config }],
+        };
+        var page = GameDetails.Describe(game, entry: null, definition, [], new Dictionary<VersionId, PinRecord>(), new HashSet<VersionId>(),
+            new Dictionary<DeviceId, string>(), [], Resolver);
+        Assert.Null(Assert.Single(page.Places).Tag);
+
+        // A folder of settings alone still says so.
+        var settingsOnly = GameDetails.Describe(game, entry: null, definition with { Rules = [definition.Rules[1]] }, [], new Dictionary<VersionId, PinRecord>(),
+            new HashSet<VersionId>(), new Dictionary<DeviceId, string>(), [], Resolver);
+        Assert.Equal("Settings", Assert.Single(settingsOnly.Places).Tag);
+
+        // The folder round the save it syncs changed while it played: never a move. Another place named for it would be.
+        var entry = new LibraryEntry
+        {
+            Id = game,
+            Title = "Dark Souls III",
+            State = LibraryState.Synced,
+            Confirmed = definition with { Roots = definition.PortableRoots! },
+        };
+        var around = new Proposal(FoundBy.NameSearch, "<roaming>/DarkSoulsIII", "**", SaveCategory.Save, 3, 17_800_000, T0);
+        var elsewhere = new Proposal(FoundBy.NameSearch, "<documents>/NBGI/DarkSoulsIII", "**", SaveCategory.Save, 1, 9_000_000, T0);
+        Assert.Equal([elsewhere], Agent.Moved(entry, [around, elsewhere]));
+    }
+
+    [Fact]
     public void FIND_06_a_game_not_syncing_yet_shows_what_the_scan_found_and_where_on_this_PC()
     {
         var entry = new LibraryEntry
@@ -131,9 +167,10 @@ public class GamePageTests
         // Favourites first on both sides, each part in the order chosen: recently played, then by name.
         Assert.Equal(["Terraria", "Slay the Spire 2"], library.FavouriteTiles.Select(t => t.Title));
         Assert.Equal(["Sekiro: Shadows Die Twice", "Risk of Rain 2"], library.OtherTiles.Select(t => t.Title));
-        Assert.Equal(["Favourites", "Terraria", "Slay the Spire 2", "Games", "Sekiro: Shadows Die Twice", "Risk of Rain 2"], Names(library));
+        // The library opens on Installed (LIB-31), the list's other heading.
+        Assert.Equal(["Favourites", "Terraria", "Slay the Spire 2", "Installed", "Sekiro: Shadows Die Twice", "Risk of Rain 2"], Names(library));
         library.Sort = LibrarySort.Name;
-        Assert.Equal(["Favourites", "Slay the Spire 2", "Terraria", "Games", "Risk of Rain 2", "Sekiro: Shadows Die Twice"], Names(library));
+        Assert.Equal(["Favourites", "Slay the Spire 2", "Terraria", "Installed", "Risk of Rain 2", "Sekiro: Shadows Die Twice"], Names(library));
 
         // The search narrows both sides; the count says how many of the view match.
         library.Search = "sts";
@@ -145,7 +182,7 @@ public class GamePageTests
 
         // A group closed from its heading.
         library.ToggleGroupCommand.Execute("favourites");
-        Assert.Equal(["Favourites", "Games", "Risk of Rain 2", "Sekiro: Shadows Die Twice"], Names(library));
+        Assert.Equal(["Favourites", "Installed", "Risk of Rain 2", "Sekiro: Shadows Die Twice"], Names(library));
 
         // A game's page opens beside the list at full glass, reads its places and history, and Back returns to the covers.
         library.OpenCommand.Execute(games[0].Id);

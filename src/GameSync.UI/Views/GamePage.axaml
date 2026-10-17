@@ -70,6 +70,9 @@
             </StackPanel>
           </c:GsPlayBar.Actions>
         </c:GsPlayBar>
+        <!-- PLAY-16: a game that asks for administrator rights (design system version 56, PlayBar) -->
+        <c:GsNote Icon="shield" IsVisible="{Binding NeedsAdmin}" Margin="4,-4,0,0"
+                  Text="This game asks for administrator rights, so Windows asks you before it starts. GameSync itself never runs as admin, and only watches the game, as it does every game." />
 
         <c:GameDetailLayout>
           <!-- The main column: About, and Achievements for a game whose store keeps them (ACH-01) -->
@@ -110,6 +113,9 @@
                                           CompletedOn="{Binding AchievementsProgress.CompletedOn}" HorizontalAlignment="Left" IsVisible="{Binding ShowsAchievementsOverview}"
                                           PlaysMoment="{Binding CelebratesZenith}" MomentPlayedCommand="{Binding SeeZenithCommand}" />
                 <c:GsNote Icon="{Binding AchievementsNoteIcon}" Text="{Binding AchievementsNote}" IsVisible="{Binding HasAchievementsNote}" />
+                <!-- Design system version 54: a copy that writes its unlocks nowhere GameSync has found has its achievements marked by hand -->
+                <c:GsButton Classes="sm" Icon="check" Content="Mark achievements…" Command="{Binding ViewAllAchievementsCommand}" HorizontalAlignment="Left"
+                            IsVisible="{Binding CanMarkAchievements}" ToolTip.Tip="Opens every achievement on Locked, to mark the ones you've earned" />
                 <StackPanel Spacing="12" IsVisible="{Binding HasLatestAchievements}">
                   <TextBlock Classes="overline faint" Text="LATEST UNLOCKED" />
                   <ItemsControl ItemsSource="{Binding LatestAchievements}">
@@ -191,6 +197,10 @@
             <StackPanel Spacing="16">
               <c:GsNote Icon="info" Text="Not installed here. Its saves are still on this PC, and still back up." IsVisible="{Binding NotInstalled}" />
               <c:GsFacts ItemsSource="{Binding PcFacts}" />
+              <!-- LIB-24 (version 57): what the program picked for it says it is, while it's in that folder -->
+              <c:GsNote Icon="alert" Classes="warn" Text="{Binding ProgramCheckText}" IsVisible="{Binding ProgramCheckIsWarn}" />
+              <c:GsNote Icon="check" Foreground="{DynamicResource ok}" Text="{Binding ProgramCheckText}" IsVisible="{Binding ProgramCheckIsOk}" />
+              <c:GsNote Icon="info" Text="{Binding ProgramCheckText}" IsVisible="{Binding ProgramCheckIsPlain}" />
               <WrapPanel ItemSpacing="8" LineSpacing="8">
                 <c:GsButton Classes="sm" Icon="folder" Content="Open the folder" Command="{Binding OpenGameFolderCommand}" IsVisible="{Binding CanOpenGameFolder}"
                             ToolTip.Tip="The game's own folder in Explorer" />

@@ -17,6 +17,9 @@ const { LIB } = new Function(viewer.slice(start, end) + "; return { LIB };")();
 const read = (rel) => fs.readFileSync(path.join(dir, rel), "utf8").replace(/\r/g, "");
 const browser = ["C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe", "C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe",
   "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"].find((p) => fs.existsSync(p));
+// A profile of its own: with Edge already open, a headless start on the usual profile hands its work to the open Edge,
+// which takes no screenshot (8 Oct 2026).
+const profile = path.join(require("os").tmpdir(), "gamesync-shoot-profile");
 if (!browser) { console.error("Neither Edge nor Chrome was found."); process.exit(1); }
 
 for (const card of cards) {
@@ -31,8 +34,13 @@ for (const card of cards) {
   const name = `${card}-${theme}-${surface}${hash ? "-" + hash.replace(/[^A-Za-z0-9]+/g, "-") : ""}`;
   const page = path.resolve(out, `${name}.html`), png = path.resolve(out, `${name}.png`);
   fs.writeFileSync(page, html);
-  execFileSync(browser, ["--headless=new", "--disable-gpu", "--hide-scrollbars", `--window-size=${w},${h}`, "--virtual-time-budget=4000",
+  if (fs.existsSync(png)) fs.unlinkSync(png);
+  execFileSync(browser, ["--headless=new", `--user-data-dir=${profile}`, "--disable-gpu", "--hide-scrollbars", `--window-size=${w},${h}`, "--virtual-time-budget=4000",
     `--screenshot=${png}`, "file:///" + page.replace(/\\/g, "/") + (hash ? "#" + hash : "")], { stdio: "ignore" });
+  // Edge's starter can return before the browser it hands the page to has drawn it, so the page stays until the picture
+  // is written (8 Oct 2026: every picture was missing, the page deleted before it loaded).
+  const until = Date.now() + 30000;
+  while (!fs.existsSync(png) && Date.now() < until) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 200);
   fs.unlinkSync(page);
-  console.log(png);
+  console.log(fs.existsSync(png) ? png : `! ${card}: no picture after 30 seconds`);
 }

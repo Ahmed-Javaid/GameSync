@@ -401,6 +401,8 @@ public class GsStatusBadge : TemplatedControl
 
     public static readonly StyledProperty<bool> PlainProperty = AvaloniaProperty.Register<GsStatusBadge, bool>(nameof(Plain));
 
+    public static readonly StyledProperty<bool?> CloudlessProperty = AvaloniaProperty.Register<GsStatusBadge, bool?>(nameof(Cloudless));
+
     public static readonly DirectProperty<GsStatusBadge, string> IconNameProperty =
         AvaloniaProperty.RegisterDirect<GsStatusBadge, string>(nameof(IconName), b => b.IconName);
 
@@ -425,6 +427,16 @@ public class GsStatusBadge : TemplatedControl
         set => SetValue(LabelProperty, value);
     }
 
+    /// <summary>
+    /// The Guide shows Upload pending both ways (ONB-08): true as with no cloud on this PC (Not synced), false as with one
+    /// (Sending); null follows <see cref="NoCloud"/>, as everywhere else.
+    /// </summary>
+    public bool? Cloudless
+    {
+        get => GetValue(CloudlessProperty);
+        set => SetValue(CloudlessProperty, value);
+    }
+
     public bool Plain
     {
         get => GetValue(PlainProperty);
@@ -443,13 +455,30 @@ public class GsStatusBadge : TemplatedControl
         private set => SetAndRaise(TextProperty, ref _text, value);
     }
 
+    /// <summary>
+    /// ONB-07 (design system version 56): no cloud is connected on this PC, so a game backed up here reads Not synced, never
+    /// Upload pending (a friend: "Upload pending is something that happens AFTER a user initiates it"). Set by the app as
+    /// it reads its data; off unless it says so.
+    /// </summary>
+    public static bool NoCloud { get; set; }
+
+    /// <summary>As <see cref="Describe(GameStatus?)"/>, with no cloud on this PC or with one, whatever this PC has.</summary>
+    public static (string Kind, string Icon, string Word) Describe(GameStatus? status, bool cloudless) => status switch
+    {
+        GameStatus.UploadPending when cloudless => ("neutral", "monitor", "Not synced"),
+        GameStatus.UploadPending => ("ok", "upload", "Sending"),
+        _ => Describe(status),
+    };
+
     /// <summary>The status's colour family, icon and word, as the design system's StatusBadge has them.</summary>
     public static (string Kind, string Icon, string Word) Describe(GameStatus? status) => status switch
     {
         // Synced is a cloud with a check, never a bare tick (design system version 35): in the cloud and on your PCs.
         GameStatus.Synced => ("ok", "cloudCheck", "Synced"),
         GameStatus.Playing => ("play", "play", "Playing"),
-        GameStatus.UploadPending => ("ok", "upload", "Upload pending"),
+        // Version 56: kept on this PC with no cloud to go to; with one, it's on its way (Upload pending until then).
+        GameStatus.UploadPending when NoCloud => ("neutral", "monitor", "Not synced"),
+        GameStatus.UploadPending => ("ok", "upload", "Sending"),
         GameStatus.NewerInCloud => ("ok", "download", "Newer in cloud"),
         GameStatus.Conflict => ("warn", "alert", "Conflict"),
         GameStatus.HeldForReview => ("warn", "pause", "Held for review"),
@@ -458,14 +487,15 @@ public class GsStatusBadge : TemplatedControl
         GameStatus.NotAvailable => ("neutral", "unplug", "Not available"),
         GameStatus.Blocked or GameStatus.Error => ("danger", "block", "Blocked"),
         GameStatus.BackupOnly => ("neutral", "shield", "Synced by its store"),
-        null => ("neutral", "cloud", "Not syncing yet"),
+        // Version 56: Not syncing yet read too like Not synced.
+        null => ("neutral", "cloud", "Not backed up"),
         _ => ("ok", "cloudCheck", "Synced"),
     };
 
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
         base.OnPropertyChanged(change);
-        if (change.Property == StatusProperty || change.Property == LabelProperty || change.Property == PlainProperty)
+        if (change.Property == StatusProperty || change.Property == LabelProperty || change.Property == PlainProperty || change.Property == CloudlessProperty)
         {
             Update();
         }
@@ -473,7 +503,7 @@ public class GsStatusBadge : TemplatedControl
 
     private void Update()
     {
-        var (kind, icon, word) = Describe(Status);
+        var (kind, icon, word) = Cloudless is { } cloudless ? Describe(Status, cloudless) : Describe(Status);
         foreach (var k in new[] { "ok", "warn", "play", "danger", "neutral" })
         {
             PseudoClasses.Set(":" + k, k == kind);

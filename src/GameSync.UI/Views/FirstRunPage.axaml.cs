@@ -16,7 +16,7 @@ public partial class FirstRunPage : UserControl
         InitializeComponent();
     }
 
-    /// <summary>Add a game folder, in Scan this PC.</summary>
+    /// <summary>Add a game folder, in Your games.</summary>
     public ICommand AddFolderCommand { get; }
 
     protected override void OnAttachedToVisualTree(Avalonia.VisualTreeAttachmentEventArgs e)
@@ -31,6 +31,25 @@ public partial class FirstRunPage : UserControl
         if (VisualRoot is not null)
         {
             (DataContext as FirstRunViewModel)?.Start();
+        }
+    }
+
+    /// <summary>Where saves are kept → A folder every PC can reach: Choose a folder…, in Windows' own folder picker.</summary>
+    private async void ChooseCloudFolder(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (DataContext is not FirstRunViewModel model || TopLevel.GetTopLevel(this)?.StorageProvider is not { } storage)
+        {
+            return;
+        }
+
+        var folders = await storage.OpenFolderPickerAsync(new FolderPickerOpenOptions
+        {
+            Title = "A folder every PC can reach, such as a NAS, a USB drive or another disk",
+            AllowMultiple = false,
+        });
+        if (folders.Count > 0 && folders[0].TryGetLocalPath() is { } path)
+        {
+            model.Cloud.ChooseFolder(path);
         }
     }
 

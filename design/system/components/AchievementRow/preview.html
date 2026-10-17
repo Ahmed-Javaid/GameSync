@@ -1,4 +1,4 @@
-<!-- @dsCard group="Achievements" height=380 subtitle="A row of every achievement: unlocked with its date, locked with how many players have it, hidden kept secret" -->
+<!-- @dsCard group="Achievements" height=440 subtitle="A row of every achievement: unlocked with its date (and where GameSync saw it: on LAPTOP, marked by you), locked with how many players have it, hidden kept secret" -->
 <!doctype html>
 <html lang="en">
 <head><meta charset="utf-8"><title>preview</title>
@@ -14,7 +14,8 @@ function achIcon(seed){ var hues=[18,200,280,140,45,340,180,95], marks=['M50 16 
   return "data:image/svg+xml,"+encodeURIComponent(svg); }
 var ITEMS = [
   {name:'Eclipse 8',desc:'Beat the game on Eclipse 8 with any survivor.',icon:achIcon(4),pct:2.7,when:'Today'},
-  {name:'The Long Road',desc:'Complete the first stage three times in one run.',icon:achIcon(1),pct:41,when:'26 Sep'},
+  {name:'The Long Road',desc:'Complete the first stage three times in one run.',icon:achIcon(1),pct:41,when:'26 Sep',by:'LAPTOP'},
+  {name:'Deicide',desc:'Defeat the twin titans in one run.',icon:achIcon(3),pct:12,when:'18 Sep',by:'you'},
   {name:'Mercenary: Mastery',desc:'As Mercenary, beat the game on Monsoon.',icon:achIcon(0),pct:8.9,state:'locked'},
   {state:'hidden',pct:3.1},
   {name:'Newtist',desc:'Discover and activate 8 unique Newt Altars.',icon:achIcon(5),pct:16,state:'locked'}

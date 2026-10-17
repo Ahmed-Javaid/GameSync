@@ -5,6 +5,7 @@ using System.Text.Json;
 using GameSync.Core.Games;
 using GameSync.Core.Model;
 using GameSync.Core.Safety;
+using GameSync.Core.Scanning;
 using GameSync.Core.State;
 using GameSync.Core.Storage;
 
@@ -63,6 +64,12 @@ public sealed record SharedVersion
 
     public string? Label { get; init; }
 
+    /// <summary>
+    /// Its name on the PC that shared it when it's a named save there (BAK-18), which it keeps as it's imported; null for a
+    /// save with none, and in zips made before 18 Oct 2026, whose saves come in as "Imported" and the day.
+    /// </summary>
+    public string? Name { get; init; }
+
     /// <summary>The account IDs its save folders used (PC-03), for SHARE-12's warning.</summary>
     public IReadOnlyDictionary<string, string>? Accounts { get; init; }
 
@@ -76,7 +83,14 @@ public sealed record SharePick(GameId Game, IReadOnlyList<VersionId> Versions);
 public sealed record SharePack(string ZipPath, int Games, int Versions, long Bytes, IReadOnlyList<string> Notes);
 
 /// <summary>What importing one game's shared saves came to: versions added, and why any weren't (SHARE-10, SHARE-11).</summary>
-public sealed record SharedImport(int Added, int Removed, IReadOnlyList<string> Notes);
+/// <param name="Saves">
+/// Each save of the zip that's in the game's history now, as a named save, oldest save first: added now, or there already
+/// with the same files; the last is the one Use it now puts in place (design system version 57).
+/// </param>
+public sealed record SharedImport(int Added, int Removed, IReadOnlyList<string> Notes, IReadOnlyList<NamedShare> Saves);
+
+/// <summary>A save of a shared zip in its game's history: its version, and its name there.</summary>
+public sealed record NamedShare(VersionId Version, string Name);
 
 /// <summary>
 /// Sharing saves (SHARE-01 to SHARE-13): picked versions packed into one zip with a manifest and a README for restoring
@@ -141,6 +155,7 @@ public sealed partial class SyncService
                     var title = stream.Definition.Title;
                     var gameFolder = Unique(gameFolders, FolderName(title, stream.Id.Value));
                     var versionFolders = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    var pins = (await _log.ListPinsAsync(stream.Id, ct)).ToDictionary(p => p.Version);
                     var shared = new List<SharedVersion>();
                     foreach (var version in versions)
                     {
@@ -178,6 +193,7 @@ public sealed partial class SyncService
                             SavedUtc = saved,
                             Pc = pc,
                             Label = version.Label,
+                            Name = pins.TryGetValue(version.Id, out var pin) && pin.Named ? pin.Label : null,
                             Accounts = version.Accounts,
                             Files = files,
                         });
@@ -227,25 +243,31 @@ public sealed partial class SyncService
 
     /// <summary>
     /// SHARE-10, SHARE-11: adds one game's saves from a shared zip, unpacked by version into <paramref name="versions"/>'
-    /// folders, as pinned versions labelled as imported: never current, so nothing changes until one is restored. Every
-    /// file gets a restore's checks first: a safe path (R6), the hash the zip says, no program (R1, left out and said so),
-    /// and the antivirus (R3, which turns the whole save away). A save whose folders this PC's rules for the game don't
-    /// have, or that's in its history already, isn't added, with the reason.
+    /// folders, as named saves (design system version 57): their own names, or "Imported" and the day; never current, so
+    /// nothing changes until one is restored. Every file gets a restore's checks first: a safe path (R6), the hash the zip
+    /// says, no program (R1, left out and said so), and the antivirus (R3, which turns the whole save away). A save whose
+    /// folders this PC's rules for the game don't have, or that's in its history already, isn't added, with the reason.
     /// </summary>
+    /// <param name="tag">A word to show after the PC's name on each save, such as the friend's name; null for none.</param>
     public async Task<SharedImport> ImportSharedAsync(GameId game, IReadOnlyList<(SharedVersion Version, string Folder)> versions, DateTime nowLocal,
-        CancellationToken ct)
+        CancellationToken ct, string? tag = null)
     {
+        tag = CleanTag(tag);
         var stream = Main(game);
         var definition = stream.Definition;
         await TryPullAsync(stream, ct);
         var (stored, _) = await LoadVersionsAsync(stream, ct);
         var known = stored.ToList();
+        var pins = (await _log.ListPinsAsync(stream.Id, ct)).ToDictionary(p => p.Version);
         var notes = new List<string>();
+        var saves = new List<NamedShare>();
         var (added, removed) = (0, 0);
         foreach (var (version, folder) in versions.OrderBy(v => v.Version.SavedUtc))
         {
-            var name = version.Label is { } shown ? $"“{shown}”" : $"{version.Pc}'s save of {version.SavedUtc.ToLocalTime():d MMM HH:mm}";
-            var label = version.Label is { } given ? $"Imported {nowLocal:d MMM yyyy}: {given}" : $"Imported {nowLocal:d MMM yyyy} from {version.Pc}";
+            // Untrusted, like everything in the zip: shown, never used as a path.
+            var pc = CleanTag(version.Pc, 40) ?? "another PC";
+            var name = (version.Name ?? version.Label) is { } shown ? $"“{shown}”" : $"{pc}'s save of {version.SavedUtc.ToLocalTime():d MMM HH:mm}";
+            var label = TryName(version.Name) ?? $"Imported {nowLocal:d MMM}";
             var missingRoot = version.Files.Select(f => f.Path.Split('/')[0]).Distinct(StringComparer.Ordinal).FirstOrDefault(r => !definition.Roots.ContainsKey(r));
             if (missingRoot is not null)
             {
@@ -306,23 +328,85 @@ public sealed partial class SyncService
             if (known.FirstOrDefault(v => FileSet.SameContent(v.Files, files)) is { } same)
             {
                 notes.Add($"{name} is in its history already, as the version of {SavedAt(same).ToLocalTime():d MMM HH:mm}, so it wasn't added again.");
+                saves.Add(new NamedShare(same.Id, pins.TryGetValue(same.Id, out var pin) && pin.Named ? pin.Label : label));
                 continue;
             }
 
             var created = await UploadAsync(stream, files, VersionKind.Kept, VersionOrigin.Imported, null, [], pinned: false, label, ct,
-                open: f => File.OpenRead(Path.Combine(folder, f.Path.Replace('/', Path.DirectorySeparatorChar))), sharedFrom: version.Pc);
-            await _log.SetPinAsync(stream.Id, new PinRecord(created.Id, label, DateTime.UtcNow, Device, Named: false), ct);
+                open: f => File.OpenRead(Path.Combine(folder, f.Path.Replace('/', Path.DirectorySeparatorChar))), sharedFrom: pc, tag: tag);
+            await _log.SetPinAsync(stream.Id, new PinRecord(created.Id, label, DateTime.UtcNow, Device, Named: true), ct);
             known.Add(created);
+            saves.Add(new NamedShare(created.Id, label));
             added++;
         }
 
         if (added > 0)
         {
-            _state.Log(stream.Id, "info", $"Imported {Count(added, "shared save")}, pinned in its history; none of them is current.", EventTags.Share);
+            _state.Log(stream.Id, "info", $"Imported {Count(added, "shared save")} as named saves{(tag is null ? "" : $", tagged {tag}")}; none of them is current.", EventTags.Share);
             await AfterManualAsync(stream, new GameResult(stream.Id, definition.Title, SyncAction.Upload, StatusFor(stream), $"Imported {Count(added, "shared save")}."), ct);
         }
 
-        return new SharedImport(added, removed, notes);
+        return new SharedImport(added, removed, notes, saves);
+    }
+
+    /// <summary>
+    /// SHARE-10 (design system version 57, ImportSavesDialog #now): Use it now. The save in place is kept first as a named
+    /// save, <paramref name="keepAs"/>, when this PC has one (a game never played here has nothing to keep); then the shared
+    /// save is restored like any other, into this PC's own account folder (SHARE-12). A file the game holds stops it with
+    /// nothing changed (KAN-91), and a game whose saves stay with their account never takes one (R16).
+    /// </summary>
+    public async Task<GameResult> UseSharedNowAsync(GameId game, NamedShare save, string keepAs, CancellationToken ct)
+    {
+        var stream = Main(game);
+        Snapshot snapshot;
+        try
+        {
+            snapshot = ScanOrThrowIfUnavailable(stream);
+        }
+        catch (FileInUseException e)
+        {
+            throw InUse(stream, e.FilePath, "restored", e);
+        }
+
+        if (snapshot.Files.Count > 0)
+        {
+            await SaveAsAsync(game, keepAs, ct);
+        }
+
+        return await RestoreAsync(game, save.Version, ct, save.Name);
+    }
+
+    /// <summary>
+    /// A tag, or a name from a shared zip, as GameSync shows it: on one line, no control characters, spaces joined, at most
+    /// <paramref name="max"/> characters; null when nothing's left.
+    /// </summary>
+    public static string? CleanTag(string? text, int max = 24)
+    {
+        if (text is null)
+        {
+            return null;
+        }
+
+        var clean = string.Join(' ', new string(text.Select(c => char.IsControl(c) ? ' ' : c).ToArray()).Split(' ', StringSplitOptions.RemoveEmptyEntries));
+        if (clean.Length > max)
+        {
+            clean = clean[..max].TrimEnd();
+        }
+
+        return clean.Length == 0 ? null : clean;
+    }
+
+    /// <summary>A save's name from a shared zip, when it makes one GameSync takes (1 to 100 characters, one line).</summary>
+    private static string? TryName(string? name)
+    {
+        try
+        {
+            return name is null ? null : CheckName(name);
+        }
+        catch (InvalidOperationException)
+        {
+            return null;
+        }
     }
 
     /// <summary>A shared zip's README (SHARE-08): how to import it, and how to restore a save by hand without GameSync.</summary>

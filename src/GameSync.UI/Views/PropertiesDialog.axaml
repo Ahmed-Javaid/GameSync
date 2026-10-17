@@ -176,8 +176,16 @@
             <c:GsFacts ItemsSource="{Binding InstalledFacts}" />
             <WrapPanel ItemSpacing="8" LineSpacing="8">
               <c:GsButton Classes="sm" Icon="folder" Content="Open the folder" Command="{Binding OpenFolderCommand}" IsVisible="{Binding CanOpenFolder}" />
+              <!-- LIB-24 (version 57): a game in its own folder: its program, checked like Locate the game… -->
+              <c:GsButton Classes="sm" Icon="search" Content="Change…" Click="ChangeFolder" IsVisible="{Binding CanChangeFolder}"
+                          IsBusy="{Binding CheckingProgram}" BusyText="Checking" AutomationProperties.Name="Change the game's folder"
+                          ToolTip.Tip="Pick the game's program in its own folder; GameSync checks it's this game's" />
               <c:GsButton Classes="ghost sm" IconAfter="external" Content="Store page" Command="{Binding StorePageCommand}" IsVisible="{Binding CanOpenStorePage}" />
             </WrapPanel>
+            <!-- What the program says it is: another game's in warn, this game's with a check, else a plain note -->
+            <c:GsNote Icon="alert" Classes="warn" Text="{Binding FolderCheckText}" IsVisible="{Binding FolderCheckIsWarn}" />
+            <c:GsNote Icon="check" Foreground="{DynamicResource ok}" Text="{Binding FolderCheckText}" IsVisible="{Binding FolderCheckIsOk}" />
+            <c:GsNote Icon="info" Text="{Binding FolderCheckText}" IsVisible="{Binding FolderCheckIsPlain}" />
           </StackPanel>
 
           <!-- Saves: which files are backed up -->
@@ -186,7 +194,7 @@
             <TextBlock Classes="muted" FontSize="{DynamicResource fs-13}" LineHeight="{DynamicResource lh-19}" TextWrapping="Wrap"
                        Text="Ticked files are backed up and synced. Unticked ones stay on this PC only, and older versions keep them; nothing is deleted." />
             <c:GsNote Icon="info" IsVisible="{Binding NotSyncing}"
-                      Text="Not syncing yet: this is what the scan found. Sync its saves from its page first; then you can choose its files here." />
+                      Text="Not backed up yet: this is what the scan found. Sync its saves from its page first; then you can choose its files here." />
             <TextBlock Classes="mono-small muted" Text="{Binding CountText}" />
             <Border Background="{DynamicResource surface-well}" BorderBrush="{DynamicResource edge-well}" BorderThickness="1" BackgroundSizing="OuterBorderEdge"
                     CornerRadius="{DynamicResource radius-md}" Padding="6">
@@ -253,7 +261,7 @@
           <!-- Sync -->
           <StackPanel Spacing="4" IsVisible="{Binding IsSync}">
             <TextBlock Text="Sync" FontSize="{DynamicResource fs-16}" LineHeight="{DynamicResource lh-22}" FontWeight="Medium" Margin="0,0,0,8" />
-            <c:GsNote Icon="info" IsVisible="{Binding NotSyncing}" Text="Not syncing yet. Sync its saves from its page first; then these settings apply." Margin="0,0,0,8" />
+            <c:GsNote Icon="info" IsVisible="{Binding NotSyncing}" Text="Not backed up yet. Back up its saves from its page first; then these settings apply." Margin="0,0,0,8" />
             <StackPanel Spacing="4" IsVisible="{Binding CanChooseFiles}">
               <c:GsSettingsRow Title="Keep it in step" Description="{Binding ModeDescription}">
                 <c:GsPillTabs ItemsSource="{x:Static vm:PropertiesViewModel.ModeChoices}" SelectedId="{Binding Mode, Mode=TwoWay}" AutomationProperties.Name="Sync" />

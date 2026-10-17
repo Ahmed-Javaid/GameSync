@@ -41,6 +41,8 @@ public static class Icons
         ["chevronsRight"] = ["M6 6l6 6-6 6", "M13 6l6 6-6 6"],
         ["x"] = ["M6 6l12 12", "M18 6L6 18"],
         ["info"] = ["M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18", "M12 11v6", "M12 7.5h.01"],
+        // Design system version 55: a question, beside words that need explaining (a game's achievements GameSync can't see, and why).
+        ["help"] = ["M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18", "M9.6 9.4a2.5 2.5 0 1 1 3.6 2.3c-.8.4-1.2 1-1.2 1.8v.3", "M12 16.9h.01"],
         ["copy"] = ["M8 8h12v12H8z", "M4 16V4h12"],
         ["monitor"] = ["M3 4h18v12H3z", "M8 20h8", "M12 16v4"],
         ["shield"] = ["M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z", "M8.5 12l2.5 2.5 4.5-5"],

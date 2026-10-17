@@ -31,9 +31,9 @@
   ],
   "lastChange": {
     "by": "Vulsight",
-    "at": "2026-10-07T14:20:46Z",
+    "at": "2026-10-17T21:27:42Z",
     "via": "Claude Code",
-    "note": "Version 53, updates (the owner, 7 Oct 2026: no paid code signing, \"yes, per-user install and tracer after v1\"): Settings has Updates, where GameSync says the version it runs, gets a newer one from GitHub once a day in the background and installs it only when you Restart to update, after its own release signature checks out (SettingsScreen #updates, #updates-latest, #updates-downloading, #updates-refused, #updates-offline); Home's top bar offers Restart to update while one is ready (LauncherScreen #update); Safety's Let learn mode ask for admin is tagged After v1."
+    "note": "Version 59: the owner's look at version 58 (18 Oct 2026). The library's views are a dropdown atop the list, beside the sort, each view with its count, and the row of pills is gone (\"Make it into a dropdown next to name with all these settings\"); the list is 288px. What Add game folder is doing, found, or why it couldn't is a notice card under the header, plain while looking, in the primary colour with Show them once it has found games, in warn on a problem (\"That information line is too bare\"; LibraryScreen #notice:looking, #notice:found, #notice:problem). An achievement icon with a frame its game drew into the art has the frame cropped off, so the art fills the badge, in the popup too (\"The achievements are squares inside the viewer\"; AchievementBadge, AchievementPopup)."
   },
   "layout": "files",
   "libraries": [

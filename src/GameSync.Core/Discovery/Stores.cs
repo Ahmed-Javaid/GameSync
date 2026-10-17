@@ -132,6 +132,9 @@ public static class SteamReader
         return new SteamInstall(root, libraries, games, ReadAccounts(root));
     }
 
+    /// <summary>The accounts Steam on this PC knows, from <c>loginusers.vdf</c>: the one it signs in with is <c>MostRecent</c>.</summary>
+    public static IReadOnlyList<SteamAccount> Accounts(string root) => ReadAccounts(root);
+
     /// <summary>Accounts from <c>loginusers.vdf</c>, with the short ID <c>userdata</c> folders use.</summary>
     private static List<SteamAccount> ReadAccounts(string root)
     {

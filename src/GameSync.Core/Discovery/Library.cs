@@ -69,6 +69,12 @@ public sealed record LibraryEntry
 
     public string? SaveListTitle { get; init; }
 
+    /// <summary>
+    /// KAN-170: the Steam app ID a copy in its own folder says it is (a <c>steam_appid.txt</c>, as the scan reads it), for
+    /// its art and store page when neither its store nor the save list gives one; never Valve's test app, 480.
+    /// </summary>
+    public long? DeclaredSteamId { get; init; }
+
     public IReadOnlyList<Proposal> Proposals { get; init; } = [];
 
     /// <summary>Registry keys the latest scan found (FIND-10).</summary>
@@ -362,8 +368,12 @@ public static class Library
         Build = null,
         Engine = print?.Engine ?? entry.Engine,
         AntiCheat = print is null ? entry.AntiCheat : print.AntiCheat,
+        DeclaredSteamId = print is null ? entry.DeclaredSteamId : Declared(print),
         LastSeenUtc = nowUtc,
     }, entry);
+
+    /// <summary>KAN-170: the Steam app ID a game's folder declares, but Valve's test app, which copies say to play together.</summary>
+    private static long? Declared(Fingerprint print) => print.SteamAppId is > 0 and not 480 and var id ? id : null;
 
     /// <summary>
     /// KAN-44: the entries that are the person's own copies (located by hand, in their own folders, or added by them) but
@@ -518,6 +528,28 @@ public static class Library
     /// ONB-04: Ludusavi's ignore list. A game confirmed in GameSync stays as it is; a title the library doesn't know
     /// yet gets an entry of its own, so the scan that finds it later finds it ignored.
     /// </summary>
+    /// <summary>
+    /// LIB-30: what the person picked from a game folder. Games in their own folders left out are ignored, so no later scan
+    /// adds them back; ones ticked that were left out before come back. A game that syncs is never left out this way.
+    /// </summary>
+    /// <param name="leaveOut">Folders left out, as <see cref="FolderLook.Key"/> has them.</param>
+    /// <param name="takeBack">Folders ticked, as <see cref="FolderLook.Key"/> has them.</param>
+    public static IReadOnlyList<LibraryEntry> Pick(IReadOnlyList<LibraryEntry> library, IReadOnlySet<string> leaveOut, IReadOnlySet<string> takeBack) =>
+        library.Select(entry => entry switch
+        {
+            { Store: StoreKind.Loose, MergedInto: null, InstallDir: { } dir, State: LibraryState.Found, Confirmed: null } when leaveOut.Contains(FolderLook.Key(dir))
+                => entry with { State = LibraryState.Ignored },
+            { Store: StoreKind.Loose, MergedInto: null, InstallDir: { } dir, State: LibraryState.Ignored } when takeBack.Contains(FolderLook.Key(dir))
+                => entry with { State = entry.Confirmed is null ? LibraryState.Found : LibraryState.Synced },
+            _ => entry,
+        }).ToList();
+
+    /// <summary>LIB-30: the folders of games in their own folders the person left out before, as <see cref="FolderLook.Key"/> has them.</summary>
+    public static IReadOnlySet<string> LeftOut(IEnumerable<LibraryEntry> library) =>
+        library.Where(e => e is { Store: StoreKind.Loose, MergedInto: null, State: LibraryState.Ignored, InstallDir: { Length: > 0 } })
+            .Select(e => FolderLook.Key(e.InstallDir!))
+            .ToHashSet(StringComparer.Ordinal);
+
     public static IReadOnlyList<LibraryEntry> IgnoreTitles(IReadOnlyList<LibraryEntry> library, IEnumerable<string> titles, DateTime nowUtc)
     {
         var entries = library.ToDictionary(e => e.Id);
@@ -636,6 +668,7 @@ public static class Library
         Build = game.Installed.Build,
         Engine = game.Print.Engine,
         AntiCheat = game.Print.AntiCheat,
+        DeclaredSteamId = Declared(game.Print),
         StoreCloud = game.StoreCloud,
         ProbablyOnlineOnly = game.ProbablyOnlineOnly,
         SaveListTitle = game.Listed?.Title,

@@ -383,6 +383,22 @@ public sealed partial class PropertiesViewModel : ObservableObject
     [ObservableProperty]
     private string? _copied;
 
+    /// <summary>
+    /// LIB-24 (design system version 57): the program picked with Installed files' Change…, checked, waiting for Save
+    /// changes; null when none is picked, or the one picked was refused.
+    /// </summary>
+    private string? _locate;
+
+    /// <summary>What the program picked with Change… says it is, until Save changes; null shows the game's own check.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(FolderCheck), nameof(HasFolderCheck), nameof(FolderCheckText), nameof(FolderCheckIcon), nameof(FolderCheckIsWarn),
+        nameof(FolderCheckIsOk), nameof(FolderCheckIsPlain))]
+    private ProgramCheck? _pickCheck;
+
+    /// <summary>Change… is checking the program picked.</summary>
+    [ObservableProperty]
+    private bool _checkingProgram;
+
     public PropertiesViewModel(GameId id, string title, LauncherActions? actions, string? section = null)
     {
         Id = id;
@@ -508,6 +524,65 @@ public sealed partial class PropertiesViewModel : ObservableObject
 
     public bool CanOpenFolder => _loaded?.InstallDir is not null;
 
+    /// <summary>
+    /// LIB-24 (design system version 57): Installed files' Change… for a game in its own folder, installed here, with a
+    /// program to pick: not a store game, which its store installs, nor a folder of the person's own with no program.
+    /// </summary>
+    public bool CanChangeFolder => IsLoaded && Installed && !ThroughStore && _loaded?.IsFolder != true && _actions?.CheckProgram is not null;
+
+    /// <summary>What the folder's program says it is: the one picked with Change…, else the game's own, kept when it was located.</summary>
+    public ProgramCheck? FolderCheck => PickCheck ?? _loaded?.About.Check;
+
+    public bool HasFolderCheck => FolderCheck is not null;
+
+    public string? FolderCheckText => FolderCheck switch
+    {
+        null => null,
+        { Refused: true } check => $"{check.Sentence} Nothing was changed.",
+        var check when PickCheck is not null => $"{check.Sentence} Save changes puts it in {check.Folder}.",
+        var check => check.Sentence,
+    };
+
+    /// <summary>Another game's, or refused: in warn, with the warning mark.</summary>
+    public bool FolderCheckIsWarn => FolderCheck is { Fit: ProgramFit.OtherGame } or { Refused: true };
+
+    /// <summary>Its own record names this game: a check.</summary>
+    public bool FolderCheckIsOk => FolderCheck is { Fit: ProgramFit.Fits, Refused: false };
+
+    public bool FolderCheckIsPlain => HasFolderCheck && !FolderCheckIsWarn && !FolderCheckIsOk;
+
+    public string FolderCheckIcon => FolderCheckIsWarn ? "alert" : FolderCheckIsOk ? "check" : "info";
+
+    /// <summary>
+    /// Installed files' Change…: the program picked in Windows' picker, checked as Locate the game… does. One GameSync takes
+    /// waits for Save changes, which moves the game to its folder; one it refuses changes nothing, and says why.
+    /// </summary>
+    public async Task ChangeFolderAsync(string program)
+    {
+        if (_actions?.CheckProgram is not { } check || CheckingProgram)
+        {
+            return;
+        }
+
+        CheckingProgram = true;
+        try
+        {
+            var answer = await check(Id, program, CancellationToken.None);
+            _locate = answer.Refused ? null : program;
+            PickCheck = answer;
+        }
+        catch (Exception e) when (e is UsageException or IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            _locate = null;
+            PickCheck = new ProgramCheck(ProgramFit.Unclear, e.Message, "") { Refused = true };
+        }
+        finally
+        {
+            CheckingProgram = false;
+            Recount();
+        }
+    }
+
     public bool CanOpenStorePage => _loaded?.About.SteamAppId is not null;
 
     /// <summary>Its files can be chosen: it syncs. A game not syncing yet shows what was found.</summary>
@@ -596,11 +671,14 @@ public sealed partial class PropertiesViewModel : ObservableObject
         };
         BuildRows(properties);
         Art = properties.Art.Select(a => new ArtSlot(Recount, a, properties.Title)).ToList();
+        _locate = null;
+        PickCheck = null;
         IsLoaded = true;
         Changes = 0;
         foreach (var name in new[] { nameof(AntiCheatNote), nameof(HasAntiCheat), nameof(ThroughStore), nameof(OwnProgram), nameof(IsSteam), nameof(RouteTitle),
             nameof(RouteDescription), nameof(RouteText), nameof(StoreOptions), nameof(InstalledFacts), nameof(Installed), nameof(NotInstalled), nameof(CanOpenFolder),
-            nameof(CanOpenStorePage), nameof(CanChooseFiles), nameof(NotSyncing), nameof(HasSettingsFiles) })
+            nameof(CanOpenStorePage), nameof(CanChooseFiles), nameof(NotSyncing), nameof(HasSettingsFiles), nameof(CanChangeFolder), nameof(FolderCheck), nameof(HasFolderCheck),
+            nameof(FolderCheckText), nameof(FolderCheckIcon), nameof(FolderCheckIsWarn), nameof(FolderCheckIsOk), nameof(FolderCheckIsPlain) })
         {
             OnPropertyChanged(name);
         }
@@ -629,6 +707,7 @@ public sealed partial class PropertiesViewModel : ObservableObject
             Hidden = Shown == p.Hidden ? !Shown : null,
             LaunchOptions = !ThroughStore && LaunchOptions.Trim() != (p.About.LaunchOptions ?? "") ? LaunchOptions : null,
             Program = !ThroughStore && Program != (p.About.ProgramPicked ? p.About.Program ?? "" : "") ? Program : null,
+            Locate = _locate,
             Mode = p.Syncs && mode != p.Mode ? mode : null,
             Conflict = p.Syncs && conflict != p.Conflict ? conflict : null,
             SettingsFiles = p.Syncs && SettingsFiles != p.SettingsFiles ? SettingsFiles : null,
@@ -796,8 +875,8 @@ public sealed partial class PropertiesViewModel : ObservableObject
         }
 
         var change = Change();
-        Changes = new object?[] { change.Title, change.Favourite, change.Hidden, change.LaunchOptions, change.Program, change.Mode, change.Conflict, change.SettingsFiles,
-            change.Screenshots, change.SkipDefaults }.Count(v => v is not null) + change.Files.Count + change.Art.Count;
+        Changes = new object?[] { change.Title, change.Favourite, change.Hidden, change.LaunchOptions, change.Program, change.Locate, change.Mode, change.Conflict,
+            change.SettingsFiles, change.Screenshots, change.SkipDefaults }.Count(v => v is not null) + change.Files.Count + change.Art.Count;
         if (Changes == 0)
         {
             ConfirmingDiscard = false;

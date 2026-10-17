@@ -73,6 +73,55 @@ public class FirstRunTests
     }
 
     [Fact]
+    public async Task ONB_02_a_folder_picked_during_the_scan_waits_for_it_and_a_refused_one_never_stops_Choose_games()
+    {
+        // The owner's friend, 8 Oct 2026: a game folder added while the first scan ran was dropped without a word, and a
+        // refused one stopped Choose games until Scan again.
+        var scans = 0;
+        var added = new List<string>();
+        var release = new TaskCompletionSource();
+        var actions = new SetupActions(
+            async (_, _) =>
+            {
+                if (++scans == 1)
+                {
+                    await release.Task;
+                }
+
+                return new SetupScan([], added.Select(f => new GameFolderSummary(f, 1, false)).ToList(), 1, 1, TimeSpan.FromSeconds(1));
+            },
+            _ => Task.FromResult<IReadOnlyList<SetupGroup>>([]),
+            (folder, _) =>
+            {
+                if (folder == @"C:\Windows")
+                {
+                    return Task.FromResult<string?>("C:\\Windows is Windows' own folder; pick the folder your games are in.");
+                }
+
+                added.Add(folder);
+                return Task.FromResult<string?>(null);
+            },
+            new CloudActions(false, _ => Task.FromResult<string?>(null), f => f),
+            (_, _) => Task.FromResult(new SetupResult(0, 0, [])));
+        var page = new FirstRunViewModel(actions);
+
+        // Picked while the scan runs: shown as waiting, then added and scanned once it has finished.
+        var first = page.ScanAsync();
+        page.AddFolder(@"E:\Games");
+        Assert.Equal((@"E:\Games", "added once this scan finishes"), (page.Folders[^1].Path, page.Folders[^1].Meta));
+        release.SetResult();
+        await first;
+        Assert.Equal(2, scans);
+        Assert.Equal([@"E:\Games"], added);
+        Assert.Equal((@"E:\Games", "1 game"), (page.Folders.Single().Path, page.Folders.Single().Meta));
+
+        // Refused: said under the folders, and Choose games stays on.
+        page.AddFolder(@"C:\Windows");
+        Assert.Equal((true, true, false), (page.HasFolderError, page.CanChoose, page.HasScanError));
+        Assert.StartsWith(@"C:\Windows is Windows' own folder", page.FolderError, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task ONB_01_skip_for_now_keeps_every_version_on_this_PC_until_a_cloud_is_connected()
     {
         using var world = new TestWorld();
@@ -101,6 +150,15 @@ public class FirstRunTests
 
         Assert.Empty(output.NeedsYouLines);
         Assert.DoesNotContain(output.Said, line => line.Contains("Offline", StringComparison.Ordinal));
+
+        // Play's check before starting it says nothing of the cloud: the person chose to keep backups here, and Home offers
+        // Connect the cloud (the owner's friend, 8 Oct 2026: a popup at the bottom right that vanished as the game started).
+        using (var engine = Engine.Open(data))
+        {
+            var (service, _) = await engine.OpenServiceAsync(new GameSync.Core.Sync.SyncOptions { DeferUploads = true }, Ct);
+            Assert.Empty((await service.PrepareLaunchAsync(id, Ct)).Warnings);
+        }
+
         var tray = TrayStatus.From(true, new SyncCounts(1, 0, 0, 1), false, CloudErrorKind.NotConnected, null);
         Assert.Equal(TrayMood.Synced, tray.Mood);
         Assert.Contains("kept on this PC", tray.Tooltip, StringComparison.Ordinal);
@@ -178,23 +236,37 @@ public class FirstRunTests
             });
         var page = new FirstRunViewModel(actions);
 
-        // The steps: only the ones reached can be picked; the scan comes first.
-        Assert.Equal(["scan", "choose", "cloud", "daily"], page.Steps.Select(s => s.Id));
+        // ONB-07 (design system version 56): five steps, only the ones reached can be picked; Welcome comes first, and the
+        // scan runs behind it.
+        Assert.Equal(["welcome", "folders", "saves", "cloud", "daily"], page.Steps.Select(s => s.Id));
+        Assert.True(page.IsWelcome);
         await page.ScanAsync();
         Assert.StartsWith("Scan finished in 12 seconds: 10 games, saves found for 9", page.ScanLabel, StringComparison.Ordinal);
-        Assert.Equal((@"G:\", "3 games"), (page.Folders[0].Path, page.Folders[0].Meta));
-        Assert.True(page.CanChoose);
+        page.NextCommand.Execute(null);
+        Assert.True(page.IsFolders);
+        Assert.Equal((@"G:\", "3 games", true), (page.Folders[0].Path, page.Folders[0].Meta, page.HasFolders));
         page.NextCommand.Execute(null);
         Assert.True(page.IsChoose);
-        Assert.Equal("check", page.Steps[0].Icon);
+        Assert.Equal(("check", "check"), (page.Steps[0].Icon, page.Steps[1].Icon));
+        Assert.Equal("Saves found for 9 of 10 games", page.SavesTitle);
 
-        // Groups: Sync open with four rows and Show 2 more; online-only unticked; No saves found yet watched, with no box.
+        // Groups: Back up and sync open with four rows and Show 2 more, its heading closing and opening it; online-only
+        // unticked; No saves found yet watched, with no box and nothing to open; each game's save size.
         var sync = page.Groups[0];
         Assert.Equal((true, 4, true, "Show 2 more"), (sync.IsOpen, sync.VisibleRows.Count, sync.HasMore, sync.MoreLabel));
+        Assert.Equal(("Back up and sync", "6 games · 5.7 MB of saves · GameSync syncs them between your PCs"), (sync.Title, sync.Summary));
+        Assert.Equal(Cli.FormatSize(1_000_000), sync.Rows[0].Size);
+        sync.ToggleOpenCommand.Execute(null);
+        Assert.Equal((false, "chevronRight", 0), (sync.IsOpen, sync.Chevron, sync.VisibleRows.Count));
+        sync.ToggleOpenCommand.Execute(null);
+        Assert.True(sync.IsOpen);
         Assert.Equal(true, sync.IsChecked);
         Assert.Equal(false, page.Groups[2].IsChecked);
-        Assert.Equal("only settings files found · Apex Legends and Rocket League", page.Groups[2].Why);
-        Assert.True(page.Groups[3].IsWatch);
+        Assert.Equal("only settings found: the game keeps your progress on its servers · Apex Legends and Rocket League", page.Groups[2].Why);
+        Assert.Equal((true, false), (page.Groups[3].IsWatch, page.Groups[3].CanOpen));
+        page.CloseGroupsCommand.Execute(null);
+        Assert.All(page.Groups, g => Assert.False(g.IsOpen));
+        sync.IsOpen = true;
         Assert.StartsWith("Apex Legends has an anti-cheat", page.AntiCheatNote, StringComparison.Ordinal);
         sync.Rows[0].IsChecked = false;
         Assert.Null(sync.IsChecked);
@@ -202,13 +274,21 @@ public class FirstRunTests
         Assert.Equal(true, sync.IsChecked);
         sync.Rows[5].IsChecked = false;
 
-        // The cloud: without Google's client, a folder; Skip for now keeps everything on the PC.
+        // Where saves are kept (ONB-07): a real choice Continue waits for. Without Google's client, a folder; only this PC
+        // says what it costs and keeps everything here.
         page.NextCommand.Execute(null);
-        Assert.Equal(("Skip for now", false), (page.CloudNextLabel, page.CloudNextIsMain));
-        Assert.Equal(AppConfig.NoCloud, page.Cloud.Remote);
+        Assert.True(page.IsCloud);
+        Assert.Equal((false, "Choose where your saves are kept first"), (page.Cloud.Ready, page.Cloud.NotReadyTip));
+        page.NextCommand.Execute(null);
+        Assert.True(page.IsCloud);
+        page.Cloud.PickCommand.Execute("local");
+        Assert.Equal((true, "Continue with this PC only", AppConfig.NoCloud), (page.Cloud.Ready, page.CloudNextLabel, page.Cloud.Remote));
+        Assert.Equal("On this PC only: not synced to your other PCs", page.SetupKeptLine);
+        page.Cloud.PickCommand.Execute("folder");
+        Assert.Equal((false, "Choose the folder first"), (page.Cloud.Ready, page.Cloud.NotReadyTip));
         Assert.True(page.Cloud.CannotSignIn);
         page.Cloud.ChooseFolder(@"D:\NAS");
-        Assert.Equal((folder, "Continue"), (page.Cloud.Remote, page.CloudNextLabel));
+        Assert.Equal((folder, "Continue", true), (page.Cloud.Remote, page.CloudNextLabel, page.Cloud.Ready));
         Assert.Contains("runs in the background", page.FirstBackupText, StringComparison.Ordinal);
 
         // Backups and startup: the time is checked; Start using GameSync takes it all.
@@ -222,6 +302,11 @@ public class FirstRunTests
         page.SaveTimeCommand.Execute(null);
         Assert.Equal("Back up every day at 07:30", page.DailyTitle);
         Assert.StartsWith("5 games sync and 1 is backed up.", page.ReadyText, StringComparison.Ordinal);
+        Assert.Equal(("6 games' saves", @"G:\", $"On this PC and in {folder}"), (page.SetupGamesTitle, page.SetupFoldersLine, page.SetupKeptLine));
+        page.GoToCommand.Execute("saves");
+        Assert.True(page.IsChoose);
+        page.GoToCommand.Execute("daily");
+        Assert.True(page.IsDaily);
         await ((CommunityToolkit.Mvvm.Input.IAsyncRelayCommand)page.FinishCommand).ExecuteAsync(null);
         Assert.NotNull(finished);
         Assert.Equal(folder, finished.Remote);

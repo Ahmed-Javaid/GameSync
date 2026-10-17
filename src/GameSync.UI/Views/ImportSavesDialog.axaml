@@ -11,7 +11,8 @@
     </Style>
   </UserControl.Styles>
   <!-- Import saves (design system → ImportSavesDialog; SHARE-10 to SHARE-13): a shared zip's games, each matched to this
-       PC's library; Add puts their saves in the games' histories, pinned, never current. -->
+       PC's library; Import puts their saves in the games' histories as named saves, or uses one now with the save there kept
+       first, and a tag goes on every save (version 57). -->
   <Border Background="{DynamicResource surface-dialog}" BorderBrush="{DynamicResource edge-dialog}" BorderThickness="1" BackgroundSizing="OuterBorderEdge"
           CornerRadius="16" BoxShadow="{DynamicResource shadow-dialog}" ClipToBounds="True">
     <DockPanel>
@@ -25,19 +26,37 @@
         </Grid>
       </Border>
 
-      <!-- Foot: what's ticked, the promise, Cancel and Add; done, what happened and Done -->
+      <!-- Foot: the tag, what's ticked, the promise, Cancel and Import; done, what happened and Done -->
       <Border DockPanel.Dock="Bottom" BorderBrush="{DynamicResource line-100}" BorderThickness="0,1,0,0" Padding="24,14">
         <Panel>
           <StackPanel Spacing="12" IsVisible="{Binding !Done}">
+            <!-- The tag (version 57): + Add a tag opens a field; the tag, such as the friend's name, goes after the PC's name on each save -->
+            <Grid ColumnDefinitions="Auto,Auto,Auto,*" ColumnSpacing="10" IsVisible="{Binding Reviewing}">
+              <TextBlock Classes="overline faint" Text="TAG" VerticalAlignment="Center" />
+              <Panel Grid.Column="1" VerticalAlignment="Center">
+                <c:GsTag Text="{Binding TagShown}" Background="{DynamicResource secondary-soft}" Foreground="{DynamicResource ink}" IsVisible="{Binding ShowsTagChip}"
+                         VerticalAlignment="Center" />
+                <TextBox Name="TagBox" Width="160" MinHeight="30" Height="30" Padding="10,4" Text="{Binding Tag}" PlaceholderText="Jawad" MaxLength="24" IsVisible="{Binding TagOpen}"
+                         VerticalContentAlignment="Center" AutomationProperties.Name="Tag for these saves">
+                  <TextBox.KeyBindings>
+                    <KeyBinding Gesture="Enter" Command="{Binding ToggleTagCommand}" />
+                  </TextBox.KeyBindings>
+                </TextBox>
+              </Panel>
+              <c:GsButton Grid.Column="2" Classes="ghost sm" Icon="{Binding TagIcon}" Content="{Binding TagLabel}" Command="{Binding ToggleTagCommand}"
+                          AutomationProperties.Name="{Binding TagLabel, StringFormat='{}{0}: a tag for these saves'}" />
+              <TextBlock Grid.Column="3" Classes="caption faint" Text="Shows after the PC's name on each save, so you know whose it is." TextWrapping="Wrap"
+                         VerticalAlignment="Center" />
+            </Grid>
             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12" IsVisible="{Binding Reviewing}">
               <TextBlock Classes="mono-small muted" Text="{Binding Summary}" TextTrimming="CharacterEllipsis" />
               <TextBlock Grid.Column="1" Classes="mono-small muted" Text="{Binding SizeText}" />
             </Grid>
-            <c:GsNote Icon="shield" Text="Every file is checked like a restore: only into the game's own folders, scanned by your antivirus, no program files. Nothing replaces your current saves." />
+            <c:GsNote Icon="shield" Text="{Binding Note}" />
             <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
               <c:GsButton Classes="ghost" Content="Cancel" Command="{Binding CloseCommand}" IsEnabled="{Binding !Importing}" />
               <c:GsButton Classes="primary" Icon="download" Content="{Binding AddLabel}" Command="{Binding AddCommand}" IsEnabled="{Binding CanImport}"
-                          IsBusy="{Binding Importing}" BusyText="Adding" />
+                          IsBusy="{Binding Importing}" BusyText="Importing" />
             </StackPanel>
           </StackPanel>
           <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16" IsVisible="{Binding Done}">
@@ -82,6 +101,9 @@
                       <c:GsNote Icon="block" Foreground="{DynamicResource danger}" Text="{Binding Removed}" IsVisible="{Binding HasRemoved}" />
                       <!-- R16 (version 51): a game whose saves stay with the account that made them can't be imported -->
                       <c:GsNote Icon="shield" Foreground="{DynamicResource danger}" Text="{Binding StaysWith}" IsVisible="{Binding HasStaysWith}" />
+                      <!-- Version 57: a game here, installed, takes its save as a named save or uses it now -->
+                      <c:GsPillTabs ItemsSource="{x:Static vm:ImportRow.UseChoices}" SelectedId="{Binding Use, Mode=TwoWay}" IsVisible="{Binding ShowsUse}"
+                                    AutomationProperties.Name="{Binding UseName}" HorizontalAlignment="Left" Margin="0,6,0,0" />
                     </StackPanel>
                     <TextBlock Grid.Column="3" Classes="mono-small muted" Text="{Binding Size}" VerticalAlignment="Center" />
                   </Grid>

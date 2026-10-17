@@ -14,6 +14,7 @@ Started 4 Oct 2026, while the owner tries what Milestone 5 left in Test (Jira's 
 | The installer, per user, with `gamesync://` links, and an uninstall that keeps the backups and the cloud copy | PKG-01, PKG-05, R12 | KAN-36 |
 | The updater | PKG-03 | KAN-37 |
 | The release signature (GameSync's own key, no Windows code signing), and v1.0 on GitHub | R19 | KAN-38 |
+| Achievements kept by GameSync (added 8 Oct 2026): its own record, copies' records found by itself, marks by hand, the same record on every PC | ACH-14 to ACH-17 | under KAN-95, once Jira is signed in |
 
 Decided with the owner on 7 Oct 2026: **no code signing** ("i dont really wanna pay for digital signing. Applyication will likely take a long time too"): no certificate, paid or applied for; each release is signed with GameSync's own release key, which the updater checks (R19, PKG-03), and Windows' SmartScreen warns on the first run. **A per-user install, and the tracer after v1** ("yes, per-user install and tracer after v1"): GameSync installs for the person alone in `%LOCALAPPDATA%\Programs\GameSync` with no admin prompt at install, update or uninstall (an unsigned installer for the whole PC would show an admin prompt from an unknown publisher at every update), and the admin tracer, which needs a folder only an administrator can change (R18), comes after v1 with a per-machine part of its own.
 
@@ -47,6 +48,18 @@ Drawn first (design system version 53: SettingsScreen `#updates` and its states,
 - **Links** (R12, `Host/Links.cs`): `gamesync://play/<game>` and `gamesync://open/<game>`, only for a game in this PC's library.
 
 Checked: 592 tests pass, 6 skipped (`UpdateTests` new: the signature and everything it refuses, a release coming down through GitHub's redirects, one changed on the way, bigger than signed, signed with another key or sent from elsewhere, offline and asked again in six hours, the installer checked again as it starts, the notes, links, and the uninstall taking only this copy's start; `SafetyAuditTests.R19_…` runs now, and finds no private key in the repository). Snapshots `settings-updates`, `-latest`, `-downloading` and `-refused`, as the design draws them. And for real on the owner's account (their yes; scratch data, no window, as they were playing): a 0.5.0 test copy installed silently into a scratch folder (its Apps entry, `gamesync://`, PATH and Start menu entry appearing), running in the tray; `gamesync update --install --background` against a feed on this PC found 0.5.1, downloaded its 39 MB, checked it, installed it and had the copy running again in the tray within 9 s, with no prompt; it then said it had the latest; a 0.5.2 changed after signing was refused ("it isn't the installer its signature describes, so it may have been changed on the way") and nothing kept; and the uninstaller ran `gamesync uninstalling`, removed everything it had added and left the test data, the owner's Run key and tasks as they were. The owner's own Start menu shortcut, which the installer's has the same name as, was kept aside and put back. Not tried for real: Restart to update from the app's own window, Home or the tray menu (they start the same installer the same way, then quit as the tray's Quit does), and a release on GitHub itself.
+
+## Achievements kept by GameSync (ACH-14 to ACH-17, built 8 Oct 2026)
+
+Added to v1 on 8 Oct 2026, after a friend's Dark Souls II showed nothing (the owner: "if the achievement system just parrots what steam records and does, thats not the point. The achievement system needs to work even without steam. It can get information about WHAT achievements are there to begin with, but after that it needs to work without it. Tracking by itself or something"). A game tells only its store, or what plays the store's part in its copy, that an achievement unlocked, and looking inside the game is R13's to forbid; so GameSync keeps its own record of every unlock anything writes down, finds those writings by itself, lets the person mark a copy that writes nothing down, and keeps the record the same on every PC. The owner's three choices: find copies' records by itself; marks "only for games that write nothing down"; the record in the Drive folder. Drawn as design system version 54, then built (design.md → Achievements; the handoff has the files).
+
+| What | Result |
+| --- | --- |
+| The record: every unlock seen kept with its day, where and on which PC; never lost; the same in any order | 9 new tests (`KeptAchievementTests`), Steam's folder removed and the unlock still shown |
+| Copies' records found by what's in them, no list of places | On a copy of the owner's library: 14 records found, the walk 0.7 s; a record written while the copy plays found and its first unlock popped up (test) |
+| Marks by hand, only where nothing writes unlocks down | Tests and the snapshots (Ghost of Tsushima) |
+| The record on every PC, one file per PC in the cloud | Two PCs over a folder cloud in a test; not yet tried live on Drive |
+| Every shape of record, records anywhere in a game's own folder, and the Steam app ID a copy says it is (ACH-18, later on 8 Oct: "Make sure that games have achievements to the best of our ability") | 7 new tests (`RecordFormatTests`); the same 14 records on the owner's PC, as nothing else there has written one yet |
 
 ## The safety audit (R1 to R21, done 7 Oct 2026)
 

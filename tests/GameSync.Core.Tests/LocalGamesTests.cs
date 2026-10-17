@@ -1,3 +1,5 @@
+using System.IO.Compression;
+using System.Text.Json;
 using GameSync.Core.Art;
 using GameSync.Core.Discovery;
 using GameSync.Core.Games;
@@ -63,7 +65,7 @@ public class LocalGamesTests
     }
 
     [Fact]
-    public void LIB_22_KAN_47_the_library_shows_local_games_and_Installed_only_which_is_kept_on_this_PC()
+    public void LIB_31_the_library_opens_on_Installed_with_Saves_only_beside_it_and_keeps_the_view_picked()
     {
         using var world = new TestWorld();
         using var state = new StateStore(Path.Combine(world.Root, "data"));
@@ -72,34 +74,59 @@ public class LocalGamesTests
             Entry("risk-of-rain-2", "Risk of Rain 2", StoreKind.Steam, "632360"),
             Entry("black-myth-wukong", "Black Myth: Wukong", StoreKind.Loose, null),
             Entry("god-of-war", "God of War", null, null) with { Installed = false },
-            Entry("hades", "Hades", StoreKind.Epic, "min") with { Installed = false },
+            Entry("hades", "Hades", StoreKind.Epic, "min") with { Installed = false, State = LibraryState.Synced },
         };
         var games = Launcher.Games(library, [], state, null, new Dictionary<long, SteamPlay>(), null);
-        var kept = new List<bool>();
-        var actions = new LauncherActions(_ => { }, () => { }, (_, _) => { }, (_, _) => { }) { SetInstalledOnly = kept.Add };
+        var kept = new List<string>();
+        var actions = new LauncherActions(_ => { }, () => { }, (_, _) => { }, (_, _) => { }) { SetView = kept.Add };
 
-        var view = LibraryViewModel.From(games, Now, "all", actions, installedOnly: true);
-        Assert.Equal(["all", "local"], view.Tabs.Select(t => t.Id));
+        // A library nobody picked a view in opens on Installed, with Saves only beside it.
+        var view = new LibraryViewModel(actions);
+        view.Update(games, LibraryViewModel.Tiles(games, Now, actions));
+        Assert.Equal(["installed", "saves", "all", "local"], view.Tabs.Select(t => t.Id));
+        Assert.Equal(["Installed", "Saves only", "All games", "Local"], view.Tabs.Select(t => t.Label));
+        Assert.Equal("installed", view.SelectedTab);
         Assert.Equal(["Black Myth: Wukong", "Risk of Rain 2"], view.OtherTiles.Select(t => t.Title).Order());
         Assert.Equal(["Black Myth: Wukong", "Risk of Rain 2"], view.ListItems.OfType<GameListRow>().Select(r => r.Game.Title).Order());
+        Assert.All(view.OtherTiles, t => Assert.False(t.SavesOnly));
+
+        // Saves only: the games not installed here, greyed with their tag, saying whose saves are kept and whose found.
+        view.SelectedTab = "saves";
+        Assert.True(view.IsSavesView);
+        Assert.Equal(["God of War", "Hades"], view.OtherTiles.Select(t => t.Title).Order());
+        Assert.All(view.OtherTiles, t => Assert.True(t.SavesOnly));
+        Assert.Equal("Not installed here · saves found", view.OtherTiles.Single(t => t.Title == "God of War").Meta);
+        Assert.Equal("Not installed here · saves kept", view.OtherTiles.Single(t => t.Title == "Hades").Meta);
         view.SelectedTab = "local";
         Assert.Equal(["Black Myth: Wukong"], view.OtherTiles.Select(t => t.Title));
         Assert.True(view.IsLocalView);
+        Assert.Empty(kept);
 
-        // Installed only is the person's setting, kept on this PC; unticked, every game shows again.
-        view.ShowView("all");
-        view.InstalledOnly = false;
+        // All games, picked, is kept on this PC: the rail and Home's My games open on it from then on. A narrower view
+        // isn't kept, and a view another page opens is a visit.
+        view.SelectedTab = "all";
         Assert.Equal(4, view.OtherTiles.Count);
-        Assert.Equal([false], kept);
-        Assert.True(new LibraryViewModel(actions, installedOnly: true).InstalledOnly);
-        view.ShowView("installed");
+        Assert.Equal(["all"], kept);
+        view.SelectedTab = "saves";
+        view.ReachedFromRail();
         Assert.Equal("all", view.SelectedTab);
+        view.ShowView("installed");
+        Assert.Equal("installed", view.SelectedTab);
+        view.ShowView(LibraryViewModel.KeptView);
+        Assert.Equal("all", view.SelectedTab);
+        view.ShowView("conflicts");
+        Assert.Equal("all", view.SelectedTab);
+        Assert.Equal(["all"], kept);
+        Assert.Equal("all", new LibraryViewModel(actions, view: "all").SelectedTab);
+        Assert.Equal("installed", new LibraryViewModel(actions, view: "saves").SelectedTab);
 
-        // LauncherData keeps it in state.db, off until ticked.
+        // LauncherData keeps it in state.db: Installed until All games is picked.
         var data = Path.Combine(world.Root, "data");
-        Assert.False(LauncherData.ReadInstalledOnly(data));
-        LauncherData.SetInstalledOnly(data, true);
-        Assert.True(LauncherData.ReadInstalledOnly(data));
+        Assert.Equal("installed", LauncherData.ReadView(data));
+        LauncherData.SetView(data, "all");
+        Assert.Equal("all", LauncherData.ReadView(data));
+        LauncherData.SetView(data, "installed");
+        Assert.Equal("installed", LauncherData.ReadView(data));
     }
 
     [Fact]
@@ -237,6 +264,88 @@ public class LocalGamesTests
 
         // The agent watches it now, though its saves don't sync.
         Assert.Contains(engine.Watched(), w => w.Id == id && !w.Syncs);
+    }
+
+    [Fact]
+    public async Task LIB_24_Locate_and_Change_check_the_program_is_the_games_and_its_pages_say_so()
+    {
+        // Design system version 57 (a friend pointed Dark Souls III at Dark Souls: Remastered's program, and Locate the
+        // game's message showed once and never again).
+        using var world = new TestWorld();
+        var data = Path.Combine(world.Root, "data");
+        new AppConfig { Remote = world.Cloud, Games = [] }.Save(data);
+        WriteSaveList(data, new SaveList(
+        [
+            new SaveListGame { Title = "Dark Souls III", SteamIds = [374320] },
+            new SaveListGame { Title = "Dark Souls: Remastered", SteamIds = [570940] },
+        ], "test", DateTime.UtcNow));
+        var ds3 = GameId.Parse("dark-souls-iii");
+        var dsr = GameId.Parse("dark-souls-remastered");
+        var remastered = Path.Combine(world.Root, "Games", "DARK SOULS REMASTERED");
+        var three = Path.Combine(world.Root, "Games", "Dark Souls 3", "Game");
+        Write(Path.Combine(remastered, "DarkSoulsRemastered.exe"), "MZ");
+        Write(Path.Combine(remastered, "steam_appid.txt"), "570940");
+        Write(Path.Combine(three, "DarkSoulsIII.exe"), "MZ");
+        Write(Path.Combine(world.Root, "Games", "Tools", "helper.exe"), "MZ");
+        using (var library = new LibraryStore(data))
+        {
+            library.SaveAll(
+            [
+                Entry("dark-souls-iii", "Dark Souls III", null, null) with { Installed = false, SaveListTitle = "Dark Souls III" },
+                Entry("dark-souls-remastered", "Dark Souls: Remastered", null, null) with { Installed = false, SaveListTitle = "Dark Souls: Remastered" },
+            ]);
+        }
+
+        // Another game's program is taken, as the person picked it, and said so in warn, naming both, on its pages too.
+        var said = await LocalGames.LocateAsync(data, ds3, Path.Combine(remastered, "DarkSoulsRemastered.exe"), new Quiet(), Ct);
+        Assert.EndsWith("This is Dark Souls: Remastered's program (DarkSoulsRemastered.exe), not Dark Souls III's: its Steam app ID says so. " +
+                        "Change… and pick Dark Souls III's own program, in its own folder.", said);
+        var page = (await GameDetails.ReadAsync(data, ds3, Ct))!;
+        Assert.Equal((ProgramFit.OtherGame, false, remastered), (page.About.Check!.Fit, page.About.Check.Refused, page.About.Check.Folder));
+
+        // A folder another game has is refused, naming it, and nothing changes.
+        var taken = await Assert.ThrowsAsync<UsageException>(() => LocalGames.LocateAsync(data, dsr, Path.Combine(remastered, "DarkSoulsRemastered.exe"), new Quiet(), Ct));
+        Assert.StartsWith("Dark Souls III already has this folder", taken.Message, StringComparison.Ordinal);
+        var refused = await ProgramChecks.CheckPickAsync(data, dsr, Path.Combine(remastered, "DarkSoulsRemastered.exe"), Ct);
+        Assert.True(refused.Refused);
+
+        // Installed files' Change…: checked first, its folder moved only by Save changes; this one fits, with a check.
+        var pick = await ProgramChecks.CheckPickAsync(data, ds3, Path.Combine(three, "DarkSoulsIII.exe"), Ct);
+        Assert.Equal((ProgramFit.Fits, false, "This is Dark Souls III's program: its own record says so."), (pick.Fit, pick.Refused, pick.Sentence));
+        Assert.Equal(remastered, (await GameDetails.ReadAsync(data, ds3, Ct))!.InstallDir);
+        await GameSettings.ApplyAsync(data, ds3, new GamePropertiesChange { Locate = Path.Combine(three, "DarkSoulsIII.exe") }, () => { }, Ct);
+        page = (await GameDetails.ReadAsync(data, ds3, Ct))!;
+        Assert.Equal((three, ProgramFit.Fits), (page.InstallDir, page.About.Check!.Fit));
+
+        // Its old folder is free again, and a program nothing names is the person's call, said plainly.
+        Assert.Contains("Play starts DarkSoulsRemastered.exe", await LocalGames.LocateAsync(data, dsr, Path.Combine(remastered, "DarkSoulsRemastered.exe"), new Quiet(), Ct),
+            StringComparison.Ordinal);
+        var unclear = await ProgramChecks.CheckPickAsync(data, ds3, Path.Combine(world.Root, "Games", "Tools", "helper.exe"), Ct);
+        Assert.Equal((ProgramFit.Unclear, "Nothing in helper.exe or its folder names a game, so GameSync goes by your pick."), (unclear.Fit, unclear.Sentence));
+
+        // The Properties dialog: Change… on Installed files, the answer under it, one change waiting for Save changes.
+        var dialog = new PropertiesViewModel(ds3, "Dark Souls III", new LauncherActions(_ => { }, () => { }, (_, _) => { }, (_, _) => { })
+        {
+            CheckProgram = (game, program, ct) => ProgramChecks.CheckPickAsync(data, game, program, ct),
+        });
+        dialog.Show((await GameSettings.ReadAsync(data, ds3, null, Ct))!);
+        Assert.True(dialog.CanChangeFolder);
+        Assert.True(dialog.FolderCheckIsOk);
+        await dialog.ChangeFolderAsync(Path.Combine(remastered, "DarkSoulsRemastered.exe"));
+        Assert.True(dialog.FolderCheckIsWarn);
+        Assert.EndsWith("Nothing was changed.", dialog.FolderCheckText, StringComparison.Ordinal);
+        Assert.Equal(0, dialog.Changes);
+        await dialog.ChangeFolderAsync(Path.Combine(world.Root, "Games", "Tools", "helper.exe"));
+        Assert.True(dialog.FolderCheckIsPlain);
+        Assert.Equal((1, Path.Combine(world.Root, "Games", "Tools", "helper.exe")), (dialog.Changes, dialog.Change().Locate));
+    }
+
+    private static void WriteSaveList(string data, SaveList list)
+    {
+        Directory.CreateDirectory(data);
+        using var file = File.Create(Path.Combine(data, "savelist.json.gz"));
+        using var gzip = new GZipStream(file, CompressionLevel.Optimal);
+        JsonSerializer.Serialize(gzip, list, Json.Options);
     }
 
     [Fact]

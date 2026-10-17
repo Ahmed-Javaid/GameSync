@@ -1,0 +1,123 @@
+<!-- @dsCard group="Screens" height=800 width=1280 page=true subtitle="The Guide (the rail's ?) and the tour after first run; #tour, then Next" -->
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>preview</title>
+<style>html,body{margin:0;background:var(--bg-100);}
+.gd-text{font-size:14px;line-height:21px;color:var(--ink);margin:0;max-width:720px}
+.gd-text + .gd-text{margin-top:10px}
+.gd-status{display:grid;grid-template-columns:200px minmax(0,1fr);gap:16px;align-items:start;padding:10px 0;border-top:1px solid var(--line-100)}
+.gd-status:first-child{border-top:0}
+.gd-tree{display:grid;grid-template-columns:max-content minmax(0,1fr);column-gap:24px;font:400 12px/22px var(--font-sans);color:var(--ink-muted);background:var(--surface-well);border:1px solid var(--edge-well);border-radius:var(--radius-md);padding:12px 16px;margin:12px 0}
+.gd-path{font-family:var(--font-mono);white-space:pre;color:var(--ink-muted)} .gd-path.is-top{color:var(--ink);font-weight:500}
+.gd-hole{position:absolute;border-radius:14px;box-shadow:0 0 0 9999px rgba(4,8,12,.62);outline:2px solid var(--primary);outline-offset:2px;pointer-events:none;transition:all .25s ease}
+.gd-bubble{position:absolute;width:340px;background:var(--surface-dialog);border:1px solid var(--edge-dialog);border-radius:var(--radius-lg);box-shadow:var(--shadow-dialog);padding:18px 20px 16px;display:flex;flex-direction:column;gap:10px;z-index:3}
+</style>
+</head>
+<body class="gs-root">
+<div id="root"></div>
+<script>
+var G = window.GameSync, h = React.createElement;
+var ART = "data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%201200%20500%27%20preserveAspectRatio%3D%27xMidYMid%20slice%27%3E%3Crect%20width%3D%271200%27%20height%3D%27500%27%20fill%3D%27%231b2a33%27/%3E%3Ccircle%20cx%3D%27860%27%20cy%3D%27150%27%20r%3D%2770%27%20fill%3D%27%237fe6f2%27%20opacity%3D%27.35%27/%3E%3Cpath%20d%3D%27M0%20330%20L180%20200%20L330%20300%20L520%20150%20L700%20290%20L880%20190%20L1200%20320%20V500%20H0Z%27%20fill%3D%27%23223640%27/%3E%3Cpath%20d%3D%27M0%20400%20L220%20290%20L420%20380%20L640%20270%20L860%20370%20L1040%20300%20L1200%20360%20V500%20H0Z%27%20fill%3D%27%23182730%27/%3E%3Cpath%20d%3D%27M0%20460%20L300%20390%20L600%20450%20L900%20380%20L1200%20440%20V500%20H0Z%27%20fill%3D%27%2310191f%27/%3E%3C/svg%3E";
+
+// The rail with the Guide at its foot, above Settings (version 56).
+function rail(cur){return h(G.SideRail,{current:cur,items:[
+  {id:'search',icon:'search',label:'Search'},
+  {id:'home',icon:'home',label:'Home',sep:true},
+  {id:'library',icon:'library',label:'Game library'},
+  {id:'achievements',icon:'trophy',label:'Achievements'},
+  {id:'saves',icon:'saves',label:'Save manager',sep:true},
+  {id:'log',icon:'terminal',label:'Console'},
+  {id:'guide',icon:'help',label:'Guide',bottom:true},
+  {id:'settings',icon:'settings',label:'Settings',bottom:true}]});}
+// Home's top bar with its buttons named in words (the friend: "Buttons on the top right are not obvious as to what they do").
+function topRight(cloud){return h('div',{'data-tour':'top',className:'gs-row',style:{flexWrap:'nowrap',gap:8}},
+  h(G.Button,{size:'sm',variant:'secondary',icon:'sync',title:'Back up and sync every game now'},'Sync now'),
+  cloud?h(G.Button,{size:'sm',variant:'secondary',icon:'cloud',title:'Your saves go to Google Drive (alex@gmail.com). Reachable.'},'Google Drive')
+   :h(G.Button,{size:'sm',variant:'secondary',icon:'cloud',title:'Kept on this PC only. Connect Google Drive or a folder to sync your saves.'},'Not synced \u00b7 Connect'),
+  h(G.Button,{size:'sm',variant:'secondary',icon:'monitor',title:'This PC, DESKTOP, and your other PCs'},'DESKTOP'));}
+
+var TOPICS=[{id:'keeps',label:'What GameSync keeps',icon:'saves'},{id:'statuses',label:'What each status means',icon:'info'},{id:'folder',label:'Your backup folder',icon:'folder'},
+  {id:'second',label:'Another PC',icon:'monitor'},{id:'back',label:'Going back to a save',icon:'reset'},{id:'share',label:'Sharing with a friend',icon:'share'},
+  {id:'tour',label:'Take the tour again',icon:'play'}];
+var STATUSES=[
+  ['synced','Synced','The newest save is on this PC and where your saves are kept. Nothing to do.'],
+  ['not-synced',null,'Backed up on this PC only, as no cloud is connected. Connect Google Drive or a folder from Home, and it syncs.'],
+  ['upload-pending',null,'Backed up here, and on its way to your cloud. Shown only while it goes, or until you\u2019re back online.'],
+  ['newer-in-cloud','Newer on another PC','You played it on another PC since. GameSync brings that save down before you play here.'],
+  ['held','Held for review','Its saves changed while the game wasn\u2019t running. GameSync keeps them aside until you look.'],
+  ['conflict','Conflict','Two PCs played it without syncing between. The newest save is in place and the other is kept; Swap if that\u2019s wrong.'],
+  ['backup-only','Synced by Steam','Steam syncs it between your PCs. GameSync keeps a copy of every version too.'],
+  ['not-syncing',null,'GameSync found its saves but isn\u2019t keeping them. Back them up from its page.'],
+  ['playing','Playing','Running now. It\u2019s backed up when you stop.']];
+function Topic(p){
+ var c={
+  keeps:[h(G.Card,{key:1,title:'Saves, not games'},
+    h('p',{className:'gd-text'},'A game\u2019s saves are the small files it writes when you save: your character, your items, how far you\u2019ve got. GameSync finds them for every game on this PC and keeps a copy each time you stop playing. It never copies, moves or changes the game itself; install a game on each PC from its store, and GameSync brings the saves.'),
+    h('p',{className:'gd-text'},'It knows where each game keeps its saves from PCGamingWiki\u2019s list. For a game not on it, it looks in the usual places; and if it still can\u2019t find them, it watches where the game writes the next time you play (learn mode), and asks you.')),
+   h(G.Card,{key:2,title:'Settings stay on each PC'},h('p',{className:'gd-text'},'A game\u2019s settings, like its resolution and key bindings, often differ between a desktop and a laptop. GameSync backs them up on each PC, but doesn\u2019t sync them, unless you turn that on in the game\u2019s Properties.'))],
+  statuses:[h(G.Card,{key:1,title:'What each status means',subtitle:'Every game shows one, on its cover, its page and in the save manager.'},
+    STATUSES.map(function(s,i){return h('div',{key:i,className:'gd-status'},h('div',null,h(G.StatusBadge,{status:s[0],label:s[1]})),h('div',{style:{fontSize:13,lineHeight:'19px'}},s[2]));}))],
+  folder:[h(G.Card,{key:1,title:'Your backup folder',subtitle:'C:\\Users\\Alex\\AppData\\Local\\GameSync\\history. Move it in Settings, Storage and folders.'},
+    h('p',{className:'gd-text'},'Each game has a folder of its own. A game with settings on this PC has a second one, ending in --pc- and this PC\u2019s mark: its settings, kept here and never synced.'),
+    h('div',{className:'gd-tree'},h('span',{key:0,className:'gd-path is-top'},'games\\dark-souls-iii\\'),h('span',{key:'w0'},'its saves'),h('span',{key:1,className:'gd-path'},'  versions\\2026-10-07T21-44Z_DESKTOP.json'),h('span',{key:'w1'},'one per version: when, on which PC, which files'),h('span',{key:2,className:'gd-path'},'  blobs\\ab\\ab12….gz'),h('span',{key:'w2'},'each file once, however many versions share it'),h('span',{key:3,className:'gd-path'},'  pins\\'),h('span',{key:'w3'},'named saves, and versions kept for good'),h('span',{key:6,className:'gd-path'},'  outbox\\'),h('span',{key:'w6'},'versions waiting to go to your cloud'),h('span',{key:4,className:'gd-path is-top'},'games\\dark-souls-iii--pc-cb75de22\\'),h('span',{key:'w4'},'its settings on this PC (graphics, keys), never synced'),h('span',{key:5,className:'gd-path is-top'},'devices\\'),h('span',{key:'w5'},'each PC that syncs, by name')),
+    h('p',{className:'gd-text'},'In your cloud, Google Drive or a folder, each game also has a latest folder: a plain copy of its newest save, which you can copy back by hand. HOW-TO-RESTORE.txt there says how.'))],
+  second:[h(G.Card,{key:1,title:'Another PC'},h('p',{className:'gd-text'},'Install GameSync there and choose the same place for your saves: sign in with the same Google account, or pick the same folder. It finds the saves your other PCs keep, and offers each game\u2019s back when you install it there.'))],
+  back:[h(G.Card,{key:1,title:'Going back to a save'},h('p',{className:'gd-text'},'Open a game\u2019s saves (its page, Saves, or the save manager). Every version is there, newest first, from every PC. Restore puts one back; GameSync keeps the save you had first, so nothing is lost. Before a boss, New named save\u2026 keeps the save under a name you choose.'))],
+  share:[h(G.Card,{key:1,title:'Sharing with a friend'},h('p',{className:'gd-text'},'In the save manager, tick games and Share selected: GameSync makes a zip. Your friend opens it with Import saves, or drops it on their GameSync, and each save comes in kept aside, to use now or later (see Import saves). Games with an anti-cheat can\u2019t be shared.'))],
+  tour:[h(G.Card,{key:1,title:'Take the tour again',subtitle:'A minute, over Home: where your games, your saves and these buttons are.'},h('div',null,h(G.Button,{variant:'primary',icon:'play'},'Start the tour')))]
+ }[p.id];
+ return h('div',{style:{display:'flex',flexDirection:'column',gap:16,minWidth:0}},c);
+}
+
+// The tour, over Home: a hole round each thing it points at, and a box saying what it is (the friend: "Add a tutorial and a guide").
+var STOPS=[
+ {sel:null,title:'You\u2019re set up',text:'Your first backup is running. Want a one-minute look round? You can take it again from the Guide.'},
+ {sel:'button[aria-label="Game library"]',title:'Your games',text:'Every game GameSync knows: the ones installed here, ready to play, and the ones whose saves it keeps.'},
+ {sel:'button[aria-label="Save manager"]',title:'Your saves',text:'Every game\u2019s saves: what\u2019s backed up, each version from each PC, and conflicts. Restore an earlier save from here.'},
+ {sel:'[data-tour="top"]',title:'These buttons',text:'Sync now backs up and syncs every game at once. The cloud button says where your saves go and whether it\u2019s reachable. The last is this PC; your other PCs are listed there too.'},
+ {sel:'[data-tour="status"]',title:'How a game\u2019s saves are',text:'Each game says it in a word: Synced, Not synced, Held for review. Point at it for what it means, or see the Guide.'},
+ {sel:'button[aria-label="Guide"]',title:'The Guide',text:'How GameSync works, what each status means and where your backups are. It\u2019s always here.'}];
+var HASH=location.hash.slice(1), TOUR=/^tour/.test(HASH), FIRST=+(HASH.split('-')[1]||0);
+var TOPIC=(/^guide-(.+)$/.exec(HASH)||[])[1]||'keeps';
+function App(){
+ var stop=React.useState(FIRST), s=stop[0], frame=React.useRef(null), box=React.useState(null), topic=React.useState(TOPIC);
+ React.useLayoutEffect(function(){
+  if(!TOUR){return;} var st=STOPS[s]; if(!st.sel||!frame.current){box[1](null);return;}
+  var el=frame.current.querySelector(st.sel); if(!el){box[1](null);return;}
+  var f=frame.current.getBoundingClientRect(), r=el.getBoundingClientRect();
+  box[1]({x:r.left-f.left,y:r.top-f.top,w:r.width,h:r.height});
+ },[s]);
+ if(!TOUR) return h(G.ThemeScope,{strength:'glass',art:ART,style:{width:1280,height:800,display:'flex'}},
+  rail('guide'),
+  h('main',{style:{flex:1,minWidth:0,padding:'20px 24px',display:'flex',flexDirection:'column',gap:16}},
+   h('header',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',gap:16}},
+    h('div',null,h('div',{style:{font:'600 15px/20px var(--font-sans)'}},'Guide'),h('div',{className:'gs-faint',style:{fontSize:12}},'How GameSync works, in a few minutes')),
+    topRight(true)),
+   h('div',{style:{display:'grid',gridTemplateColumns:'260px minmax(0,1fr)',gap:24,minHeight:0,flex:1}},
+    h(G.Card,{style:{padding:'12px 8px',alignSelf:'start'}},h(G.SettingsNav,{label:'Guide topics',current:topic[0],onChange:topic[1],items:TOPICS})),
+    h('div',{style:{overflow:'auto',minHeight:0}},h(Topic,{id:topic[0]})))));
+ var st=STOPS[s], b=box[0];
+ var pos=!b?{left:(1280-340)/2,top:280}:b.x<120?{left:b.x+b.w+20,top:Math.max(16,Math.min(800-230,b.y-20))}:b.y<120?{left:Math.min(1280-356,b.x+b.w-340),top:b.y+b.h+18}:{left:b.x+40,top:Math.min(800-240,b.y+b.h-200)};
+ return h(G.ThemeScope,{strength:'glass',art:ART,style:{width:1280,height:800,display:'flex',position:'relative',overflow:'hidden'}},
+  h('div',{ref:frame,style:{position:'absolute',inset:0,display:'flex'}},
+   rail('home'),
+   h('main',{style:{flex:1,minWidth:0,padding:'20px 24px',display:'flex',flexDirection:'column',gap:16}},
+    h('header',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',gap:16}},
+     h('div',null,h('div',{style:{font:'600 15px/20px var(--font-sans)'}},'Welcome back'),h('div',{className:'gs-faint',style:{fontSize:12}},'Here\u2019s where you left off')),
+     topRight(true)),
+    h('div',{'data-tour':'status'},h(G.HeroBanner,{art:ART,eyebrow:'Last played today, 20:12',chip:'31 hrs played',title:'Dark Souls III',status:'synced',statusLabel:'Synced',blurb:'Its saves are backed up on this PC and in your Google Drive.',style:{minHeight:320}})),
+    h('div',{style:{display:'grid',gridTemplateColumns:'1fr 1.5fr 1fr',gap:16,flex:1,minHeight:0}},h(G.Card,{title:'Achievements'}),h(G.Card,{title:'Jump back in'}),h(G.Card,{title:'Activity'})))),
+  b?h('div',{className:'gd-hole',style:{left:b.x-4,top:b.y-4,width:b.w+8,height:b.h+8}}):h('div',{style:{position:'absolute',inset:0,background:'rgba(4,8,12,.62)'}}),
+  h('div',{className:'gd-bubble',role:'dialog','aria-labelledby':'gd-tour-title',style:pos},
+   h('div',{className:'gs-row',style:{justifyContent:'space-between',flexWrap:'nowrap'}},h('h2',{id:'gd-tour-title',className:'gs-dialog-title',style:{fontSize:16}},st.title),s?h('span',{className:'gs-faint',style:{fontSize:12}},s+' of '+(STOPS.length-1)):null),
+   h('p',{className:'gs-muted',style:{margin:0,fontSize:13,lineHeight:'19px'}},st.text),
+   h('div',{className:'gs-row',style:{justifyContent:'space-between',flexWrap:'nowrap',marginTop:4}},
+    h(G.Button,{size:'sm',variant:'ghost',onClick:function(){}},s?'End the tour':'Not now'),
+    h('div',{className:'gs-row',style:{gap:8,flexWrap:'nowrap'}},
+     s>1?h(G.Button,{size:'sm',variant:'ghost',onClick:function(){stop[1](s-1);}},'Back'):null,
+     h(G.Button,{size:'sm',variant:'primary',onClick:function(){stop[1](s+1<STOPS.length?s+1:0);}},s===0?'Show me around':s===STOPS.length-1?'Done':'Next')))));
+}
+ReactDOM.createRoot(document.getElementById('root')).render(h(App));
+</script>
+</body>
+</html>

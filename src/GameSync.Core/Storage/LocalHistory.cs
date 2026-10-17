@@ -34,6 +34,42 @@ public sealed class LocalHistory
 
     public string Folder { get; }
 
+    /// <summary>The README GameSync keeps at the top of the backup folder (KAN-171).</summary>
+    public const string ReadmeName = "README.txt";
+
+    /// <summary>
+    /// KAN-171 (a friend, 8 Oct 2026: "How exactly are the games saved. Why does each game have 2 saves in the backup
+    /// folder?"): a README at the top of the backup folder saying what each folder is, written when it's missing or older
+    /// than this GameSync's; nothing else in the folder is touched. A folder that can't be written is left as it is.
+    /// </summary>
+    public void WriteReadme()
+    {
+        try
+        {
+            using var stream = typeof(LocalHistory).Assembly.GetManifestResourceStream("GameSync.BackupFolderReadme.txt");
+            if (stream is null)
+            {
+                return;
+            }
+
+            using var reader = new StreamReader(stream);
+            // Windows' own line endings, so Notepad shows it as it reads here.
+            var text = reader.ReadToEnd().ReplaceLineEndings("\r\n");
+            var path = Path.Combine(Folder, ReadmeName);
+            if (File.Exists(path) && File.ReadAllText(path) == text)
+            {
+                return;
+            }
+
+            Directory.CreateDirectory(Folder);
+            File.WriteAllText(path, text);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            // The backups matter, not their README.
+        }
+    }
+
     public FolderBlobStore Blobs { get; }
 
     public FolderVersionLog Log { get; }

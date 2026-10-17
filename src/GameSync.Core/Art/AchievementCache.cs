@@ -142,7 +142,7 @@ public sealed partial class AchievementCache : IDisposable
     }
 
     /// <summary>Asks Steam how many players have each achievement, when what's kept is a week old or <paramref name="again"/> says so.</summary>
-    /// <param name="again">Asked now whatever its age: the Achievements page's Refresh rarity.</param>
+    /// <param name="again">Asked now whatever its age: Settings, Achievements, Rarity's Refresh now (design system version 55).</param>
     /// <returns>Whether new percentages were kept.</returns>
     public async Task<bool> FetchRarityAsync(long appId, CancellationToken ct, bool again = false)
     {
@@ -191,6 +191,66 @@ public sealed partial class AchievementCache : IDisposable
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
             return null;
+        }
+    }
+
+    /// <summary>
+    /// Design system version 54: a game's list as Steam's own files on this PC hold it, kept in the shape of Steam's public
+    /// list when none is kept yet, so its achievements keep their names should Steam go from this PC. The public list,
+    /// when asked for, replaces it with rarity too.
+    /// </summary>
+    public void KeepList(long appId, IEnumerable<Discovery.SteamAchievement> all)
+    {
+        if (File.Exists(ListPath(appId)))
+        {
+            return;
+        }
+
+        try
+        {
+            Directory.CreateDirectory(Path.Combine(Folder, appId.ToString(CultureInfo.InvariantCulture)));
+            using var stream = new MemoryStream();
+            using (var json = new Utf8JsonWriter(stream))
+            {
+                json.WriteStartObject();
+                json.WriteStartObject("response");
+                json.WriteStartArray("achievements");
+                foreach (var a in all)
+                {
+                    json.WriteStartObject();
+                    json.WriteString("internal_name", a.Id);
+                    json.WriteString("localized_name", a.Name);
+                    if (a.Description is { } description)
+                    {
+                        json.WriteString("localized_desc", description);
+                    }
+
+                    if (a.Icon is { } icon)
+                    {
+                        json.WriteString("icon", icon);
+                    }
+
+                    if (a.IconLocked is { } gray)
+                    {
+                        json.WriteString("icon_gray", gray);
+                    }
+
+                    json.WriteBoolean("hidden", a.Hidden);
+                    json.WriteEndObject();
+                }
+
+                json.WriteEndArray();
+                json.WriteEndObject();
+                json.WriteEndObject();
+            }
+
+            var temp = ListPath(appId) + ".tmp";
+            File.WriteAllBytes(temp, stream.ToArray());
+            File.Move(temp, ListPath(appId), overwrite: true);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            // Kept at the next look.
         }
     }
 

@@ -81,6 +81,26 @@
     <Style Selector="^.ghost.sm">
       <Setter Property="Padding" Value="12,0" />
     </Style>
+    <!-- Two dropdowns side by side in the library's narrow list (the view and the order) -->
+    <Style Selector="^.ghost.sm.tight">
+      <Setter Property="Padding" Value="8,0" />
+    </Style>
+    <!-- Words that shorten with … when there's no room (the library's dropdowns, at a large Windows text size): a grid, as
+         the usual row of icon, words and icon measures its words at any width and can't shorten them -->
+    <Style Selector="^.trims">
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Border Name="PART_Border" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}"
+                  BackgroundSizing="OuterBorderEdge" CornerRadius="{TemplateBinding CornerRadius}" Padding="{TemplateBinding Padding}">
+            <Grid ColumnDefinitions="Auto,*,Auto" VerticalAlignment="Center">
+              <c:GsIcon Icon="{TemplateBinding Icon}" Size="{TemplateBinding IconSize}" VerticalAlignment="Center" Margin="0,0,8,0" IsVisible="{TemplateBinding ShowsIcon}" />
+              <ContentPresenter Grid.Column="1" Content="{TemplateBinding Content}" VerticalAlignment="Center" />
+              <c:GsIcon Grid.Column="2" Icon="{TemplateBinding IconAfter}" Size="16" VerticalAlignment="Center" Margin="8,0,0,0" IsVisible="{TemplateBinding ShowsIconAfter}" />
+            </Grid>
+          </Border>
+        </ControlTemplate>
+      </Setter>
+    </Style>
     <Style Selector="^:disabled">
       <Setter Property="Opacity" Value="0.45" />
     </Style>
@@ -337,7 +357,8 @@
     <Setter Property="FocusAdorner" Value="{StaticResource SmallFocus}" />
     <Setter Property="Template">
       <ControlTemplate>
-        <StackPanel Orientation="Horizontal" Spacing="8" Background="{TemplateBinding Background}">
+        <!-- A grid, so a label made to wrap (a TextBlock with TextWrapping) can, within the box's width; plain words never do -->
+        <Grid ColumnDefinitions="Auto,*" Background="{TemplateBinding Background}">
           <Border Name="PART_Box" Width="18" Height="18" CornerRadius="{DynamicResource radius-sm}" BorderThickness="1.5"
                   BorderBrush="{DynamicResource line-200}" Background="Transparent" VerticalAlignment="Center">
             <Panel>
@@ -346,9 +367,9 @@
               <Rectangle Name="PART_Dash" Width="9" Height="2" Fill="{DynamicResource on-primary}" IsVisible="False" />
             </Panel>
           </Border>
-          <ContentPresenter Content="{TemplateBinding Content}" VerticalAlignment="Center"
+          <ContentPresenter Grid.Column="1" Margin="8,0,0,0" Content="{TemplateBinding Content}" VerticalAlignment="Center"
                             IsVisible="{Binding $parent[CheckBox].Content, Converter={x:Static ObjectConverters.IsNotNull}}" />
-        </StackPanel>
+        </Grid>
       </ControlTemplate>
     </Setter>
     <Style Selector="^:checked /template/ Border#PART_Box">

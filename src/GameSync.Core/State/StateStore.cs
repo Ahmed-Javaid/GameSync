@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.Json;
+using GameSync.Core.Discovery;
 using GameSync.Core.Model;
 using Microsoft.Data.Sqlite;
 
@@ -77,7 +78,10 @@ public static class EventTags
     public static IReadOnlySet<string> Moves { get; } = new HashSet<string>(StringComparer.Ordinal) { Upload, Download, Backup, Restore, Named, Share };
 }
 
-/// <summary>This PC's own state, in <c>state.db</c>: never synced, and safe to rebuild from the cloud.</summary>
+/// <summary>
+/// This PC's own state, in <c>state.db</c>: never synced as it is, and safe to rebuild from the cloud. GameSync's record of
+/// achievements is kept here too; with the cloud's copy on, every PC's own file in the cloud holds it as well.
+/// </summary>
 public sealed class StateStore : IDisposable
 {
     private readonly SqliteConnection _db;
@@ -100,6 +104,9 @@ public sealed class StateStore : IDisposable
                 attempts INTEGER NOT NULL DEFAULT 0, last_error TEXT NULL, created_utc TEXT NOT NULL, updated_utc TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS events (id INTEGER PRIMARY KEY, at_utc TEXT NOT NULL, game TEXT NOT NULL, level TEXT NOT NULL, message TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS hash_cache (path TEXT PRIMARY KEY, size INTEGER NOT NULL, mtime INTEGER NOT NULL, hash TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS achievements (
+                app INTEGER NOT NULL, id TEXT NOT NULL COLLATE NOCASE, unlocked_utc TEXT NULL, seen TEXT NOT NULL, device TEXT NOT NULL,
+                seen_utc TEXT NOT NULL, changed_utc TEXT NOT NULL, removed INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (app, id));
             """);
         AddColumn("events", "tag", "TEXT NULL");
     }
@@ -278,6 +285,81 @@ public sealed class StateStore : IDisposable
     public void CacheHash(string fullPath, long size, long mtimeTicks, BlobId hash) =>
         Execute("INSERT INTO hash_cache (path, size, mtime, hash) VALUES ($p, $s, $m, $h) ON CONFLICT(path) DO UPDATE SET size = $s, mtime = $m, hash = $h",
             ("$p", fullPath.ToUpperInvariant()), ("$s", size), ("$m", mtimeTicks), ("$h", hash.Value));
+
+    // ---- achievements kept by GameSync (design system version 54) ----
+
+    /// <summary>The setting that says when GameSync's record of achievements last changed on this PC, for the cloud's copy.</summary>
+    public const string UnlocksChangedKey = "achievements.changed";
+
+    /// <summary>GameSync's own record of achievements: every entry, or one game's; marks taken off are in it too.</summary>
+    public IReadOnlyList<KeptUnlock> GetUnlocks(long? app = null)
+    {
+        using var cmd = app is { } one
+            ? Command("SELECT app, id, unlocked_utc, seen, device, seen_utc, changed_utc, removed FROM achievements WHERE app = $a", ("$a", one))
+            : Command("SELECT app, id, unlocked_utc, seen, device, seen_utc, changed_utc, removed FROM achievements");
+        using var reader = cmd.ExecuteReader();
+        var unlocks = new List<KeptUnlock>();
+        while (reader.Read())
+        {
+            if (KeptAchievements.Seen(reader.GetString(3)) is { } seen)
+            {
+                unlocks.Add(new KeptUnlock(reader.GetInt64(0), reader.GetString(1), reader.IsDBNull(2) ? null : ParseTime(reader.GetString(2)), seen,
+                    reader.GetString(4), ParseTime(reader.GetString(5)), ParseTime(reader.GetString(6)), reader.GetInt64(7) != 0));
+            }
+        }
+
+        return unlocks;
+    }
+
+    /// <summary>
+    /// Adds what's been seen or marked to the record: each entry is kept where it's better than what the record holds
+    /// (<see cref="KeptAchievements.Compare"/>), so nothing seen is ever lost and the same entries give the same record in
+    /// any order. Returns how many changed; any change notes the time, for the cloud's copy.
+    /// </summary>
+    public int KeepUnlocks(IEnumerable<KeptUnlock> unlocks)
+    {
+        var changed = 0;
+        using var transaction = _db.BeginTransaction();
+        foreach (var e in KeptAchievements.Merge(unlocks))
+        {
+            if (Unlock(e.AppId, e.Id, transaction) is { } old && KeptAchievements.Compare(e, old) <= 0)
+            {
+                continue;
+            }
+
+            using var cmd = Command("""
+                INSERT INTO achievements (app, id, unlocked_utc, seen, device, seen_utc, changed_utc, removed) VALUES ($a, $i, $u, $s, $d, $su, $c, $r)
+                ON CONFLICT(app, id) DO UPDATE SET id = $i, unlocked_utc = $u, seen = $s, device = $d, seen_utc = $su, changed_utc = $c, removed = $r
+                """, ("$a", e.AppId), ("$i", e.Id), ("$u", e.UnlockedUtc is { } at ? Format(at) : null), ("$s", KeptAchievements.Word(e.Seen)),
+                ("$d", e.Device), ("$su", Format(e.SeenUtc)), ("$c", Format(e.ChangedUtc)), ("$r", e.Removed ? 1 : 0));
+            cmd.Transaction = transaction;
+            cmd.ExecuteNonQuery();
+            changed++;
+        }
+
+        if (changed > 0)
+        {
+            using var note = Command("INSERT INTO settings (key, value) VALUES ($k, $v) ON CONFLICT(key) DO UPDATE SET value = $v",
+                ("$k", UnlocksChangedKey), ("$v", Now()));
+            note.Transaction = transaction;
+            note.ExecuteNonQuery();
+        }
+
+        transaction.Commit();
+        return changed;
+    }
+
+    private KeptUnlock? Unlock(long app, string id, SqliteTransaction transaction)
+    {
+        using var cmd = Command("SELECT app, id, unlocked_utc, seen, device, seen_utc, changed_utc, removed FROM achievements WHERE app = $a AND id = $i",
+            ("$a", app), ("$i", id));
+        cmd.Transaction = transaction;
+        using var reader = cmd.ExecuteReader();
+        return reader.Read() && KeptAchievements.Seen(reader.GetString(3)) is { } seen
+            ? new KeptUnlock(reader.GetInt64(0), reader.GetString(1), reader.IsDBNull(2) ? null : ParseTime(reader.GetString(2)), seen,
+                reader.GetString(4), ParseTime(reader.GetString(5)), ParseTime(reader.GetString(6)), reader.GetInt64(7) != 0)
+            : null;
+    }
 
     // ---- plumbing ----
 

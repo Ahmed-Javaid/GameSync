@@ -29,7 +29,9 @@ public sealed record UpdateRefusal(Version Version, string Reason, DateTime AtUt
 public readonly record struct UpdateProgress(Version Version, long Done, long Total);
 
 /// <summary>Settings → Updates: everything it says, read from this PC alone.</summary>
-public sealed record UpdatesView(Version Current, bool Installed, bool Daily, DateTime? CheckedUtc, ReadyUpdate? Ready, UpdateRefusal? Refused, UpdateProblem? Problem);
+/// <param name="AtSignIn">A ready update installs by itself when GameSync starts with Windows (9 Oct 2026, the owner).</param>
+public sealed record UpdatesView(Version Current, bool Installed, bool Daily, DateTime? CheckedUtc, ReadyUpdate? Ready, UpdateRefusal? Refused, UpdateProblem? Problem,
+    bool AtSignIn = true);
 
 /// <summary>
 /// PKG-03, R19 (design system version 53, Settings → Updates): GameSync asks GitHub for its latest release once a day,
@@ -50,6 +52,7 @@ public sealed partial class Updates : IDisposable
     public const string ProblemKey = "updates.problem";
     public const string RefusedKey = "updates.refused";
     public const string ToldKey = "updates.told";
+    public const string AtSignInKey = "updates.atsignin";
 
     /// <summary>How often GameSync asks, and how soon it asks again after GitHub couldn't be reached.</summary>
     public static readonly TimeSpan Every = TimeSpan.FromDays(1);
@@ -105,7 +108,7 @@ public sealed partial class Updates : IDisposable
     public UpdatesView Read()
     {
         using var state = new StateStore(_dataDir);
-        return new UpdatesView(Current, IsInstalledCopy, IsDaily(state), Time(state.GetSetting(CheckedKey)), FindReady(), Refusal(state), Problem(state));
+        return new UpdatesView(Current, IsInstalledCopy, IsDaily(state), Time(state.GetSetting(CheckedKey)), FindReady(), Refusal(state), Problem(state), IsAtSignIn(state));
     }
 
     public static bool IsDaily(StateStore state) => state.GetSetting(DailyKey) != "off";
@@ -115,6 +118,25 @@ public sealed partial class Updates : IDisposable
         using var state = new StateStore(dataDir);
         state.SetSetting(DailyKey, on ? "" : "off");
     }
+
+    /// <summary>
+    /// PKG-03 (the owner, 9 Oct 2026: yes to "Should a downloaded update install by itself when GameSync starts at sign-in, so
+    /// friends never have to click?"): on unless turned off in Settings → Updates.
+    /// </summary>
+    public static bool IsAtSignIn(StateStore state) => state.GetSetting(AtSignInKey) != "off";
+
+    public static void SetAtSignIn(string dataDir, bool on)
+    {
+        using var state = new StateStore(dataDir);
+        state.SetSetting(AtSignInKey, on ? "" : "off");
+    }
+
+    /// <summary>
+    /// Whether GameSync, starting with Windows, installs <paramref name="ready"/> now: it's this person's installed copy
+    /// (a build or the zip only says a newer one is out), the switch is on, and no game is being played.
+    /// </summary>
+    public static bool InstallsAtSignIn(ReadyUpdate? ready, bool atSignIn, bool installedCopy, bool playing) =>
+        ready is not null && atSignIn && installedCopy && !playing;
 
     /// <summary>Whether the daily check is due: on, and a day since the last try (six hours when GitHub couldn't be reached).</summary>
     public bool Due()

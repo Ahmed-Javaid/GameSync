@@ -42,6 +42,11 @@ internal sealed class TrayApp
     /// </summary>
     private volatile CopyPlaying? _copyPlaying;
 
+    // Design system version 54: the watch for the record a copy playing now writes, while none is known; and whether
+    // GameSync has looked for copies' records this run (once a run, again with Look again or new games).
+    private RecordWatch? _recordWatch;
+    private bool _recordsLooked;
+
     private sealed record CopyPlaying(long AppId, GameId Game, string Title);
     private AchievementPopups? _popups;
     private readonly HashSet<long> _achievementsAsked = [];
@@ -159,6 +164,9 @@ internal sealed class TrayApp
             _cloud = TrayStatus.CloudTrouble(results);
             RefreshSoon();
         });
+
+        // Design system version 54: another PC's achievements came in from the cloud.
+        _output.AchievementsCame += () => Dispatcher.UIThread.Post(RefreshSoon);
         _output.PlayChanged += (game, title, playing) => Dispatcher.UIThread.Post(() =>
         {
             if (playing)
@@ -173,6 +181,8 @@ internal sealed class TrayApp
                 if (_copyPlaying?.Game == game)
                 {
                     _copyPlaying = null;
+                    _recordWatch?.Dispose();
+                    _recordWatch = null;
                 }
             }
 
@@ -198,13 +208,18 @@ internal sealed class TrayApp
         _ = Task.Run(() => AppPipe.ServeAsync(_dataDir, Answer, e => _output.Say($"! A second start can't reach this app: {e.Message}"), _stop.Token));
         _ = Task.Run(ReadTodaysLogAsync);
         _ = Task.Run(() => RefreshArtAsync());
-        _ = Task.Run(UpdatesLoopAsync);
+        _ = Task.Run(() => UpdatesLoopAsync(atSignIn: !showWindow));
 
         // LIB-12: games installed or copied in while GameSync runs join the library, and are watched, without a restart.
         _libraryWatch = new LibraryWatch(_dataDir, _output, () => _agent.HoldsDiskWork, added =>
         {
             _agent.WatchNow();
-            Dispatcher.UIThread.Post(RefreshSoon);
+            Dispatcher.UIThread.Post(() =>
+            {
+                // Design system version 54: new games' copies may keep records of their own, looked for again.
+                _recordsLooked &= added.Count == 0;
+                RefreshSoon();
+            });
             if (added.Count > 0)
             {
                 _ = Task.Run(() => RefreshArtAsync(now: true));
@@ -281,8 +296,31 @@ internal sealed class TrayApp
         "saves" => Saves,
         "settings" => Settings,
         "achievements" => Trophies,
+        ShellViewModel.GuideId => new GuideViewModel(LauncherData.BackupFolder(_dataDir), () => StartTour(startAt: 1)),
         _ => null,
     };
+
+    /// <summary>
+    /// ONB-08: the tour over Home. After first run it asks first, once; the Guide's Take the tour again starts at its
+    /// first stop. It ends with Done, End the tour, Not now or Esc.
+    /// </summary>
+    private void StartTour(int startAt)
+    {
+        if (_shell is null)
+        {
+            return;
+        }
+
+        _page = "home";
+        _shell.Open("home");
+        _shell.Tour = new TourViewModel(() =>
+        {
+            if (_shell is not null)
+            {
+                _shell.Tour = null;
+            }
+        }, startAt);
+    }
 
     private void Picked(string id)
     {
@@ -320,12 +358,18 @@ internal sealed class TrayApp
         HasCloud = () => _cloud != CloudErrorKind.NotConnected && _pages?.Games.Any(g => g.Cloud is not null) != false,
         SetFavourite = SetFavourite,
         SetSort = sort => Task.Run(() => LauncherData.SetSort(_dataDir, sort)),
-        SetInstalledOnly = installedOnly => Task.Run(() => LauncherData.SetInstalledOnly(_dataDir, installedOnly)),
+        SetView = view => Task.Run(() => LauncherData.SetView(_dataDir, view)),
         ScanFolder = async (folder, ct) =>
         {
             try
             {
-                var scan = await Task.Run(() => LocalGames.ScanFolderAsync(_dataDir, folder, _output, _stop.Token), ct);
+                // LIB-30: what's in the folder first, for the person to pick the games; closed, nothing is added.
+                if (await PickGamesAsync(folder, setup: false) is not { } picks)
+                {
+                    return null;
+                }
+
+                var scan = await Task.Run(() => LocalGames.ScanFolderAsync(_dataDir, folder, _output, _stop.Token, picks), ct);
                 _output.Say(scan.Sentence);
                 _agent.WatchNow();
                 _ = Task.Run(() => RefreshArtAsync(now: true));
@@ -356,20 +400,6 @@ internal sealed class TrayApp
             share.Load();
         },
         OpenImport = OpenImportSaves,
-        CheckPlan = ct => Task.Run(() => SyncPlans.CheckAsync(_dataDir, _output, ct), ct),
-        RunPlan = async (chosen, ct) =>
-        {
-            try
-            {
-                var run = await Task.Run(() => SyncPlans.RunAsync(_dataDir, chosen, _output, ct), ct);
-                _output.Say($"Plan: {run.Sentence}");
-                return run;
-            }
-            finally
-            {
-                Dispatcher.UIThread.Post(RefreshSoon);
-            }
-        },
         LoadSpace = ct => Task.Run(() => SaveOverview.Space(_dataDir), ct),
         ConnectCloud = ConnectCloud,
         OpenGame = OpenGame,
@@ -396,13 +426,38 @@ internal sealed class TrayApp
                 return fetch && await Host.Achievements.FetchAsync(_dataDir, view, ct, every: true) ? Host.Achievements.For(_dataDir, shown) : view;
             }, ct);
         },
+        MarkAchievement = (game, achievement, unlocked, ct) =>
+        {
+            var shown = _pages?.Games.FirstOrDefault(g => g.Id == game);
+            return Task.Run(() =>
+            {
+                if (shown is null)
+                {
+                    return null;
+                }
+
+                try
+                {
+                    _output.Say(Host.Achievements.Mark(_dataDir, shown, achievement, unlocked));
+                }
+                catch (UsageException e)
+                {
+                    _output.Say("! " + e.Message);
+                }
+
+                // Design system version 54: the mark goes to the other PCs at the agent's next round.
+                _agent.ShareAchievementsNow();
+                Dispatcher.UIThread.Post(RefreshSoon);
+                return Host.Achievements.For(_dataDir, shown);
+            }, ct);
+        },
         LoadAllAchievements = (how, ct) =>
         {
             var games = _pages?.Games ?? [];
             return Task.Run(async () =>
             {
                 var views = Host.Achievements.ForAll(_dataDir, games);
-                if (how == AchievementsLoad.Read || !await Host.Achievements.FetchAllAsync(_dataDir, views, ct, again: how == AchievementsLoad.Refresh))
+                if (how == AchievementsLoad.Read || !await Host.Achievements.FetchAllAsync(_dataDir, views, ct))
                 {
                     return views;
                 }
@@ -430,7 +485,6 @@ internal sealed class TrayApp
             }
         },
         LoadSaves = ct => Task.Run(() => SaveOverview.ReadAsync(_dataDir, ct), ct),
-        LoadVersions = ct => Task.Run(() => SaveHistory.ReadVersionsAsync(_dataDir, ct), ct),
         LoadLog = ct => Task.Run(() => SaveHistory.ReadLog(_dataDir), ct),
         LoadProperties = (game, ct) => Task.Run(() => GameSettings.ReadAsync(_dataDir, game, SteamIdOf(game), ct), ct),
         SaveProperties = (game, change) => Job(async ct =>
@@ -438,12 +492,18 @@ internal sealed class TrayApp
             try
             {
                 _output.Say(await GameSettings.ApplyAsync(_dataDir, game, change, () => _output.Say("Waiting for the sync in the background to finish first."), ct));
+                if (change.Locate is not null)
+                {
+                    // LIB-24: a game in a new folder is watched there from now on.
+                    _agent.WatchNow();
+                }
             }
             catch (Exception e) when (e is UsageException or IOException or UnauthorizedAccessException or InvalidOperationException)
             {
                 _output.NeedsYou("GameSync", e.Message);
             }
         }),
+        CheckProgram = (game, program, ct) => Task.Run(() => ProgramChecks.CheckPickAsync(_dataDir, game, program, ct), ct),
         Approve = game => Job(ct => AppActions.ApproveAsync(_dataDir, game, _output, ct)),
         OpenConflict = OpenConflict,
         LoadConflict = (game, ct) => Task.Run(() => ConflictDetails.ReadAsync(_dataDir, game, ct), ct),
@@ -599,7 +659,32 @@ internal sealed class TrayApp
         Finish: FinishSetupAsync)
     {
         AddGame = () => ShowDialog(new AddOwnViewModel(OwnActionsFor(setup: true), setup: true)),
+        PickGames = folder => PickGamesAsync(folder, setup: true),
+        Pick = (picks, ct) => Task.Run(() => FirstRun.Pick(_dataDir, picks), ct),
     };
+
+    /// <summary>
+    /// LIB-30 (design system version 56, OnboardingScreen #scan-folder): What's in a folder over the window. GameSync looks
+    /// in the folder first, then waits for the person to pick; null when they close it without adding. A folder no scan may
+    /// look in is thrown, for the page to say.
+    /// </summary>
+    private async Task<FolderPicks?> PickGamesAsync(string folder, bool setup)
+    {
+        var look = await Task.Run(() => LocalGames.Look(_dataDir, folder, setup));
+        var picked = new TaskCompletionSource<FolderPicks?>();
+        FolderPickViewModel? dialog = null;
+        dialog = new FolderPickViewModel(look, picks =>
+        {
+            if (_shell is not null && ReferenceEquals(_shell.Dialog, dialog))
+            {
+                _shell.Dialog = null;
+            }
+
+            picked.TrySetResult(picks);
+        });
+        ShowDialog(dialog);
+        return await picked.Task;
+    }
 
     /// <summary>
     /// Add a game or folder (LIB-13), the dialog's work. From the library the game syncs at once, the agent watches its
@@ -664,7 +749,13 @@ internal sealed class TrayApp
         SetKeepEverything = everything => Change(_ => Task.FromResult(SettingsData.SetKeepEverything(_dataDir, everything))),
         AddGameFolder = folder => Change(async ct =>
         {
-            var scan = await LocalGames.ScanFolderAsync(_dataDir, folder, _output, ct);
+            // LIB-30: what's in the folder first, for the person to pick the games; closed, nothing is added.
+            if (await PickGamesAsync(folder, setup: false) is not { } picks)
+            {
+                return "";
+            }
+
+            var scan = await LocalGames.ScanFolderAsync(_dataDir, folder, _output, ct, picks);
             _output.Say(scan.Sentence);
             _agent.WatchNow();
             _ = Task.Run(() => RefreshArtAsync(now: true));
@@ -691,6 +782,35 @@ internal sealed class TrayApp
         }),
         AddAchievementFolder = folder => Change(_ => Task.FromResult(Host.Achievements.AddRecordFolder(_dataDir, folder))),
         RemoveAchievementFolder = folder => Change(_ => Task.FromResult(Host.Achievements.RemoveRecordFolder(_dataDir, folder))),
+        LookForRecords = () => Change(async ct =>
+        {
+            var games = _pages?.Games ?? LauncherData.Read(_dataDir, DateTime.Now).Games;
+            var found = await Host.Achievements.FindRecordsAsync(_dataDir, games, ct);
+            Dispatcher.UIThread.Post(RefreshSoon);
+            return found switch
+            {
+                0 => "No records found: a copy that writes nothing down can have its achievements marked on its page.",
+                1 => "Found the record of 1 copy: what you unlock in it counts.",
+                _ => $"Found the records of {found} copies: what you unlock in them counts.",
+            };
+        }),
+        RefreshRarity = () => Change(async ct =>
+        {
+            var games = _pages?.Games ?? LauncherData.Read(_dataDir, DateTime.Now).Games;
+            var (asked, answered) = await Host.Achievements.RefreshRarityAsync(_dataDir, games, ct);
+            Dispatcher.UIThread.Post(RefreshSoon);
+            return asked == 0 ? "No game here has achievements whose rarity Steam keeps yet."
+                : answered == 0 ? "Steam didn't answer, so nothing changed. Try again once you're online."
+                : $"Asked Steam again for {asked} {(asked == 1 ? "game" : "games")}{(answered == asked ? "" : $"; {answered} came back with percentages")}. The tiers on the Achievements page and Home follow.";
+        }),
+        SetAchievementsInCloud = on => Change(_ =>
+        {
+            AchievementShare.SetOn(_dataDir, on);
+            _agent.ShareAchievementsNow();
+            return Task.FromResult(on
+                ? "Your achievements go to the cloud in a moment, and every PC shows the same."
+                : "Your achievements are kept on this PC only now; what's in the cloud stays there.");
+        }),
         SetShareFolder = folder => Change(_ => Task.FromResult(Sharing.SetFolder(_dataDir, folder))),
         SetShareAsk = ask => Task.Run(() => Sharing.SetAsk(_dataDir, ask)),
         SetStartAtSignIn = on => Change(_ => Task.FromResult(SettingsData.SetStartAtSignIn(_dataDir, on))),
@@ -728,6 +848,7 @@ internal sealed class TrayApp
             }
         }),
         Diagnostics = ct => Task.Run(() => SettingsData.DiagnosticsAsync(_dataDir, ct), ct),
+        AnimationsOff = () => !Motion.On,
         SetAchievementPopups = async change =>
         {
             await Task.Run(() => AchievementPopupSettings.Set(_dataDir, change));
@@ -742,6 +863,7 @@ internal sealed class TrayApp
         CheckUpdates = CheckUpdatesAsync,
         RestartToUpdate = () => Task.FromResult(RestartToUpdate()),
         SetUpdatesDaily = on => Task.Run(() => Updates.SetDaily(_dataDir, on)),
+        SetUpdatesAtSignIn = on => Task.Run(() => Updates.SetAtSignIn(_dataDir, on)),
         TryPopup = delay => _popups?.Test(null, delay),
         AchievementGames = ct =>
         {
@@ -780,8 +902,10 @@ internal sealed class TrayApp
             return new Outcome("GameSync is closing, so nothing was changed.", Failed: true);
         }
         catch (Exception e) when (e is UsageException or IOException or UnauthorizedAccessException or InvalidOperationException or CloudException
-                                      or System.Net.Http.HttpRequestException or FormatException)
+                                      or System.Net.Http.HttpRequestException or FormatException or GameSync.Core.Scanning.InvalidGameDefinitionException
+                                      or GameSync.Core.Safety.UnsafePathException or GameSync.Core.Sync.BlockedException or BlobMismatchException)
         {
+            // An import's or a folder's refusal says why, rather than taking the app down (8 Oct 2026).
             return new Outcome(e.Message, Failed: true);
         }
         finally
@@ -797,12 +921,18 @@ internal sealed class TrayApp
         Pack = (picks, path, progress, ct) => Task.Run(() => Sharing.PackAsync(_dataDir, picks, path, progress, _output, ct), ct),
         Where = () => (Sharing.Folder(_dataDir), Sharing.AsksEachTime(_dataDir)),
         Preview = (zip, ct) => Task.Run(() => Sharing.Preview(_dataDir, zip), ct),
-        Import = (zip, games) => Change(async ct =>
+        Import = async (zip, games, useNow, tag) =>
         {
-            var said = await Sharing.ImportAsync(_dataDir, zip, games, _output, ct);
-            _agent.WatchNow();
-            return said;
-        }),
+            var outcome = await Change(async ct =>
+            {
+                var said = await Sharing.ImportAsync(_dataDir, zip, games, _output, ct, useNow, tag);
+                _agent.WatchNow();
+                return said;
+            });
+
+            // Nothing added is a problem to read, with its reasons, not a check mark.
+            return outcome.Text.StartsWith(Sharing.NothingAdded, StringComparison.Ordinal) ? outcome with { Failed = true } : outcome;
+        },
         CoverOf = game => _pages?.Games.FirstOrDefault(g => g.Id == game)?.CoverPath,
         ShowInFolder = path =>
         {
@@ -948,6 +1078,14 @@ internal sealed class TrayApp
             _page = "home";
             _shell?.Open("home");
             Refresh();
+
+            // ONB-08: the tour offers itself once, as GameSync is first set up on this PC.
+            using var state = new StateStore(_dataDir);
+            if (state.GetSetting(TourOfferedKey) is not { Length: > 0 })
+            {
+                state.SetSetting(TourOfferedKey, "1");
+                StartTour(startAt: 0);
+            }
         });
         // After what first run asked Steam meanwhile, which has usually finished by now.
         _ = Task.Run(async () =>
@@ -957,6 +1095,9 @@ internal sealed class TrayApp
         });
         return result;
     }
+
+    /// <summary>ONB-08: set once the tour has offered itself after first run.</summary>
+    private const string TourOfferedKey = "tour.offered";
 
     /// <summary>Connect the cloud, from Home after first run skipped it: the choice is connected at once, and the waiting versions go up.</summary>
     private void ConnectCloud() => ShowDialog(new ConnectCloudViewModel(CloudActions with { SignedIn = false }, async (remote, ct) =>
@@ -1098,7 +1239,7 @@ internal sealed class TrayApp
 
     private LibraryViewModel NewLibrary()
     {
-        var library = new LibraryViewModel(Actions, ReadSort(), installedOnly: ReadInstalledOnly());
+        var library = new LibraryViewModel(Actions, ReadSort(), view: ReadView());
         if (_pages is { } pages)
         {
             library.Update(pages.Games, pages.Tiles);
@@ -1119,16 +1260,16 @@ internal sealed class TrayApp
         }
     }
 
-    /// <summary>The library's Installed only, kept on this PC (KAN-47).</summary>
-    private bool ReadInstalledOnly()
+    /// <summary>The view the library opens on, kept on this PC: Installed until All games is picked (LIB-31).</summary>
+    private string ReadView()
     {
         try
         {
-            return LauncherData.ReadInstalledOnly(_dataDir);
+            return LauncherData.ReadView(_dataDir);
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidOperationException)
         {
-            return false;
+            return LibraryViewModel.InstalledView;
         }
     }
 
@@ -1287,8 +1428,11 @@ internal sealed class TrayApp
     /// </summary>
     private void OpenLink(string link)
     {
+        // Only the places GameSync means to open: Steam's pages, Drive, GameSync's own GitHub (SET-05, Report a problem) and
+        // Windows' Visual effects page (LOOK-28).
         if (!link.StartsWith("https://store.steampowered.com/app/", StringComparison.Ordinal) && !link.StartsWith("steam://", StringComparison.Ordinal) &&
-            !link.StartsWith("https://drive.google.com/", StringComparison.Ordinal))
+            !link.StartsWith("https://drive.google.com/", StringComparison.Ordinal) && !link.StartsWith("https://github.com/Ahmed-Javaid/GameSync/", StringComparison.Ordinal) &&
+            link != "ms-settings:easeofaccess-visualeffects")
         {
             return;
         }
@@ -1317,36 +1461,108 @@ internal sealed class TrayApp
     private (long AppId, GameId Game, string Title)? RunningCopy() => _copyPlaying is { } copy ? (copy.AppId, copy.Game, copy.Title) : null;
 
     /// <summary>
-    /// KAN-123: a game starts being played: when it's a copy Steam doesn't run, with a Steam app ID, and folders of copies'
-    /// records are added in Settings, its record is watched while it plays (one it writes at its first unlock too). Looked up
-    /// in the background, from the pages or, with the window closed, the library.
+    /// KAN-123: a game starts being played: when it's a copy Steam doesn't run, with a Steam app ID, its own record is
+    /// watched while it plays (one it writes at its first unlock too). Since design system version 54 that's every such copy:
+    /// with no record known, Steam's list is fetched first, to tell its record by, and the files it writes are watched until
+    /// one names its achievements (<see cref="RecordWatch"/>). Looked up in the background, from the pages or, with the
+    /// window closed, the library.
     /// </summary>
     private void WatchCopy(GameId game)
     {
         var games = _pages?.Games;
-        _ = Task.Run(() =>
+        _ = Task.Run(async () =>
         {
             try
             {
-                if (Host.Achievements.RecordFolders(_dataDir).Count == 0 ||
-                    (games ?? LauncherData.Read(_dataDir, DateTime.Now).Games).FirstOrDefault(g => g.Id == game) is not { SteamAppId: { } app } shown ||
+                if ((games ?? LauncherData.Read(_dataDir, DateTime.Now).Games).FirstOrDefault(g => g.Id == game) is not { } shown ||
                     shown.Store == GameSync.Core.Discovery.StoreKind.Steam)
                 {
                     return;
                 }
 
-                var copy = new CopyPlaying(app, game, shown.Title);
+                // ACH-18: the ID the copy's record was found under, or GameSync's for the game; a copy GameSync knows no
+                // ID for may still say one in its own folder, which the watch for its record looks under.
+                var app = Host.Achievements.AppIdOf(_dataDir, shown);
+                RecordWatch? watch = null;
+                if (app is null || Host.Achievements.RecordOf(_dataDir, app.Value) is null)
+                {
+                    if (app is { } known)
+                    {
+                        await Host.Achievements.FetchForAsync(_dataDir, shown.Id, shown.Title, shown.Store, known, _stop.Token);
+                    }
+
+                    watch = await Host.Achievements.WatchForRecordAsync(_dataDir, shown, _ => Dispatcher.UIThread.Post(() =>
+                    {
+                        _output.Say($"{shown.Title}: GameSync found its own record of achievements; what you unlock in it counts.");
+
+                        // Found under another ID than the one watched: the watch over the game follows it from now on.
+                        if (_copyPlaying is { } playing && playing.Game == game && Host.Achievements.AppIdOf(_dataDir, shown) is { } now && now != playing.AppId)
+                        {
+                            _copyPlaying = playing with { AppId = now };
+                        }
+
+                        RefreshSoon();
+                    }), ct: _stop.Token);
+                }
+
+                if (app is null && watch is null)
+                {
+                    return;
+                }
+
+                var copy = new CopyPlaying(app ?? 0, game, shown.Title);
                 Dispatcher.UIThread.Post(() =>
                 {
                     if (_playing.ContainsKey(game))
                     {
                         _copyPlaying = copy;
+                        _recordWatch?.Dispose();
+                        _recordWatch = watch;
+                    }
+                    else
+                    {
+                        watch?.Dispose();
                     }
                 });
             }
-            catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidOperationException)
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidOperationException or HttpRequestException or OperationCanceledException)
             {
                 // Not watched this time: its unlocks still count once it closes.
+            }
+        });
+    }
+
+    /// <summary>
+    /// Design system version 54 (the owner: "Tracking by itself", then "find them itself"): once a run, and again when new
+    /// games appear, GameSync looks for the records copies Steam doesn't run keep themselves; never while a game that syncs
+    /// plays (BG-08). The pages read again when one is found.
+    /// </summary>
+    private void LookForRecords(IReadOnlyList<LauncherGame> games)
+    {
+        if (_recordsLooked || _agent.HoldsDiskWork || !games.Any(g => g.Store != GameSync.Core.Discovery.StoreKind.Steam))
+        {
+            return;
+        }
+
+        _recordsLooked = true;
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                int before;
+                using (var state = new GameSync.Core.State.StateStore(_dataDir))
+                {
+                    before = Host.Achievements.FoundRecords(state).Count;
+                }
+
+                if (await Host.Achievements.FindRecordsAsync(_dataDir, games, _stop.Token) != before)
+                {
+                    Dispatcher.UIThread.Post(RefreshSoon);
+                }
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException or HttpRequestException or OperationCanceledException)
+            {
+                // Looked for again at the next start, or with Look again.
             }
         });
     }
@@ -1357,6 +1573,7 @@ internal sealed class TrayApp
     /// </summary>
     private void FetchRecordLists(IReadOnlyList<LauncherGame> games)
     {
+        LookForRecords(games);
         var due = games.Where(g => g.Store != GameSync.Core.Discovery.StoreKind.Steam && g.SteamAppId is { } app && !_achievementsAsked.Contains(app)).ToList();
         if (due.Count == 0)
         {
@@ -1401,8 +1618,8 @@ internal sealed class TrayApp
     }
 
     /// <summary>
-    /// Opens a page, on a view when asked: Home's My games opens the library on every game, and its Needs you the save
-    /// manager's Needs you (KAN-46).
+    /// Opens a page, on a view when asked: Home's My games opens the library on the view kept on this PC (LIB-31), and its
+    /// Conflicts the save manager's Conflicts (KAN-46).
     /// </summary>
     private void Show(string page, string? tab)
     {
@@ -1788,14 +2005,15 @@ internal sealed class TrayApp
             ShowSurface();
         }
 
-        // KAN-76: a new look the open window shows comes through softly instead of jumping, from the click; Glossy and Solid
-        // alone turn into each other evenly, all of the window at once (the owner, 1 Oct). Windows' accent changing while the
-        // look doesn't use it changes nothing that shows.
-        var colours = !ThemeEngine.Build(choice).OrderBy(t => t.Key).SequenceEqual(_tokens.OrderBy(t => t.Key));
+        // KAN-76: Dark and Light turn into each other softly instead of jumping, from the click; Glossy and Solid alone turn
+        // into each other evenly, all of the window at once (the owner, 1 Oct). A preset, pure black or an accent changes at
+        // once (the owner, 8 Oct 2026: "Theme change animation is not needed for things like arcade -> Moss - tidal etc. The
+        // animation will only exist for lightmode and darkmode").
+        var mode = choice.Mode != _choice.Mode;
         var surface = (glossyBefore ?? _look.ShowsGlossy(_choice, _transparency)) != _look.ShowsGlossy(choice, transparency);
-        if (_window is { } window && (colours || surface))
+        if (_window is { } window && (mode || surface))
         {
-            window.ChangeLook(Apply, evenly: !colours);
+            window.ChangeLook(Apply, evenly: !mode);
         }
         else
         {
@@ -1989,9 +2207,10 @@ internal sealed class TrayApp
     /// <summary>
     /// PKG-03 (design system version 53): what was downloaded before shows at once; then, two minutes after start and
     /// every hour after, the daily check when it's due (a day since the last, six hours when GitHub couldn't be reached),
-    /// which gets a newer GameSync ready in the background.
+    /// which gets a newer GameSync ready in the background. Started with Windows (<paramref name="atSignIn"/>), a ready
+    /// update installs then and there, before any game is played, unless Settings → Updates turned that off (9 Oct 2026).
     /// </summary>
-    private async Task UpdatesLoopAsync()
+    private async Task UpdatesLoopAsync(bool atSignIn)
     {
         try
         {
@@ -1999,7 +2218,20 @@ internal sealed class TrayApp
             {
                 updates.CleanUp();
                 var ready = updates.FindReady();
-                Dispatcher.UIThread.Post(() => ShowUpdate(ready));
+                bool installs;
+                using (var state = new StateStore(_dataDir))
+                {
+                    installs = atSignIn && Updates.InstallsAtSignIn(ready, Updates.IsAtSignIn(state), Updates.IsInstalledCopy, playing: false);
+                }
+
+                Dispatcher.UIThread.Post(() =>
+                {
+                    ShowUpdate(ready);
+                    if (installs && _playing.Count == 0 && RestartToUpdate() is { Failed: true } refused)
+                    {
+                        _output.Say($"! {refused.Text}");
+                    }
+                });
             }
 
             await Task.Delay(TimeSpan.FromMinutes(2), _stop.Token);
@@ -2245,6 +2477,7 @@ internal sealed class TrayApp
             try
             {
                 var (thisPc, others, where) = LauncherData.Devices(dataDir);
+                GsStatusBadge.NoCloud = where is null;
                 if (where is null)
                 {
                     // First run skipped the cloud: the top bar offers Connect the cloud.

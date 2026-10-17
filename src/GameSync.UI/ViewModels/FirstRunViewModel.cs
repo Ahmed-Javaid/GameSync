@@ -20,6 +20,12 @@ public sealed record SetupActions(
 {
     /// <summary>Something missing?'s Add a game or folder: its dialog over first run (LIB-13).</summary>
     public Action? AddGame { get; init; }
+
+    /// <summary>LIB-30: What's in a folder over first run, for the person to pick from; null when they closed it.</summary>
+    public Func<string, Task<FolderPicks?>>? PickGames { get; init; }
+
+    /// <summary>LIB-30: what the person picked from a folder, kept once the scan with it has finished.</summary>
+    public Func<FolderPicks, CancellationToken, Task>? Pick { get; init; }
 }
 
 /// <summary>Connecting the cloud, in first run's step and in the Connect cloud dialog: Google Drive, or a folder.</summary>
@@ -33,13 +39,18 @@ public sealed record CloudActions(bool CanSignIn, Func<CancellationToken, Task<s
 }
 
 /// <summary>
-/// The cloud's two ways (design system → OnboardingScreen's Connect the cloud, ConnectCloudDialog): Sign in with Google,
-/// or a folder (a NAS, a USB drive, another disk). What's chosen becomes games.json's cloud: "drive", the folder, or
-/// none, for Skip for now, which keeps every version on this PC.
+/// The cloud's two ways (design system → OnboardingScreen's Where saves are kept, ConnectCloudDialog): Sign in with
+/// Google, or a folder (a NAS, a USB drive, another disk). What's chosen becomes games.json's cloud: "drive", the folder,
+/// or none. First run (ONB-07, design system version 56) makes it a choice of three, Only on this PC, for now the third,
+/// and goes on only once one is made (<see cref="Picked"/>, <see cref="Ready"/>).
 /// </summary>
 public sealed partial class CloudSetupViewModel : ObservableObject
 {
     public const string Drive = "drive";
+
+    public const string InFolder = "folder";
+
+    public const string Local = "local";
 
     private readonly CloudActions _actions;
 
@@ -64,6 +75,11 @@ public sealed partial class CloudSetupViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(HasError))]
     private string? _error;
 
+    /// <summary>ONB-07: first run's choice, <c>drive</c>, <c>folder</c> or <c>local</c>; null until one is made.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsDrivePicked), nameof(IsFolderPicked), nameof(IsLocalPicked), nameof(Ready), nameof(Remote), nameof(NotReadyTip), nameof(IsPicked))]
+    private string? _picked;
+
     public CloudSetupViewModel(CloudActions actions)
     {
         _actions = actions;
@@ -73,6 +89,7 @@ public sealed partial class CloudSetupViewModel : ObservableObject
         }
 
         SignInCommand = new AsyncRelayCommand(SignInAsync, () => CanSignIn && !IsSigningIn);
+        PickCommand = new RelayCommand<string>(choice => Picked = choice is Drive or InFolder or Local ? choice : null);
         ChangeFolderCommand = new RelayCommand(() =>
         {
             Folder = null;
@@ -92,6 +109,35 @@ public sealed partial class CloudSetupViewModel : ObservableObject
 
     public bool IsConnected => IsSignedIn || HasFolder;
 
+    public bool IsDrivePicked => Picked == Drive;
+
+    public bool IsFolderPicked => Picked == InFolder;
+
+    public bool IsLocalPicked => Picked == Local;
+
+    public bool IsPicked => Picked is not null;
+
+    /// <summary>ONB-07: first run goes on once the choice is whole: signed in, a folder chosen, or this PC only.</summary>
+    public bool Ready => Picked switch
+    {
+        Drive => IsSignedIn,
+        InFolder => HasFolder,
+        Local => true,
+        _ => false,
+    };
+
+    /// <summary>Why Continue waits, under the pointer.</summary>
+    public string? NotReadyTip => Picked switch
+    {
+        null => "Choose where your saves are kept first",
+        Drive when !IsSignedIn => "Sign in with Google first",
+        InFolder when !HasFolder => "Choose the folder first",
+        _ => null,
+    };
+
+    /// <summary>A choice in first run's Where saves are kept: <c>drive</c>, <c>folder</c> or <c>local</c>.</summary>
+    public ICommand PickCommand { get; }
+
     /// <summary>Sign in with Google leads until a folder is chosen; then Continue does, and it steps down. It never leads when it can't work.</summary>
     public bool SignInIsMain => !HasFolder && CanSignIn;
 
@@ -103,13 +149,19 @@ public sealed partial class CloudSetupViewModel : ObservableObject
 
     public string SignInLabel => IsSigningIn ? "Waiting for your browser…" : "Sign in with Google";
 
-    /// <summary>games.json's cloud: "drive", the folder, or "none".</summary>
-    public string Remote => Choice switch
+    /// <summary>games.json's cloud: "drive", the folder, or "none"; Only on this PC in first run is none, whatever else was done.</summary>
+    public string Remote => Picked == Local ? AppConfig.NoCloud : Choice switch
     {
         Drive => Drive,
         "folder" when Folder is { } folder => folder,
         _ => AppConfig.NoCloud,
     };
+
+    partial void OnChoiceChanged(string value)
+    {
+        OnPropertyChanged(nameof(Ready));
+        OnPropertyChanged(nameof(NotReadyTip));
+    }
 
     public ICommand SignInCommand { get; }
 
@@ -123,6 +175,7 @@ public sealed partial class CloudSetupViewModel : ObservableObject
         {
             Folder = _actions.Folder(picked);
             Choice = "folder";
+            Picked = InFolder;
             Error = null;
         }
         catch (Exception e) when (e is UsageException or IOException or UnauthorizedAccessException or ArgumentException)
@@ -139,6 +192,7 @@ public sealed partial class CloudSetupViewModel : ObservableObject
         {
             Account = await _actions.SignIn(CancellationToken.None);
             Choice = Drive;
+            Picked = Drive;
         }
         catch (OperationCanceledException)
         {
@@ -203,17 +257,21 @@ public sealed partial class SetupGameRow : ObservableObject
 
     public string FoundBy => Game.FoundBy ?? "";
 
+    /// <summary>ONB-07: what its saves come to now ("4.2 MB"); nothing when there's none to back up.</summary>
+    public string Size => Game.Bytes > 0 ? Cli.FormatSize(Game.Bytes) : "";
+
     /// <summary>It has a box: every group but No saves found yet, whose games are watched instead.</summary>
     public bool Tickable { get; }
 
     partial void OnIsCheckedChanged(bool value) => _changed();
 
-    public override string ToString() => Tickable ? $"{Title}, {(IsChecked ? "syncs" : "doesn't sync")}" : $"{Title}, watched the first time you play";
+    public override string ToString() => Tickable ? $"{Title}, {(IsChecked ? "backed up" : "not backed up")}{(Size.Length > 0 ? $", {Size} of saves" : "")}" : $"{Title}, watched the first time you play";
 }
 
 /// <summary>
-/// A group of first run's Choose games (ONB-02): a box for the whole group, its name, how many and why, and its games,
-/// the first four at a time. No saves found yet has a clock instead of a box: its games are watched the first time
+/// A group of first run's Choose saves (ONB-02, ONB-07): a box for the whole group, its name, how many, their saves' size
+/// and why, and its games, the first four at a time. Its heading opens and closes it (a friend: "There is no option to
+/// collapse opened games"). No saves found yet has a clock instead of a box: its games are watched the first time
 /// they're played.
 /// </summary>
 public sealed partial class SetupGroupViewModel : ObservableObject
@@ -223,7 +281,7 @@ public sealed partial class SetupGroupViewModel : ObservableObject
     private readonly Action _changed;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(VisibleRows), nameof(HasMore), nameof(ShowsOpen))]
+    [NotifyPropertyChangedFor(nameof(VisibleRows), nameof(HasMore), nameof(ShowsOpen), nameof(Chevron), nameof(ToggleOpenName))]
     private bool _isOpen;
 
     [ObservableProperty]
@@ -243,6 +301,7 @@ public sealed partial class SetupGroupViewModel : ObservableObject
         _isOpen = Kind == SetupGroupKind.Sync;
         Recount();
         OpenCommand = new RelayCommand(() => IsOpen = true);
+        ToggleOpenCommand = new RelayCommand(() => IsOpen = !IsOpen, () => Rows.Count > 0 && Tickable);
         ShowAllCommand = new RelayCommand(() => ShowsAll = true);
         ToggleCommand = new RelayCommand(() =>
         {
@@ -272,7 +331,22 @@ public sealed partial class SetupGroupViewModel : ObservableObject
 
     public bool IsWatch => !Tickable;
 
-    public string Summary => $"{(Rows.Count == 1 ? "1 game" : $"{Rows.Count.ToString(CultureInfo.InvariantCulture)} games")} · {Why}";
+    public string Summary => $"{(Rows.Count == 1 ? "1 game" : $"{Rows.Count.ToString(CultureInfo.InvariantCulture)} games")}{(Bytes > 0 && Kind != SetupGroupKind.OnlineOnly ? $" · {Cli.FormatSize(Bytes)} of saves" : "")} · {Why}";
+
+    /// <summary>What its games' saves come to.</summary>
+    public long Bytes => Rows.Sum(r => r.Game.Bytes);
+
+    /// <summary>The heading's chevron: down while open.</summary>
+    public string Chevron => IsOpen ? "chevronDown" : "chevronRight";
+
+    /// <summary>The heading, as a screen reader says it: "Close Back up and sync".</summary>
+    public string ToggleOpenName => $"{(IsOpen ? "Close" : "Open")} {Title}";
+
+    /// <summary>The heading: opens the group, or closes it.</summary>
+    public ICommand ToggleOpenCommand { get; }
+
+    /// <summary>The heading opens and closes it: a group with games to tick.</summary>
+    public bool CanOpen => Rows.Count > 0 && Tickable;
 
     public IReadOnlyList<SetupGameRow> VisibleRows => !IsOpen ? [] : ShowsAll ? Rows : Rows.Take(Shown).ToList();
 
@@ -314,11 +388,11 @@ public sealed partial class SetupGroupViewModel : ObservableObject
     /// <summary>A group's name, and why its games are in it, naming a few when it helps.</summary>
     private static (string Title, string Why) Describe(SetupGroupKind kind, IReadOnlyList<SetupGame> games) => kind switch
     {
-        SetupGroupKind.Sync => ("Sync", "saves found, no store cloud"),
-        SetupGroupKind.StoreCloud => ("Synced by their store", "Steam or Epic syncs these between PCs; GameSync keeps a backup of every version"),
-        SetupGroupKind.OnlineOnly => ("Probably online-only", $"only settings files found · {Names(games, 2)}"),
-        SetupGroupKind.NotInstalled => ("Saves found, game not installed", $"kept safe, offered back if you install them · {Names(games, 1)}"),
-        _ => ("No saves found yet", $"{Names(games, 3)} · watched the first time you play"),
+        SetupGroupKind.Sync => ("Back up and sync", "GameSync syncs them between your PCs"),
+        SetupGroupKind.StoreCloud => ("Synced by Steam or Epic already", "their store syncs them; GameSync keeps every version too"),
+        SetupGroupKind.OnlineOnly => ("Probably online-only", $"only settings found: the game keeps your progress on its servers · {Names(games, 2)}"),
+        SetupGroupKind.NotInstalled => ("Saves of games not installed", $"kept safe, ready if you install them again · {Names(games, 1)}"),
+        _ => ("No saves found yet", $"{Names(games, 3)} · GameSync watches them the first time you play"),
     };
 
     /// <summary>"Apex Legends, Rocket League and 10 more".</summary>
@@ -335,17 +409,20 @@ public sealed partial class SetupGroupViewModel : ObservableObject
 }
 
 /// <summary>
-/// First run (design system → OnboardingScreen; ONB-01 to ONB-05): four steps down the left, scan this PC, choose games,
-/// connect the cloud, then backups and startup, with no side rail until it's done. The scan starts when the page opens
-/// and only reads; nothing syncs until Start using GameSync.
+/// First run (design system → OnboardingScreen, version 56; ONB-01 to ONB-07): five steps down the left, Welcome, Your
+/// games, Choose saves, Where saves are kept, then Backups and startup, with no side rail until it's done. It says first
+/// that GameSync keeps saves, not games; asks for game folders before anything else; and goes on from Where saves are
+/// kept only once a choice is made (a friend clicked Next through every step, 8 Oct 2026). The scan starts when the page
+/// opens and only reads; nothing is copied until Start using GameSync.
 /// </summary>
 public sealed partial class FirstRunViewModel : ObservableObject, IPageSurface, IWholeWindowPage
 {
     public static readonly IReadOnlyList<(string Id, string Label, string Icon)> StepList =
     [
-        ("scan", "Scan this PC", "search"),
-        ("choose", "Choose games", "library"),
-        ("cloud", "Connect the cloud", "cloud"),
+        ("welcome", "Welcome", "logo"),
+        ("folders", "Your games", "folder"),
+        ("saves", "Choose saves", "saves"),
+        ("cloud", "Where saves are kept", "cloud"),
         ("daily", "Backups and startup", "clock"),
     ];
 
@@ -354,14 +431,14 @@ public sealed partial class FirstRunViewModel : ObservableObject, IPageSurface, 
     private bool _started;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsScan), nameof(IsChoose), nameof(IsCloud), nameof(IsDaily))]
-    private string _step = "scan";
+    [NotifyPropertyChangedFor(nameof(IsWelcome), nameof(IsFolders), nameof(IsChoose), nameof(IsCloud), nameof(IsDaily))]
+    private string _step = "welcome";
 
     [ObservableProperty]
     private IReadOnlyList<NavItem> _steps = [];
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(CanChoose), nameof(ScanDone))]
+    [NotifyPropertyChangedFor(nameof(CanChoose), nameof(ScanDone), nameof(SavesTitle), nameof(CanContinueSaves))]
     private bool _isScanning;
 
     [ObservableProperty]
@@ -388,7 +465,17 @@ public sealed partial class FirstRunViewModel : ObservableObject, IPageSurface, 
     private IReadOnlyList<StoreRow> _stores = [];
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasFolders), nameof(NoFolders), nameof(SetupFoldersLine))]
     private IReadOnlyList<FolderItem> _folders = [];
+
+    /// <summary>ONB-07: the title of Choose saves, "Saves found for 43 of 46 games", once the scan has finished.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SavesTitle))]
+    private string _foundTitle = "";
+
+    /// <summary>ONB-07: how many games are ticked and what their saves come to, above the groups.</summary>
+    [ObservableProperty]
+    private string _tickedText = "";
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasScanError), nameof(CanChoose))]
@@ -429,6 +516,13 @@ public sealed partial class FirstRunViewModel : ObservableObject, IPageSurface, 
     [ObservableProperty]
     private string _readyText = "";
 
+    /// <summary>ONB-07: Your setup, the games line ("31 games' saves").</summary>
+    [ObservableProperty]
+    private string _setupGamesTitle = "";
+
+    [ObservableProperty]
+    private string _setupGamesLine = "";
+
     [ObservableProperty]
     private string _firstBackupText = "";
 
@@ -446,10 +540,11 @@ public sealed partial class FirstRunViewModel : ObservableObject, IPageSurface, 
         Cloud = new CloudSetupViewModel(actions.Cloud);
         Cloud.PropertyChanged += (_, e) =>
         {
-            if (e.PropertyName is nameof(CloudSetupViewModel.IsConnected))
+            if (e.PropertyName is nameof(CloudSetupViewModel.IsConnected) or nameof(CloudSetupViewModel.Picked) or nameof(CloudSetupViewModel.Ready))
             {
                 OnPropertyChanged(nameof(CloudNextLabel));
                 OnPropertyChanged(nameof(CloudNextIsMain));
+                OnPropertyChanged(nameof(SetupKeptLine));
                 Recount();
             }
         };
@@ -465,8 +560,56 @@ public sealed partial class FirstRunViewModel : ObservableObject, IPageSurface, 
         SaveTimeCommand = new RelayCommand(SaveTime);
         FinishCommand = new AsyncRelayCommand(FinishAsync, () => !IsFinishing);
         AddGameCommand = new RelayCommand(() => _actions.AddGame?.Invoke());
+        GoToCommand = new RelayCommand<string>(step =>
+        {
+            if (step is not null && Index(step) <= _reached)
+            {
+                Step = step;
+            }
+        });
+        CloseGroupsCommand = new RelayCommand(() =>
+        {
+            foreach (var group in Groups)
+            {
+                group.IsOpen = false;
+            }
+        });
         BuildSteps();
     }
+
+    /// <summary>Your setup's Change: back to that step.</summary>
+    public ICommand GoToCommand { get; }
+
+    /// <summary>Choose saves' Close every group.</summary>
+    public ICommand CloseGroupsCommand { get; }
+
+    public bool IsWelcome => Step == "welcome";
+
+    public bool IsFolders => Step == "folders";
+
+    public bool HasFolders => Folders.Count > 0;
+
+    /// <summary>ONB-07: no game folder yet: Your games says what that costs, and going on without one is its own button.</summary>
+    public bool NoFolders => Folders.Count == 0;
+
+    /// <summary>Choose saves' title: what was found, or that it's still looking.</summary>
+    public string SavesTitle => IsScanning || FoundTitle.Length == 0 ? "Looking for saves…" : FoundTitle;
+
+    /// <summary>Choose saves goes on once every game has been looked at.</summary>
+    public bool CanContinueSaves => !IsScanning && ScanError is null;
+
+    /// <summary>Your setup, the game folders line.</summary>
+    public string SetupFoldersLine => Folders.Count == 0
+        ? "None: only games from Steam, Epic and the EA app are found."
+        : string.Join(", ", Folders.Select(f => f.Path));
+
+    /// <summary>Your setup, where saves are kept.</summary>
+    public string SetupKeptLine => Cloud.Picked switch
+    {
+        CloudSetupViewModel.Local => "On this PC only: not synced to your other PCs",
+        CloudSetupViewModel.InFolder when Cloud.Folder is { } folder => $"On this PC and in {folder}",
+        _ => "On this PC and in your Google Drive",
+    };
 
     /// <summary>Something missing?: Add a game or folder, for one of the person's own (LIB-13).</summary>
     public ICommand AddGameCommand { get; }
@@ -502,9 +645,7 @@ public sealed partial class FirstRunViewModel : ObservableObject, IPageSurface, 
     /// <summary>Glossy's glow over the last-played game's art, like Settings (LOOK-17).</summary>
     public GlassStrength Strength => GlassStrength.Glow;
 
-    public bool IsScan => Step == "scan";
-
-    public bool IsChoose => Step == "choose";
+    public bool IsChoose => Step == "saves";
 
     public bool IsCloud => Step == "cloud";
 
@@ -517,6 +658,19 @@ public sealed partial class FirstRunViewModel : ObservableObject, IPageSurface, 
 
     public bool HasScanError => ScanError is not null;
 
+    /// <summary>
+    /// Why a game folder wasn't added (the owner's friend, 8 Oct 2026): said under the folders, without stopping Choose
+    /// games, as the scan itself went fine.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasFolderError))]
+    private string? _folderError;
+
+    public bool HasFolderError => FolderError is not null;
+
+    /// <summary>Folders picked while the scan ran: each is added once it has finished, then the PC is scanned again with it.</summary>
+    private readonly Queue<(string Folder, FolderPicks? Picks)> _waitingFolders = new();
+
     public bool HasAntiCheat => AntiCheatNote is not null;
 
     public bool NotEditingTime => !EditingTime;
@@ -527,9 +681,10 @@ public sealed partial class FirstRunViewModel : ObservableObject, IPageSurface, 
 
     public string DailyTitle => DailyOn ? $"Back up every day at {DailyTime}" : "Back up every day";
 
-    public string CloudNextLabel => Cloud.IsConnected ? "Continue" : "Skip for now";
+    /// <summary>ONB-07: Continue, or Continue with this PC only; it waits until a choice is made.</summary>
+    public string CloudNextLabel => Cloud.IsLocalPicked ? "Continue with this PC only" : "Continue";
 
-    public bool CloudNextIsMain => Cloud.IsConnected;
+    public bool CloudNextIsMain => true;
 
     public string FinishLabel => IsFinishing ? "Setting up…" : "Start using GameSync";
 
@@ -558,30 +713,72 @@ public sealed partial class FirstRunViewModel : ObservableObject, IPageSurface, 
         }
     }
 
-    /// <summary>Add a game folder: picked in Windows' folder picker, checked, then the PC is scanned again with it.</summary>
+    /// <summary>
+    /// Add a game folder: picked in Windows' folder picker, then What's in it (LIB-30) for the person to pick the games,
+    /// then the PC is scanned again with it and what they left out stays out.
+    /// </summary>
     public async void AddFolder(string folder)
     {
+        FolderError = null;
+        FolderPicks? picks = null;
+        if (_actions.PickGames is { } pickGames)
+        {
+            try
+            {
+                picks = await pickGames(folder);
+            }
+            catch (Exception e) when (e is UsageException or IOException or UnauthorizedAccessException or InvalidOperationException)
+            {
+                FolderError = e.Message;
+                return;
+            }
+
+            if (picks is null)
+            {
+                // Closed without adding.
+                return;
+            }
+        }
+
         if (IsScanning)
         {
+            // The owner's friend, 8 Oct 2026: a folder picked while the first scan ran was dropped without a word. It waits
+            // for the scan, shown in the list meanwhile.
+            _waitingFolders.Enqueue((folder, picks));
+            Folders = [.. Folders, new FolderItem(folder, "added once this scan finishes")];
             return;
         }
 
+        await AddPickedAsync(folder, picks);
+    }
+
+    private async Task AddPickedAsync(string folder, FolderPicks? picks)
+    {
+        FolderError = null;
         try
         {
             if (await _actions.AddGameFolder(folder, CancellationToken.None) is { } refused)
             {
-                ScanError = refused;
+                FolderError = refused;
                 return;
             }
         }
         catch (Exception e) when (e is UsageException or IOException or UnauthorizedAccessException or InvalidOperationException)
         {
-            ScanError = e.Message;
+            FolderError = e.Message;
             return;
+        }
+
+        if (picks is not null)
+        {
+            _picks[picks.Folder] = picks;
         }
 
         await ScanAsync();
     }
+
+    /// <summary>LIB-30: what was picked from each folder added here, kept after every scan and said beside the folder.</summary>
+    private readonly Dictionary<string, FolderPicks> _picks = new(StringComparer.OrdinalIgnoreCase);
 
     public async Task ScanAsync()
     {
@@ -616,14 +813,23 @@ public sealed partial class FirstRunViewModel : ObservableObject, IPageSurface, 
         {
             var scan = await _actions.Scan(progress, CancellationToken.None);
             Stores = Rows(scan.Stores);
-            Folders = scan.Folders.Select(f => new FolderItem(f.Path, f.Missing ? "not there right now" : Count(f.Games))).ToList();
+            if (_actions.Pick is { } pick)
+            {
+                foreach (var picked in _picks.Values)
+                {
+                    await pick(picked, CancellationToken.None);
+                }
+            }
+
+            Folders = scan.Folders.Select(f => new FolderItem(f.Path, f.Missing ? "not there right now" : FolderMeta(f))).ToList();
             var groups = await _actions.Groups(CancellationToken.None);
             Groups = groups.Select(g => new SetupGroupViewModel(g, Recount)).ToList();
             ScanLabel = $"Scan finished in {Seconds(scan.Took)}: {Count(scan.Games)}, saves found for {scan.WithSaves.ToString(CultureInfo.InvariantCulture)}";
             ScanValue = 100;
             ScanRight = "100%";
             (ScanState, ScanTitle, ScanBar) = ("done", "Scan finished", 100);
-            ChooseSubtitle = $"{Count(scan.Games)} found. Ticked games are backed up now and synced from then on; you can change this any time.";
+            FoundTitle = $"Saves found for {scan.WithSaves.ToString(CultureInfo.InvariantCulture)} of {Count(scan.Games)}";
+            ChooseSubtitle = "These are save files, your progress in each game, usually a few megabytes. GameSync keeps a copy of the ticked ones when you finish. Your games aren't copied.";
             AntiCheatNote = AntiCheat(groups);
             Recount();
         }
@@ -637,6 +843,11 @@ public sealed partial class FirstRunViewModel : ObservableObject, IPageSurface, 
         finally
         {
             IsScanning = false;
+        }
+
+        if (_waitingFolders.TryDequeue(out var waiting))
+        {
+            await AddPickedAsync(waiting.Folder, waiting.Picks);
         }
     }
 
@@ -656,8 +867,9 @@ public sealed partial class FirstRunViewModel : ObservableObject, IPageSurface, 
     private void Next()
     {
         var at = Index(Step);
-        if (at == 0 && !CanChoose)
+        if ((Step == "saves" && !CanContinueSaves) || (Step == "cloud" && !Cloud.Ready))
         {
+            // ONB-07: Choose saves waits for the scan, and Where saves are kept for a choice.
             return;
         }
 
@@ -728,6 +940,12 @@ public sealed partial class FirstRunViewModel : ObservableObject, IPageSurface, 
     private void Recount()
     {
         var chosen = Chosen;
+        var bytes = chosen.Sum(r => r.Game.Bytes);
+        TickedText = $"{Count(chosen.Count)} ticked · {FirstRun.Size(bytes)} of saves";
+        SetupGamesTitle = chosen.Count == 1 ? "1 game's saves" : $"{chosen.Count.ToString(CultureInfo.InvariantCulture)} games' saves";
+        SetupGamesLine = chosen.Count == 0
+            ? "None ticked: any game's page can back up its saves later."
+            : $"Backed up when you start, {FirstRun.Size(bytes)}, then each time you stop playing.";
         var store = chosen.Count(r => Groups.Any(g => g.Kind == SetupGroupKind.StoreCloud && g.Rows.Contains(r)));
         var syncing = chosen.Count - store;
         var sync = $"{Count(syncing)} {(syncing == 1 ? "syncs" : "sync")}";
@@ -736,7 +954,7 @@ public sealed partial class FirstRunViewModel : ObservableObject, IPageSurface, 
             ? "No games are ticked, so GameSync starts with nothing to sync. Any game's page can sync its saves later."
             : $"{(store == 0 ? sync : syncing == 0 ? $"{Count(store)} {(store == 1 ? "is" : "are")} backed up" : $"{sync} and {backup}")}. Your saves stay in their folders; GameSync keeps copies.";
         var size = FirstRun.Size(chosen.Sum(r => r.Game.Bytes));
-        FirstBackupText = Cloud.IsConnected
+        FirstBackupText = Cloud.IsConnected && !Cloud.IsLocalPicked
             ? $"The first backup, about {size}, runs in the background once you start. You can play meanwhile."
             : $"The first backup, about {size}, stays on this PC until you connect a cloud. You can play meanwhile.";
         OnPropertyChanged(nameof(Chosen));
@@ -759,6 +977,12 @@ public sealed partial class FirstRunViewModel : ObservableObject, IPageSurface, 
     }
 
     private static string Count(int games) => games == 1 ? "1 game" : $"{games.ToString(CultureInfo.InvariantCulture)} games";
+
+    /// <summary>A game folder's line: its games, and what the person left out there ("5 games · 4 left out").</summary>
+    private string FolderMeta(GameFolderSummary folder) =>
+        _picks.TryGetValue(folder.Path, out var picked) && picked.LeftOutNames.Count > 0
+            ? $"{Count(folder.Games)} · {picked.LeftOutNames.Count.ToString(CultureInfo.InvariantCulture)} left out"
+            : Count(folder.Games);
 
     private static List<StoreRow> Rows(IReadOnlyList<StoreSummary> stores) =>
         stores.Select(s => new StoreRow(s.Name, s.Where, s.Games == 0 ? "0" : Count(s.Games))).ToList();

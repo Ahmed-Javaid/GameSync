@@ -82,7 +82,7 @@ public class GamePropertiesTests
         Assert.True(page.PrimaryIsMain);
         Assert.Equal(["Last played", "Play time", "Saves"], page.Stats.Select(s => s.Label));
         Assert.Equal("218 hours", page.Stats[1].Value);
-        Assert.Equal("Not syncing yet", page.Stats[2].Value);
+        Assert.Equal("Not backed up", page.Stats[2].Value);
 
         // About, from its Steam store page.
         Assert.Equal("From its Steam store page", page.AboutSource);
@@ -337,6 +337,36 @@ public class GamePropertiesTests
 
         Assert.Equal("steam://rungameid/632360", GameLaunch.StoreLink(new LibraryEntry { Id = game, Title = "x", Store = StoreKind.Steam, StoreId = "632360" }));
         Assert.Null(GameLaunch.StoreLink(new LibraryEntry { Id = game, Title = "x", Store = StoreKind.Loose }));
+    }
+
+    [Fact]
+    public void PLAY_16_a_game_that_asks_for_admin_starts_through_Windows_prompt_with_the_same_program_folder_and_options()
+    {
+        using var world = new TestWorld();
+        using var state = new StateStore(world.Root);
+        var game = GameId.Parse("dark-souls-remastered");
+        Assert.False(GameLaunch.NeedsAdmin(state, game));
+        state.SetSetting(GameLaunch.AdminKey(game), "1");
+        Assert.True(GameLaunch.NeedsAdmin(state, game));
+
+        var start = new System.Diagnostics.ProcessStartInfo(@"C:\Games\DSR\DarkSoulsRemastered.exe") { UseShellExecute = false, WorkingDirectory = @"C:\Games\DSR", Arguments = "-windowed" };
+        var admin = GameLaunch.AsAdmin(start);
+        Assert.True(admin.UseShellExecute);
+        Assert.Equal("runas", admin.Verb);
+        Assert.Equal(start.FileName, admin.FileName);
+        Assert.Equal(@"C:\Games\DSR", admin.WorkingDirectory);
+        Assert.Equal("-windowed", admin.Arguments);
+
+        // Steam's %command% comes as separate arguments: each is quoted back as Windows reads it.
+        var wrapped = new System.Diagnostics.ProcessStartInfo(@"C:\Games\DSR\DarkSoulsRemastered.exe") { UseShellExecute = false };
+        wrapped.ArgumentList.Add("-name");
+        wrapped.ArgumentList.Add(@"My Save\");
+        wrapped.ArgumentList.Add("say \"hi\"");
+        Assert.Equal(@"-name ""My Save\\"" ""say \""hi\""""", GameLaunch.AsAdmin(wrapped).Arguments);
+
+        var launcher = Launcher.Games([new LibraryEntry { Id = game, Title = "Dark Souls: Remastered", Store = StoreKind.Loose, State = LibraryState.Synced }], [], state, null,
+            new Dictionary<long, SteamPlay>(), null);
+        Assert.True(Assert.Single(launcher).NeedsAdmin);
     }
 
     [Fact]

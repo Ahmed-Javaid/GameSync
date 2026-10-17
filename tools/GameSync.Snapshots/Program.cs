@@ -9,12 +9,13 @@
 // by status and Every game by status reversed, KAN-49),
 // library-local, library-search and library-game (a game's page, the
 // one --game names or the hero game), saves and game-saves (the save manager, and that game's saves in it), conflict and
-// conflict-settled (a made-up conflict of that game, waiting and settled), plan (the save manager's Plan tab, made up),
+// conflict-settled (a made-up conflict of that game, waiting and settled),
 // add-place and import-kept (those dialogs over
 // its saves, made up), and
 // properties-general, -art, -launch, -files, -saves and -sync (its Properties) from that data folder's games and art;
-// first run over that data folder's library, as if it weren't set up (its stores' folders made up): setup-scan (the scan
-// under way), setup, setup-choose, setup-cloud, setup-cloud-folder, setup-daily and setup-daily-time; home-nocloud and
+// first run over that data folder's library, as if it weren't set up (its stores' folders made up): setup (Welcome),
+// setup-folders, setup-folders-added, setup-scan (the scan under way on Choose saves), setup-choose, setup-cloud,
+// setup-cloud-folder, setup-cloud-local, setup-daily and setup-daily-time, and setup-pick (What's in E:\Games, LIB-30); home-nocloud and
 // connect-cloud (Home after Skip for now, and its Connect the cloud dialog); add-game, add-game-program and setup-add-game
 // (Add a game or folder over the library and over first run, made up); settings, settings-storage, settings-backup,
 // settings-cloud, settings-devices, settings-notifications, settings-achievements and settings-safety (Settings from that data folder's own
@@ -216,10 +217,11 @@ if (dataDir is not null)
         OpenImportKept = _ => { },
         SaveProperties = (_, _) => { },
         CloseDialog = () => { },
-        SetInstalledOnly = _ => { },
-        ScanFolder = (folder, _) => Task.FromResult(new FolderScan(folder, [], 0)),
+        SetView = _ => { },
+        ScanFolder = (folder, _) => Task.FromResult<FolderScan?>(new FolderScan(folder, [], 0)),
         Locate = (_, _) => { },
         OpenAddGame = () => { },
+        CheckProgram = (_, program, _) => Task.FromResult(new ProgramCheck(ProgramFit.Fits, "This is the game's program: its own record says so.", System.IO.Path.GetDirectoryName(program) ?? "")),
     };
 
     // First run's and Connect the cloud's two ways, answering without signing in or writing: a folder picked becomes
@@ -229,9 +231,9 @@ if (dataDir is not null)
     // Read off the UI thread, as the app does: waiting on it here would hold the thread its awaits come back to.
     T Off<T>(Func<Task<T>> read) => Task.Run(read).GetAwaiter().GetResult();
 
-    LibraryViewModel Library(string tab = "all", string search = "", bool open = false, bool installedOnly = false)
+    LibraryViewModel Library(string tab = LibraryViewModel.InstalledView, string search = "", bool open = false)
     {
-        var library = LibraryViewModel.From(games, now, tab, actions, installedOnly: installedOnly, progress: progress);
+        var library = LibraryViewModel.From(games, now, tab, actions, progress: progress);
         library.Search = search;
         if (open && shown is not null)
         {
@@ -267,81 +269,8 @@ if (dataDir is not null)
         return saves;
     }
 
-    // The save manager's Plan tab (SYNC-14) as the design draws it: three changes, three games that won't run and six in
-    // sync. Made up, like the conflict.
-    SaveManagerViewModel PlanTab()
-    {
-        var saves = Saves();
-        GameId Id(string id) => GameId.Parse(id);
-        saves.Plan.Show(new SyncPlanView(
-            [
-                new PlannedChange(Id("ready-or-not"), "Ready or Not", PlanStep.Upload, "Changed here on 22 Sep. The upload waited because this PC was offline.", 14_155_776, "a"),
-                new PlannedChange(Id("slay-the-spire-2"), "Slay the Spire 2", PlanStep.Download, "LAPTOP uploaded a newer save on 26 Sep and this PC's is unchanged. This PC's copy goes into history first.", 913_408, "b"),
-                new PlannedChange(Id("cyberpunk-2077"), "Cyberpunk 2077", PlanStep.BackUp, "Steam Cloud syncs this game, so GameSync only adds this save to its history.", 16_777_216, "c"),
-            ],
-            [
-                new PlannedWait(Id("sekiro"), Id("sekiro"), "Sekiro: Shadows Die Twice", GameSync.Core.State.GameStatus.Conflict, "Changed on DESKTOP and LAPTOP since the last sync. Nothing moves until you choose.", "Resolve"),
-                new PlannedWait(Id("ghost"), Id("ghost"), "Ghost of Tsushima", GameSync.Core.State.GameStatus.Playing, "Being played now. It syncs a few seconds after it closes.", null),
-                new PlannedWait(Id("rounds"), Id("rounds"), "ROUNDS", GameSync.Core.State.GameStatus.NoSaves, "No save folder found yet. Add a place where it keeps its saves.", "Add a place"),
-            ],
-            ["Terraria", "Hades", "Hollow Knight", "Core Keeper", "Valheim", "Risk of Rain 2"],
-            now.ToUniversalTime()));
-        saves.Tab = "plan";
-        return saves;
-    }
-
-    // The save manager's Versions tab (MGR-08) as the design draws it: the newest versions from two PCs, one for each
-    // reason a version is kept, and 204 older ones behind Show N older; kept: Named and kept only; empty: a game that
-    // hasn't synced since it was added. Made up, like the plan.
-    SaveManagerViewModel VersionsTab(string state)
-    {
-        var saves = Saves();
-        saves.Tab = "versions";
-        DateTime At(int daysAgo, int hour, int minute) => now.Date.AddDays(-daysAgo).AddHours(hour).AddMinutes(minute).ToUniversalTime();
-        SavedVersion V(string game, string title, DateTime at, string pc, string why, KeptFor kind, int files, long bytes, bool named = false, bool kept = false) =>
-            new(GameId.Parse(game), title, VersionId.New(at, pc), at, at, pc, why, kind, named, kept, files, bytes);
-        var versions = new List<SavedVersion>
-        {
-            V("sekiro", "Sekiro: Shadows Die Twice", At(0, 21, 6), "DESKTOP", "After play · 3 h 10 min", KeptFor.Play, 2, 2_202_009),
-            V("sekiro", "Sekiro: Shadows Die Twice", At(0, 21, 4), "LAPTOP", "LAPTOP's save, replaced by DESKTOP's in a conflict", KeptFor.Kept, 2, 2_199_552, kept: true),
-            V("terraria", "Terraria", At(0, 20, 0), "DESKTOP", "Daily backup", KeptFor.Daily, 3, 341_835_776),
-            V("slay-the-spire-2", "Slay the Spire 2", At(0, 19, 30), "LAPTOP", "After play · 47 min", KeptFor.Play, 1, 913_408),
-            V("black-myth-wukong", "Black Myth: Wukong", At(1, 23, 31), "DESKTOP", "Named: Before Erlang Shen", KeptFor.Kept, 3, 522_240, named: true, kept: true),
-            V("black-myth-wukong", "Black Myth: Wukong", At(1, 22, 47), "DESKTOP", "Changed outside play, held for review", KeptFor.Held, 3, 519_168),
-            V("minecraft-server-world", "Minecraft server world", At(1, 21, 10), "DESKTOP", "After 5 quiet minutes", KeptFor.Quiet, 142, 40_265_318),
-            V("hollow-knight", "Hollow Knight", At(2, 18, 5), "LAPTOP", "Kept before update to build 1.5.78 (28 Sep)", KeptFor.Kept, 6, 1_153_434, kept: true),
-            V("dark-souls-3", "Dark Souls III", At(2, 12, 0), "DESKTOP", "Kept before a restore", KeptFor.Kept, 1, 6_815_744, kept: true),
-            V("cuphead", "Cuphead", At(4, 20, 0), "LAPTOP", "First backup", KeptFor.First, 4, 48_128),
-        };
-        var played = new[]
-        {
-            ("sekiro", "Sekiro: Shadows Die Twice", 2_199_552L), ("terraria", "Terraria", 341_000_000L), ("slay-the-spire-2", "Slay the Spire 2", 905_216L),
-            ("hollow-knight", "Hollow Knight", 1_150_000L), ("cuphead", "Cuphead", 48_128L), ("dark-souls-3", "Dark Souls III", 6_815_744L),
-        };
-        for (var i = 0; i < 204; i++)
-        {
-            var (id, title, bytes) = played[i % played.Length];
-            versions.Add(V(id, title, At(5 + i / 16, 22 - i % 16, 10), i % 3 == 0 ? "LAPTOP" : "DESKTOP",
-                $"After play · {Launcher.DurationText(TimeSpan.FromMinutes(20 + i % 7 * 13))}", KeptFor.Play, 2, bytes));
-        }
-
-        var games = versions.Select(v => new HistoryGame(v.Game, v.Title)).DistinctBy(g => g.Id).Append(new HistoryGame(GameId.Parse("hades"), "Hades"))
-            .OrderBy(g => g.Title, StringComparer.CurrentCultureIgnoreCase).ToList();
-        saves.Versions.Show(new VersionsView(versions, games, "DESKTOP", ["DESKTOP", "LAPTOP"], 10, HasCloud: true), now);
-        if (state == "kept")
-        {
-            saves.Versions.KeptOnly = true;
-        }
-        else if (state == "empty")
-        {
-            saves.Versions.Game = "hades";
-        }
-
-        return saves;
-    }
-
     // The save manager's Log tab (MGR-09): lines as GameSync writes them, newest first and dated, with the daily
-    // backup's for the days before; needs: Only what needs you; search: "dark souls" typed. Made up, like the plan.
+    // backup's for the days before; needs: Only what needs you; search: "dark souls" typed. Made up, like the conflict.
     SaveManagerViewModel SavesLogTab(string state)
     {
         var saves = Saves();
@@ -447,6 +376,21 @@ if (dataDir is not null)
         return saves;
     }
 
+    // LIB-24 (design system version 57, GamePropertiesDialog #files-wrong): Installed files with another game's program
+    // picked, made up over the game's own Properties.
+    PropertiesViewModel? FilesWrong()
+    {
+        var properties = Properties("files");
+        if (properties is not null)
+        {
+            properties.PickCheck = new ProgramCheck(ProgramFit.OtherGame,
+                "This is Dark Souls: Remastered's program (DarkSoulsRemastered.exe), not Dark Souls III's: its Steam app ID says so. Change… and pick Dark Souls III's own program, in its own folder.",
+                @"E:\Games\DARK SOULS REMASTERED");
+        }
+
+        return properties;
+    }
+
     // A game's Properties over its page, on the section given.
     PropertiesViewModel? Properties(string section)
     {
@@ -516,7 +460,23 @@ if (dataDir is not null)
         ["playing"] = Playing,
         ["library"] = () => Library(),
         ["marks"] = Marked,
-        ["installed"] = () => Library(installedOnly: true),
+        ["installed"] = () => Library(LibraryViewModel.InstalledView),
+        ["all-games"] = () => Library(LibraryViewModel.AllView),
+        ["saves-only"] = () => Library(LibraryViewModel.SavesView),
+        // 18 Oct 2026: Add game folder's notice, still looking and once it has found the games.
+        ["library-looking"] = () =>
+        {
+            var library = Library();
+            library.ScanNote = new LibraryNotice(LibraryNotice.Busy, @"Looking for games in E:\Games", "GameSync scans the rest of this PC with it, which takes a minute or so.");
+            return library;
+        },
+        ["library-found"] = () =>
+        {
+            var library = Library();
+            var found = new FolderScan(@"E:\Games", ["Battlefield 1", "Call of Duty: Advanced Warfare", "Call of Duty: Black Ops II", "Call of Duty: Black Ops III", "Cuphead", "Child of Light"], 0);
+            library.ScanNote = new LibraryNotice(LibraryNotice.Done, found.Headline, found.Detail) { Found = true };
+            return library;
+        },
         ["saves-by-name"] = () =>
         {
             var saves = Saves();
@@ -630,23 +590,27 @@ if (dataDir is not null)
         },
         ["conflict"] = () => Conflict(settled: false),
         ["conflict-settled"] = () => Conflict(settled: true),
-        ["plan"] = PlanTab,
-        ["versions"] = () => VersionsTab(""),
-        ["versions-kept"] = () => VersionsTab("kept"),
-        ["versions-empty"] = () => VersionsTab("empty"),
         ["saves-log"] = () => SavesLogTab(""),
         ["saves-log-needs"] = () => SavesLogTab("needs"),
         ["saves-log-search"] = () => SavesLogTab("search"),
         ["home-nocloud"] = () => HomeViewModel.From(home, games, now, actions,
             new HomeStatus("No cloud yet", GameSync.Core.Storage.NoCloud.Message, Environment.MachineName, []) { NoCloud = true }),
         ["setup-scan"] = () => Setup("scanning"),
-        ["setup"] = () => Setup("scan"),
+        ["setup"] = () => Setup("welcome"),
+        ["setup-folders"] = () => Setup("folders"),
+        ["setup-folders-added"] = () => Setup("folders-added"),
         ["setup-choose"] = () => Setup("choose"),
         ["setup-cloud"] = () => Setup("cloud"),
         ["setup-cloud-folder"] = () => Setup("cloud-folder"),
+        ["setup-cloud-local"] = () => Setup("cloud-local"),
         ["setup-daily"] = () => Setup("daily"),
         ["setup-daily-time"] = () => Setup("daily-time"),
+        // ONB-08 (design system version 56, GuideScreen): the Guide, on its first topic, the statuses and the backup folder.
+        ["guide"] = () => new GuideViewModel(Path.Combine(dataDir, "history"), () => { }),
+        ["guide-statuses"] = () => new GuideViewModel(Path.Combine(dataDir, "history"), () => { }, "statuses"),
+        ["guide-folder"] = () => new GuideViewModel(Path.Combine(dataDir, "history"), () => { }, "folder"),
         ["settings"] = () => SettingsPage(SettingsViewModel.AppearanceId),
+        ["settings-still"] = () => SettingsPage(SettingsViewModel.AppearanceId, still: true),
         ["settings-storage"] = () => SettingsPage(SettingsViewModel.StorageId),
         ["settings-backup"] = () => SettingsPage(SettingsViewModel.BackupId),
         ["settings-backup-apply"] = () => SettingsPage(SettingsViewModel.BackupId, apply: true),
@@ -702,7 +666,7 @@ if (dataDir is not null)
     // Settings (SET-01) from this data folder's own settings, on a section; the actions only answer, so nothing is
     // written. With drive, the cloud is a made-up Google Drive, signed in and 81% full (CLOUD-05); with apply, the
     // settings files default was just changed, so What to back up offers to apply it to games that differ (SET-06).
-    SettingsViewModel SettingsPage(string section, bool drive = false, bool apply = false, string? updates = null)
+    SettingsViewModel SettingsPage(string section, bool drive = false, bool apply = false, string? updates = null, bool still = false)
     {
         var view = SettingsData.Read(dataDir);
         if (drive)
@@ -726,6 +690,8 @@ if (dataDir is not null)
             Cloud = _ => Task.FromResult(details),
             Diagnostics = _ => Task.FromResult(""),
             AchievementGames = _ => Task.FromResult(GameSync.Host.Achievements.SettingsRows(dataDir, games)),
+            // LOOK-28 (design system version 57): settings-still is Settings with Windows' Animation effects off.
+            AnimationsOff = () => still,
         }, new Look(), section);
         settings.Apply(view);
         settings.Storage.LoadFigures();
@@ -800,15 +766,36 @@ if (dataDir is not null)
             AddGame = () => { },
         });
         setup.Start();
-        var steps = state switch { "choose" => 1, "cloud" or "cloud-folder" => 2, "daily" or "daily-time" => 3, _ => 0 };
+
+        // ONB-07: Welcome, Your games, Choose saves, Where saves are kept, Backups and startup. Where saves are kept goes on
+        // once a choice is made: a folder, here.
+        var steps = state switch
+        {
+            "folders" or "folders-added" => 1,
+            "scanning" or "choose" => 2,
+            "cloud" or "cloud-folder" or "cloud-local" => 3,
+            "daily" or "daily-time" => 4,
+            _ => 0,
+        };
         for (var i = 0; i < steps; i++)
         {
+            if (i == 3)
+            {
+                setup.Cloud.PickCommand.Execute("folder");
+                setup.Cloud.ChooseFolder(@"D:\");
+            }
+
             setup.NextCommand.Execute(null);
         }
 
         if (state == "cloud-folder")
         {
+            setup.Cloud.PickCommand.Execute("folder");
             setup.Cloud.ChooseFolder(@"D:\");
+        }
+        else if (state == "cloud-local")
+        {
+            setup.Cloud.PickCommand.Execute("local");
         }
         else if (state == "daily-time")
         {
@@ -816,6 +803,25 @@ if (dataDir is not null)
         }
 
         return setup;
+    }
+
+    // LIB-30: What's in a folder of games, as the friend's E:\Games held them (made up, as drawn in design system version 56).
+    FolderPickViewModel FolderPickMadeUp()
+    {
+        var folder = @"E:\Games";
+        GameSync.Core.Discovery.FolderCandidate Game(string title, string program, string why) => new(title, Path.Combine(folder, title), program, true, why);
+        GameSync.Core.Discovery.FolderCandidate Not(string title, string program, string why) => new(title, Path.Combine(folder, title), program, false, why);
+        return new FolderPickViewModel(new FolderLookResult(folder,
+        [
+            Game("Dark Souls III", @"DARK SOULS III\Game\DarkSoulsIII.exe", "in the save list"),
+            Game("Hollow Knight", @"Hollow Knight\hollow_knight.exe", "in the save list"),
+            Game("Cuphead", @"Cuphead\Cuphead.exe", "in the save list"),
+            Game("Friday Night Funkin'", @"FNF\Funkin.exe", "a program of its own; nothing says it isn't a game"),
+            Game("Guacamelee! 2", @"Guacamelee 2\Guac2.exe", "named in its GOG record"),
+            Not("FL Studio 2024", @"FL Studio 2024\FL64.exe", "an app: its program calls itself FL Studio, by Image-Line"),
+            Not("Cursor", @"cursor\Cursor.exe", "an app built on Chromium, like a browser or a code editor"),
+            Not("GameSync", @"GitHub\GameSync", "a code project: it has a .git folder"),
+        ]), _ => { });
     }
 
     // The library with every game given a made-up status in turn, to show the fine games' marks and the badges (KAN-45, KAN-48).
@@ -986,7 +992,8 @@ if (dataDir is not null)
         return share;
     }
 
-    ImportSavesViewModel ImportSaves()
+    // Version 57: import-now has the first game used now, import-tag the tag's field open, import-tagged a tag set.
+    ImportSavesViewModel ImportSaves(string state = "")
     {
         var syncing = games.FirstOrDefault(g => g.Syncs);
         var other = games.FirstOrDefault(g => !g.Syncs && !g.IsSoftware);
@@ -1002,14 +1009,27 @@ if (dataDir is not null)
         ]);
         var import = new ImportSavesViewModel(Sharing(preview), preview.ZipPath);
         import.Load();
+        if (state == "now" && import.Rows.FirstOrDefault(r => r.CanUseNow) is { } first)
+        {
+            first.Use = ImportRow.Now;
+        }
+
+        if (state is "tag" or "tagged")
+        {
+            import.TagOpen = state == "tag";
+            import.Tag = "Jawad";
+        }
+
         return import;
     }
 
     Control Shell(string current, string? dialog = null) => new Shell
     {
-        DataContext = new ShellViewModel(Makers(), current)
+        DataContext = new ShellViewModel(Makers(), current.StartsWith("tour", StringComparison.Ordinal) ? "home" : current)
         {
             Rail = rail,
+            // ONB-08: the tour over Home, asking first (tour) or at a stop (tour-3).
+            Tour = current.StartsWith("tour", StringComparison.Ordinal) ? new TourViewModel(() => { }, current == "tour" ? 0 : int.Parse(current[5..], System.Globalization.CultureInfo.InvariantCulture)) : null,
             Dialog = dialog switch
             {
                 null => null,
@@ -1019,11 +1039,15 @@ if (dataDir is not null)
                 "add-game" => AddGame(setup: false, program: false),
                 "add-game-program" => AddGame(setup: false, program: true),
                 "setup-add-game" => AddGame(setup: true, program: false),
+                "setup-pick" => FolderPickMadeUp(),
                 "share" => Share(ShareStart.Pick),
                 "share-all" => Share(ShareStart.All),
                 "share-export" => Share(ShareStart.Pick, export: true),
                 "share-done" => Share(ShareStart.Pick, done: true),
                 "import-saves" => ImportSaves(),
+                "import-now" => ImportSaves("now"),
+                "import-tag" => ImportSaves("tag"),
+                "import-tagged" => ImportSaves("tagged"),
                 "named-save" => NamedSave(""),
                 "named-save-taken" => NamedSave("taken"),
                 "named-save-new" => NamedSave("new"),
@@ -1034,6 +1058,8 @@ if (dataDir is not null)
                 "kept-copies-keeping" => KeptCopiesDialogFor(backup: false, done: false, busy: "keeping"),
                 "achievement-games" => new AchievementGamesViewModel(SettingsPage(SettingsViewModel.AchievementsId).Achievements, () => { }),
                 "learn-finds" => new LearnFindsViewModel(shown?.Id ?? GameId.Parse("rounds"), shown?.Title ?? "ROUNDS", LearnMadeUp(), new Dictionary<string, string?>(), null, () => { }, now),
+                "files-wrong" => FilesWrong(),
+                "report-problem" => new ReportProblemViewModel(new SettingsActions(), _ => { }) { Words = "Dark Souls III shows Not backed up, but I ticked it in first run." },
                 _ => Properties(dialog),
             },
         },
@@ -1046,6 +1072,10 @@ if (dataDir is not null)
     pages["library-full"] = (() => Shell("library"), 1280, 2400);
     pages["library-hidden"] = (() => Shell("hidden"), 1280, 800);
     pages["library-installed"] = (() => Shell("installed"), size.Width, size.Height);
+    pages["library-all"] = (() => Shell("all-games"), size.Width, size.Height);
+    pages["library-saves"] = (() => Shell("saves-only"), size.Width, size.Height);
+    pages["library-looking"] = (() => Shell("library-looking"), size.Width, size.Height);
+    pages["library-found"] = (() => Shell("library-found"), size.Width, size.Height);
     pages["saves-needs"] = (() => Shell("saves-needs"), size.Width, size.Height);
     pages["saves-by-name"] = (() => Shell("saves-by-name"), size.Width, size.Height);
     pages["saves-by-status"] = (() => Shell("saves-by-status"), size.Width, size.Height);
@@ -1064,15 +1094,16 @@ if (dataDir is not null)
     pages["game-saves"] = (() => Shell("game-saves"), size.Width, size.Height);
     pages["conflict"] = (() => Shell("conflict"), size.Width, size.Height);
     pages["conflict-settled"] = (() => Shell("conflict-settled"), size.Width, size.Height);
-    pages["plan"] = (() => Shell("plan"), size.Width, size.Height);
-    foreach (var tab in new[] { "versions", "versions-kept", "versions-empty", "saves-log", "saves-log-needs", "saves-log-search" })
+    foreach (var tab in new[] { "saves-log", "saves-log-needs", "saves-log-search" })
     {
         pages[tab] = (() => Shell(tab), size.Width, size.Height);
     }
-    foreach (var section in new[] { "general", "art", "launch", "files", "saves", "sync" })
+    foreach (var section in new[] { "general", "art", "launch", "files", "saves", "sync", "files-wrong" })
     {
         pages["properties-" + section] = (() => Shell("game", section), size.Width, size.Height);
     }
+
+    pages["report-problem"] = (() => Shell("settings", "report-problem"), size.Width, size.Height);
 
     pages["add-place"] = (() => Shell("game-saves", "add-place"), size.Width, size.Height);
     foreach (var dialog in new[] { "named-save", "named-save-taken", "named-save-new" })
@@ -1100,7 +1131,12 @@ if (dataDir is not null)
     pages["add-game"] = (() => Shell("library", "add-game"), size.Width, size.Height);
     pages["add-game-program"] = (() => Shell("library", "add-game-program"), size.Width, size.Height);
     pages["setup-add-game"] = (() => Shell("setup-choose", "setup-add-game"), size.Width, size.Height);
-    foreach (var dialog in new[] { "share", "share-all", "share-export", "share-done", "import-saves" })
+    pages["setup-pick"] = (() => Shell("setup-folders", "setup-pick"), size.Width, size.Height);
+    foreach (var page in new[] { "guide", "guide-statuses", "guide-folder", "tour", "tour-1", "tour-3", "tour-4", "tour-5" })
+    {
+        pages[page] = (() => Shell(page), size.Width, size.Height);
+    }
+    foreach (var dialog in new[] { "share", "share-all", "share-export", "share-done", "import-saves", "import-now", "import-tag", "import-tagged" })
     {
         pages[dialog] = (() => Shell("saves", dialog), size.Width, size.Height);
     }
@@ -1108,14 +1144,14 @@ if (dataDir is not null)
     // Achievements by game (KAN-131), over Settings' Achievements.
     pages["achievement-games"] = (() => Shell("settings-achievements", "achievement-games"), size.Width, size.Height);
     pages["saves-selected"] = (() => Shell("saves-selected"), size.Width, size.Height);
-    foreach (var section in new[] { "settings", "settings-storage", "settings-backup", "settings-backup-apply", "settings-cloud", "settings-cloud-drive", "settings-devices",
+    foreach (var section in new[] { "settings", "settings-still", "settings-storage", "settings-backup", "settings-backup-apply", "settings-cloud", "settings-cloud-drive", "settings-devices",
                  "settings-notifications", "settings-achievements", "settings-safety", "settings-updates", "settings-updates-latest", "settings-updates-downloading",
                  "settings-updates-refused" })
     {
         pages[section] = (() => Shell(section), size.Width, size.Height);
     }
 
-    foreach (var step in new[] { "setup-scan", "setup", "setup-choose", "setup-cloud", "setup-cloud-folder", "setup-daily", "setup-daily-time" })
+    foreach (var step in new[] { "setup-scan", "setup", "setup-folders", "setup-folders-added", "setup-choose", "setup-cloud", "setup-cloud-folder", "setup-cloud-local", "setup-daily", "setup-daily-time" })
     {
         pages[step] = (() => Shell(step), size.Width, size.Height);
     }
@@ -1130,7 +1166,7 @@ if (dataDir is not null)
         "22:31:57  Hades: synced after play (3 files, 1.2 MB).",
         "22:32:02  ! Sekiro: Shadows Die Twice: changed on two PCs. A conflict waits for you.",
     ], now);
-    foreach (var current in new[] { "home", "library", "game", "saves", "game-saves", "conflict", "log", "settings", "properties", "setup", "setup-choose", "plan", "versions", "saves-log", "achievements" })
+    foreach (var current in new[] { "home", "library", "game", "saves", "game-saves", "conflict", "log", "settings", "properties", "setup", "setup-choose", "saves-log", "achievements" })
     {
         glossy[current == "log" ? "glossy-console" : "glossy-" + current] = choice =>
         {

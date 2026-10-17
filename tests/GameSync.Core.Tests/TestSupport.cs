@@ -306,6 +306,14 @@ public sealed class FaultyCloud(ICloud inner, TestPc pc) : ICloud
 
     public Task WriteRestoreKitAsync(CancellationToken ct) => Check(pc, "kit", () => inner.WriteRestoreKitAsync(ct));
 
+    public Task<IReadOnlyList<CloudFileTag>> ListAchievementFilesAsync(CancellationToken ct) => Check(pc, "achievements.list", () => inner.ListAchievementFilesAsync(ct));
+
+    public Task<byte[]?> GetAchievementFileAsync(DeviceId device, long largest, CancellationToken ct) =>
+        Check(pc, "achievements.get", () => inner.GetAchievementFileAsync(device, largest, ct));
+
+    public Task SaveAchievementFileAsync(DeviceId device, byte[] content, CancellationToken ct) =>
+        Check(pc, "achievements.save", () => inner.SaveAchievementFileAsync(device, content, ct));
+
     internal static void Check(TestPc pc, string call)
     {
         if (pc.Fault?.Invoke(call) is { } fault)

@@ -27,6 +27,25 @@
       <Setter Property="FontStyle" Value="Italic" />
       <Setter Property="Foreground" Value="{DynamicResource ink-faint}" />
     </Style>
+    <!-- Design system version 55: the ? after the header's words, for a copy whose achievements GameSync can't see -->
+    <Style Selector="Button.why">
+      <Setter Property="Width" Value="18" />
+      <Setter Property="Height" Value="18" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="MinWidth" Value="0" />
+      <Setter Property="MinHeight" Value="0" />
+      <Setter Property="CornerRadius" Value="9" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Foreground" Value="{DynamicResource ink-faint}" />
+      <Setter Property="Cursor" Value="Help" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.why:pointerover /template/ ContentPresenter, Button.why:focus-visible /template/ ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource bg-300}" />
+      <Setter Property="Foreground" Value="{DynamicResource ink}" />
+    </Style>
     <Style Selector="TextBlock.fact-value">
       <Setter Property="FontSize" Value="{DynamicResource fs-13}" />
       <Setter Property="LineHeight" Value="{DynamicResource lh-18}" />
@@ -79,7 +98,36 @@
         <Grid ColumnDefinitions="*,Auto" ColumnSpacing="24" Margin="24,20">
           <StackPanel VerticalAlignment="Center">
             <TextBlock Classes="page-title" Text="{Binding Title}" TextWrapping="Wrap" />
-            <TextBlock Classes="muted" Text="{Binding Subtitle}" FontSize="{DynamicResource fs-13}" LineHeight="{DynamicResource lh-19}" TextWrapping="Wrap" Margin="0,4,0,0" />
+            <!-- Design system version 55 (the owner, 8 Oct 2026: "have a little question mark on the achivement page for the game that
+                 when hovered it explains why the game is prolly not being picked up"): a ? after these words; a click or Enter shows
+                 the same, for the keyboard and touch -->
+            <TextBlock Classes="muted" FontSize="{DynamicResource fs-13}" LineHeight="{DynamicResource lh-19}" TextWrapping="Wrap" Margin="0,4,0,0">
+              <Run Text="{Binding Subtitle}" />
+              <InlineUIContainer BaselineAlignment="Center">
+                <Button Classes="why" Margin="4,-3,0,-3" IsVisible="{Binding HasWhy}" AutomationProperties.Name="{x:Static vm:AchievementsViewModel.WhyTitle}"
+                        AutomationProperties.HelpText="{Binding WhyText}">
+                  <ToolTip.Tip>
+                  <StackPanel Spacing="6" MaxWidth="360">
+                    <TextBlock Text="{x:Static vm:AchievementsViewModel.WhyTitle}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                    <TextBlock Text="{Binding WhyText}" TextWrapping="Wrap" />
+                    <TextBlock Text="{Binding WhyPath}" TextWrapping="Wrap" FontFamily="{DynamicResource font-mono}" FontSize="{DynamicResource fs-11}" Opacity="0.75"
+                               IsVisible="{Binding HasWhyPath}" />
+                  </StackPanel>
+                  </ToolTip.Tip>
+                  <Button.Flyout>
+                    <Flyout Placement="BottomEdgeAlignedLeft">
+                    <StackPanel Spacing="6" MaxWidth="360">
+                      <TextBlock Text="{x:Static vm:AchievementsViewModel.WhyTitle}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                      <TextBlock Text="{Binding WhyText}" TextWrapping="Wrap" />
+                      <TextBlock Text="{Binding WhyPath}" TextWrapping="Wrap" FontFamily="{DynamicResource font-mono}" FontSize="{DynamicResource fs-11}" Opacity="0.75"
+                                 IsVisible="{Binding HasWhyPath}" />
+                    </StackPanel>
+                    </Flyout>
+                  </Button.Flyout>
+                  <c:GsIcon Icon="help" Size="15" />
+                </Button>
+              </InlineUIContainer>
+            </TextBlock>
           </StackPanel>
           <c:GsAchievementsOverview Grid.Column="1" Done="{Binding Progress.Done}" Total="{Binding Progress.Total}" Gold="{Binding Progress.Gold}"
                                     Silver="{Binding Progress.Silver}" Bronze="{Binding Progress.Bronze}" CompletedOn="{Binding Progress.CompletedOn}"
@@ -97,6 +145,8 @@
       <!-- The list: All, Unlocked, Locked and Hidden with their counts; a search and a sort; one Tab stop, Up and Down move through it -->
       <c:GsCard Padding="16" AutomationProperties.Name="Every achievement">
         <DockPanel>
+          <!-- Design system version 54: a copy that writes its unlocks nowhere GameSync can find, whose achievements are marked by hand -->
+          <c:GsNote DockPanel.Dock="Top" Icon="info" Text="{x:Static vm:AchievementsViewModel.MarkNote}" IsVisible="{Binding CanMark}" Margin="0,0,0,12" />
           <c:GsPillTabs DockPanel.Dock="Top" ItemsSource="{Binding Tabs}" SelectedId="{Binding Tab, Mode=TwoWay}" AutomationProperties.Name="Which achievements"
                         HorizontalAlignment="Left">
             <c:GsPillTabs.ItemsPanel>
@@ -141,8 +191,11 @@
                       <TextBlock Classes="row-desc" Classes.secret="{Binding IsSecret}" Text="{Binding Description}" IsVisible="{Binding HasDescription}" />
                     </StackPanel>
                     <StackPanel Grid.Column="2" Spacing="2" VerticalAlignment="Center" HorizontalAlignment="Right">
-                      <TextBlock Text="{Binding When}" FontSize="{DynamicResource fs-12}" LineHeight="{DynamicResource lh-16}" FontWeight="Medium"
-                                 Foreground="{DynamicResource ink-muted}" HorizontalAlignment="Right" IsVisible="{Binding HasWhen}" />
+                      <!-- Where GameSync saw it, when not here itself: "· LAPTOP", "· marked by you" (design system version 54) -->
+                      <TextBlock FontSize="{DynamicResource fs-12}" LineHeight="{DynamicResource lh-16}" HorizontalAlignment="Right" IsVisible="{Binding HasWhen}">
+                        <Run Text="{Binding When}" FontWeight="Medium" Foreground="{DynamicResource ink-muted}" />
+                        <Run Text="{Binding WhenBy}" Foreground="{DynamicResource ink-faint}" />
+                      </TextBlock>
                       <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Right" IsVisible="{Binding HasPercent}">
                         <Border Theme="{StaticResource TierDot}" Classes.gold="{Binding IsGoldDot}" Classes.silver="{Binding IsSilverDot}"
                                 Classes.bronze="{Binding IsBronzeDot}" IsVisible="{Binding HasDot}" />
@@ -167,19 +220,41 @@
               <Panel HorizontalAlignment="Center" Margin="0,8,0,0">
                 <Ellipse Theme="{StaticResource TierGlow}" Width="190" Height="190" Margin="-43" Classes.gold="{Binding PickedGold}" Classes.silver="{Binding PickedSilver}"
                          Classes.bronze="{Binding PickedBronze}" />
-                <c:GsAchievementBadge Size="lg" Icon="{Binding Picked.Icon, FallbackValue={x:Null}}" State="{Binding Picked.State, FallbackValue=unlocked}"
+                <c:GsAchievementBadge Size="lg" Icon="{Binding Picked.Icon, FallbackValue={x:Null}}" State="{Binding PickedState}"
                                       Tier="{Binding Picked.Tier, FallbackValue={x:Null}}" />
               </Panel>
-              <TextBlock Text="{Binding Picked.Name, FallbackValue={x:Null}}" FontSize="{DynamicResource fs-20}" LineHeight="{DynamicResource lh-26}" FontWeight="SemiBold"
+              <TextBlock Text="{Binding PickedName}" FontSize="{DynamicResource fs-20}" LineHeight="{DynamicResource lh-26}" FontWeight="SemiBold"
                          TextWrapping="Wrap" TextAlignment="Center" Margin="0,6,0,0" />
               <TextBlock Classes="muted" Text="{Binding PickedText}" FontSize="{DynamicResource fs-13}" LineHeight="{DynamicResource lh-20}" TextWrapping="Wrap"
                          TextAlignment="Center" />
               <c:GsTierChip Tier="{Binding PickedTier, FallbackValue=bronze}" IsVisible="{Binding HasPickedTier}" HorizontalAlignment="Center" />
+              <!-- Design system version 54: marking by hand, only for a copy that writes its unlocks nowhere GameSync can find -->
+              <StackPanel Spacing="6" HorizontalAlignment="Center" IsVisible="{Binding CanMarkPicked}">
+                <c:GsButton Classes="primary" Icon="check" Content="Mark as unlocked" Command="{Binding MarkCommand}" HorizontalAlignment="Center"
+                            IsBusy="{Binding Marking}" BusyText="Marking" ToolTip.Tip="Unlocked today, marked by you. It counts like any other, on every PC." />
+                <TextBlock Classes="caption faint" Text="Unlocked today, marked by you. It counts like any other." TextWrapping="Wrap" TextAlignment="Center"
+                           MaxWidth="250" />
+              </StackPanel>
+              <StackPanel Spacing="6" HorizontalAlignment="Center" IsVisible="{Binding CanUnmarkPicked}">
+                <c:GsButton Classes="secondary sm" Icon="reset" Content="Unmark" Command="{Binding UnmarkCommand}" HorizontalAlignment="Center"
+                            IsBusy="{Binding Marking}" BusyText="Unmarking" ToolTip.Tip="Takes your mark off it, on every PC" />
+                <TextBlock Classes="caption faint" Text="Marked by mistake? Unmark it on every PC." TextWrapping="Wrap" TextAlignment="Center" MaxWidth="250" />
+              </StackPanel>
+              <StackPanel Spacing="6" HorizontalAlignment="Center" IsVisible="{Binding CanRevealPicked}">
+                <c:GsButton Classes="secondary sm" Content="Show it to mark it" Command="{Binding RevealCommand}" HorizontalAlignment="Center"
+                            ToolTip.Tip="Shows its name and what it asks, for this look only" />
+                <TextBlock Classes="caption faint" Text="Shows its name and what it asks, so you can find the one you earned." TextWrapping="Wrap"
+                           TextAlignment="Center" MaxWidth="250" />
+              </StackPanel>
               <Border BorderBrush="{DynamicResource line-100}" BorderThickness="0,1,0,0" Padding="0,18,0,0" Margin="0,8,0,0">
                 <StackPanel Spacing="14">
                   <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
                     <TextBlock Classes="overline faint" Text="UNLOCKED" VerticalAlignment="Center" />
                     <TextBlock Grid.Column="1" Classes="fact-value" Text="{Binding PickedWhen}" />
+                  </Grid>
+                  <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12" IsVisible="{Binding HasPickedSeen}">
+                    <TextBlock Classes="overline faint" Text="SEEN" VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="1" Classes="fact-value" Text="{Binding PickedSeen}" />
                   </Grid>
                   <StackPanel Spacing="6">
                     <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">

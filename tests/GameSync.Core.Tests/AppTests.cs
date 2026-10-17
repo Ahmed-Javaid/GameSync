@@ -419,12 +419,13 @@ public class AppTests
         var library = LibraryViewModel.From(games, DateTime.Now, "all", actions, LibrarySort.Name);
         var changed = new List<string?>();
         library.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
-        Assert.Equal(["all", "local", "software", "hidden"], library.Tabs.Select(t => t.Id));
+        Assert.Equal(["installed", "saves", "all", "local", "software", "hidden"], library.Tabs.Select(t => t.Id));
         Assert.Equal(["celeste", "hades"], library.OtherTiles.Select(t => t.Title));
         library.SelectedTab = "hidden";
         Assert.Equal(["rounds"], library.OtherTiles.Select(t => t.Title));
         Assert.Contains(nameof(LibraryViewModel.OtherTiles), changed);
-        Assert.Equal("all", LibraryViewModel.From([Game("hades")], DateTime.Now, "hidden").SelectedTab);
+        // A view the library hasn't (nothing hidden) shows the view kept on this PC, Installed until All games is picked (LIB-31).
+        Assert.Equal("installed", LibraryViewModel.From([Game("hades")], DateTime.Now, "hidden").SelectedTab);
 
         using var world = new TestWorld();
         using var pc = world.Pc("DESKTOP");
@@ -436,7 +437,7 @@ public class AppTests
         home.SyncNowCommand.Execute(null);
         home.OpenLibraryCommand.Execute(null);
         home.OpenSavesCommand.Execute(null);
-        Assert.Equal([("saves", "needs"), ("library", "all"), ("saves", "needs")], shown);
+        Assert.Equal([("saves", "needs"), ("library", LibraryViewModel.KeptView), ("saves", "needs")], shown);
         Assert.Equal([GameId.Parse("hades")], played);
 
         // Design system version 32 (the owner, 3 Oct 2026): while something needs the person, Needs you is in warn with
@@ -459,7 +460,7 @@ public class AppTests
         IReadOnlyList<LauncherGame> games = [Game("hades"), Game("celeste", GameStatus.Conflict), Game("rounds", GameStatus.HeldForReview, local: true)];
         var actions = new LauncherActions(_ => { }, () => { }, (_, _) => { }, (_, _) => { });
 
-        // The library as it was left: a view, a search and a game's page open; the rail's Game library shows every game.
+        // The library as it was left: a view, a search and a game's page open; the rail's Game library shows the library itself.
         var library = LibraryViewModel.From(games, DateTime.Now, "local", actions);
         library.Search = "ro";
         library.Open(GameId.Parse("rounds"), "home");
@@ -467,14 +468,15 @@ public class AppTests
         Assert.Null(library.Selected);
         Assert.True(library.ShowsCovers);
         Assert.Equal("", library.Search);
-        Assert.Equal("all", library.SelectedTab);
+        // LIB-31: on the view kept on this PC, Installed until All games is picked; never a narrower one left from before.
+        Assert.Equal("installed", library.SelectedTab);
         Assert.Null(library.ReturnTo);
         Assert.Equal(3, library.OtherTiles.Count);
 
         // The save manager's Needs you: its count on the tab, each game with what happened and its button.
         var saves = new SaveManagerViewModel(actions);
         saves.Update(games);
-        Assert.Equal(["saves", "needs", "plan", "versions", "log"], saves.Tabs.Select(t => t.Id));
+        Assert.Equal(["saves", "needs", "log"], saves.Tabs.Select(t => t.Id));
         Assert.Equal("2", saves.Tabs.Single(t => t.Id == "needs").Count);
         saves.ShowTab(SaveManagerViewModel.NeedsTab);
         Assert.True(saves.ShowsNeeds);

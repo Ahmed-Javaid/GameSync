@@ -5,8 +5,74 @@
              xmlns:v="using:GameSync.UI.Views"
              x:Class="GameSync.UI.Views.FirstRunPage"
              x:DataType="vm:FirstRunViewModel">
-  <!-- First run (design system → OnboardingScreen): four steps down the left, no side rail until it's done. The scan only
-       reads, and nothing syncs until Start using GameSync. -->
+  <!-- First run (design system → OnboardingScreen, version 56; ONB-07): five steps down the left, no side rail until it's done.
+       It says first that GameSync keeps saves, not games; asks for game folders before anything else; and goes on from
+       Where saves are kept only once a choice is made. The scan only reads, and nothing is copied until Start using GameSync. -->
+  <UserControl.Styles>
+    <!-- Welcome's three points: an icon in a soft circle, its title and its words -->
+    <Style Selector="Border.point-dot">
+      <Setter Property="Width" Value="36" />
+      <Setter Property="Height" Value="36" />
+      <Setter Property="CornerRadius" Value="18" />
+      <Setter Property="Background" Value="{DynamicResource primary-soft}" />
+      <Setter Property="HorizontalAlignment" Value="Left" />
+    </Style>
+    <!-- The worked example: the save, backed up, beside the game, never touched -->
+    <Style Selector="Border.well">
+      <Setter Property="Background" Value="{DynamicResource surface-well}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource edge-well}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="{DynamicResource radius-md}" />
+      <Setter Property="Padding" Value="16,14" />
+    </Style>
+    <Style Selector="Border.well.ok">
+      <Setter Property="Background" Value="{DynamicResource ok-soft}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource ok}" />
+    </Style>
+    <!-- Where saves are kept: three choices, one picked -->
+    <Style Selector="Button.choice">
+      <Setter Property="Background" Value="{DynamicResource bg-200}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource edge-card}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="{DynamicResource radius-lg}" />
+      <Setter Property="Padding" Value="18,16" />
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+      <Setter Property="Cursor" Value="Hand" />
+    </Style>
+    <Style Selector="Button.choice:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource bg-300}" />
+    </Style>
+    <Style Selector="Button.choice.on">
+      <Setter Property="Background" Value="{DynamicResource primary-soft}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource primary}" />
+    </Style>
+    <Style Selector="Button.choice.on:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource primary-soft}" />
+    </Style>
+    <Style Selector="Ellipse.radio">
+      <Setter Property="Width" Value="18" />
+      <Setter Property="Height" Value="18" />
+      <Setter Property="Stroke" Value="{DynamicResource ink-faint}" />
+      <Setter Property="StrokeThickness" Value="2" />
+    </Style>
+    <Style Selector="Button.choice.on Ellipse.radio">
+      <Setter Property="Stroke" Value="{DynamicResource primary}" />
+      <Setter Property="StrokeThickness" Value="5" />
+    </Style>
+    <!-- A group's heading opens and closes it -->
+    <Style Selector="Button.group-head">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Padding" Value="6,4" />
+      <Setter Property="CornerRadius" Value="{DynamicResource radius-sm}" />
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+      <Setter Property="Cursor" Value="Hand" />
+    </Style>
+    <Style Selector="Button.group-head:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource bg-300}" />
+    </Style>
+  </UserControl.Styles>
   <Grid>
     <!-- The steps grow a little with Windows' text size (A11Y-04) -->
     <Grid.ColumnDefinitions>
@@ -21,95 +87,212 @@
           <c:GsIcon Icon="logo" Size="28" VerticalAlignment="Center" />
           <StackPanel VerticalAlignment="Center">
             <TextBlock Text="Set up GameSync" FontSize="{DynamicResource fs-15}" LineHeight="{DynamicResource lh-20}" FontWeight="SemiBold" />
-            <TextBlock Classes="caption faint" Text="Four steps, about two minutes" />
+            <TextBlock Classes="caption faint" Text="Five steps, about three minutes" />
           </StackPanel>
         </StackPanel>
-        <c:GsNote DockPanel.Dock="Bottom" Icon="info" Margin="12,0" Text="Nothing syncs until you finish, and your saves stay where they are." />
+        <c:GsNote DockPanel.Dock="Bottom" Icon="info" Margin="12,0" Text="Nothing is copied until you finish. Your games and saves stay where they are." />
         <c:GsSettingsNav ItemsSource="{Binding Steps}" SelectedId="{Binding Step, Mode=TwoWay}" AutomationProperties.Name="Setup steps" VerticalAlignment="Top" />
       </DockPanel>
     </Border>
 
     <Panel Grid.Column="1" Margin="32,28,32,24">
 
-      <!-- 1. Scan this PC -->
-      <DockPanel IsVisible="{Binding IsScan}">
-        <StackPanel DockPanel.Dock="Top" Spacing="4" Margin="0,0,0,16">
-          <TextBlock Classes="page-title" Text="Scan this PC" />
-          <TextBlock Classes="muted" TextWrapping="Wrap" MaxWidth="720" HorizontalAlignment="Left"
-                     Text="GameSync reads what Steam, Epic and EA know, and looks through the game folders you add. It only reads; nothing is copied yet." />
+      <!-- 1. Welcome: what GameSync keeps, before anything is asked -->
+      <DockPanel IsVisible="{Binding IsWelcome}">
+        <StackPanel DockPanel.Dock="Top" Spacing="6" Margin="0,0,0,16">
+          <TextBlock Classes="page-title" Text="GameSync keeps your game saves safe" />
+          <TextBlock Classes="muted" TextWrapping="Wrap" MaxWidth="760" HorizontalAlignment="Left"
+                     Text="Your saves are your progress: the small files each game writes when you save. GameSync finds them, keeps a copy every time you play, and brings them to your other PCs. It never copies or moves your games." />
         </StackPanel>
-        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="12" HorizontalAlignment="Right" Margin="0,16,0,0">
-          <c:GsButton Classes="ghost" Icon="sync" Content="Scan again" Command="{Binding ScanAgainCommand}" IsVisible="{Binding HasScanError}" />
-          <c:GsButton Classes="primary" IconAfter="chevronRight" Content="Choose games" Command="{Binding NextCommand}" IsEnabled="{Binding CanChoose}"
-                      ToolTip.Tip="Once the scan has finished" />
-        </StackPanel>
-        <StackPanel Spacing="16">
-          <!-- KAN-80: the scan as a job: a spinner and how far it is, then how it ended -->
-          <c:GsJobProgress Classes="boxed" Title="{Binding ScanTitle}" Value="{Binding ScanBar}" State="{Binding ScanState}" Detail="{Binding ScanLabel}" Note="{Binding ScanLabel}" />
-          <TextBlock Foreground="{DynamicResource warn}" Text="{Binding ScanError}" TextWrapping="Wrap" IsVisible="{Binding HasScanError}" />
-          <Grid ColumnDefinitions="*,*" ColumnSpacing="16">
-            <c:GsCard Title="Stores" VerticalAlignment="Stretch">
-              <ItemsControl ItemsSource="{Binding Stores}">
-                <ItemsControl.ItemTemplate>
-                  <DataTemplate x:DataType="vm:StoreRow">
-                    <c:GsSettingsRow Title="{Binding Name}" Description="{Binding Where}" AutomationProperties.Name="{Binding}">
-                      <TextBlock Classes="mono" Classes.faint="{Binding IsEmpty}" Text="{Binding Count}" VerticalAlignment="Center" />
-                    </c:GsSettingsRow>
-                  </DataTemplate>
-                </ItemsControl.ItemTemplate>
-              </ItemsControl>
+        <Grid DockPanel.Dock="Bottom" ColumnDefinitions="*,Auto" ColumnSpacing="24" Margin="0,16,0,0">
+          <c:GsNote Icon="info" MaxWidth="620" HorizontalAlignment="Left" VerticalAlignment="Center"
+                    Text="Setting up takes about three minutes. Nothing is copied until the last step, and your saves stay where they are." />
+          <c:GsButton Grid.Column="1" Classes="primary" IconAfter="chevronRight" Content="Get started" Command="{Binding NextCommand}" />
+        </Grid>
+        <ScrollViewer HorizontalScrollBarVisibility="Disabled" Margin="0,0,-12,0" Padding="0,0,12,0">
+          <StackPanel Spacing="16">
+            <Grid ColumnDefinitions="*,*,*" ColumnSpacing="16">
+              <c:GsCard Padding="18,18,18,20">
+                <StackPanel Spacing="10">
+                  <Border Classes="point-dot"><c:GsIcon Icon="search" Size="18" Foreground="{DynamicResource primary}" HorizontalAlignment="Center" VerticalAlignment="Center" /></Border>
+                  <TextBlock Text="It finds your saves" FontWeight="SemiBold" FontSize="{DynamicResource fs-15}" />
+                  <TextBlock Classes="muted" TextWrapping="Wrap"
+                             Text="For each game on this PC, GameSync knows where its saves live, from PCGamingWiki's list of where games keep their saves, or it looks for them." />
+                </StackPanel>
+              </c:GsCard>
+              <c:GsCard Grid.Column="1" Padding="18,18,18,20">
+                <StackPanel Spacing="10">
+                  <Border Classes="point-dot"><c:GsIcon Icon="clock" Size="18" Foreground="{DynamicResource primary}" HorizontalAlignment="Center" VerticalAlignment="Center" /></Border>
+                  <TextBlock Text="It keeps every version" FontWeight="SemiBold" FontSize="{DynamicResource fs-15}" />
+                  <TextBlock Classes="muted" TextWrapping="Wrap"
+                             Text="Each time you stop playing, it keeps a copy. Lost a run, or a save went bad? Go back to any earlier one." />
+                </StackPanel>
+              </c:GsCard>
+              <c:GsCard Grid.Column="2" Padding="18,18,18,20">
+                <StackPanel Spacing="10">
+                  <Border Classes="point-dot"><c:GsIcon Icon="monitor" Size="18" Foreground="{DynamicResource primary}" HorizontalAlignment="Center" VerticalAlignment="Center" /></Border>
+                  <TextBlock Text="Your other PCs get them" FontWeight="SemiBold" FontSize="{DynamicResource fs-15}" />
+                  <TextBlock Classes="muted" TextWrapping="Wrap"
+                             Text="With Google Drive or a shared folder, your laptop carries on from where your desktop left off." />
+                </StackPanel>
+              </c:GsCard>
+            </Grid>
+            <c:GsCard Title="What GameSync backs up, and what it leaves alone" Subtitle="Dark Souls III, for example.">
+              <Grid ColumnDefinitions="*,*" ColumnSpacing="16">
+                <Border Classes="well ok">
+                  <StackPanel Spacing="6">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                      <c:GsIcon Icon="check" Size="16" Foreground="{DynamicResource ok}" VerticalAlignment="Center" />
+                      <TextBlock Text="Its saves: backed up" FontWeight="SemiBold" Foreground="{DynamicResource ok}" />
+                    </StackPanel>
+                    <TextBlock Classes="mono-small muted" Text="AppData\Roaming\DarkSoulsIII\0110000…\DS30000.sl2" TextTrimming="CharacterEllipsis" />
+                    <TextBlock TextWrapping="Wrap" Text="1 file, 11 MB. Your character, your items, how far you've got." />
+                  </StackPanel>
+                </Border>
+                <Border Grid.Column="1" Classes="well">
+                  <StackPanel Spacing="6">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                      <c:GsIcon Icon="block" Size="16" VerticalAlignment="Center" />
+                      <TextBlock Text="The game itself: never touched" FontWeight="SemiBold" />
+                    </StackPanel>
+                    <TextBlock Classes="mono-small muted" Text="E:\Steam\steamapps\common\DARK SOULS III" TextTrimming="CharacterEllipsis" />
+                    <TextBlock TextWrapping="Wrap" Text="25 GB. Install the game on each PC yourself, from its store; GameSync brings the saves." />
+                  </StackPanel>
+                </Border>
+              </Grid>
             </c:GsCard>
-            <c:GsCard Grid.Column="1" Title="Your game folders" Subtitle="For games outside Steam, Epic and EA." VerticalAlignment="Stretch">
-              <c:GsFolderList Items="{Binding Folders}" AddLabel="Add a game folder" Empty="None yet. Add the folder your other games are in, such as E:\Games."
-                              AddCommand="{Binding $parent[v:FirstRunPage].AddFolderCommand}" />
-            </c:GsCard>
-          </Grid>
-        </StackPanel>
+          </StackPanel>
+        </ScrollViewer>
       </DockPanel>
 
-      <!-- 2. Choose games -->
+      <!-- 2. Your games: game folders first; what the stores hold is found by itself -->
+      <DockPanel IsVisible="{Binding IsFolders}">
+        <StackPanel DockPanel.Dock="Top" Spacing="6" Margin="0,0,0,16">
+          <TextBlock Classes="page-title" Text="Where are your games?" />
+          <TextBlock Classes="muted" TextWrapping="Wrap" MaxWidth="760" HorizontalAlignment="Left"
+                     Text="GameSync looks for the saves of every game it finds. Games from Steam, Epic and the EA app are found by themselves. Games you installed another way, from GOG, an installer or a zip, are found only in a folder you add here." />
+        </StackPanel>
+        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="12" HorizontalAlignment="Right" Margin="0,16,0,0">
+          <c:GsButton Classes="ghost" Content="Back" Command="{Binding BackCommand}" />
+          <c:GsButton Content="Carry on without a folder" Command="{Binding NextCommand}" IsVisible="{Binding NoFolders}"
+                      ToolTip.Tip="Only games from Steam, Epic and the EA app are found then" />
+          <c:GsButton Classes="primary" IconAfter="chevronRight" Content="Find saves" Command="{Binding NextCommand}" IsVisible="{Binding HasFolders}" />
+        </StackPanel>
+        <ScrollViewer HorizontalScrollBarVisibility="Disabled" Margin="0,0,-12,0" Padding="0,0,12,0">
+          <StackPanel Spacing="16">
+            <Grid ColumnDefinitions="5*,7*" ColumnSpacing="16">
+              <c:GsCard Title="Found by themselves" VerticalAlignment="Top">
+                <StackPanel>
+                  <c:GsNote Icon="search" Text="Reading what Steam, Epic and the EA app know…" IsBusy="True" IsVisible="{Binding IsScanning}" Margin="0,4" />
+                  <ItemsControl ItemsSource="{Binding Stores}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="vm:StoreRow">
+                        <c:GsSettingsRow Title="{Binding Name}" Description="{Binding Where}" AutomationProperties.Name="{Binding}">
+                          <TextBlock Classes="mono" Classes.faint="{Binding IsEmpty}" Text="{Binding Count}" VerticalAlignment="Center" />
+                        </c:GsSettingsRow>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </StackPanel>
+              </c:GsCard>
+              <c:GsCard Grid.Column="1" Title="Your game folders" VerticalAlignment="Top"
+                        Subtitle="Folders that hold games, like D:\Games or G:\. You choose which of what's inside are games.">
+                <StackPanel Spacing="12">
+                  <!-- None yet: what that costs, and Add a game folder as the step's primary -->
+                  <StackPanel Spacing="8" HorizontalAlignment="Center" Margin="12,16,12,8" IsVisible="{Binding NoFolders}">
+                    <c:GsIcon Icon="folder" Size="28" Foreground="{DynamicResource ink-muted}" HorizontalAlignment="Center" />
+                    <TextBlock Text="No game folder yet" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                    <TextBlock Classes="muted" TextWrapping="Wrap" TextAlignment="Center" MaxWidth="380"
+                               Text="Without one, GameSync can't find games outside Steam, Epic and the EA app, or their saves." />
+                    <c:GsButton Classes="primary" Icon="plus" Content="Add a game folder…" HorizontalAlignment="Center" Margin="0,4,0,0"
+                                Command="{Binding $parent[v:FirstRunPage].AddFolderCommand}" />
+                  </StackPanel>
+                  <c:GsFolderList Items="{Binding Folders}" AddLabel="Add another folder" IsVisible="{Binding HasFolders}"
+                                  AddCommand="{Binding $parent[v:FirstRunPage].AddFolderCommand}" />
+                  <!-- Why a folder wasn't added -->
+                  <c:GsNote Classes="warn" Icon="alert" Text="{Binding FolderError}" IsVisible="{Binding HasFolderError}" />
+                </StackPanel>
+              </c:GsCard>
+            </Grid>
+            <c:GsNote Icon="info" IsVisible="{Binding NoFolders}"
+                      Text="Only use Steam, Epic or the EA app? Then you need no folder: carry on without one. You can add one later in the library or Settings." />
+          </StackPanel>
+        </ScrollViewer>
+      </DockPanel>
+
+      <!-- 3. Choose saves: what was found, in groups that open and close, each game with its save size -->
       <DockPanel IsVisible="{Binding IsChoose}">
-        <StackPanel DockPanel.Dock="Top" Spacing="4" Margin="0,0,0,16">
-          <TextBlock Classes="page-title" Text="Choose what to sync" />
-          <TextBlock Classes="muted" TextWrapping="Wrap" MaxWidth="720" HorizontalAlignment="Left" Text="{Binding ChooseSubtitle}" />
+        <StackPanel DockPanel.Dock="Top" Spacing="6" Margin="0,0,0,12">
+          <TextBlock Classes="page-title" Text="{Binding SavesTitle}" />
+          <TextBlock Classes="muted" TextWrapping="Wrap" MaxWidth="760" HorizontalAlignment="Left"
+                     Text="These are save files, your progress in each game, usually a few megabytes. GameSync keeps a copy of the ticked ones when you finish. Your games aren't copied." />
         </StackPanel>
         <Grid DockPanel.Dock="Bottom" ColumnDefinitions="*,Auto" ColumnSpacing="24" Margin="0,16,0,0">
           <c:GsNote Icon="shield" Text="{Binding AntiCheatNote}" IsVisible="{Binding HasAntiCheat}" MaxWidth="620" HorizontalAlignment="Left" VerticalAlignment="Center" />
           <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12">
             <c:GsButton Classes="ghost" Content="Back" Command="{Binding BackCommand}" />
-            <c:GsButton Classes="primary" IconAfter="chevronRight" Content="Continue" Command="{Binding NextCommand}" />
+            <c:GsButton Classes="primary" IconAfter="chevronRight" Content="Continue" Command="{Binding NextCommand}" IsEnabled="{Binding CanContinueSaves}"
+                        ToolTip.Tip="Once every game has been looked at" ToolTip.ShowOnDisabled="True" />
           </StackPanel>
         </Grid>
+        <StackPanel DockPanel.Dock="Top" Spacing="8" Margin="0,0,0,12">
+          <!-- KAN-80: the scan as a job: a spinner and how far it is, then how it ended -->
+          <c:GsJobProgress Classes="boxed" Title="{Binding ScanTitle}" Value="{Binding ScanBar}" State="{Binding ScanState}" Detail="{Binding ScanLabel}" Note="{Binding ScanLabel}"
+                           IsVisible="{Binding !ScanDone}" />
+          <TextBlock Foreground="{DynamicResource warn}" Text="{Binding ScanError}" TextWrapping="Wrap" IsVisible="{Binding HasScanError}" />
+          <c:GsButton Classes="ghost" Icon="sync" Content="Scan again" Command="{Binding ScanAgainCommand}" IsVisible="{Binding HasScanError}" HorizontalAlignment="Left" />
+          <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding ScanDone}">
+            <TextBlock Classes="muted" Text="{Binding TickedText}" VerticalAlignment="Center" />
+            <c:GsButton Grid.Column="1" Classes="ghost sm" Content="Close every group" Command="{Binding CloseGroupsCommand}" />
+          </Grid>
+        </StackPanel>
         <ScrollViewer HorizontalScrollBarVisibility="Disabled" Margin="0,0,-12,0" Padding="0,0,12,0">
-          <StackPanel Spacing="12">
+          <StackPanel Spacing="10">
           <ItemsControl ItemsSource="{Binding Groups}">
             <ItemsControl.ItemsPanel>
               <ItemsPanelTemplate>
-                <StackPanel Spacing="12" />
+                <StackPanel Spacing="10" />
               </ItemsPanelTemplate>
             </ItemsControl.ItemsPanel>
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:SetupGroupViewModel">
-                <c:GsCard Padding="16,12" AutomationProperties.Name="{Binding}">
-                  <StackPanel Spacing="6">
-                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                <c:GsCard Padding="16,10" AutomationProperties.Name="{Binding}">
+                  <StackPanel Spacing="4">
+                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
                       <Panel VerticalAlignment="Center">
                         <CheckBox IsThreeState="True" IsChecked="{Binding IsChecked, Mode=OneWay}" Command="{Binding ToggleCommand}" IsVisible="{Binding Tickable}"
                                   AutomationProperties.Name="{Binding ToggleName}" />
                         <c:GsIcon Icon="clock" Size="18" Foreground="{DynamicResource ink-muted}" IsVisible="{Binding IsWatch}"
                                   ToolTip.Tip="Watched the first time you play" />
                       </Panel>
-                      <TextBlock Grid.Column="1" TextWrapping="Wrap" VerticalAlignment="Center">
-                        <Run Text="{Binding Title}" FontWeight="SemiBold" /><Run Text="  " /><Run Text="{Binding Summary}" Foreground="{DynamicResource ink-muted}" />
-                      </TextBlock>
-                      <c:GsButton Grid.Column="2" Classes="ghost sm" IconAfter="chevronRight" Content="Show" Command="{Binding OpenCommand}" IsVisible="{Binding ShowsOpen}"
-                                  AutomationProperties.Name="{Binding Title, StringFormat='Show {0}'}" VerticalAlignment="Center" />
+                      <!-- The heading opens and closes the group; a group of games watched has nothing to open, so it's words alone -->
+                      <Panel Grid.Column="1">
+                        <Button Classes="group-head" Command="{Binding ToggleOpenCommand}" IsVisible="{Binding CanOpen}"
+                                AutomationProperties.Name="{Binding ToggleOpenName}">
+                          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                            <TextBlock TextWrapping="Wrap" VerticalAlignment="Center" Foreground="{DynamicResource ink}">
+                              <Run Text="{Binding Title}" FontWeight="SemiBold" /><Run Text="  " /><Run Text="{Binding Summary}" Foreground="{DynamicResource ink-muted}" />
+                            </TextBlock>
+                            <c:GsIcon Grid.Column="1" Icon="{Binding Chevron}" Size="16" Foreground="{DynamicResource ink-muted}" VerticalAlignment="Center" />
+                          </Grid>
+                        </Button>
+                        <TextBlock TextWrapping="Wrap" VerticalAlignment="Center" Margin="6,4" IsVisible="{Binding !CanOpen}">
+                          <Run Text="{Binding Title}" FontWeight="SemiBold" /><Run Text="  " /><Run Text="{Binding Summary}" Foreground="{DynamicResource ink-muted}" />
+                        </TextBlock>
+                      </Panel>
+                    </Grid>
+                    <!-- Its games, under small headings -->
+                    <Grid ColumnDefinitions="20,24,196,*,72,96" ColumnSpacing="12" IsVisible="{Binding IsOpen}" Margin="0,2,0,0">
+                      <TextBlock Grid.Column="2" Classes="overline faint" Text="GAME" />
+                      <TextBlock Grid.Column="3" Classes="overline faint" Text="ITS SAVES ARE IN" />
+                      <TextBlock Grid.Column="4" Classes="overline faint" Text="SIZE" HorizontalAlignment="Right" />
+                      <TextBlock Grid.Column="5" Classes="overline faint" Text="FOUND BY" />
                     </Grid>
                     <ItemsControl ItemsSource="{Binding VisibleRows}">
                       <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:SetupGameRow">
-                          <Grid ColumnDefinitions="20,24,196,*,96" ColumnSpacing="12" MinHeight="36" AutomationProperties.Name="{Binding}">
-                            <CheckBox IsChecked="{Binding IsChecked}" IsVisible="{Binding Tickable}" AutomationProperties.Name="{Binding Title, StringFormat='Sync {0}'}"
+                          <Grid ColumnDefinitions="20,24,196,*,72,96" ColumnSpacing="12" MinHeight="36" AutomationProperties.Name="{Binding}">
+                            <CheckBox IsChecked="{Binding IsChecked}" IsVisible="{Binding Tickable}" AutomationProperties.Name="{Binding Title, StringFormat='Back up {0}'}"
                                       VerticalAlignment="Center" />
                             <Border Grid.Column="1" Width="24" Height="36" CornerRadius="6" ClipToBounds="True" Background="{DynamicResource bg-300}" VerticalAlignment="Center">
                               <Panel>
@@ -122,7 +305,8 @@
                                        ToolTip.Tip="{Binding Title}" />
                             <TextBlock Grid.Column="3" Classes="mono-small muted" Text="{Binding SavePath}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
                                        ToolTip.Tip="{Binding SavePathTip}" />
-                            <TextBlock Grid.Column="4" Classes="caption faint" Text="{Binding FoundBy}" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="4" Classes="mono-small" Text="{Binding Size}" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="5" Classes="caption faint" Text="{Binding FoundBy}" VerticalAlignment="Center" />
                           </Grid>
                         </DataTemplate>
                       </ItemsControl.ItemTemplate>
@@ -134,14 +318,14 @@
               </DataTemplate>
             </ItemsControl.ItemTemplate>
           </ItemsControl>
-          <!-- Something missing?: a game or folder of the person's own (LIB-13), like a game server's world -->
-          <c:GsCard Padding="16,12" IsVisible="{Binding CanAddGame}" AutomationProperties.Name="Something missing?">
+          <!-- A game missing?: its game folder on Back, or a game or folder of the person's own (LIB-13) -->
+          <c:GsCard Padding="16,10" IsVisible="{Binding CanAddGame}" AutomationProperties.Name="A game missing?">
             <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
               <c:GsIcon Icon="folder" Size="18" Foreground="{DynamicResource ink-faint}" VerticalAlignment="Center" />
               <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                <TextBlock Text="Something missing?" FontWeight="SemiBold" />
+                <TextBlock Text="A game missing?" FontWeight="SemiBold" />
                 <TextBlock Classes="caption muted" TextWrapping="Wrap"
-                           Text="Add a game or folder of your own, like a game server's world, and GameSync keeps it in step on every PC." />
+                           Text="Add its game folder on Back, or add one game or folder by hand, like a game server's world." />
               </StackPanel>
               <c:GsButton Grid.Column="2" Classes="sm" Icon="plus" Content="Add a game or folder" Command="{Binding AddGameCommand}" VerticalAlignment="Center" />
             </Grid>
@@ -150,67 +334,147 @@
         </ScrollViewer>
       </DockPanel>
 
-      <!-- 3. Connect the cloud -->
+      <!-- 4. Where saves are kept: a real choice of three, which Continue waits for -->
       <DockPanel IsVisible="{Binding IsCloud}">
-        <StackPanel DockPanel.Dock="Top" Spacing="4" Margin="0,0,0,16">
-          <TextBlock Classes="page-title" Text="Connect the cloud" />
-          <TextBlock Classes="muted" TextWrapping="Wrap" MaxWidth="720" HorizontalAlignment="Left"
-                     Text="Your saves go to your own Google Drive, in one folder GameSync makes. It can see that folder and nothing else in your Drive." />
+        <StackPanel DockPanel.Dock="Top" Spacing="6" Margin="0,0,0,16">
+          <TextBlock Classes="page-title" Text="Where should your saves be kept?" />
+          <TextBlock Classes="muted" TextWrapping="Wrap" MaxWidth="760" HorizontalAlignment="Left"
+                     Text="GameSync keeps every version on this PC. Choose where a second copy goes, so a dead drive or a new PC doesn't cost you your progress, and so your other PCs get your saves." />
         </StackPanel>
         <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="12" HorizontalAlignment="Right" Margin="0,16,0,0">
           <c:GsButton Classes="ghost" Content="Back" Command="{Binding BackCommand}" />
-          <c:GsButton Classes.primary="{Binding CloudNextIsMain}" IconAfter="chevronRight" Content="{Binding CloudNextLabel}" Command="{Binding NextCommand}" />
+          <c:GsButton Classes="primary" IconAfter="chevronRight" Content="{Binding CloudNextLabel}" Command="{Binding NextCommand}" IsEnabled="{Binding Cloud.Ready}"
+                      ToolTip.Tip="{Binding Cloud.NotReadyTip}" ToolTip.ShowOnDisabled="True" />
         </StackPanel>
-        <StackPanel Spacing="16">
-          <v:CloudChoice DataContext="{Binding Cloud}" />
-          <c:GsNote Icon="monitor" Text="Setting up the laptop later? Install GameSync there and sign in with the same Google account; it finds this PC's saves." />
-          <c:GsNote Icon="info" IsVisible="{Binding !Cloud.IsConnected}"
-                    Text="Skip for now keeps every version on this PC. Connect the cloud, on Home's top bar, connects one whenever you like, and what waited goes up then." />
-        </StackPanel>
+        <ScrollViewer HorizontalScrollBarVisibility="Disabled" Margin="0,0,-12,0" Padding="0,0,12,0">
+          <StackPanel Spacing="12" DataContext="{Binding Cloud}" x:DataType="vm:CloudSetupViewModel" AutomationProperties.Name="Where your saves are kept">
+            <!-- Google Drive -->
+            <Button Classes="choice" Classes.on="{Binding IsDrivePicked}" Command="{Binding PickCommand}" CommandParameter="drive"
+                    AutomationProperties.Name="Google Drive, recommended">
+              <Grid ColumnDefinitions="Auto,*" ColumnSpacing="14">
+                <Ellipse Classes="radio" VerticalAlignment="Top" Margin="0,2,0,0" />
+                <StackPanel Grid.Column="1" Spacing="8">
+                  <StackPanel Orientation="Horizontal" Spacing="10">
+                    <c:GsIcon Icon="cloud" Size="18" VerticalAlignment="Center" />
+                    <TextBlock Text="Google Drive" FontWeight="SemiBold" FontSize="{DynamicResource fs-15}" VerticalAlignment="Center" />
+                    <Border Background="{DynamicResource primary}" CornerRadius="9" Padding="7,1" VerticalAlignment="Center">
+                      <TextBlock Text="RECOMMENDED" FontSize="{DynamicResource fs-10}" FontWeight="SemiBold" LetterSpacing="1" Foreground="{DynamicResource on-primary}" />
+                    </Border>
+                  </StackPanel>
+                  <TextBlock Classes="muted" TextWrapping="Wrap"
+                             Text="In a GameSync folder in your own Drive. Your other PCs get your saves by signing in with the same account. GameSync can see that folder and nothing else." />
+                  <Panel IsVisible="{Binding IsDrivePicked}">
+                    <c:GsButton Classes="primary" Icon="cloud" Content="{Binding SignInLabel}" Command="{Binding SignInCommand}" HorizontalAlignment="Left"
+                                IsVisible="{Binding !IsSignedIn}" IsEnabled="{Binding CanSignIn}" AutomationProperties.Name="Sign in with Google" />
+                    <StackPanel Orientation="Horizontal" Spacing="12" IsVisible="{Binding IsSignedIn}">
+                      <c:GsStatusBadge Label="{Binding SignedInTitle}" />
+                    </StackPanel>
+                  </Panel>
+                  <c:GsNote Icon="info" IsVisible="{Binding CannotSignIn}"
+                            Text="This copy of GameSync has no Google client yet, so it can't sign in to Google Drive. A folder works the same way." />
+                </StackPanel>
+              </Grid>
+            </Button>
+            <!-- A folder every PC can reach -->
+            <Button Classes="choice" Classes.on="{Binding IsFolderPicked}" Command="{Binding PickCommand}" CommandParameter="folder"
+                    AutomationProperties.Name="A folder every PC can reach">
+              <Grid ColumnDefinitions="Auto,*" ColumnSpacing="14">
+                <Ellipse Classes="radio" VerticalAlignment="Top" Margin="0,2,0,0" />
+                <StackPanel Grid.Column="1" Spacing="8">
+                  <StackPanel Orientation="Horizontal" Spacing="10">
+                    <c:GsIcon Icon="drive" Size="18" VerticalAlignment="Center" />
+                    <TextBlock Text="A folder every PC can reach" FontWeight="SemiBold" FontSize="{DynamicResource fs-15}" VerticalAlignment="Center" />
+                  </StackPanel>
+                  <TextBlock Classes="muted" TextWrapping="Wrap" Text="A NAS, a USB drive or another disk. Each PC points at the same folder." />
+                  <Panel IsVisible="{Binding IsFolderPicked}">
+                    <c:GsButton Classes="primary" Icon="folder" Content="Choose a folder…" Click="ChooseCloudFolder" HorizontalAlignment="Left" IsVisible="{Binding NoFolder}" />
+                    <StackPanel Orientation="Horizontal" Spacing="12" IsVisible="{Binding HasFolder}">
+                      <c:GsStatusBadge Label="{Binding FolderTitle}" VerticalAlignment="Center" />
+                      <c:GsButton Classes="ghost sm" Content="Change…" Click="ChooseCloudFolder" AutomationProperties.Name="Change the cloud folder" />
+                    </StackPanel>
+                  </Panel>
+                </StackPanel>
+              </Grid>
+            </Button>
+            <!-- Only on this PC, for now: what it costs, said plainly -->
+            <Button Classes="choice" Classes.on="{Binding IsLocalPicked}" Command="{Binding PickCommand}" CommandParameter="local"
+                    AutomationProperties.Name="Only on this PC, for now">
+              <Grid ColumnDefinitions="Auto,*" ColumnSpacing="14">
+                <Ellipse Classes="radio" VerticalAlignment="Top" Margin="0,2,0,0" />
+                <StackPanel Grid.Column="1" Spacing="8">
+                  <StackPanel Orientation="Horizontal" Spacing="10">
+                    <c:GsIcon Icon="monitor" Size="18" VerticalAlignment="Center" />
+                    <TextBlock Text="Only on this PC, for now" FontWeight="SemiBold" FontSize="{DynamicResource fs-15}" VerticalAlignment="Center" />
+                  </StackPanel>
+                  <TextBlock Classes="muted" TextWrapping="Wrap"
+                             Text="Nothing leaves this PC. Your saves show Not synced until you connect Google Drive or a folder, from Home whenever you like." />
+                  <c:GsNote Classes="warn" Icon="alert" IsVisible="{Binding IsLocalPicked}"
+                            Text="If this PC's drive fails, its backups go with it, and your other PCs won't get these saves." />
+                </StackPanel>
+              </Grid>
+            </Button>
+            <TextBlock Foreground="{DynamicResource warn}" Text="{Binding Error}" TextWrapping="Wrap" IsVisible="{Binding HasError}" />
+          </StackPanel>
+        </ScrollViewer>
       </DockPanel>
 
-      <!-- 4. Backups and startup -->
+      <!-- 5. Backups and startup, then Your setup with a way back to each choice -->
       <DockPanel IsVisible="{Binding IsDaily}">
-        <StackPanel DockPanel.Dock="Top" Spacing="4" Margin="0,0,0,16">
+        <StackPanel DockPanel.Dock="Top" Spacing="6" Margin="0,0,0,16">
           <TextBlock Classes="page-title" Text="Backups and startup" />
-          <TextBlock Classes="muted" TextWrapping="Wrap" Text="Games sync when you quit them. These two keep that going without you." />
+          <TextBlock Classes="muted" TextWrapping="Wrap" Text="GameSync backs a game up when you stop playing it. These two keep that going without you." />
         </StackPanel>
-        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="12" HorizontalAlignment="Right" Margin="0,16,0,0">
-          <c:GsButton Classes="ghost" Content="Back" Command="{Binding BackCommand}" />
-          <c:GsButton Classes="primary" Icon="check" Content="{Binding FinishLabel}" Command="{Binding FinishCommand}" />
-        </StackPanel>
-        <StackPanel Spacing="16">
-          <c:GsCard>
-            <StackPanel>
-              <c:GsSettingsRow Title="Start GameSync when you sign in"
-                               Description="It notices games however you start them, syncs each one after you play, and brings the other PC's saves down.">
-                <c:GsSwitch IsChecked="{Binding StartAtSignIn}" AutomationProperties.Name="Start GameSync when you sign in" />
-              </c:GsSettingsRow>
-              <c:GsSettingsRow Title="{Binding DailyTitle}"
-                               Description="Pick a time your PC is usually on. If it's off then, the backup runs about 10 minutes after you next sign in.">
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                  <c:GsButton Classes="sm" Icon="clock" Content="Change time" Command="{Binding EditTimeCommand}" IsVisible="{Binding NotEditingTime}"
-                              IsEnabled="{Binding DailyOn}" />
-                  <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding EditingTime}">
-                    <TextBox Width="84" Text="{Binding TimeText}" TextAlignment="Center" MaxLength="5" AutomationProperties.Name="Daily backup time, 24-hour">
-                      <TextBox.KeyBindings>
-                        <KeyBinding Gesture="Enter" Command="{Binding SaveTimeCommand}" />
-                      </TextBox.KeyBindings>
-                    </TextBox>
-                    <c:GsButton Classes="primary sm" Content="Save" Command="{Binding SaveTimeCommand}" />
+        <Grid DockPanel.Dock="Bottom" ColumnDefinitions="*,Auto" ColumnSpacing="24" Margin="0,16,0,0">
+          <c:GsNote Icon="shield" MaxWidth="620" HorizontalAlignment="Left" VerticalAlignment="Center"
+                    Text="Both run as you, without admin rights. The first backup runs in the background; you can play meanwhile." />
+          <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12">
+            <c:GsButton Classes="ghost" Content="Back" Command="{Binding BackCommand}" />
+            <c:GsButton Classes="primary" Icon="check" Content="{Binding FinishLabel}" Command="{Binding FinishCommand}" />
+          </StackPanel>
+        </Grid>
+        <ScrollViewer HorizontalScrollBarVisibility="Disabled" Margin="0,0,-12,0" Padding="0,0,12,0">
+          <StackPanel Spacing="16">
+            <c:GsCard>
+              <StackPanel>
+                <c:GsSettingsRow Title="Start GameSync when you sign in to Windows"
+                                 Description="So it notices games however you start them, backs each one up after you play, and brings your other PCs' saves down.">
+                  <c:GsSwitch IsChecked="{Binding StartAtSignIn}" AutomationProperties.Name="Start GameSync when you sign in to Windows" />
+                </c:GsSettingsRow>
+                <c:GsSettingsRow Title="{Binding DailyTitle}"
+                                 Description="A safety net for saves that change outside a game. Pick a time your PC is usually on; if it's off then, it runs about 10 minutes after you next sign in.">
+                  <StackPanel Orientation="Horizontal" Spacing="8">
+                    <c:GsButton Classes="sm" Icon="clock" Content="Change time" Command="{Binding EditTimeCommand}" IsVisible="{Binding NotEditingTime}"
+                                IsEnabled="{Binding DailyOn}" />
+                    <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding EditingTime}">
+                      <TextBox Width="84" Text="{Binding TimeText}" TextAlignment="Center" MaxLength="5" AutomationProperties.Name="Daily backup time, 24-hour">
+                        <TextBox.KeyBindings>
+                          <KeyBinding Gesture="Enter" Command="{Binding SaveTimeCommand}" />
+                        </TextBox.KeyBindings>
+                      </TextBox>
+                      <c:GsButton Classes="primary sm" Content="Save" Command="{Binding SaveTimeCommand}" />
+                    </StackPanel>
+                    <c:GsSwitch IsChecked="{Binding DailyOn}" AutomationProperties.Name="Back up every day" VerticalAlignment="Center" />
                   </StackPanel>
-                  <c:GsSwitch IsChecked="{Binding DailyOn}" AutomationProperties.Name="Back up every day" VerticalAlignment="Center" />
-                </StackPanel>
-              </c:GsSettingsRow>
-              <TextBlock Foreground="{DynamicResource warn}" Text="{Binding TimeError}" TextWrapping="Wrap" IsVisible="{Binding HasTimeError}" HorizontalAlignment="Right" />
-            </StackPanel>
-          </c:GsCard>
-          <c:GsNote Icon="shield" Text="Both run as you, without admin rights, so Windows won't ask for permission. You can change them in Settings." />
-          <c:GsCard Title="Ready" Subtitle="{Binding ReadyText}">
-            <c:GsNote Icon="upload" Text="{Binding FirstBackupText}" />
-          </c:GsCard>
-          <TextBlock Foreground="{DynamicResource warn}" Text="{Binding FinishError}" TextWrapping="Wrap" IsVisible="{Binding HasFinishError}" />
-        </StackPanel>
+                </c:GsSettingsRow>
+                <TextBlock Foreground="{DynamicResource warn}" Text="{Binding TimeError}" TextWrapping="Wrap" IsVisible="{Binding HasTimeError}" HorizontalAlignment="Right" />
+              </StackPanel>
+            </c:GsCard>
+            <c:GsCard Title="Your setup">
+              <StackPanel>
+                <c:GsSettingsRow Title="{Binding SetupGamesTitle}" Description="{Binding SetupGamesLine}">
+                  <c:GsButton Classes="ghost sm" Content="Change" Command="{Binding GoToCommand}" CommandParameter="saves" AutomationProperties.Name="Change the saves backed up" />
+                </c:GsSettingsRow>
+                <c:GsSettingsRow Title="Game folders" Description="{Binding SetupFoldersLine}">
+                  <c:GsButton Classes="ghost sm" Content="Change" Command="{Binding GoToCommand}" CommandParameter="folders" AutomationProperties.Name="Change the game folders" />
+                </c:GsSettingsRow>
+                <c:GsSettingsRow Title="Kept" Description="{Binding SetupKeptLine}">
+                  <c:GsButton Classes="ghost sm" Content="Change" Command="{Binding GoToCommand}" CommandParameter="cloud" AutomationProperties.Name="Change where saves are kept" />
+                </c:GsSettingsRow>
+              </StackPanel>
+            </c:GsCard>
+            <TextBlock Foreground="{DynamicResource warn}" Text="{Binding FinishError}" TextWrapping="Wrap" IsVisible="{Binding HasFinishError}" />
+          </StackPanel>
+        </ScrollViewer>
       </DockPanel>
     </Panel>
   </Grid>

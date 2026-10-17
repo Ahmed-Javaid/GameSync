@@ -180,7 +180,7 @@ internal sealed class AchievementPopups
     {
         if (achievement.Icon is { } kept)
         {
-            return ArtImages.Load(kept, 64);
+            return ArtImages.LoadIcon(kept, 64);
         }
 
         if (achievement.IconFile is not { } file)
@@ -195,7 +195,7 @@ internal sealed class AchievementPopups
                 using var soon = new CancellationTokenSource(TimeSpan.FromSeconds(1.5));
                 using var cache = new AchievementCache(_dataDir);
                 await cache.FetchIconsAsync(app, [file], soon.Token);
-                return ArtImages.Load(cache.Icon(app, file), 64);
+                return ArtImages.LoadIcon(cache.Icon(app, file), 64);
             }
             catch (Exception e) when (e is OperationCanceledException or IOException or HttpRequestException)
             {

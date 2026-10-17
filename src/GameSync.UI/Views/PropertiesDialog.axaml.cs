@@ -111,4 +111,27 @@ public partial class PropertiesDialog : UserControl
             model.Program = path;
         }
     }
+
+    /// <summary>
+    /// Installed files' Change… (LIB-24, design system version 57): the game's program, picked in Windows' own file picker,
+    /// which sets its folder once it's checked and saved.
+    /// </summary>
+    private async void ChangeFolder(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not PropertiesViewModel model || TopLevel.GetTopLevel(this)?.StorageProvider is not { } storage)
+        {
+            return;
+        }
+
+        var files = await storage.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = $"{model.Title}'s program, in its own folder",
+            AllowMultiple = false,
+            FileTypeFilter = [new FilePickerFileType("Programs") { Patterns = ["*.exe"] }],
+        });
+        if (files.Count > 0 && files[0].TryGetLocalPath() is { } path)
+        {
+            await model.ChangeFolderAsync(path);
+        }
+    }
 }

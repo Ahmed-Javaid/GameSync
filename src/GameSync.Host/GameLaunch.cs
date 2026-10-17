@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using GameSync.Core.Discovery;
 using GameSync.Core.Model;
 using GameSync.Core.State;
@@ -18,6 +19,34 @@ public static class GameLaunch
     public static string ProgramKey(GameId game) => $"launch.program.{game}";
 
     public static string OptionsKey(GameId game) => $"launch.options.{game}";
+
+    /// <summary>PLAY-16: set once Windows has refused to start the game without administrator rights.</summary>
+    public static string AdminKey(GameId game) => $"launch.admin.{game}";
+
+    /// <summary>Windows' ERROR_ELEVATION_REQUIRED: the program asks for administrator rights.</summary>
+    public const int ElevationRequired = 740;
+
+    /// <summary>Windows' ERROR_CANCELLED: the person said No to Windows' prompt.</summary>
+    public const int Cancelled = 1223;
+
+    /// <summary>PLAY-16: the game asks for administrator rights, so Play lets Windows ask (Play as admin).</summary>
+    public static bool NeedsAdmin(StateStore state, GameId game) => state.GetSetting(AdminKey(game)) == "1";
+
+    /// <summary>
+    /// PLAY-16: the same start through Windows' own prompt for administrator rights (UAC). GameSync itself never runs as
+    /// admin (R17); the person says yes or no to Windows, and only the game runs with the rights it asked for.
+    /// </summary>
+    public static ProcessStartInfo AsAdmin(ProcessStartInfo start)
+    {
+        var elevated = new ProcessStartInfo(start.FileName) { UseShellExecute = true, Verb = "runas", WorkingDirectory = start.WorkingDirectory };
+        elevated.Arguments = start.ArgumentList.Count > 0 ? string.Join(' ', start.ArgumentList.Select(Quote)) : start.Arguments;
+        return elevated;
+    }
+
+    /// <summary>One argument as Windows' command line reads it back: quoted when it has a space or a quote in it.</summary>
+    internal static string Quote(string argument) =>
+        argument.Length > 0 && !argument.Any(c => c is ' ' or '\t' or '"') ? argument
+        : "\"" + System.Text.RegularExpressions.Regex.Replace(argument.Replace("\"", "\\\""), @"(\\+)$", "$1$1") + "\"";
 
     /// <summary>The store's own link, when a store starts the game; null for a game in its own folder.</summary>
     public static string? StoreLink(LibraryEntry? entry) => entry switch

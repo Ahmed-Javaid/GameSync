@@ -5,8 +5,32 @@
              xmlns:v="using:GameSync.UI.Views"
              x:Class="GameSync.UI.Views.LibraryPage"
              x:DataType="vm:LibraryViewModel">
+  <UserControl.Styles>
+    <!-- The scan's notice: plain while it looks, in the primary colour once it has found something, in warn on a problem -->
+    <Style Selector="Border.notice">
+      <Setter Property="Background" Value="{DynamicResource bg-300}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource line-200}" />
+    </Style>
+    <Style Selector="Border.notice.done">
+      <Setter Property="Background" Value="{DynamicResource primary-soft}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource primary}" />
+    </Style>
+    <Style Selector="Border.notice.problem">
+      <Setter Property="Background" Value="{DynamicResource warn-soft}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource warn}" />
+    </Style>
+    <Style Selector="Border.notice Border.notice-mark">
+      <Setter Property="Background" Value="{DynamicResource bg-400}" />
+    </Style>
+    <Style Selector="Border.notice.done Border.notice-mark">
+      <Setter Property="Background" Value="{DynamicResource primary}" />
+    </Style>
+    <Style Selector="Border.notice.problem Border.notice-mark">
+      <Setter Property="Background" Value="{DynamicResource bg-100}" />
+    </Style>
+  </UserControl.Styles>
   <!-- The game library, like Steam's (design system → LibraryScreen): every game by name in a list on the left, with the
-       search, the sort, Installed only and favourites first; the covers, or the page of the game picked, on the right. -->
+       search, the sort and favourites first; the covers, or the page of the game picked, on the right. -->
   <Grid ColumnSpacing="16" Margin="24,20">
     <!-- The list grows a little with Windows' text size (A11Y-04) -->
     <Grid.ColumnDefinitions>
@@ -38,12 +62,32 @@
           </TextBox.KeyBindings>
         </TextBox>
 
-        <!-- Installed only (KAN-47), kept on this PC like the order; the list's headings count the games -->
-        <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="4,10,0,6">
-          <CheckBox Content="Installed" AutomationProperties.Name="Installed only" IsChecked="{Binding InstalledOnly}" FontSize="{DynamicResource fs-12}" MinWidth="0" Padding="6,0,0,0" VerticalAlignment="Center"
-                    ToolTip.Tip="Only the games installed on this PC, in the list and the covers" />
-          <c:GsButton Grid.Column="1" Classes="ghost sm" IconAfter="chevronDown" Content="{Binding SortLabel}"
-                      AutomationProperties.Name="{Binding SortName}">
+        <!-- The view and the order, side by side (the owner, 18 Oct 2026: "Make it into a dropdown next to name"): each a
+             dropdown; Installed or All games, and the order, are kept on this PC (LIB-31, LIB-16) -->
+        <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" ColumnSpacing="4" Margin="0,10,0,6">
+          <c:GsButton Classes="ghost sm tight trims" IconAfter="chevronDown" HorizontalAlignment="Left" AutomationProperties.Name="{Binding ViewName}"
+                      ToolTip.Tip="Which games the list and the covers show">
+            <TextBlock Text="{Binding ViewLabel}" TextTrimming="CharacterEllipsis" />
+            <c:GsButton.Flyout>
+              <MenuFlyout Placement="BottomEdgeAlignedLeft">
+                <c:GsMenuItem Header="{Binding InstalledChoice}" ToggleType="CheckBox" IsChecked="{Binding ViewIsInstalled, Mode=OneWay}"
+                              Command="{Binding ViewCommand}" CommandParameter="installed" />
+                <c:GsMenuItem Header="{Binding SavesChoice}" ToggleType="CheckBox" IsChecked="{Binding ViewIsSaves, Mode=OneWay}"
+                              Command="{Binding ViewCommand}" CommandParameter="saves" />
+                <c:GsMenuItem Header="{Binding AllChoice}" ToggleType="CheckBox" IsChecked="{Binding ViewIsAll, Mode=OneWay}"
+                              Command="{Binding ViewCommand}" CommandParameter="all" />
+                <c:GsMenuItem Header="{Binding LocalChoice}" ToggleType="CheckBox" IsChecked="{Binding ViewIsLocal, Mode=OneWay}"
+                              Command="{Binding ViewCommand}" CommandParameter="local" />
+                <c:GsMenuItem Header="{Binding SoftwareChoice}" ToggleType="CheckBox" IsChecked="{Binding ViewIsSoftware, Mode=OneWay}"
+                              Command="{Binding ViewCommand}" CommandParameter="software" IsVisible="{Binding HasSoftware}" />
+                <c:GsMenuItem Header="{Binding HiddenChoice}" ToggleType="CheckBox" IsChecked="{Binding ViewIsHidden, Mode=OneWay}"
+                              Command="{Binding ViewCommand}" CommandParameter="hidden" IsVisible="{Binding HasHidden}" />
+              </MenuFlyout>
+            </c:GsButton.Flyout>
+          </c:GsButton>
+          <c:GsButton Grid.Column="1" Classes="ghost sm tight trims" IconAfter="chevronDown" AutomationProperties.Name="{Binding SortName}"
+                      ToolTip.Tip="The order of the list and the covers">
+            <TextBlock Text="{Binding SortLabel}" TextTrimming="CharacterEllipsis" />
             <c:GsButton.Flyout>
               <MenuFlyout Placement="BottomEdgeAlignedRight">
                 <c:GsMenuItem Header="Recently played" ToggleType="CheckBox" IsChecked="{Binding SortsByRecent, Mode=OneWay}"
@@ -114,30 +158,71 @@
     <!-- The covers, or the game picked -->
     <Panel Grid.Column="1">
       <DockPanel IsVisible="{Binding ShowsCovers}">
-        <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="16" Margin="0,0,0,16">
+        <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" ColumnSpacing="16" Margin="0,0,0,12">
           <StackPanel VerticalAlignment="Center">
             <TextBlock Text="{Binding Title}" FontSize="{DynamicResource fs-15}" LineHeight="{DynamicResource lh-20}" FontWeight="SemiBold" />
             <TextBlock Classes="caption faint" Text="{Binding Subtitle}" TextTrimming="CharacterEllipsis" />
           </StackPanel>
-          <c:GsPillTabs Grid.Column="1" ItemsSource="{Binding Tabs}" SelectedId="{Binding SelectedTab, Mode=TwoWay}" AutomationProperties.Name="Library view"
-                        HorizontalAlignment="Center" />
-          <!-- Add game: a game or folder of the person's own (LIB-13), in its dialog -->
-          <c:GsButton Grid.Column="2" Icon="plus" Content="Add game" HorizontalAlignment="Right" Command="{Binding AddGameCommand}" IsVisible="{Binding CanAddGame}"
-                      ToolTip.Tip="A game GameSync didn't find, or any folder to keep in step, like a game server's world" />
-
+          <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+            <!-- Add game folder (LIB-31): a folder of games, whose games the person picks in What's in it (LIB-30) -->
+            <c:GsButton Icon="folder" Content="Add game folder" Click="ScanFolder" IsVisible="{Binding CanScan}"
+                        IsEnabled="{Binding !IsScanning}" IsBusy="{Binding IsScanning}" BusyText="Scanning"
+                        ToolTip.Tip="A folder your games are in: you pick which of what's inside are games" />
+            <!-- Add game: a game or folder of the person's own (LIB-13), in its dialog -->
+            <c:GsButton Icon="plus" Content="Add game" Command="{Binding AddGameCommand}" IsVisible="{Binding CanAddGame}"
+                        ToolTip.Tip="One game GameSync didn't find, or a folder of your own such as a server's world" />
+          </StackPanel>
         </Grid>
+        <!-- What Add game folder or Scan a folder for games… is doing, found, or why it couldn't: a notice over the covers,
+             in any view, until it's closed (the owner, 18 Oct 2026: "it need to be apparent that this is something we want you to see") -->
+        <Border DockPanel.Dock="Top" Classes="notice" Classes.done="{Binding ScanNoteDone}" Classes.problem="{Binding ScanNoteProblem}"
+                CornerRadius="{DynamicResource radius-lg}" BorderThickness="1" Padding="16,12" Margin="0,0,0,16" IsVisible="{Binding HasScanNote}"
+                AutomationProperties.Name="{Binding ScanNote}" AutomationProperties.LiveSetting="Polite">
+          <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="14">
+            <Panel Width="32" Height="32" VerticalAlignment="Top">
+              <Border Classes="notice-mark" CornerRadius="16" />
+              <c:GsSpinner Size="18" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding ScanNoteBusy}" />
+              <c:GsIcon Icon="check" Size="18" StrokeWidth="2.4" Foreground="{DynamicResource on-primary}" HorizontalAlignment="Center" VerticalAlignment="Center"
+                        IsVisible="{Binding ScanNoteDone}" />
+              <c:GsIcon Icon="alert" Size="18" StrokeWidth="2.2" Foreground="{DynamicResource warn}" HorizontalAlignment="Center" VerticalAlignment="Center"
+                        IsVisible="{Binding ScanNoteProblem}" />
+            </Panel>
+            <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+              <TextBlock Text="{Binding ScanNote.Title, FallbackValue=''}" FontWeight="SemiBold" FontSize="{DynamicResource fs-14}" LineHeight="{DynamicResource lh-20}" TextWrapping="Wrap" />
+              <TextBlock Classes="muted" Text="{Binding ScanNote.Detail, FallbackValue=''}" FontSize="{DynamicResource fs-13}" LineHeight="{DynamicResource lh-19}" TextWrapping="Wrap" />
+            </StackPanel>
+            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+              <c:GsButton Classes="sm" Content="Show them" Command="{Binding ShowFoundCommand}" IsVisible="{Binding ScanNoteFound}"
+                          ToolTip.Tip="The Local view: games in their own folders, which Play starts from there" />
+              <c:GsIconButton Classes="sm" Icon="x" Label="Close this notice" Command="{Binding CloseScanNoteCommand}" IsVisible="{Binding !ScanNoteBusy}" />
+            </StackPanel>
+          </Grid>
+        </Border>
+        <!-- Saves only: games whose saves are here but that aren't installed on this PC (LIB-31) -->
+        <c:GsCard DockPanel.Dock="Top" Padding="20,14" Margin="0,0,0,16" IsVisible="{Binding IsSavesView}" AutomationProperties.Name="Games whose saves are here">
+          <Grid ColumnDefinitions="Auto,*" ColumnSpacing="16">
+            <c:GsIcon Icon="saves" Size="18" Foreground="{DynamicResource ink-muted}" VerticalAlignment="Center" />
+            <TextBlock Grid.Column="1" Classes="muted" FontSize="{DynamicResource fs-13}" LineHeight="{DynamicResource lh-19}" TextWrapping="Wrap" VerticalAlignment="Center"
+                       Text="Games whose saves are here but that aren't installed on this PC: kept from your other PCs or a friend's zip, or left by a game you uninstalled. Install one, and its saves are ready." />
+          </Grid>
+        </c:GsCard>
+        <!-- Hidden: what the person hid, and what a later scan took for no game (LIB-30) -->
+        <c:GsCard DockPanel.Dock="Top" Padding="20,14" Margin="0,0,0,16" IsVisible="{Binding IsHiddenView}" AutomationProperties.Name="Hidden from the launcher">
+          <Grid ColumnDefinitions="Auto,*" ColumnSpacing="16">
+            <c:GsIcon Icon="info" Size="18" Foreground="{DynamicResource ink-muted}" VerticalAlignment="Center" />
+            <TextBlock Grid.Column="1" Classes="muted" FontSize="{DynamicResource fs-13}" LineHeight="{DynamicResource lh-19}" TextWrapping="Wrap" VerticalAlignment="Center"
+                       Text="Games you hid, and anything new in a game folder that doesn't look like a game, such as an app. Show in the launcher brings one back." />
+          </Grid>
+        </c:GsCard>
         <!-- Local: what the view holds, and Scan a folder for games… (LIB-22, LIB-23) -->
         <c:GsCard DockPanel.Dock="Top" Padding="16,12" Margin="0,0,0,16" IsVisible="{Binding IsLocalView}" AutomationProperties.Name="Games in their own folders">
           <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="14">
             <c:GsIcon Icon="folder" Size="18" Foreground="{DynamicResource ink-muted}" VerticalAlignment="Center" />
-            <StackPanel Grid.Column="1" Spacing="6" VerticalAlignment="Center">
-              <TextBlock Classes="muted" FontSize="{DynamicResource fs-13}" LineHeight="{DynamicResource lh-19}" TextWrapping="Wrap"
-                         Text="Games in their own folders, started without a store's launcher. GameSync finds them in the folders you give it, such as G:\ or E:\Games." />
-              <TextBlock Classes="caption" Text="{Binding ScanNote}" TextWrapping="Wrap" IsVisible="{Binding HasScanNote}" />
-            </StackPanel>
+            <TextBlock Grid.Column="1" Classes="muted" FontSize="{DynamicResource fs-13}" LineHeight="{DynamicResource lh-19}" TextWrapping="Wrap" VerticalAlignment="Center"
+                       Text="Games in their own folders, started without a store's launcher. GameSync finds them in the folders you give it, such as G:\ or E:\Games." />
             <c:GsButton Grid.Column="2" Classes="sm" Icon="search" Content="{Binding ScanLabel}" Click="ScanFolder" VerticalAlignment="Center"
                         IsEnabled="{Binding !IsScanning}" IsVisible="{Binding CanScan}" IsBusy="{Binding IsScanning}" BusyText="Scanning"
-                        ToolTip.Tip="Pick a folder of games; GameSync looks in it now and at every scan" />
+                        ToolTip.Tip="Pick a folder of games; you choose which of what's inside are games, and GameSync looks in it at every scan" />
           </Grid>
         </c:GsCard>
         <!-- The covers' hover ring reaches 4px past each cover: the scroller gives it room on every side, so the first

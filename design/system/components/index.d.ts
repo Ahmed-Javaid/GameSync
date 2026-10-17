@@ -10,7 +10,7 @@ export type IconName =
 
 export type Status =
   | "synced" | "playing" | "upload-pending" | "newer-in-cloud" | "conflict" | "held"
-  | "in-use" | "not-found" | "not-available" | "blocked" | "backup-only" | "not-syncing";
+  | "in-use" | "not-found" | "not-available" | "blocked" | "backup-only" | "not-syncing" | "not-synced";
 
 /** Outlined 24px icon. `play` is always filled; `filled` fills the star, for a favourite. */
 export function Icon(props: { name: IconName; size?: number; strokeWidth?: number; label?: string; filled?: boolean; className?: string }): JSX.Element;
@@ -174,7 +174,12 @@ export interface ImportItem {
 }
 
 /** Bring saves from a shared zip in as pinned versions; never replaces current saves. */
-export function ImportSavesDialog(props: { zipName?: string; from?: string; items: ImportItem[]; stage?: "review" | "done"; onImport?: (ids: string[]) => void; onClose?: () => void }): JSX.Element;
+/**
+ * Import saves (version 57, KAN-166): each save of a game here comes in as a named save, or is used now (`use[id]` "now"),
+ * the save in place kept first as a named save; `tag` (a friend's name) goes on every save it brings, after the PC's name.
+ */
+export function ImportSavesDialog(props: { zipName?: string; from?: string; items: ImportItem[]; stage?: "review" | "done"; use?: Record<string, "named" | "now">; tag?: string; tagOpen?: boolean;
+  onImport?: (ids: string[], use: Record<string, "named" | "now">, tag: string) => void; onClose?: () => void }): JSX.Element;
 
 /** Left column of the Settings screen. `badge` flags a section that needs the person. */
 export function SettingsNav(props: { items: { id: string; label: string; icon: IconName; badge?: string }[]; current?: string; onChange?: (id: string) => void; label?: string }): JSX.Element;
@@ -352,8 +357,8 @@ export function AchievementsOverview(props: { done: number; total: number; tiers
 /** A game's rarest unlocked achievement in its own light: its badge large, what it is, its tier and how few players have it. */
 export function AchievementSpotlight(props: { item: { name: string; desc?: string; icon?: string; pct?: number }; eyebrow?: string; size?: "sm" }): JSX.Element;
 
-/** A row of every achievement: badge, name and description, when it was unlocked or how many players have it; a hidden one keeps its name and description secret. */
-export function AchievementRow(props: { item: { name: string; desc?: string; icon?: string; pct?: number; when?: string; state?: "unlocked" | "locked" | "hidden" }; selected?: boolean; onClick?: () => void }): JSX.Element;
+/** A row of every achievement: badge, name and description, when it was unlocked or how many players have it; a hidden one keeps its name and description secret. `by` (version 54): "you" for one marked by hand, or the PC it was unlocked on. */
+export function AchievementRow(props: { item: { name: string; desc?: string; icon?: string; pct?: number; when?: string; by?: string; state?: "unlocked" | "locked" | "hidden" }; selected?: boolean; onClick?: () => void }): JSX.Element;
 
 /** ACH-09 (version 35): the popup when an achievement unlocks while you play, GameSync's own window in a corner over the game, never taking focus or clicks; dark glass in every theme. `item` the achievement (a `hidden` one says "Hidden achievement unlocked"); `game` its game; `progress` with it unlocked; `kind` "zenith" for a game's 100%; `phase` "in" or "out" draws its motion; `corner` where it shows. */
 export function AchievementPopup(props: { item?: { name: string; icon?: string; pct?: number; hidden?: boolean }; game?: string; progress?: { done: number; total: number }; kind?: "achievement" | "zenith"; phase?: "in" | "out"; corner?: "top-right" | "top-left" | "bottom-right" | "bottom-left"; className?: string; style?: CSSProperties }): JSX.Element;

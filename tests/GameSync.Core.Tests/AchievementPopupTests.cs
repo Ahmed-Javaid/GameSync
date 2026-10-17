@@ -510,21 +510,27 @@ public class AchievementPopupTests
             return page;
         }
 
-        // The owner's Cuphead, a copy that isn't Steam's: 0 of 28, from Steam's list.
+        // The owner's Cuphead, a copy that isn't Steam's with nothing written down: 0 of 28, from Steam's list, and since
+        // design system version 54 its achievements are marked by hand (Mark achievements…).
         var cuphead = new LauncherGame { Id = GameId.Parse("cuphead"), Title = "Cuphead", Store = StoreKind.Loose, SteamAppId = Cuphead, Installed = true };
-        var list = View(Enumerable.Range(1, 28).Select(i => ($"A{i}", false, false, (double?)i, 0)).ToArray()) with { Game = cuphead.Id, From = AchievementsFrom.ListNotSteamCopy };
+        var list = View(Enumerable.Range(1, 28).Select(i => ($"A{i}", false, false, (double?)i, 0)).ToArray()) with
+        {
+            Game = cuphead.Id, From = AchievementsFrom.ListNotSteamCopy, CanMark = true,
+        };
         var page = Page(cuphead, list);
-        Assert.Equal((true, true, "0 of 28 · Steam's list", false), (page.HasAchievements, page.ShowsAchievementsOverview, page.AchievementsSubtitle, page.NoneUnlocked));
-        Assert.StartsWith("This copy isn't Steam's", page.AchievementsNote, StringComparison.Ordinal);
+        Assert.Equal((true, true, "0 of 28 · nothing written down yet", false), (page.HasAchievements, page.ShowsAchievementsOverview, page.AchievementsSubtitle, page.NoneUnlocked));
+        Assert.StartsWith("This copy writes its unlocks nowhere GameSync has found.", page.AchievementsNote, StringComparison.Ordinal);
         Assert.Equal("info", page.AchievementsNoteIcon);
         Assert.True(page.CanViewAllAchievements);
+        Assert.True(page.CanMarkAchievements);
 
-        // A Steam game Steam here hasn't run, one played here, and one finished.
+        // A Steam game no PC has unlocked one of, one played here, and one finished: kept by GameSync, no longer "on Steam".
         var valheim = new LauncherGame { Id = ValheimId, Title = "Valheim", Store = StoreKind.Steam, SteamAppId = Valheim, Installed = true };
-        Assert.Equal("0 of 28 · none unlocked on this PC", Page(valheim, list with { From = AchievementsFrom.ListNotPlayedHere }).AchievementsSubtitle);
+        var notPlayed = Page(valheim, list with { From = AchievementsFrom.ListNotPlayedHere, CanMark = false });
+        Assert.Equal(("0 of 28 · none unlocked yet", false), (notPlayed.AchievementsSubtitle, notPlayed.CanMarkAchievements));
         var played = Page(valheim, View(("A", true, false, 50, 2), ("B", false, false, 3, 0)));
-        Assert.Equal(("1 of 2 unlocked on Steam", false), (played.AchievementsSubtitle, played.HasAchievementsNote));
-        Assert.Equal("Every achievement unlocked on Steam", Page(valheim, View(("A", true, false, 50, 2))).AchievementsSubtitle);
+        Assert.Equal(("1 of 2 unlocked", false), (played.AchievementsSubtitle, played.HasAchievementsNote));
+        Assert.Equal("Every achievement unlocked", Page(valheim, View(("A", true, false, 50, 2))).AchievementsSubtitle);
 
         // Left out in Settings: the card says so, and Count it again counts it back in.
         var leftOut = Page(valheim, View(("A", true, false, 50, 2)), leftOut: true);
@@ -544,7 +550,7 @@ public class AchievementPopupTests
         var bloodborne = new LauncherGame { Id = GameId.Parse("bloodborne"), Title = "Bloodborne", Store = StoreKind.Loose, Installed = true };
         var none = Page(bloodborne, null);
         Assert.Equal((true, false, "trophy", false), (none.HasAchievements, none.ShowsAchievementsOverview, none.AchievementsNoteIcon, none.CanViewAllAchievements));
-        Assert.Equal("GameSync can't read this game's achievements yet: it reads Steam's for now.", none.AchievementsNote);
+        Assert.Equal("GameSync names achievements from Steam's lists, and Steam has no list for this game.", none.AchievementsNote);
         Assert.Equal("Its list of achievements comes from Steam the next time GameSync can ask.", Page(cuphead, null).AchievementsNote);
 
         // A folder of your own isn't played, so it has no card.

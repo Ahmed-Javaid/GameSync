@@ -120,6 +120,9 @@ public sealed class AppOutput(string dataDir, Action<string, string> notify) : I
     /// <summary>KAN-80: an upload or a download of a game's saves moved on, or ended.</summary>
     public event Action<TransferUpdate>? TransferChanged;
 
+    /// <summary>Design system version 54: another PC's achievements came into GameSync's record from the cloud.</summary>
+    public event Action? AchievementsCame;
+
     public void Say(string line)
     {
         lock (_inner)
@@ -192,6 +195,8 @@ public sealed class AppOutput(string dataDir, Action<string, string> notify) : I
     public void Played(GameId game, string title, bool playing) => PlayChanged?.Invoke(game, title, playing);
 
     public void Transfer(TransferUpdate update) => TransferChanged?.Invoke(update);
+
+    public void AchievementsChanged() => AchievementsCame?.Invoke();
 }
 
 /// <summary>

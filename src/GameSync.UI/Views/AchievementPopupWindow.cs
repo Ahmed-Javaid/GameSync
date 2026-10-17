@@ -61,10 +61,16 @@ public sealed class AchievementPopupWindow : Window
     public Task ShowInCornerAsync()
     {
         var placed = new TaskCompletionSource();
-        Opened += (_, _) => Dispatcher.UIThread.Post(() =>
+        Opened += (_, _) => Dispatcher.UIThread.Post(async () =>
         {
-            Place();
-            placed.TrySetResult();
+            try
+            {
+                await PlaceAsync();
+            }
+            finally
+            {
+                placed.TrySetResult();
+            }
         }, DispatcherPriority.Loaded);
         Show();
         return placed.Task.ContinueWith(_ => Dispatcher.UIThread.InvokeAsync(() => Popup.SlideInAsync(FromLeft)), TaskScheduler.Default).Unwrap();
@@ -77,9 +83,10 @@ public sealed class AchievementPopupWindow : Window
         Close();
     }
 
-    private void Place()
+    private async Task PlaceAsync()
     {
         var handle = TryGetPlatformHandle()?.Handle ?? IntPtr.Zero;
+        PopupWindow.MakeClickThrough(handle);
         var seeThrough = ActualTransparencyLevel == WindowTransparencyLevel.Transparent;
         if (!seeThrough)
         {
@@ -88,14 +95,30 @@ public sealed class AchievementPopupWindow : Window
             UpdateLayout();
         }
 
+        var screen = PopupWindow.ForegroundScreen();
+        if (screen is { } target && Math.Abs(target.Scale - RenderScaling) > 0.01)
+        {
+            // A screen of another scale than the one it opened on (the owner's friend's 1440p beside a 4K, 8 Oct 2026: it
+            // landed in the middle of the desk): moved there first, unseen, so Windows gives it that screen's scale, then
+            // sized and placed by it.
+            Position = new PixelPoint(target.Left, target.Top);
+            var until = DateTime.UtcNow.AddMilliseconds(300);
+            while (Math.Abs(target.Scale - RenderScaling) > 0.01 && DateTime.UtcNow < until)
+            {
+                await Task.Delay(15);
+            }
+
+            UpdateLayout();
+        }
+
         var scale = RenderScaling;
         var width = (int)Math.Ceiling(Bounds.Width * scale);
         var height = (int)Math.Ceiling(Bounds.Height * scale);
-        if (PopupWindow.ForegroundScreen() is { } screen)
+        if (screen is { } at)
         {
             var edge = (int)Math.Round((Edge - (seeThrough ? Room : 0)) * scale);
-            var x = FromLeft ? screen.Left + edge : screen.Right - edge - width;
-            var y = Corner.StartsWith("top", StringComparison.Ordinal) ? screen.Top + edge : screen.Bottom - edge - height;
+            var x = FromLeft ? at.Left + edge : at.Right - edge - width;
+            var y = Corner.StartsWith("top", StringComparison.Ordinal) ? at.Top + edge : at.Bottom - edge - height;
             Position = new PixelPoint(x, y);
         }
 
@@ -103,7 +126,5 @@ public sealed class AchievementPopupWindow : Window
         {
             PopupWindow.RoundCorners(handle, 0, 0, width, height, (int)Math.Round(20 * scale));
         }
-
-        PopupWindow.MakeClickThrough(handle);
     }
 }

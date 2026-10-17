@@ -1,4 +1,4 @@
-<!-- @dsCard group="Screens" height=800 width=1280 page=true subtitle="Game detail, beside the library's list: Back, the art, a play bar like Steam's, about the game, achievements, and a little about its saves" -->
+<!-- @dsCard group="Screens" height=800 width=1280 page=true subtitle="Game detail, beside the library's list: Back, the art, a play bar like Steam's, about the game, achievements, and a little about its saves; achievements kept by GameSync (#wukong/ach, #wukong/ach-record, #wukong/ach-marked, #hollow/ach-laptop)" -->
 <!doctype html>
 <html lang="en">
 <head><meta charset="utf-8"><title>preview</title>
@@ -237,14 +237,19 @@ function GamePage(p){
             {label:'Genres',value:info.genres?h('span',{className:'gd-genres'},info.genres.map(function(x){return h('span',{key:x,className:'gs-tag'},x)})):null},
             {label:'Engine',value:info.engine||g.engine}]})),
         // Every game's page has its Achievements card (version 35; the owner: "it should still have achievements on its game
-        // page. Let it say 0"): its own from Steam on this PC; Steam's list at 0 for a copy that isn't Steam's or a game not
-        // run here; a line for a game with no list; and a game left out says so.
+        // page. Let it say 0"); a line for a game with no list; and a game left out says so. Since version 54 (the owner,
+        // 8 Oct 2026: "The achievement system needs to work even without steam") what's unlocked is GameSync's own record,
+        // and the card says where GameSync saw it when that's not Steam on this PC: this copy's own record, which GameSync
+        // found by itself; another PC; or the person, who marks them for a copy that writes its unlocks nowhere.
         info.ach && info.ach.off ? h(G.Card,{title:'Achievements',subtitle:'Left out of your achievements'},
             h('div',{className:'gd-status'},h('p',null,'No popups while you play it, and it isn\u2019t counted on the Achievements page or Home.')),
             h('div',{className:'gs-row'},h(G.Button,{size:'sm',variant:'secondary',icon:'trophy'},'Count it again')))
         : info.ach ? h(G.Card,{title:'Achievements',
-            subtitle:info.ach.source==='record'?info.ach.done+' of '+info.ach.total+' unlocked \u00b7 this copy\u2019s record':info.ach.source==='not-steam'?'0 of '+info.ach.total+' \u00b7 Steam\u2019s list':info.ach.source==='not-played'?'0 of '+info.ach.total+' \u00b7 none unlocked on this PC'
-              :info.ach.done>=info.ach.total?'Every achievement unlocked on Steam':info.ach.done+' of '+info.ach.total+' unlocked on Steam',
+            subtitle:info.ach.source==='record'?info.ach.done+' of '+info.ach.total+' unlocked \u00b7 this copy\u2019s own record'
+              :info.ach.source==='marked'?info.ach.done+' of '+info.ach.total+' unlocked \u00b7 marked by you'
+              :info.ach.source==='other-pc'?info.ach.done+' of '+info.ach.total+' unlocked \u00b7 on '+info.ach.pc
+              :info.ach.source==='not-steam'?'0 of '+info.ach.total+' \u00b7 nothing written down yet':info.ach.source==='not-played'?'0 of '+info.ach.total+' \u00b7 none unlocked yet'
+              :info.ach.done>=info.ach.total?'Every achievement unlocked':info.ach.done+' of '+info.ach.total+' unlocked',
             action:h(G.Button,{size:'sm',variant:'ghost',iconAfter:'chevronRight',title:'Every one of its achievements: what each is, when you unlocked it, how rare it is'},'View all')},
           h('div',{className:'gd-achcard'},
             h(G.AchievementsOverview,{done:info.ach.done,total:info.ach.total,tiers:info.ach.tiers,completedOn:info.ach.completedOn,moment:info.ach.moment}),
@@ -253,12 +258,17 @@ function GamePage(p){
               h('div',{className:'gd-ach-row'},info.ach.latest.map(function(a){return h('div',{key:a.name,className:'gd-ach',title:a.name+', unlocked '+a.when+(a.pct!=null?', '+G.achievements.percent(a.pct)+' of players':'')},
                 h(G.AchievementBadge,{icon:a.art,name:a.name,tier:G.achievements.tierOf(a.pct)}),h('span',{className:'gd-ach-name'},a.name),h('span',{className:'gd-ach-when'},a.when))}))) : null,
             info.ach.source ? h('div',{className:'gs-note'},h(G.Icon,{name:'info',size:16}),info.ach.source==='record'
-              ? 'This copy isn\u2019t Steam\u2019s, so what you\u2019ve unlocked comes from its own record, in a folder added in Settings, Achievements. Each one\u2019s name, icon and how rare it is are Steam\u2019s.'
+              ? 'This copy isn\u2019t Steam\u2019s. GameSync found its own record of what\u2019s unlocked and keeps what it sees there; each one\u2019s name, icon and how rare it is are Steam\u2019s.'
+              : info.ach.source==='marked'
+              ? 'This copy writes its unlocks nowhere GameSync can find, so you mark them in View all. GameSync keeps them like any other, on every PC.'
+              : info.ach.source==='other-pc'
+              ? 'Unlocked on '+info.ach.pc+'. GameSync keeps your achievements in the cloud, so every PC of yours shows them, played there or not.'
               : info.ach.source==='not-steam'
-              ? 'This copy isn\u2019t Steam\u2019s, so what you unlock in it doesn\u2019t show here: if it keeps its own record, add the folder in Settings, Achievements. The list is Steam\u2019s, with how rare each one is.'
-              : 'Steam on this PC hasn\u2019t seen you play it, so nothing shows as unlocked yet; once you play it here, what you unlock does.') : null,
+              ? 'This copy writes its unlocks nowhere GameSync has found. It watches for a record the next time you play; until there is one, mark each achievement as you earn it.'
+              : 'Steam on this PC hasn\u2019t seen you play it, and none of your PCs has unlocked one yet. Once you play it, what you unlock shows here.') : null,
+            info.ach.source==='not-steam' ? h('div',{className:'gs-row'},h(G.Button,{size:'sm',variant:'secondary',icon:'check',title:'Opens every achievement on Locked, to mark the ones you\u2019ve earned'},'Mark achievements\u2026')) : null,
             info.ach.rarest ? h(G.AchievementSpotlight,{item:{name:info.ach.rarest.name,desc:info.ach.rarest.desc,pct:info.ach.rarest.pct,icon:info.ach.rarest.art}}) : null))
-        : h(G.Card,{title:'Achievements'},h('div',{className:'gs-note'},h(G.Icon,{name:'trophy',size:16}),'GameSync can\u2019t read this game\u2019s achievements yet: it reads Steam\u2019s for now.'))),
+        : h(G.Card,{title:'Achievements'},h('div',{className:'gs-note'},h(G.Icon,{name:'trophy',size:16}),'GameSync names achievements from Steam\u2019s lists, and Steam has no list for this game.'))),
       h('div',{className:'gd-col'},
         h(G.Card,{title:'Saves',action:h(G.Button,{size:'sm',variant:'ghost',iconAfter:'chevronRight',onClick:p.onSaves},'Open in Saves')},
           h('div',{className:'gd-status'},h(G.StatusBadge,{status:g.status||'not-syncing',label:statusWord(g)}),h('p',null,blurbOf(g))),
@@ -300,11 +310,19 @@ function App(){
   if (hash[1] === 'ach-off' && INFO[hash[0]] && INFO[hash[0]].ach) INFO[hash[0]].ach.off = true;
   // #sekiro/ach-moment: the first time its 100% is seen, the Zenith's moment plays (version 49).
   if (hash[1] === 'ach-moment' && INFO[hash[0]] && INFO[hash[0]].ach) { INFO[hash[0]].ach.moment = true; hash[1] = 'ach'; }
-  // #wukong/ach-record: a copy that isn't Steam's, with its own record of what's unlocked read from a folder added in
-  // Settings, Achievements (version 48, KAN-123): counted like a Steam game's, its names, icons and rarity Steam's.
+  // #wukong/ach-record: a copy that isn't Steam's, with its own record of what's unlocked (version 48, KAN-123), found by
+  // GameSync itself since version 54: counted like a Steam game's, its names, icons and rarity Steam's.
   if (hash[1] === 'ach-record' && INFO[hash[0]] && INFO[hash[0]].ach) Object.assign(INFO[hash[0]].ach, {source:'record', done:27, tiers:{gold:2,silver:6,bronze:19},
     rarest:{name:'Unbroken',desc:'Finish a chapter without being struck.',pct:3.4,art:achIcon(6)},
     latest:[{name:'Toad Bane',when:'Yesterday',pct:41,art:achIcon(3)},{name:'Bell Ringer',when:'3 Oct',pct:18,art:achIcon(5)},{name:'Brushed Away',when:'30 Sep',pct:62,art:achIcon(1)}]});
+  // #wukong/ach-marked (version 54): a copy that writes its unlocks nowhere, its achievements marked by the person.
+  if (hash[1] === 'ach-marked' && INFO[hash[0]] && INFO[hash[0]].ach) Object.assign(INFO[hash[0]].ach, {source:'marked', done:5, tiers:{gold:0,silver:2,bronze:3},
+    latest:[{name:'Bell Ringer',when:'Today',pct:18,art:achIcon(5)},{name:'Toad Bane',when:'4 Oct',pct:41,art:achIcon(3)},{name:'Brushed Away',when:'30 Sep',pct:62,art:achIcon(1)}]});
+  // #hollow/ach-laptop (version 54): a Steam game not played on this PC, its achievements unlocked on LAPTOP and kept in
+  // the cloud by GameSync, so this PC shows them too.
+  if (hash[1] === 'ach-laptop' && INFO[hash[0]] && INFO[hash[0]].ach) Object.assign(INFO[hash[0]].ach, {source:'other-pc', pc:'LAPTOP', done:12, tiers:{gold:1,silver:4,bronze:7},
+    rarest:{name:'Steel Soul',desc:'Complete the game in Steel Soul mode.',pct:2.6,art:achIcon(2)},
+    latest:[{name:'Grubfriend',when:'30 Sep',pct:38,art:achIcon(4)},{name:'Dream Nail',when:'29 Sep',pct:61,art:achIcon(0)}]});
   var frame = useRef(null), search = useRef(null);
   // #ror2/ach: the page scrolled to its Achievements card (design system version 33).
   useEffect(function(){ if(hash[1]&&hash[1].indexOf('ach')===0){ var c=Array.prototype.filter.call(document.querySelectorAll('.gs-card'),function(x){return x.getAttribute('aria-label')==='Achievements'})[0]; if(c) c.scrollIntoView({block:'start'}); } },[]);

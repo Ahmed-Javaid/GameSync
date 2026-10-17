@@ -810,6 +810,10 @@ public sealed partial class UpdateSettings : ObservableObject
     [ObservableProperty]
     private bool _daily = true;
 
+    /// <summary>PKG-03 (9 Oct 2026): a ready update installs by itself when GameSync starts with Windows.</summary>
+    [ObservableProperty]
+    private bool _atSignIn = true;
+
     /// <summary>Restart to update waits while a game is played; the tooltip says why.</summary>
     [ObservableProperty]
     private bool _canRestart = true;
@@ -847,6 +851,7 @@ public sealed partial class UpdateSettings : ObservableObject
             ? @"Installed for you alone, in %LOCALAPPDATA%\Programs\GameSync."
             : $"Running from {AppContext.BaseDirectory.TrimEnd('\\')}, not installed: a newer version installs in %LOCALAPPDATA%\\Programs\\GameSync, beside this one.";
         Daily = view.Daily;
+        AtSignIn = view.AtSignIn;
         _showing = false;
         if (State is Checking or Downloading)
         {
@@ -952,6 +957,14 @@ public sealed partial class UpdateSettings : ObservableObject
         if (!_showing)
         {
             _ = _actions.SetUpdatesDaily(value);
+        }
+    }
+
+    partial void OnAtSignInChanged(bool value)
+    {
+        if (!_showing)
+        {
+            _ = _actions.SetUpdatesAtSignIn(value);
         }
     }
 }
@@ -1215,6 +1228,127 @@ public sealed partial class AchievementSettings : ObservableObject
     [ObservableProperty]
     private Outcome? _recordNote;
 
+    /// <summary>
+    /// Design system version 54 (the owner: "Tracking by itself", then "find them itself"): the records of copies Steam
+    /// doesn't run that GameSync found by itself, each with its game.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(FoundTitle), nameof(HasFound))]
+    private IReadOnlyList<FolderItem> _recordsFound = [];
+
+    /// <summary>When GameSync last looked, for "Looked 2 minutes ago"; null before it has.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(FoundLine))]
+    private DateTime? _lookedUtc;
+
+    /// <summary>Look again is under way.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(FoundLine))]
+    private bool _looking;
+
+    /// <summary>Version 54: Keep them in the cloud: GameSync's record of achievements on every PC.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CloudLine))]
+    private bool _keepInCloud = true;
+
+    /// <summary>A cloud is connected, so the record can be kept there.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CloudLine))]
+    private bool _hasCloud;
+
+    /// <summary>What Keep them in the cloud's switch came to.</summary>
+    [ObservableProperty]
+    private Outcome? _cloudNote;
+
+    /// <summary>Version 55: Rarity's Refresh now is asking Steam.</summary>
+    [ObservableProperty]
+    private bool _refreshingRarity;
+
+    /// <summary>What Refresh now came to.</summary>
+    [ObservableProperty]
+    private Outcome? _rarityNote;
+
+    public string FoundTitle => RecordsFound.Count switch
+    {
+        0 => "None found yet",
+        1 => "Found 1 record",
+        _ => $"Found {RecordsFound.Count.ToString(CultureInfo.InvariantCulture)} records",
+    };
+
+    public bool HasFound => RecordsFound.Count > 0;
+
+    /// <summary>"In AppData, Documents, Public Documents and each game's own folder, and while a game plays. Looked 2 minutes ago."</summary>
+    public string FoundLine => Looking
+        ? "Looking in AppData, Documents, Public Documents and your games' folders…"
+        : "In AppData, Documents, Public Documents and each game's own folder, and while a game plays." + (LookedUtc is { } at ? $" Looked {Ago(at)}." : "");
+
+    public string CloudLine => !HasCloud ? "Connect the cloud first: until then GameSync keeps them on this PC."
+        : KeepInCloud ? "Every PC shows the same achievements: one unlocked on another PC counts here too. Kept in GameSync's folder in the cloud, beside your saves."
+        : "Kept on this PC only. Turn it on and every PC of yours shows the same achievements.";
+
+    /// <summary>"just now", "2 minutes ago", "3 hours ago", "on 6 Oct".</summary>
+    private static string Ago(DateTime utc)
+    {
+        var gone = DateTime.UtcNow - utc;
+        return gone.TotalMinutes < 1 ? "just now"
+            : gone.TotalMinutes < 60 ? $"{Math.Floor(gone.TotalMinutes).ToString(CultureInfo.InvariantCulture)} minute{(gone.TotalMinutes >= 2 ? "s" : "")} ago"
+            : gone.TotalHours < 24 ? $"{Math.Floor(gone.TotalHours).ToString(CultureInfo.InvariantCulture)} hour{(gone.TotalHours >= 2 ? "s" : "")} ago"
+            : "on " + utc.ToLocalTime().ToString("d MMM", CultureInfo.InvariantCulture);
+    }
+
+    /// <summary>Look again: the usual places and every copy's own folder, for the records copies keep themselves.</summary>
+    [RelayCommand]
+    private async Task LookAgain()
+    {
+        if (Looking)
+        {
+            return;
+        }
+
+        Looking = true;
+        try
+        {
+            RecordNote = await _actions.LookForRecords();
+        }
+        finally
+        {
+            Looking = false;
+        }
+    }
+
+    /// <summary>
+    /// Rarity's Refresh now (design system version 55; the owner, 8 Oct 2026: "Refresh rarity shouldn't be on the main
+    /// achievements page, but in settings"): Steam asked again how rare each achievement is, for every game.
+    /// </summary>
+    [RelayCommand]
+    private async Task RefreshRarity()
+    {
+        if (RefreshingRarity)
+        {
+            return;
+        }
+
+        RefreshingRarity = true;
+        try
+        {
+            RarityNote = await _actions.RefreshRarity();
+        }
+        finally
+        {
+            RefreshingRarity = false;
+        }
+    }
+
+    partial void OnKeepInCloudChanged(bool value)
+    {
+        if (!_showing)
+        {
+            _ = SetCloud(value);
+        }
+    }
+
+    private async Task SetCloud(bool on) => CloudNote = await _actions.SetAchievementsInCloud(on);
+
     /// <summary>Add a folder: the folder picked on the page.</summary>
     public async Task AddRecordFolder(string folder) => RecordNote = await _actions.AddAchievementFolder(folder);
 
@@ -1250,7 +1384,7 @@ public sealed partial class AchievementSettings : ObservableObject
         {
             if (Games.Count == 0)
             {
-                return GamesRead ? "Steam games show here once Steam has run them on this PC, and copies with their own record once their folder is added below." : "Reading your games\u2026";
+                return GamesRead ? "Games show here once GameSync keeps achievements for them: Steam games Steam has run on this PC, copies whose own record GameSync found, and any unlocked on another PC." : "Reading your games\u2026";
             }
 
             var counted = Games.Count(g => g.Counted);
@@ -1291,6 +1425,16 @@ public sealed partial class AchievementSettings : ObservableObject
             RecordFolders = folders;
         }
 
+        // Version 54: the records GameSync found by itself, when it last looked, and the record kept in the cloud.
+        var found = view.AchievementRecordsFound.Select(f => new FolderItem(f.Path, f.Game, null, "trophy")).ToList();
+        if (!found.SequenceEqual(RecordsFound))
+        {
+            RecordsFound = found;
+        }
+
+        LookedUtc = view.AchievementsLookedUtc;
+        HasCloud = view.Cloud != SettingsData.NoCloud;
+        KeepInCloud = view.AchievementsInCloud;
         _showing = false;
     }
 

@@ -80,7 +80,14 @@ if ($Method -eq 'signin') {
 if (-not (Test-Path -LiteralPath $configPath)) { Fail 'Not signed in to Jira yet: run this with signin first.' }
 if (-not $Path) { Fail 'Give the API path, like rest/api/3/myself.' }
 $config = Get-Content -LiteralPath $configPath -Raw | ConvertFrom-Json
-$auth = Basic $config.email ([Net.NetworkCredential]::new('', ($config.token | ConvertTo-SecureString)).Password)
+# A token pasted into jira.json by hand (an Atlassian token starts ATATT) is taken as it is and saved encrypted in its place.
+if ($config.token -like 'ATATT*') {
+    $plain = $config.token.Trim()
+    $config.token = ConvertTo-SecureString $plain -AsPlainText -Force | ConvertFrom-SecureString
+    $config | ConvertTo-Json | Set-Content -LiteralPath $configPath -Encoding UTF8
+    $auth = Basic $config.email $plain
+}
+else { $auth = Basic $config.email ([Net.NetworkCredential]::new('', ($config.token | ConvertTo-SecureString)).Password) }
 $json = $null
 if ($BodyFile) { $json = [IO.File]::ReadAllText((Resolve-Path -LiteralPath $BodyFile).Path, [Text.Encoding]::UTF8) }
 $result = Send $Method.ToUpperInvariant() "$($config.base)/$($Path.TrimStart('/'))" $auth $json

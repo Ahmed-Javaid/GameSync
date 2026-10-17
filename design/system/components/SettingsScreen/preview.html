@@ -1,4 +1,4 @@
-<!-- @dsCard group="Screens" height=800 width=1280 page=true subtitle="Settings: Appearance re-themes the whole screen live, its Surface included (every screen follows it); Storage and folders; startup, the daily backup and what to back up; the cloud (#cloud-folder, #cloud-none); your PCs; updates (#updates, #updates-latest, #updates-downloading, #updates-refused, #updates-offline); Copy diagnostics" -->
+<!-- @dsCard group="Screens" height=800 width=1280 page=true subtitle="Settings: Appearance re-themes the whole screen live, its Surface included (every screen follows it); Storage and folders; startup, the daily backup and what to back up; the cloud (#cloud-folder, #cloud-none); your PCs; updates (#updates, #updates-latest, #updates-downloading, #updates-refused, #updates-offline); Copy diagnostics and Report a problem (#report); Windows' animations off (#appearance-still)" -->
 <!doctype html>
 <html lang="en">
 <head><meta charset="utf-8"><title>preview</title>
@@ -36,7 +36,7 @@ function rail(cur){return h(G.SideRail,{current:cur,items:[
   {id:'achievements',icon:'trophy',label:'Achievements'},
   {id:'saves',icon:'saves',label:'Save manager',sep:true,dot:'warn',dotLabel:'2 conflicts'},
   {id:'log',icon:'terminal',label:'Console'},
-  {id:'settings',icon:'settings',label:'Settings',bottom:true}]})}
+  {id:'guide',icon:'help',label:'Guide',bottom:true},{id:'settings',icon:'settings',label:'Settings',bottom:true}]})}
 function topbar(title,sub,tabs,right){return h('header',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',gap:16}},h('div',null,h('div',{style:{font:'600 15px/20px var(--font-sans)'}},title),h('div',{className:'gs-faint',style:{fontSize:12}},sub)),tabs,h('div',{className:'gs-row',style:{flexWrap:'nowrap'}},right));}
 
 var SECTIONS=[{id:'appearance',label:'Appearance',icon:'palette'},{id:'storage',label:'Storage and folders',icon:'drive'},{id:'backup',label:'Backup and sync',icon:'sync'},{id:'cloud',label:'Cloud',icon:'cloud'},{id:'devices',label:'Devices',icon:'monitor'},{id:'notifications',label:'Notifications',icon:'bell'},{id:'achievements',label:'Achievements',icon:'trophy'},{id:'safety',label:'Safety',icon:'shield'},{id:'updates',label:'Updates',icon:'download'}];
@@ -57,7 +57,7 @@ function App(){
  function set(x){t[1](Object.assign({},th,x));}
  React.useEffect(function(){var mo=new MutationObserver(function(){t[1](fresh())});mo.observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});return function(){mo.disconnect()}},[]);
  // A render can open a section: #backup.
- var hash=(location.hash||'').slice(1), sec=React.useState(hash.split('-')[0]||'appearance');
+ var hash=(location.hash||'').slice(1), sec=React.useState(SECTIONS.some(function(s){return s.id===hash.split('-')[0]})?hash.split('-')[0]:'appearance');
  var cloudState=hash==='cloud-folder'?'folder':hash==='cloud-none'?'none':'drive';
  var mode=th.system?(window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches?'light':'dark'):th.mode;
  var opts={preset:th.preset,mode:mode,pureBlack:th.pureBlack&&mode==='dark',primary:th.primary,secondary:th.secondary,accent:'#0078d4'};
@@ -75,14 +75,30 @@ function App(){
  var copied=React.useState(false), pcName=React.useState('DESKTOP'), renaming=React.useState(false), nameText=React.useState('DESKTOP'), signOut=React.useState(false);
  var achDialog=React.useState(location.hash==='#achievements-games'), chime=React.useState('bell'), volume=React.useState('soft');
  var popOn=React.useState(true), soundOn=React.useState(true), corner=React.useState('top-right'), tried=React.useState(null), achOff=React.useState([]), achPop=React.useState(['wukong']);
- // Version 48 (KAN-123): folders where copies Steam doesn't run keep their records of what's unlocked; #achievements-none: none added.
- var recs=React.useState(location.hash==='#achievements-none'?[]:[{path:'C:\\Users\\Public\\Documents\\Records',meta:'Records for 12 of your games',icon:'trophy'}]);
+ // Version 48 (KAN-123): folders where copies Steam doesn't run keep their records of what's unlocked. Since version 54
+ // GameSync finds those records by itself (found), and a folder is added here only for records kept anywhere else;
+ // #achievements-none: none found or added.
+ var none=location.hash==='#achievements-none';
+ var found=none?[]:[{path:'C:\\Users\\Public\\Documents\\Records\\2358720\\achievements.ini',meta:'Black Myth: Wukong · 27 of 81 unlocked',icon:'trophy'},
+   {path:'%APPDATA%\\Records\\1145360\\achievements.json',meta:'Hades · 31 of 49 unlocked',icon:'trophy'},
+   {path:'G:\\Hollow Knight\\Records\\367520\\stats.json',meta:'Hollow Knight · 12 of 63 unlocked',icon:'trophy'}];
+ var recs=React.useState(none?[]:[{path:'D:\\Game records',meta:'Records for 2 of your games',icon:'folder'}]);
+ // Version 54: what's unlocked is GameSync's own record, kept in the cloud so every PC has the same one; Look again's state.
+ var achCloud=React.useState(true), looked=React.useState('idle');
+ // Version 55: Refresh now, moved here from the Achievements page: idle, asking Steam, then what it came to.
+ var rarity=React.useState('idle');
  // Version 53 (7 Oct 2026): an update's state. #updates: one is ready; #updates-latest, -downloading, -refused, -offline.
- var upd=React.useState(hash.indexOf('updates-')===0?hash.slice(8):'ready'), updDaily=React.useState(true);
+ var upd=React.useState(hash.indexOf('updates-')===0?hash.slice(8):'ready'), updDaily=React.useState(true), updSignIn=React.useState(true);
+ // Version 57: Windows' animation effects off (#appearance-still), and Report a problem open (#report).
+ var still=hash==='appearance-still', report=React.useState(hash==='report');
  var cfg=React.useState('this-pc'), shots=React.useState('off'), skip=React.useState(true), also=React.useState([{path:'*.bak',meta:'Backup copies some games keep',icon:'file'},{path:'**/Mods/**',meta:'Mod folders',icon:'folder'}]);
  var touched=cfg[0]!=='this-pc'||shots[0]!=='off'||!skip[0]||also[0].length!==2;
  var views={
   appearance:function(){return h(Page,{title:'Appearance',sub:'Changes apply straight away and are saved on this PC only.'},
+    // Version 57 (a friend: "Some user dont have animations?"): GameSync follows Windows' Animation effects; off, it says so first.
+    still?h(G.Card,{title:'Motion'},
+      h(G.SettingsRow,{title:'Animations are off in Windows',description:'Windows’ Animation effects are off on this PC, so GameSync doesn’t animate either: looks change at once and nothing moves. Turn them on in Windows Settings, Accessibility, Visual effects.'},
+        h(G.Button,{size:'sm',variant:'secondary',icon:'external'},'Open Visual effects'))):null,
     h(G.Card,{title:'Theme',subtitle:pre.dynamic?'Follows your Windows accent colour.':pre.note,action:h(G.PillTabs,{label:'Mode',value:th.system?'system':th.mode,onChange:function(v){set(v==='system'?{system:true}:{system:false,mode:v})},items:[{id:'dark',label:'Dark',icon:'moon'},{id:'light',label:'Light',icon:'sun'},{id:'system',label:'Match Windows',icon:'monitor'}]})},
       h(G.ThemePicker,{value:th.preset,mode:mode,pureBlack:opts.pureBlack,accent:opts.accent,onChange:function(id){set({preset:id,primary:null,secondary:null})}}),
       h(G.SettingsRow,{title:'Surface',tag:'New',description:'Glossy lets your game’s art show through GameSync, frosted dark or light with the mode; Solid keeps every surface plain. Glossy turns off when Windows’ transparency effects are off.'},h(G.PillTabs,{label:'Surface',value:surface,onChange:G.surface.set,items:[{id:'glossy',label:'Glossy'},{id:'solid',label:'Solid'}]})),
@@ -98,8 +114,8 @@ function App(){
     h('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16}},
       h(G.Card,{title:'Game folders to scan',subtitle:'For games outside Steam, Epic, EA and Xbox.'},h(G.FolderList,{items:scan[0],onRemove:function(it){scan[1](scan[0].filter(function(x){return x!==it}))},onAdd:function(){scan[1](scan[0].concat([{path:'F:\\Games',meta:'Scanning\u2026'}]))}})),
       h(G.Card,{title:'Extra save folders',subtitle:'Saves outside the usual places. Kept on this PC only.'},h(G.FolderList,{items:extra[0],onRemove:function(it){extra[1](extra[0].filter(function(x){return x!==it}))},onAdd:function(){extra[1](extra[0].concat([{path:'E:\\Emulated\\saves',meta:'Watched for saves'}]))}}))),
-    h(G.Card,{title:'Shared zips'},
-      h(G.FolderField,{path:'C:\\Users\\You\\Downloads',meta:'Where Share saves puts its zip files'}),
+    h(G.Card,{title:'Sharing saves with friends'},
+      h(G.FolderField,{path:'C:\\Users\\You\\Downloads',meta:'Where the zips you make to share saves with a friend are saved'}),
       h(G.SettingsRow,{title:'Ask where to save each time'},h(G.Switch,{label:'Ask where to save each time',checked:ask[0],onChange:ask[1]}))));},
   backup:function(){return h(Page,{title:'Backup and sync',sub:'Most syncing happens when you quit a game. The daily backup is the safety net.'},
     h(G.Card,{title:'In the background'},
@@ -150,7 +166,15 @@ function App(){
     h(G.Card,{title:'Windows notifications'},
       h(G.SettingsRow,{title:'Hold while a fullscreen game runs',description:'Shown after you quit, so nothing pops up mid-game.'},h(G.Switch,{label:'Hold while a fullscreen game runs',checked:hold[0],onChange:hold[1]})),
       h(G.SettingsRow,{title:'Daily summary',description:'One line after the daily backup: what was checked and what changed.'},h(G.Switch,{label:'Daily summary',checked:daily[0],onChange:daily[1]}))));},
-  achievements:function(){return h(Page,{title:'Achievements',sub:'What you see and hear when you unlock one while playing, and which games count.'},
+  achievements:function(){return h(Page,{title:'Achievements',sub:'GameSync keeps every achievement you unlock, on every PC; what you see and hear when one unlocks; and which games count.'},
+    // Version 54 (the owner, 8 Oct 2026: "The achievement system needs to work even without steam. It can get information
+    // about WHAT achievements are there to begin with, but after that it needs to work without it", then yes to keeping
+    // it in the Drive folder): GameSync's own record of what's unlocked, kept whether Steam is there or not, the same on
+    // every PC once it's in the cloud.
+    h(G.Card,{title:'Kept by GameSync',subtitle:'Every achievement GameSync sees unlocked stays, with its day, whether Steam, the copy or the PC is still there or not.'},
+      h(G.SettingsRow,{title:'Keep them in the cloud',description:achCloud[0]?'Every PC shows the same achievements: one unlocked on LAPTOP counts here too. Kept in GameSync’s folder on Google Drive, beside your saves.':'Kept on this PC only. Turn it on and every PC of yours shows the same achievements.'},
+        h(G.Switch,{label:'Keep them in the cloud',checked:achCloud[0],onChange:achCloud[1]})),
+      h('div',{className:'gs-note'},h(G.Icon,{name:'info',size:16}),'GameSync sees unlocks in Steam’s files on any of your PCs and in the records copies keep themselves, which it finds by itself. For a copy that writes nothing down, you mark them on its page. Steam’s list names them.')),
     h(G.Card,{title:'When you unlock one while playing'},
       h(G.SettingsRow,{title:'Show a popup',description:'GameSync’s own small window over the game for a few seconds. It never takes focus or a click. Over a game in exclusive fullscreen only the sound plays, and the popups wait until you quit.'},h(G.Switch,{label:'Show a popup',checked:popOn[0],onChange:popOn[1]})),
       h(G.SettingsRow,{title:'Play a sound',description:'A short chime with each popup, brighter for rarer ones; a Zenith has its own.'},h(G.Switch,{label:'Play a sound',checked:soundOn[0],onChange:soundOn[1]})),
@@ -166,20 +190,34 @@ function App(){
         h(G.Button,{size:'sm',variant:'secondary',icon:'trophy',onClick:function(){tried[1]('now')}},'Show it now'),
         h(G.Button,{size:'sm',variant:'ghost',icon:'clock',onClick:function(){tried[1]('later')}},'In 10 seconds')),
       tried[0]==='now'?h('div',{style:{display:'flex',justifyContent:corner[0].indexOf('left')>=0?'flex-start':'flex-end'}},h(G.AchievementPopup,{item:{name:'Seeker: Scorched Earth',pct:2.7},game:'Risk of Rain 2',progress:{done:124,total:171},phase:'in',corner:corner[0]})):null,
-      h('div',{className:'gs-note'},h(G.Icon,{name:'info',size:16}),'GameSync sees unlocks in Steam’s files on this PC, and in the records of the copies below. Steam shows its own popup for its games, so GameSync’s is off for each until you turn it on in Achievements by game; a copy of its own has GameSync’s.')),
+      h('div',{className:'gs-note'},h(G.Icon,{name:'info',size:16}),'Steam shows its own popup for its games, so GameSync’s is off for each until you turn it on in Achievements by game; a copy of its own has GameSync’s.')),
     // Version 48 (KAN-123; the owner, 4 Oct 2026: "As long as my offline games also have achievements"): a copy Steam doesn't
-    // run keeps its own record of what's unlocked, one folder per game named by its Steam number; GameSync reads those
-    // records from the folders added here and names each achievement from Steam's list.
-    h(G.Card,{title:'Copies Steam doesn’t run',subtitle:'Copies that keep their own record of what’s unlocked. Kept on this PC only.'},
-      h(G.FolderList,{items:recs[0],addLabel:'Add a folder',empty:'None yet. A copy that isn’t Steam’s shows Steam’s list at 0 on its page.',
+    // run keeps its own record of what's unlocked. Since version 54 (the owner, 8 Oct 2026: "Tracking by itself", then
+    // "find them itself") GameSync finds those records by itself, by the game's achievements named inside them, in the
+    // usual places and while a game plays; a folder is added here only for records kept anywhere else.
+    h(G.Card,{title:'Copies Steam doesn’t run',subtitle:'GameSync finds the records they keep of what’s unlocked by itself.'},
+      h(G.SettingsRow,{title:found.length?'Found '+found.length+' records':'None found yet',
+          description:looked[0]==='looking'?'Looking in AppData, Documents, Public Documents and your games\u2019 folders\u2026':'In AppData, Documents, Public Documents and each game\u2019s own folder, and while a game plays. Looked 2 minutes ago.'},
+        h(G.Button,{size:'sm',variant:'secondary',icon:'sync',busy:looked[0]==='looking',busyLabel:'Looking',onClick:function(){looked[1]('looking');setTimeout(function(){looked[1]('idle')},1600)}},'Look again')),
+      found.length ? h(G.FolderList,{items:found})
+        : h('div',{className:'gs-note'},h(G.Icon,{name:'info',size:16}),'None found yet. A copy that writes nothing down can have its achievements marked on its page.'),
+      h(G.SettingsRow,{title:'Other folders',description:'For records kept anywhere else: a folder with one folder per game, named by its Steam number.'}),
+      h(G.FolderList,{items:recs[0],addLabel:'Add a folder',empty:'None added.',
         onRemove:function(it){recs[1](recs[0].filter(function(x){return x!==it}))},
-        onAdd:function(){recs[1](recs[0].concat([{path:'D:\\Game records',meta:'No records for your games here',icon:'trophy'}]))}}),
-      h('div',{className:'gs-note'},h(G.Icon,{name:'info',size:16}),'Add the folder holding one folder per game, named by its Steam number, with the copy’s record inside. GameSync only reads the records; each achievement’s name, icon and how rare it is come from Steam’s list. Their unlocks count on the Achievements page and Home, and pop up while you play.')),
+        onAdd:function(){recs[1](recs[0].concat([{path:'E:\\More records',meta:'No records for your games here',icon:'folder'}]))}}),
+      h('div',{className:'gs-note'},h(G.Icon,{name:'info',size:16}),'GameSync knows a record by the game\u2019s achievements named inside it, so no list of where such records live comes with GameSync. It only reads them; each achievement\u2019s name, icon and how rare it is come from Steam\u2019s list. Their unlocks count on the Achievements page and Home, and pop up while you play.')),
     // Version 41 (the owner: "Game in your achievements makes no sense. Also it needs to be either a popup or a new window"):
     // one row with how many count and how many have GameSync's popup; Choose games… opens Achievements by game over the page.
     h(G.Card,{title:'Games'},
       h(G.SettingsRow,{title:'Achievements by game',description:(ACH_GAMES.length-achOff[0].length)+' of '+ACH_GAMES.length+' games count on the Achievements page and Home. GameSync’s popup is on for '+achPop[0].length+': Steam shows its own for the rest.'},
         h(G.Button,{size:'sm',variant:'secondary',icon:'trophy','aria-haspopup':'dialog',onClick:function(){achDialog[1](true)}},'Choose games…'))),
+    // Version 55 (the owner, 8 Oct 2026: "Refresh rarity shouldn't be on the main achievements page, but in settings"): how rare
+    // each achievement is, Steam's share of players, which sets its tier; asked once a week by itself, or now.
+    h(G.Card,{title:'Rarity'},
+      h(G.SettingsRow,{title:'How rare each one is',description:'The share of Steam’s players who have each achievement, which sets its tier. GameSync asks Steam once a week by itself.'},
+        h(G.Button,{size:'sm',variant:'secondary',icon:'sync',busy:rarity[0]==='asking',busyLabel:'Asking Steam',title:'Asks Steam again now, for every game with achievements',
+          onClick:function(){rarity[1]('asking');setTimeout(function(){rarity[1]('done')},1600)}},'Refresh now')),
+      rarity[0]==='done'?h('div',{className:'gs-note'},h(G.Icon,{name:'info',size:16}),'Asked Steam again for 23 games. The tiers on the Achievements page and Home follow.'):null),
     achDialog[0]?h('div',{style:{position:'fixed',inset:0,background:'var(--scrim)',display:'grid',placeItems:'center',zIndex:5}},
       h(G.AchievementGamesDialog,{games:ACH_GAMES.map(function(g){return Object.assign({},g,{counted:achOff[0].indexOf(g.id)<0,popup:achPop[0].indexOf(g.id)>=0})}),
         onCount:function(id,v){achOff[1](v?achOff[0].filter(function(x){return x!==id}):achOff[0].concat([id]))},
@@ -215,23 +253,43 @@ function App(){
          h(G.Button,{size:'sm',variant:'secondary',icon:'sync',onClick:function(){upd[1]('latest')}},'Check now'))
      :h(G.SettingsRow,{title:'You have the latest version',description:'Checked today at 14:02.'},
          h(G.Button,{size:'sm',variant:'secondary',icon:'sync',onClick:function(){upd[1]('downloading')}},'Check now'));
-   return h(Page,{title:'Updates',sub:'GameSync checks GitHub for a new version once a day and gets it ready. It installs when you restart GameSync.'},
+   return h(Page,{title:'Updates',sub:'GameSync checks GitHub for a new version once a day and gets it ready. It installs as GameSync starts with Windows, or when you restart it.'},
      h(G.Card,{title:'GameSync 1.0.0',subtitle:'Installed for you alone, in %LOCALAPPDATA%\\Programs\\GameSync.'},block),
      h(G.Card,{title:'Checking'},
-       h(G.SettingsRow,{title:'Check for updates every day',description:'GameSync asks GitHub for its latest release once a day and gets it in the background. Nothing installs until you restart it. Off, Check now still works.'},
+       h(G.SettingsRow,{title:'Check for updates every day',description:'GameSync asks GitHub for its latest release once a day and gets it in the background. Off, Check now still works.'},
          h(G.Switch,{label:'Check for updates every day',checked:updDaily[0],onChange:updDaily[1]})),
+       // Version 57 (the owner, 9 Oct 2026: yes, so friends never have to click; built): a ready update installs at sign-in.
+       h(G.SettingsRow,{title:'Install updates when GameSync starts with Windows',description:'A ready update installs as you sign in, before you play, in a few seconds. Off, it waits for Restart to update.'},
+         h(G.Switch,{label:'Install updates when GameSync starts with Windows',checked:updSignIn[0],onChange:updSignIn[1]})),
        h('div',{className:'gs-note'},h(G.Icon,{name:'shield',size:16}),'GameSync isn\u2019t code-signed, so Windows may warn the first time you run it. Every update is checked against GameSync\u2019s own release signature before it installs, and anything else is refused.')));}
  };
- return h(G.ThemeScope,{theme:opts,strength:'glow',art:ART,style:{width:1280,height:800,display:'flex',overflow:'hidden'}},
+ return h(G.ThemeScope,{theme:opts,strength:'glow',art:ART,style:{width:1280,height:800,display:'flex',overflow:'hidden',position:'relative'}},
   rail('settings'),
   h('div',{style:{width:248,flexShrink:0,padding:'24px 12px',background:'var(--bg-100)',borderRight:'1px solid var(--line-100)',display:'flex',flexDirection:'column',gap:16}},
     h('div',{style:{font:'600 15px/20px var(--font-sans)',padding:'0 12px'}},'Settings'),
     h(G.SettingsNav,{items:SECTIONS,current:sec[0],onChange:sec[1]}),
     h('div',{style:{marginTop:'auto',padding:'0 12px',display:'flex',flexDirection:'column',gap:8,alignItems:'flex-start'}},
       h('div',{className:'gs-faint',style:{fontSize:12}},'GameSync 1.0 \u00b7 this PC is '+pcName[0]),
+      // Version 57 (a friend: "add a report a bug tool"): Report a problem, then Copy diagnostics.
+      h(G.Button,{size:'sm',variant:'primary',icon:'alert',onClick:function(){report[1](true)}},'Report a problem\u2026'),
       h(G.Button,{size:'sm',variant:'secondary',icon:copied[0]?'check':'copy',onClick:function(){copied[1](true);setTimeout(function(){copied[1](false)},2000)}},copied[0]?'Copied':'Copy diagnostics'),
       h('div',{className:'gs-faint',style:{fontSize:12,lineHeight:'16px'}},'For a bug report: the logs and each game\u2019s versions. Never your sign-in or your saves.'))),
-  h('main',{style:{flex:1,minWidth:0,padding:'24px 32px',overflow:'auto'}},views[sec[0]]()));
+  h('main',{style:{flex:1,minWidth:0,padding:'24px 32px',overflow:'auto'}},views[sec[0]]()),
+  // Report a problem (version 57): what went wrong in the person's words, the diagnostics shown before anything goes,
+  // then GitHub's new-issue page opens with both filled in; nothing is sent until they post it there.
+  report[0]?h('div',{className:'gs-scrim',style:{position:'absolute',inset:0,zIndex:5,display:'flex',alignItems:'center',justifyContent:'center'}},
+    h('div',{className:'gs-dialog',role:'dialog','aria-modal':'true','aria-labelledby':'rp-title'},
+      h('div',{className:'gs-dialog-head'},h('div',{className:'gs-card-head'},
+        h('div',null,h('h2',{id:'rp-title',className:'gs-dialog-title'},'Report a problem'),h('p',{className:'gs-dialog-sub'},'Say what happened. GameSync opens a new issue on GitHub with it, the diagnostics ready to paste in; you post it there.')),
+        h(G.IconButton,{icon:'x',label:'Close Report a problem',onClick:function(){report[1](false)}}))),
+      h('div',{className:'gs-dialog-body',style:{gap:12,paddingBottom:8}},
+        h('label',{className:'gs-own-label',htmlFor:'rp-what'},'What happened'),
+        h('textarea',{id:'rp-what',className:'gs-input',rows:4,style:{width:'100%',boxSizing:'border-box',resize:'vertical'},defaultValue:'Dark Souls III shows Not backed up, but I ticked it in first run.'}),
+        h(G.Checkbox,{label:'Add the diagnostics: the logs and each game\u2019s versions, never your sign-in or your saves',showLabel:true,checked:true}),
+        h('div',{className:'gs-note'},h(G.Icon,{name:'shield',size:16}),'Nothing is posted until you submit the issue on GitHub. You need a GitHub account to post one; without one, Copy diagnostics and send it to whoever helps you.')),
+      h('div',{className:'gs-dialog-foot'},h('div',{className:'gs-dialog-actions'},
+        h(G.Button,{variant:'ghost',onClick:function(){report[1](false)}},'Cancel'),
+        h(G.Button,{variant:'primary',icon:'external'},'Open on GitHub'))))):null);
 }
 ReactDOM.createRoot(document.getElementById('root')).render(h(App));
 </script>

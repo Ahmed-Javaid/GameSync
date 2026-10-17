@@ -577,6 +577,7 @@ button.gs-ftree-twisty:hover { color: var(--ink); background: var(--bg-400); }
 .gs-achrow.is-hidden .gs-achrow-desc { font-style: italic; color: var(--ink-faint); }
 .gs-achrow-side { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
 .gs-achrow-when { font: 500 12px/16px var(--font-sans); color: var(--ink-muted); white-space: nowrap; }
+.gs-achrow-by { font-weight: 400; color: var(--ink-faint); }
 .gs-achrow-pct { display: inline-flex; align-items: center; gap: 6px; font: 500 12px/16px var(--font-mono); color: var(--ink-faint); white-space: nowrap; }
 @media (prefers-reduced-motion: reduce) { .gs-ring-arc { transition: none; } .gs-zenith.is-unfurling .gs-banner { animation: none; } .gs-achov-zenith.is-moment .gs-tier-dot { animation: none; } }
 

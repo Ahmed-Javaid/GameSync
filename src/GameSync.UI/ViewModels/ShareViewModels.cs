@@ -31,7 +31,12 @@ public sealed record ShareActions
     public Func<string, CancellationToken, Task<ImportPreview>> Preview { get; init; } =
         (zip, _) => Task.FromResult(new ImportPreview(zip, DateTime.UtcNow, "", []));
 
-    public Func<string, IReadOnlyList<GameId>, Task<Outcome>> Import { get; init; } = (_, _) => Task.FromResult(new Outcome(""));
+    /// <summary>
+    /// SHARE-10: the zip's games picked, by their IDs in it; those whose newest save is used now (design system version 57);
+    /// and the tag every save brings, or null.
+    /// </summary>
+    public Func<string, IReadOnlyList<GameId>, IReadOnlyCollection<GameId>, string?, Task<Outcome>> Import { get; init; } =
+        (_, _, _, _) => Task.FromResult(new Outcome(""));
 
     public Func<GameId, string?> CoverOf { get; init; } = _ => null;
 
@@ -469,9 +474,21 @@ public sealed partial class ShareViewModel : ObservableObject
     private static string Count(int count, string what) => count == 1 ? $"1 {what}" : $"{count.ToString(CultureInfo.InvariantCulture)} {what}s";
 }
 
-/// <summary>A game in a shared zip, as Import saves shows it: how it meets this PC, and anything to say (SHARE-10 to SHARE-13).</summary>
-public sealed partial class ImportRow(ImportGamePreview game, string? coverPath) : ObservableObject
+/// <summary>
+/// A game in a shared zip, as Import saves shows it: how it meets this PC, how its save comes in (a named save, or used now,
+/// design system version 57), and anything to say (SHARE-10 to SHARE-13).
+/// </summary>
+/// <param name="from">The PC the zip was packed on, for a single save's line.</param>
+public sealed partial class ImportRow(ImportGamePreview game, string? coverPath, string from = "") : ObservableObject
 {
+    /// <summary>How a game's save comes in: kept as a named save, the default and all a game not installed here can do.</summary>
+    public const string Named = "named";
+
+    /// <summary>Used now: its newest save is put in place, after the one there is kept as a named save.</summary>
+    public const string Now = "now";
+
+    public static readonly IReadOnlyList<NavItem> UseChoices = [new(Named, "Keep as a named save"), new(Now, "Use it now")];
+
     private IImage? _cover;
     private bool _coverRead;
 
@@ -500,16 +517,39 @@ public sealed partial class ImportRow(ImportGamePreview game, string? coverPath)
     public bool CanTick => game.Match is not (ImportMatch.Unknown or ImportMatch.Blocked);
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowsUse))]
     private bool _ticked = game.Match is not (ImportMatch.Unknown or ImportMatch.Blocked);
+
+    /// <summary><see cref="Named"/> or <see cref="Now"/>; only a game here that's installed can be <see cref="Now"/>.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(Meta), nameof(UsedNow))]
+    private string _use = Named;
+
+    /// <summary>Use it now is on offer: an installed game here, whose saves can be imported.</summary>
+    public bool CanUseNow => game.CanUseNow;
+
+    /// <summary>The choice shows under the game while it's ticked.</summary>
+    public bool ShowsUse => Ticked && CanUseNow;
+
+    public bool UsedNow => Ticked && CanUseNow && Use == Now;
+
+    /// <summary>What a screen reader says for the choice: "How Terraria's save comes in".</summary>
+    public string UseName => $"How {game.Title}'s save comes in";
 
     public string Meta => game.Match switch
     {
-        ImportMatch.Matched => $"{(game.Versions == 1 ? "1 version" : $"{game.Versions} versions")} · added as pinned, not current",
-        ImportMatch.NotSyncing => $"{(game.Versions == 1 ? "1 version" : $"{game.Versions} versions")} · its saves are kept from now on, backed up only",
-        ImportMatch.NotInstalled => $"{(game.Versions == 1 ? "1 version" : $"{game.Versions} versions")} · not installed here, waits until the game is found",
         ImportMatch.Blocked => "Can't be imported",
-        _ => "Not in your library · can't be imported",
+        ImportMatch.Unknown => "Not in your library · can't be imported",
+        ImportMatch.NotInstalled => "Not installed here · kept as a named save until the game is found",
+        _ when !CanUseNow => $"Not installed here · {Kept.ToLowerInvariant()}{Backed}",
+        _ when Use == Now => $"{(game.Versions == 1 ? "Used now" : $"{game.Versions} saves, the newest used now")} · your save in place is kept first, as a named save{Backed}",
+        _ => $"{Kept}{(game.Versions == 1 && from.Length > 0 ? $" · from {from}" : "")}{Backed}",
     };
+
+    private string Kept => game.Versions == 1 ? "Kept as a named save" : $"{game.Versions} saves, kept as named saves";
+
+    // A game GameSync knew but didn't keep: importing keeps its saves from now on, backed up only.
+    private string Backed => game.Match == ImportMatch.NotSyncing ? " · backed up from now on" : "";
 
     public string Size => CanTick ? Cli.FormatSize(game.Bytes) : "";
 
@@ -536,10 +576,13 @@ public sealed partial class ImportRow(ImportGamePreview game, string? coverPath)
 
 /// <summary>
 /// Import saves (design system → ImportSavesDialog; SHARE-10 to SHARE-13): a shared zip's games, each matched to this PC's
-/// library, ticked unless GameSync doesn't know it; Add puts their saves in the games' histories, pinned, never current.
+/// library, ticked unless GameSync doesn't know it; Import puts their saves in the games' histories as named saves, never
+/// current, unless a game's is used now, the save in place kept first; a tag goes on every save (design system version 57).
 /// </summary>
 public sealed partial class ImportSavesViewModel(ShareActions actions, string zipPath) : ObservableObject
 {
+    /// <summary>The longest tag: a friend's name, a word.</summary>
+    public const int TagLength = 24;
     public string ZipName => Path.GetFileName(zipPath);
 
     /// <summary>reading, review, importing, done.</summary>
@@ -573,7 +616,32 @@ public sealed partial class ImportSavesViewModel(ShareActions actions, string zi
 
     public bool CanImport => Reviewing && TickedVersions > 0;
 
-    public string AddLabel => TickedVersions == 1 ? "Add 1 version" : $"Add {TickedVersions} versions";
+    public string AddLabel => TickedVersions == 1 ? "Import 1 save" : $"Import {TickedVersions} saves";
+
+    /// <summary>The foot's promise: a save used now goes in only after the one there is kept.</summary>
+    [ObservableProperty]
+    private string _note = $"{CheckedLikeRestore} Nothing replaces your current saves.";
+
+    private const string CheckedLikeRestore = "Every file is checked like a restore: only into the game's own folders, scanned by your antivirus, no program files.";
+
+    /// <summary>The tag as typed: it goes on every save the zip brings, after the PC's name (design system version 57).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(TagShown), nameof(ShowsTagChip), nameof(TagLabel), nameof(TagIcon))]
+    private string _tag = "";
+
+    /// <summary>The tag's field is open, for typing it.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowsTagChip), nameof(TagLabel), nameof(TagIcon))]
+    private bool _tagOpen;
+
+    /// <summary>The tag as it'll show: on one line, at most <see cref="TagLength"/> characters; null for none.</summary>
+    public string? TagShown => SyncService.CleanTag(Tag, TagLength);
+
+    public bool ShowsTagChip => !TagOpen && TagShown is not null;
+
+    public string TagLabel => TagOpen ? "Done" : TagShown is null ? "Add a tag" : "Change";
+
+    public string TagIcon => TagOpen ? "check" : TagShown is null ? "plus" : "pencil";
 
     [ObservableProperty]
     private string _doneText = "";
@@ -590,12 +658,12 @@ public sealed partial class ImportSavesViewModel(ShareActions actions, string zi
         {
             var preview = await actions.Preview(zipPath, CancellationToken.None);
             From = $"From {ZipName} · packed on {preview.PackedUtc.ToLocalTime():d MMM yyyy} on {preview.PackedOn}";
-            Rows = preview.Games.Select(g => new ImportRow(g, g.LocalId is { } id ? actions.CoverOf(id) : null)).ToList();
+            Rows = preview.Games.Select(g => new ImportRow(g, g.LocalId is { } id ? actions.CoverOf(id) : null, preview.PackedOn)).ToList();
             foreach (var row in Rows)
             {
                 row.PropertyChanged += (_, e) =>
                 {
-                    if (e.PropertyName == nameof(ImportRow.Ticked))
+                    if (e.PropertyName is nameof(ImportRow.Ticked) or nameof(ImportRow.Use))
                     {
                         Recount();
                     }
@@ -616,10 +684,27 @@ public sealed partial class ImportSavesViewModel(ShareActions actions, string zi
     private void Recount()
     {
         var ticked = Rows.Where(r => r.Ticked && r.CanTick).ToList();
+        var usedNow = ticked.Count(r => r.UsedNow);
         TickedVersions = ticked.Sum(r => r.Game.Versions);
-        Summary = $"{(ticked.Count == 1 ? "1 game" : $"{ticked.Count} games")} · {(TickedVersions == 1 ? "1 version" : $"{TickedVersions} versions")}, added as pinned versions";
+        Summary = $"{(ticked.Count == 1 ? "1 game" : $"{ticked.Count} games")} · {(TickedVersions == 1 ? "1 save" : $"{TickedVersions} saves")}" +
+                  (usedNow > 0 ? $", {usedNow} used now" : TickedVersions == 1 ? ", kept as a named save" : ", kept as named saves");
+        Note = usedNow > 0
+            ? $"{CheckedLikeRestore} A save used now is put in place only after your own is kept as a named save."
+            : $"{CheckedLikeRestore} Nothing replaces your current saves.";
         SizeText = Cli.FormatSize(ticked.Sum(r => r.Game.Bytes));
         OnPropertyChanged(nameof(AddLabel));
+    }
+
+    /// <summary>+ Add a tag opens the field; Done, or Enter in it, closes it, the tag kept as typed.</summary>
+    [RelayCommand]
+    private void ToggleTag()
+    {
+        if (TagOpen)
+        {
+            Tag = TagShown ?? "";
+        }
+
+        TagOpen = !TagOpen;
     }
 
     [RelayCommand]
@@ -631,8 +716,10 @@ public sealed partial class ImportSavesViewModel(ShareActions actions, string zi
         }
 
         Error = null;
+        TagOpen = false;
         Stage = "importing";
-        var outcome = await actions.Import(zipPath, Rows.Where(r => r.Ticked && r.CanTick).Select(r => r.Game.Id).ToList());
+        var ticked = Rows.Where(r => r.Ticked && r.CanTick).ToList();
+        var outcome = await actions.Import(zipPath, ticked.Select(r => r.Game.Id).ToList(), ticked.Where(r => r.UsedNow).Select(r => r.Game.Id).ToList(), TagShown);
         if (outcome.Failed)
         {
             Error = outcome.Text;

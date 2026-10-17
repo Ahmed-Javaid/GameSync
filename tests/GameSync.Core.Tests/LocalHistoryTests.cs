@@ -16,6 +16,30 @@ public class LocalHistoryTests
     private static readonly GameId Game = GameId.Parse("game");
 
     [Fact]
+    public void KAN_171_the_backup_folder_has_a_README_saying_what_each_folder_is()
+    {
+        // A friend, 8 Oct 2026: "How exactly are the games saved. Why does each game have 2 saves in the backup folder?"
+        using var world = new TestWorld();
+        var folder = Path.Combine(world.Root, "history");
+        var history = new LocalHistory(folder);
+        history.WriteReadme();
+        var readme = Path.Combine(folder, LocalHistory.ReadmeName);
+        var text = File.ReadAllText(readme);
+        Assert.Contains(@"games\<game>--pc-", text, StringComparison.Ordinal);
+        Assert.Contains("That's why a game can have two folders here.", text, StringComparison.Ordinal);
+        Assert.Contains("\r\n", text, StringComparison.Ordinal);
+
+        // Written again only when it differs: a README changed by hand, or an older GameSync's, is put right.
+        var written = File.GetLastWriteTimeUtc(readme);
+        File.SetLastWriteTimeUtc(readme, written.AddHours(-1));
+        history.WriteReadme();
+        Assert.Equal(written.AddHours(-1), File.GetLastWriteTimeUtc(readme));
+        File.WriteAllText(readme, "old words");
+        history.WriteReadme();
+        Assert.Equal(text, File.ReadAllText(readme));
+    }
+
+    [Fact]
     public async Task BAK_17_this_pc_keeps_the_newest_10_versions_files_and_the_cloud_keeps_all()
     {
         using var world = new TestWorld();

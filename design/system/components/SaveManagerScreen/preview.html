@@ -75,7 +75,7 @@ function rail(cur){return h(G.SideRail,{current:cur,items:[
   {id:'achievements',icon:'trophy',label:'Achievements'},
   {id:'saves',icon:'saves',label:'Save manager',sep:true,dot:'warn',dotLabel:'2 conflicts'},
   {id:'log',icon:'terminal',label:'Console'},
-  {id:'settings',icon:'settings',label:'Settings',bottom:true}]})}
+  {id:'guide',icon:'help',label:'Guide',bottom:true},{id:'settings',icon:'settings',label:'Settings',bottom:true}]})}
 function topbar(title,sub,tabs,right){return h('header',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',gap:16}},h('div',null,h('div',{style:{font:'600 15px/20px var(--font-sans)'}},title),h('div',{className:'gs-faint',style:{fontSize:12}},sub)),tabs,h('div',{className:'gs-row',style:{flexWrap:'nowrap'}},right));}
 
 // A number in the strip: its label, the number, and a line under it when it needs one (where it is, what's free).
@@ -163,7 +163,7 @@ function App(){
   h('main',{className:'sm-main'},
    game ? h(GameSaves,{key:game.id,game:game,onBack:function(){open[1](null)}}) : [
    h(React.Fragment,{key:'top'},topbar('Save manager','DESKTOP \u00b7 daily backup 20:00',
-     h(G.PillTabs,{label:'Save manager view',items:[{id:'saves',label:'Saves',icon:'saves'},{id:'needs',label:'Conflicts',icon:'alert',count:2},{id:'plan',label:'Plan',icon:'chevronsRight'},{id:'versions',label:'Versions',icon:'clock'},{id:'log',label:'Log',icon:'terminal'}]}),
+     h(G.PillTabs,{label:'Save manager view',items:[{id:'saves',label:'Saves',icon:'saves'},{id:'needs',label:'Conflicts',icon:'alert',count:2},{id:'log',label:'Log',icon:'terminal'}]}),
      [h(G.IconButton,{key:4,icon:'download',label:'Import saves',onClick:function(){d[1]('import')}}),
       h(G.Button,{key:3,variant:'primary',icon:'sync'},'Sync now')])),
    h('div',{key:'stats',style:{display:'flex',gap:48,padding:'4px 4px 0'}},h(Stat,{k:'Games',v:'12'}),h(Stat,{k:'Backups on this PC',v:'1.04 GB',sub:'E: \u00b7 312 GB free'}),h(Stat,{k:'Versions',v:'214'}),h(Stat,{k:'Last backup',v:'20:00'}),h(Stat,{k:'Conflicts',v:'2'})),

@@ -2,13 +2,13 @@ using GameSync.Core.Games;
 using GameSync.Core.Model;
 using GameSync.Core.State;
 using GameSync.Host;
-using GameSync.UI.ViewModels;
 
 namespace GameSync.Core.Tests;
 
 /// <summary>
-/// SYNC-14 in the app: the save manager's Plan tab shows what the next sync would do for each game and why, with nothing
-/// done until Run, and Run does exactly that for the games left ticked; a game that changed since the plan doesn't run.
+/// SYNC-14: the plan says what the next sync would do for each game and why, with nothing done until it's run, and running
+/// it does exactly that for the games chosen; a game that changed since the plan doesn't run. The app's Plan tab was taken
+/// out on 9 Oct 2026 (the owner); <c>gamesync plan</c> shows the plan.
 /// </summary>
 public class PlanTests
 {
@@ -70,62 +70,6 @@ public class PlanTests
         Assert.Empty(stale.Results);
         Assert.Equal(["Held Game"], stale.Changed);
         Assert.StartsWith("Held Game changed since the plan, so it didn't run", stale.Sentence, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public async Task SYNC_14_the_plan_tab_counts_what_will_run_and_runs_the_ticked_games()
-    {
-        var checks = 0;
-        IReadOnlyList<PlannedChange>? ran = null;
-        (GameId Game, bool Conflict)? opened = null;
-        var sekiro = GameId.Parse("sekiro");
-        var view = new SyncPlanView(
-            [
-                new PlannedChange(GameId.Parse("ready-or-not"), "Ready or Not", PlanStep.Upload, "Changed here on 22 Sep.", 14_155_776, "a"),
-                new PlannedChange(GameId.Parse("sts2"), "Slay the Spire 2", PlanStep.Download, "LAPTOP uploaded a newer save.", 913_408, "b"),
-            ],
-            [new PlannedWait(sekiro, sekiro, "Sekiro", GameStatus.Conflict, "Changed on both PCs.", "Resolve"),
-             new PlannedWait(GameId.Parse("ghost"), GameId.Parse("ghost"), "Ghost of Tsushima", GameStatus.Playing, "Being played now.", null)],
-            ["Terraria", "Hades"],
-            DateTime.UtcNow);
-        var actions = new LauncherActions(_ => { }, () => { }, (_, _) => { }, (_, _) => { })
-        {
-            CheckPlan = _ =>
-            {
-                checks++;
-                return Task.FromResult(view);
-            },
-            RunPlan = (chosen, _) =>
-            {
-                ran = chosen;
-                return Task.FromResult(new PlanRun([], []));
-            },
-        };
-        var saves = new SaveManagerViewModel(actions);
-
-        // The tab makes the plan the first time it's shown.
-        Assert.Equal(["saves", "needs", "plan", "versions", "log"], saves.Tabs.Select(t => t.Id));
-        saves.Tab = "plan";
-        Assert.Equal((true, false, 1), (saves.ShowsPlan, saves.ShowsTable, checks));
-        var plan = saves.Plan;
-        Assert.Equal(["2", "1", "1", "2", "14.4 MB"], plan.Stats.Select(s => s.Value));
-        Assert.Equal(("Run 2 changes", "2 of 2 will run · untick a game to skip it this time"), (plan.RunLabel, plan.ChangesToolbar));
-
-        // Unticking one skips it this time; Run sends the rest, then the plan is made again.
-        plan.Changes[1].IsChecked = false;
-        Assert.Equal(("Run 1 change", "13.5 MB"), (plan.RunLabel, plan.Stats[^1].Value));
-        await ((CommunityToolkit.Mvvm.Input.IAsyncRelayCommand)plan.RunCommand).ExecuteAsync(null);
-        Assert.Equal(["Ready or Not"], ran!.Select(c => c.Title));
-        Assert.Equal(2, checks);
-        Assert.False(plan.Changes.Single(c => c.Title == "Slay the Spire 2").IsChecked);
-
-        // A waiting game's button: Resolve opens its conflict.
-        plan.ShowInSyncCommand.Execute(null);
-        Assert.Equal(("Hide the games already in sync", "Terraria · Hades"), (plan.InSyncLabel, plan.InSyncText));
-        var runs = new SyncPlanViewModel(actions, (game, conflict) => opened = (game, conflict));
-        runs.Show(view);
-        runs.WaitCommand.Execute(runs.Waits[0]);
-        Assert.Equal((sekiro, true), opened);
     }
 
     private static GameDefinition Game(string id, string title, string saves) => new()

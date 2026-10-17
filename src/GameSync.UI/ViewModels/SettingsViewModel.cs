@@ -46,6 +46,18 @@ public sealed record SettingsActions
 
     public Func<string, Task<Outcome>> RemoveAchievementFolder { get; init; } = _ => Task.FromResult(new Outcome(""));
 
+    /// <summary>Design system version 54: Look again, for the records copies Steam doesn't run keep themselves.</summary>
+    public Func<Task<Outcome>> LookForRecords { get; init; } = () => Task.FromResult(new Outcome(""));
+
+    /// <summary>
+    /// Design system version 55 (the owner, 8 Oct 2026: "Refresh rarity shouldn't be on the main achievements page, but in
+    /// settings"): Rarity's Refresh now, Steam asked again how rare each achievement is, for every game.
+    /// </summary>
+    public Func<Task<Outcome>> RefreshRarity { get; init; } = () => Task.FromResult(new Outcome(""));
+
+    /// <summary>Version 54: Keep them in the cloud: GameSync's record of achievements on every PC, or on this one only.</summary>
+    public Func<bool, Task<Outcome>> SetAchievementsInCloud { get; init; } = _ => Task.FromResult(new Outcome(""));
+
     /// <summary>FOLD-09: the folder shared zips go to, and asking each time instead.</summary>
     public Func<string, Task<Outcome>> SetShareFolder { get; init; } = _ => Task.FromResult(new Outcome(""));
 
@@ -99,6 +111,9 @@ public sealed record SettingsActions
 
     public Func<bool, Task> SetUpdatesDaily { get; init; } = _ => Task.CompletedTask;
 
+    /// <summary>PKG-03: Install updates when GameSync starts with Windows.</summary>
+    public Func<bool, Task> SetUpdatesAtSignIn { get; init; } = _ => Task.CompletedTask;
+
     /// <summary>KAN-110: every game GameSync tracks achievements for, counted or left out.</summary>
     public Func<CancellationToken, Task<IReadOnlyList<AchievementGameRow>>> AchievementGames { get; init; } = _ => Task.FromResult<IReadOnlyList<AchievementGameRow>>([]);
 
@@ -107,6 +122,12 @@ public sealed record SettingsActions
 
     /// <summary>KAN-131: turns GameSync's popup on or off for a game.</summary>
     public Func<GameSync.Core.Model.GameId, bool, Task> SetAchievementPopup { get; init; } = (_, _) => Task.CompletedTask;
+
+    /// <summary>LOOK-28 (design system version 57): Windows' Animation effects are off, so nothing in GameSync moves either.</summary>
+    public Func<bool> AnimationsOff { get; init; } = () => false;
+
+    /// <summary>SET-05 (design system version 57): GameSync's own GitHub, where a problem is reported as a new issue.</summary>
+    public string IssuesUrl { get; init; } = "https://github.com/Ahmed-Javaid/GameSync/issues/new";
 
     /// <summary>A dialog over the page (Achievements by game), and closing it.</summary>
     public Action<object> OpenDialog { get; init; } = _ => { };
@@ -229,6 +250,10 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageSurface
         }
     }
 
+    /// <summary>SET-05 (design system version 57): Report a problem…, a dialog over the page.</summary>
+    [RelayCommand]
+    private void ReportProblem() => _actions.OpenDialog(new ReportProblemViewModel(_actions, text => CopyText?.Invoke(text)));
+
     /// <summary>SET-05: the diagnostics go on the clipboard, and the button says Copied for a moment.</summary>
     [RelayCommand]
     private async Task CopyDiagnostics()
@@ -303,6 +328,7 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageSurface
 
     public void Apply(SettingsView view)
     {
+        Appearance.CheckMotion();
         Storage.Show(view);
         Backup.Show(view);
         Cloud.Show(view);
@@ -354,6 +380,7 @@ public sealed partial class AppearanceSettings : ObservableObject
     {
         _actions = actions;
         Show(look);
+        CheckMotion();
     }
 
     public IReadOnlyList<NavItem> Modes { get; } = [new(Look.Dark, "Dark", "moon"), new(Look.Light, "Light", "sun"), new(Look.MatchWindows, "Match Windows", "monitor")];
@@ -429,6 +456,20 @@ public sealed partial class AppearanceSettings : ObservableObject
 
     /// <summary>What the person has now, as it's saved.</summary>
     public Look Look => new(Mode, PureBlack, Preset, Primary, Secondary, Surface);
+
+    /// <summary>
+    /// LOOK-28 (design system version 57; a friend: "Some user dont have animations?"): Windows' Animation effects are off,
+    /// so Appearance starts with the Motion card saying GameSync doesn't animate either, with Open Visual effects.
+    /// </summary>
+    [ObservableProperty]
+    private bool _animationsOff;
+
+    /// <summary>Reads Windows' Animation effects again, as the page opens or reads its settings again.</summary>
+    public void CheckMotion() => AnimationsOff = _actions.AnimationsOff();
+
+    /// <summary>Windows' own Visual effects page, where Animation effects is.</summary>
+    [RelayCommand]
+    private void OpenVisualEffects() => _actions.OpenLink("ms-settings:easeofaccess-visualeffects");
 
     /// <summary>The look as it is on this PC, from the app or another change (<c>gamesync set surface</c>); nothing is saved.</summary>
     public void Show(Look look)

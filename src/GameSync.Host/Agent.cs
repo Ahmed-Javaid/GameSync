@@ -53,6 +53,11 @@ public interface IAgentOutput
     void Transfer(TransferUpdate update)
     {
     }
+
+    /// <summary>Design system version 54: another PC's achievements came into GameSync's record from the cloud.</summary>
+    void AchievementsChanged()
+    {
+    }
 }
 
 /// <summary>
@@ -96,6 +101,11 @@ internal sealed class Agent(string dataDir, IAgentOutput output) : IDisposable
     private int _syncSoon;
     private int _watchSoon;
 
+    // Design system version 54: GameSync's record of achievements goes to and from the cloud every 15 minutes, after a
+    // session, and soon after the person marks one.
+    private DateTime _achievementsAt = DateTime.MinValue;
+    private int _achievementsSoon;
+
     // KAN-88: in the app, uploads run beside the rounds under their own lock, so a long one never holds back the
     // person's actions, the check before playing, or the rounds noticing a game start.
     private readonly object _uploadsLock = new();
@@ -124,6 +134,9 @@ internal sealed class Agent(string dataDir, IAgentOutput output) : IDisposable
 
     /// <summary>The games are read again at the next round, so a game just located or found is watched at once (PLAY-12). Any thread.</summary>
     public void WatchSoon() => Interlocked.Exchange(ref _watchSoon, 1);
+
+    /// <summary>Design system version 54: GameSync's record of achievements goes to and from the cloud at the next round with nothing playing. Any thread.</summary>
+    public void ShareAchievementsSoon() => Interlocked.Exchange(ref _achievementsSoon, 1);
 
     /// <summary>
     /// KAN-88: syncs do their work on this PC and the uploads run on their own beside the rounds (the app), pausing while
@@ -298,6 +311,7 @@ internal sealed class Agent(string dataDir, IAgentOutput output) : IDisposable
         if (_ended.Count > 0)
         {
             await WorkAsync(() => SyncEndedAsync(ct));
+            ShareAchievementsSoon();
         }
 
         // BG-02: the scheduled daily run hands itself to the agent when it's running.
@@ -327,6 +341,12 @@ internal sealed class Agent(string dataDir, IAgentOutput output) : IDisposable
         {
             _buildsAt = nowUtc;
             await CheckBuildsAsync(ct);
+        }
+
+        if (Interlocked.Exchange(ref _achievementsSoon, 0) == 1 || nowUtc >= _achievementsAt)
+        {
+            _achievementsAt = nowUtc + SyncEvery;
+            await ShareAchievementsAsync(ct);
         }
 
         if (UploadsInBackground)
@@ -768,6 +788,26 @@ internal sealed class Agent(string dataDir, IAgentOutput output) : IDisposable
         });
     }
 
+    /// <summary>
+    /// Design system version 54: GameSync's record of achievements to and from the cloud; what other PCs unlocked shows on
+    /// the screens once it's in. Offline or signed out, it waits for the next round.
+    /// </summary>
+    private async Task ShareAchievementsAsync(CancellationToken ct)
+    {
+        try
+        {
+            if ((await AchievementShare.ExchangeAsync(dataDir, ct)).Pulled > 0)
+            {
+                output.AchievementsChanged();
+            }
+        }
+        catch (Exception e) when (e is CloudException or IOException or UnauthorizedAccessException or HttpRequestException or UsageException
+            or InvalidOperationException or TaskCanceledException && !ct.IsCancellationRequested)
+        {
+            // Tried again at the next round.
+        }
+    }
+
     /// <summary>BAK-06: a synced game whose build changed since it was last seen keeps its save before the new build runs.</summary>
     private async Task CheckBuildsAsync(CancellationToken ct)
     {
@@ -799,16 +839,25 @@ internal sealed class Agent(string dataDir, IAgentOutput output) : IDisposable
             return;
         }
 
-        if (engine.Library.All().FirstOrDefault(e => e.Id == game) is not { Installed: true, Store: { } store, InstallDir: { } folder, Confirmed: not null } entry)
+        if (engine.Library.All().FirstOrDefault(e => e.Id == game) is not { Installed: true, Store: { } store, InstallDir: { } folder, Confirmed: { } confirmed } entry)
         {
+            return;
+        }
+
+        // The game's own saves changed this session, though nothing was uploaded at its end (a named save or Back up now while
+        // playing took them up already): nothing moved (the owner's Dark Souls III, 8 Oct 2026).
+        var since = session.StartUtc - DecisionEngine.SessionSlack;
+        if (SyncedFilesChangedSince(engine, confirmed, since))
+        {
+            engine.State.SetSetting($"moved.{game}", "");
             return;
         }
 
         var discoverer = new Discoverer(new SaveListStore(dataDir).Load(), engine.Here.Folders, Cli.SaveFolders(engine.State), engine.Here.Guard);
         var changed = discoverer.EveryLayer(new InstalledGame { Store = store, Title = entry.Title, InstallDir = folder, StoreId = entry.StoreId })
-            .Where(p => p.NewestUtc >= session.StartUtc - DecisionEngine.SessionSlack)
+            .Where(p => p.NewestUtc >= since)
             .ToList();
-        var moved = (entry with { Proposals = changed }).Suggestions;
+        var moved = Moved(entry, changed);
         if (moved.Count == 0)
         {
             return;
@@ -818,6 +867,40 @@ internal sealed class Agent(string dataDir, IAgentOutput output) : IDisposable
         engine.State.SetSetting($"moved.{game}", string.Join("; ", moved.Select(p => p.Root)));
         output.NeedsYou(entry.DisplayTitle,
             $"Its saves may have moved: {moved[0].Root} changed while you played, and the folder GameSync syncs didn't. See: gamesync show {game}");
+    }
+
+    /// <summary>
+    /// FIND-07: the places that changed while the game played that it doesn't sync. A place around a folder it already syncs
+    /// holds only what its rules leave out there (its settings, a copy kept by hand): never a move, and never offered as
+    /// more saves (the owner's Dark Souls III, 8 Oct 2026, offered its whole DarkSoulsIII folder round the save it syncs).
+    /// </summary>
+    internal static IReadOnlyList<Proposal> Moved(LibraryEntry entry, IReadOnlyList<Proposal> changed)
+    {
+        if (entry.Confirmed is not { } confirmed)
+        {
+            return [];
+        }
+
+        var synced = confirmed.Rules.Where(r => confirmed.Roots.ContainsKey(r.Root))
+            .Select(r => new Proposal(FoundBy.ByHand, confirmed.Roots[r.Root], r.Include, r.Category, 0, 0, null))
+            .ToList();
+        return (entry with { Proposals = changed }).Suggestions.Where(p => !synced.Any(s => Discoverer.Covers(p, s))).ToList();
+    }
+
+    /// <summary>Whether any file the game syncs was written since <paramref name="since"/>, as its synced folders hold them now.</summary>
+    private static bool SyncedFilesChangedSince(Engine engine, GameDefinition confirmed, DateTime since)
+    {
+        try
+        {
+            var resolved = engine.Here.Resolver.Resolve(confirmed);
+            return new GameSync.Core.Scanning.SnapshotScanner(engine.Here.Guard, engine.State).Scan(resolved, _ => true).Files.Any(f => f.ModifiedUtc >= since);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or GameSync.Core.Scanning.InvalidGameDefinitionException
+                                      or GameSync.Core.Safety.UnsafePathException)
+        {
+            // Unreadable now: the check below decides as before.
+            return false;
+        }
     }
 
     /// <summary>

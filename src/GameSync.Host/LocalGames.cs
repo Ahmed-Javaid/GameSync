@@ -2,22 +2,55 @@ using GameSync.Core.Discovery;
 using GameSync.Core.Model;
 using GameSync.Core.Storage;
 using GameSync.Core.Sync;
+using GameSync.Windows;
 
 namespace GameSync.Host;
 
 /// <summary>What Scan a folder for games… found: the games in the folder, by name, and how many are new here.</summary>
 public sealed record FolderScan(string Folder, IReadOnlyList<string> Games, int New)
 {
+    /// <summary>LIB-30: what the person left out of the library when they picked from the folder.</summary>
+    public IReadOnlyList<string> LeftOut { get; init; } = [];
+
     /// <summary>What the app says once the scan is done.</summary>
     public string Sentence => Games.Count switch
     {
-        0 => $"No games in {Folder}: GameSync looks in it for folders with a game's program in them, such as {System.IO.Path.Combine(Folder, "Black Myth Wukong")}, and in folders of several games.",
-        _ => $"Found {Count(Games.Count)} in {Folder}{(New < Games.Count ? $" ({New} new here)" : "")}: {Names()}. They're in the library's Local view; Play starts each from its folder.",
+        0 => $"No games in {Folder}: GameSync looks in it for folders with a game's program in them, such as {System.IO.Path.Combine(Folder, "Black Myth Wukong")}, and in folders of several games.{Left()}",
+        _ => $"Found {Count(Games.Count)} in {Folder}{(New < Games.Count ? $" ({New} new here)" : "")}: {Names(Games)}. They're in the library's Local view; Play starts each from its folder.{Left()}",
     };
 
-    private string Names() => Games.Count <= 5 ? string.Join(", ", Games) : $"{string.Join(", ", Games.Take(4))} and {Games.Count - 4} more";
+    /// <summary>The notice's first line, in bold (the owner, 18 Oct 2026: "it need to be apparent that this is something we want you to see").</summary>
+    public string Headline => Games.Count switch
+    {
+        0 => $"No games found in {Folder}",
+        _ when New == 0 => $"Found {Count(Games.Count)} in {Folder}, all in your library already",
+        _ when New == Games.Count => $"Found {Count(Games.Count)} in {Folder}",
+        _ => $"Found {Count(Games.Count)} in {Folder}, {New} of them new",
+    };
+
+    /// <summary>The notice's second line: which games, and where they are now; or what GameSync looks for.</summary>
+    public string Detail => Games.Count switch
+    {
+        0 => $"GameSync looks in it for folders with a game's program in them, such as {System.IO.Path.Combine(Folder, "Black Myth Wukong")}, and in folders of several games.{Left()}",
+        _ => $"{Names(Games)}. They're in the Local view, and Play starts each from its folder.{Left()}",
+    };
+
+    private string Left() => LeftOut.Count == 0 ? "" : $" Left out, as you chose: {Names(LeftOut)}.";
+
+    private static string Names(IReadOnlyList<string> names) => names.Count <= 5 ? string.Join(", ", names) : $"{string.Join(", ", names.Take(4))} and {names.Count - 4} more";
 
     private static string Count(int games) => games == 1 ? "1 game" : $"{games} games";
+}
+
+/// <summary>LIB-30: what a game folder holds, each program judged a game or probably not, before anything is added.</summary>
+public sealed record FolderLookResult(string Folder, IReadOnlyList<FolderCandidate> Candidates);
+
+/// <summary>LIB-30: what the person picked from a game folder: the folders they left out, and ones ticked that were left out before.</summary>
+/// <param name="LeftOutNames">The names of what was left out, for what the app says after.</param>
+public sealed record FolderPicks(string Folder, IReadOnlySet<string> LeaveOut, IReadOnlySet<string> TakeBack, IReadOnlyList<string> LeftOutNames)
+{
+    /// <summary>Everything ticked as it was offered: nothing left out, nothing taken back.</summary>
+    public static FolderPicks All(string folder) => new(folder, new HashSet<string>(), new HashSet<string>(), []);
 }
 
 /// <summary>
@@ -27,12 +60,37 @@ public sealed record FolderScan(string Folder, IReadOnlyList<string> Games, int 
 public static class LocalGames
 {
     /// <summary>
+    /// LIB-30 (design system version 56, OnboardingScreen #scan-folder): what a folder of games holds, before it's added,
+    /// for the person to pick from: each program found, judged a game or probably not (an app, a code project, a tool),
+    /// with why, and what they left out before unticked. Only reads; refuses a folder no scan may look in.
+    /// </summary>
+    /// <param name="setup">First run: GameSync isn't set up yet on this data folder.</param>
+    public static FolderLookResult Look(string dataDir, string folder, bool setup = false)
+    {
+        var full = Full(folder);
+        if (!Directory.Exists(full))
+        {
+            throw new UsageException($"{full} isn't there on this PC.");
+        }
+
+        using var engine = setup ? Engine.OpenForSetup(dataDir) : Engine.Open(dataDir);
+        if (FolderRefusal(full, engine) is { } refused)
+        {
+            throw new UsageException(refused);
+        }
+
+        var found = Detector.Detect(StoreLocations.ForThisPc([full])).Games.Where(g => g.Store == StoreKind.Loose && Inside(g.InstallDir, full));
+        return new FolderLookResult(full, FolderLook.Look(full, found, new SaveListStore(dataDir).Load(), Library.LeftOut(engine.Library.All())));
+    }
+
+    /// <summary>
     /// LIB-23: Scan a folder for games…, as <c>gamesync add-folder</c> then <c>gamesync scan</c>: the folder joins the ones
     /// every scan looks in, and this PC is scanned now. Each folder in it with a game's program becomes a game in its own
     /// folder, joining the game its saves were already known by. The scan runs outside the engine lock; only folding its
     /// findings into the library waits for a sync in the background to finish. What goes wrong is thrown, for the page to say.
     /// </summary>
-    public static async Task<FolderScan> ScanFolderAsync(string dataDir, string folder, IAgentOutput output, CancellationToken ct)
+    /// <param name="picks">LIB-30: what the person picked from the folder (left out, or taken back); null keeps everything found.</param>
+    public static async Task<FolderScan> ScanFolderAsync(string dataDir, string folder, IAgentOutput output, CancellationToken ct, FolderPicks? picks = null)
     {
         var full = Full(folder);
         if (!Directory.Exists(full))
@@ -53,11 +111,11 @@ public static class LocalGames
         }
 
         output.Say($"Looking for games in {full}, and scanning the rest of this PC with it...");
-        var entries = await RescanAsync(dataDir, output, ct);
+        var entries = await RescanAsync(dataDir, output, ct, picks ?? FolderPicks.All(full));
         var inFolder = entries.Where(e => e is { Installed: true, MergedInto: null, State: not LibraryState.Ignored, InstallDir: { } dir } && Inside(dir, full))
             .OrderBy(e => e.DisplayTitle, StringComparer.OrdinalIgnoreCase)
             .ToList();
-        return new FolderScan(full, inFolder.Select(e => e.DisplayTitle).ToList(), inFolder.Count(e => !before.Contains(e.Id)));
+        return new FolderScan(full, inFolder.Select(e => e.DisplayTitle).ToList(), inFolder.Count(e => !before.Contains(e.Id))) { LeftOut = picks?.LeftOutNames ?? [] };
     }
 
     /// <summary>
@@ -92,8 +150,10 @@ public static class LocalGames
     /// <summary>
     /// Scans this PC as <c>gamesync scan</c> does and folds what it found into the library: the scan runs outside the
     /// engine lock, and only folding it in waits for a sync in the background to finish. Returns the library after.
+    /// LIB-30: what the person picked from a folder (<paramref name="picks"/>) is kept as they picked it; anything else
+    /// new in a game folder that doesn't look like a game waits in the library's Hidden tab, said in the log.
     /// </summary>
-    internal static async Task<IReadOnlyList<LibraryEntry>> RescanAsync(string dataDir, IAgentOutput output, CancellationToken ct)
+    internal static async Task<IReadOnlyList<LibraryEntry>> RescanAsync(string dataDir, IAgentOutput output, CancellationToken ct, FolderPicks? picks = null)
     {
         Cli.ScanFindings findings;
         using (var engine = Engine.Open(dataDir))
@@ -104,9 +164,43 @@ public static class LocalGames
         using var engineLock = await EngineLock.AcquireAsync(dataDir, () => output.Say("Waiting for the sync in the background to finish first."), ct);
         using var here = Engine.Open(dataDir);
         var others = await OtherGamesAsync(here, ct);
-        var entries = Library.Reconcile(here.Library.All(), findings.Found, DateTime.UtcNow, others, findings.Leftovers);
+        var known = here.Library.All();
+        var entries = Library.Reconcile(known, findings.Found, DateTime.UtcNow, others, findings.Leftovers);
+        if (picks is not null)
+        {
+            entries = Library.Pick(entries, picks.LeaveOut, picks.TakeBack);
+        }
+
         here.Library.ReplaceAll(entries);
+        HideApps(here, known, entries, picks, output);
         return entries;
+    }
+
+    /// <summary>
+    /// LIB-30: something new in a game folder, found by a scan nobody picked from (a game installed there later, or an app),
+    /// that doesn't look like a game goes to the library's Hidden tab on this PC, where Unhide brings it back.
+    /// </summary>
+    private static void HideApps(Engine engine, IReadOnlyList<LibraryEntry> before, IReadOnlyList<LibraryEntry> after, FolderPicks? picks, IAgentOutput output)
+    {
+        var known = before.Select(e => e.Id).ToHashSet();
+        var fresh = after.Where(e => e is { Store: StoreKind.Loose, MergedInto: null, State: LibraryState.Found, InstallDir: { Length: > 0 } } && !known.Contains(e.Id) &&
+            (picks is null || !Inside(e.InstallDir!, picks.Folder))).ToList();
+        if (fresh.Count == 0)
+        {
+            return;
+        }
+
+        var list = new SaveListStore(engine.DataDir).Load();
+        foreach (var entry in fresh)
+        {
+            var dir = entry.InstallDir!;
+            var judged = FolderLook.Judge(new InstalledGame { Store = StoreKind.Loose, Title = entry.Title, InstallDir = dir }, System.IO.Path.GetDirectoryName(dir) ?? dir, list);
+            if (!judged.LooksLikeGame)
+            {
+                engine.State.SetSetting(Launcher.HiddenKey(entry.Id), "1");
+                output.Say($"{entry.DisplayTitle}, new in {System.IO.Path.GetDirectoryName(dir)}, doesn't look like a game ({judged.Why}), so it's in the library's Hidden tab.");
+            }
+        }
     }
 
     /// <summary>
@@ -124,6 +218,8 @@ public static class LocalGames
         }
 
         var folder = LooseScanner.GameFolderOf(full);
+        // The save list, which says which game a program is (LIB-24), is read before the lock: it takes a moment.
+        var list = new SaveListStore(dataDir).Load();
         using var engineLock = await EngineLock.AcquireAsync(dataDir, () => output.Say("Waiting for the sync in the background to finish first."), ct);
         using var engine = Engine.Open(dataDir);
         var entry = engine.Library.All().FirstOrDefault(e => e.Id == game && e.MergedInto is null)
@@ -133,6 +229,23 @@ public static class LocalGames
             throw new UsageException($"{entry.DisplayTitle} is installed through {StoreNames.Name(store)}, which starts it.");
         }
 
+        return Locate(engine, entry, full, folder, list);
+    }
+
+    /// <summary>
+    /// LIB-24: a game's folder set from its program, under the engine lock, for Locate the game… and Installed files'
+    /// Change…: refused when another game has the folder or it can't be a game's; otherwise kept, with what the program's
+    /// own record says (design system version 57), which the game's pages say from then on while it's in that folder.
+    /// </summary>
+    internal static string Locate(Engine engine, LibraryEntry entry, string full, string folder, SaveList? list)
+    {
+        var game = entry.Id;
+        var check = ProgramChecks.Check(engine, entry, full, folder, list);
+        if (check.Refused)
+        {
+            throw new UsageException(check.Sentence);
+        }
+
         if (ProgramRefusal(folder, engine, game) is { } refused)
         {
             throw new UsageException(refused);
@@ -140,18 +253,20 @@ public static class LocalGames
 
         var located = Library.Locate(entry, folder, Fingerprinter.Read(folder), DateTime.UtcNow);
         engine.Library.SaveAll([located]);
+        ProgramChecks.Keep(engine.State, game, check);
+        var says = check.Fit == ProgramFit.Fits ? "" : $" {check.Sentence}";
 
         // R15: a game with an anti-cheat starts only through its anti-cheat's own launcher, never the program picked.
         if (located.HasAntiCheat && !GameLaunch.IsAntiCheatLauncher(full))
         {
             GameLaunch.SetProgram(engine.State, game, null);
             return GameLaunch.AntiCheatLauncher(folder) is { } launcher
-                ? $"{entry.DisplayTitle} is on this PC, in {folder}. It has an anti-cheat, so Play starts it through {System.IO.Path.GetFileName(launcher)}."
-                : $"{entry.DisplayTitle} is on this PC, in {folder}. It has an anti-cheat, so start it from its launcher; GameSync backs up its saves when you've played.";
+                ? $"{entry.DisplayTitle} is on this PC, in {folder}. It has an anti-cheat, so Play starts it through {System.IO.Path.GetFileName(launcher)}.{says}"
+                : $"{entry.DisplayTitle} is on this PC, in {folder}. It has an anti-cheat, so start it from its launcher; GameSync backs up its saves when you've played.{says}";
         }
 
         GameLaunch.SetProgram(engine.State, game, full, located.HasAntiCheat);
-        return $"{entry.DisplayTitle} is on this PC, in {folder}. Play starts {System.IO.Path.GetFileName(full)} from there.";
+        return $"{entry.DisplayTitle} is on this PC, in {folder}. Play starts {System.IO.Path.GetFileName(full)} from there.{says}";
     }
 
     /// <summary>

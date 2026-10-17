@@ -122,9 +122,11 @@ internal sealed class Engine : IDisposable
 
         string? Title(GameId id) => Service?.Streams.FirstOrDefault(s => s.Id == id)?.Definition.Title;
         Cloud = drive is not null ? new DriveCloud(drive, Title) : Config.HasNoCloud ? new NoCloud() : new FolderCloud(Config.Remote);
+        var history = new LocalHistory(Cli.HistoryFolder(State, DataDir));
+        history.WriteReadme();
         Service = new SyncService(
             Games,
-            new LocalHistory(Cli.HistoryFolder(State, DataDir)),
+            history,
             Cloud,
             State,
             new SnapshotScanner(Here.Guard, State),

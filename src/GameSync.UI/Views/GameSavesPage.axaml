@@ -199,7 +199,12 @@
                         <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="4" VerticalAlignment="Center">
                           <StackPanel VerticalAlignment="Center">
                             <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Name}" />
-                            <TextBlock Classes="mono-small faint" Text="{Binding Meta}" />
+                            <!-- SHARE-10 (version 57): the tag it was imported with, after the PC's name -->
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                              <TextBlock Classes="mono-small faint" Text="{Binding Meta}" VerticalAlignment="Center" />
+                              <c:GsTag Text="{Binding Tag}" Background="{DynamicResource secondary-soft}" Foreground="{DynamicResource ink}" IsVisible="{Binding HasTag}"
+                                       VerticalAlignment="Center" ToolTip.Tip="{Binding Tag, StringFormat='Tagged {0} when it was imported'}" />
+                            </StackPanel>
                           </StackPanel>
                           <!-- KAN-51: the named save whose files are the game's now says so, instead of offering Restore -->
                           <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" Margin="0,0,10,0" IsVisible="{Binding IsInPlace}"
@@ -208,7 +213,7 @@
                             <TextBlock Classes="caption" Text="In place" Foreground="{DynamicResource ok}" VerticalAlignment="Center" />
                           </StackPanel>
                           <c:GsButton Grid.Column="1" Classes="ghost sm" Icon="reset" Content="Restore" AutomationProperties.Name="{Binding Name, StringFormat='Restore {0}'}"
-                                      IsVisible="{Binding CanRestore}" IsBusy="{Binding IsRestoring}" BusyText="Restoring"
+                                      IsVisible="{Binding CanRestore}" IsBusy="{Binding IsRestoring}" BusyText="Restoring" IsEnabled="{Binding !Waiting}"
                                       ToolTip.Tip="Puts this save in place of your current one; your current save is kept first">
                             <c:GsButton.Flyout>
                               <!-- KAN-89: it asks first, saying what it does; KAN-91: and what to expect while the game runs -->
@@ -352,7 +357,12 @@
                         <ColumnDefinition Width="Auto" SharedSizeGroup="Act" />
                       </Grid.ColumnDefinitions>
                       <TextBlock Classes="td" Text="{Binding Saved}" />
-                      <TextBlock Grid.Column="1" Classes="td" Text="{Binding Pc}" />
+                      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                        <TextBlock Classes="td" Text="{Binding Pc}" />
+                        <!-- SHARE-10 (version 57): the tag it was imported with, after the PC's name -->
+                        <c:GsTag Text="{Binding Tag}" Background="{DynamicResource secondary-soft}" Foreground="{DynamicResource ink}" IsVisible="{Binding HasTag}"
+                                 VerticalAlignment="Center" ToolTip.Tip="{Binding Tag, StringFormat='Tagged {0} when it was imported'}" />
+                      </StackPanel>
                       <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" Margin="12,0" VerticalAlignment="Center">
                         <c:GsTag Text="Current" Background="{DynamicResource secondary-soft}" Foreground="{DynamicResource ink}" IsVisible="{Binding IsCurrent}" />
                         <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding ShowsNote}">
@@ -367,7 +377,7 @@
                                   Command="{Binding $parent[v:GameSavesPage].((vm:GameSavesViewModel)DataContext).ExportCommand}" CommandParameter="{Binding}"
                                   AutomationProperties.Name="{Binding Saved, StringFormat='Export the save from {0}'}" ToolTip.Tip="Puts this save in a zip to share" />
                       <c:GsButton Classes="ghost sm" Content="Restore" FontFamily="{DynamicResource font-sans}" IsBusy="{Binding IsRestoring}" BusyText="Restoring"
-                                  IsVisible="{Binding CanRestore}" AutomationProperties.Name="{Binding Saved, StringFormat='Restore the save from {0}'}"
+                                  IsVisible="{Binding CanRestore}" IsEnabled="{Binding !Waiting}" AutomationProperties.Name="{Binding Saved, StringFormat='Restore the save from {0}'}"
                                   ToolTip.Tip="Puts this save in place of your current one; your current save is kept first">
                         <c:GsButton.Flyout>
                           <Flyout Placement="BottomEdgeAlignedRight">
@@ -476,7 +486,7 @@
               </Grid>
             </Border>
             <c:GsNote Icon="shield" IsVisible="{Binding HasPlaces}"
-                      Text="Not syncing yet: nothing is backed up until you say so. Only save data ever moves, never the game's own files." />
+                      Text="Not backed up: nothing is kept until you say so. Only save data ever moves, never the game's own files." />
           </StackPanel>
         </c:GsCard>
 

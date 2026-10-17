@@ -1,4 +1,4 @@
-<!-- @dsCard group="Screens" height=800 width=1280 page=true subtitle="Every achievement of a game (its page's View all): the list with Unlocked, Locked and Hidden, and the one picked; hidden ones stay secret (#all, #zenith, #hidden)" -->
+<!-- @dsCard group="Screens" height=800 width=1280 page=true subtitle="Every achievement of a game (its page's View all): the list with Unlocked, Locked and Hidden, and the one picked; hidden ones stay secret; kept by GameSync, marked by hand for a copy that writes nothing down, with a ? saying why GameSync can't see them (#all, #zenith, #hidden, #marking, #marking-hidden, #marking-why)" -->
 <!doctype html>
 <html lang="en">
 <head><meta charset="utf-8"><title>preview</title>
@@ -29,11 +29,22 @@ html,body{margin:0;background:var(--bg-100);}
 .ac-facts{align-self:stretch;text-align:left;display:flex;flex-direction:column;gap:14px;margin-top:8px;padding-top:18px;border-top:1px solid var(--line-100)}
 .ac-fact{display:flex;justify-content:space-between;align-items:center;gap:12px}
 .ac-fact-label{font:600 11px/14px var(--font-sans);letter-spacing:.12em;text-transform:uppercase;color:var(--ink-faint)}
-.ac-fact-value{font:500 13px/18px var(--font-sans);color:var(--ink)}
+.ac-fact-value{font:500 13px/18px var(--font-sans);color:var(--ink);text-align:right}
 .ac-glow{position:relative;display:grid;place-items:center;padding:8px}
 .ac-glow::before{content:"";position:absolute;inset:-30px;border-radius:50%;opacity:.55;background:radial-gradient(circle,var(--glow,transparent),transparent 65%)}
 .ac-glow > *{position:relative}
 .ac-empty{padding:24px 8px;text-align:center;color:var(--ink-faint);font:400 13px/19px var(--font-sans)}
+.ac-act{display:flex;flex-direction:column;align-items:center;gap:6px}
+.ac-act-hint{font:400 12px/16px var(--font-sans);color:var(--ink-faint);max-width:250px}
+/* Version 55: the ? beside the header's words, for a copy whose achievements GameSync can't see, and its tooltip */
+.ac-why{display:inline-grid;place-items:center;width:20px;height:20px;margin:-3px 0 -3px 4px;vertical-align:middle;border:0;border-radius:50%;padding:0;background:none;color:var(--ink-faint);cursor:help}
+.ac-why:hover,.ac-why:focus-visible{color:var(--ink);background:var(--bg-300)}
+.ac-why:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+.ac-head-wrap{position:relative;flex-shrink:0}
+.ac-why-tip{position:absolute;z-index:5;width:380px;padding:10px 12px;border-radius:var(--radius-md);background:var(--surface-dialog);border:1px solid var(--edge-dialog);color:var(--ink);box-shadow:var(--shadow-dialog);
+  font:400 12px/17px var(--font-sans);display:flex;flex-direction:column;gap:6px;pointer-events:none}
+.ac-why-tip strong{font-weight:600}
+.ac-why-tip .gs-mono{font-size:11px;line-height:15px;color:var(--ink-muted);word-break:break-all}
 </style>
 </head>
 <body class="gs-root">
@@ -48,21 +59,39 @@ function achIcon(seed){ var hues=[18,200,280,140,45,340,180,95], marks=['M50 16 
 var HERO = "data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%201200%20500%27%20preserveAspectRatio%3D%27xMidYMid%20slice%27%3E%3Crect%20width%3D%271200%27%20height%3D%27500%27%20fill%3D%27%23123142%27/%3E%3Ccircle%20cx%3D%27860%27%20cy%3D%27150%27%20r%3D%2790%27%20fill%3D%27%237fe6f2%27%20opacity%3D%27.45%27/%3E%3Cpath%20d%3D%27M0%20330%20L180%20200%20L330%20300%20L520%20150%20L700%20290%20L880%20190%20L1200%20320%20V500%20H0Z%27%20fill%3D%27%2318405a%27/%3E%3C/svg%3E";
 
 // #all: the All tab. #zenith: every one unlocked. #hidden: the Hidden tab, a hidden one picked.
+// Version 54 (the owner, 8 Oct 2026: "The achievement system needs to work even without steam ... Tracking by itself"):
+// GameSync keeps its own record. The default draws a Steam copy, some unlocked here and some on LAPTOP. #marking: a copy
+// that writes its unlocks nowhere GameSync can find, whose achievements the person marks by hand, on the Locked tab;
+// #marking-hidden: its Hidden tab, a hidden one picked, which can be shown to be marked.
+// Version 55 (the owner, 8 Oct 2026: "have a little question mark on the achivement page for the game that when hovered it
+// explains why the game is prolly not being picked up"): such a copy's header has a ? after its words; under the pointer
+// it says why GameSync can't see what's unlocked in it, from what GameSync found. #marking-why draws it hovered.
 var MODE = (location.hash || '').slice(1);
+var MARKING = MODE === 'marking' || MODE === 'marking-hidden' || MODE === 'marking-why';
+// One of the reasons (the README has them all): a file for its achievements, made at the first start and never written since.
+var WHY = {title:'Why GameSync can’t see them',
+  text:'This copy made a file for its achievements on 11 Jul and hasn’t written to it since, though you’ve played since, last on 27 Sep: it isn’t recording them. Mark the ones you’ve earned; GameSync looks again each time you play.',
+  file:'C:\\Users\\Public\\Documents\\…\\2215430\\achievements.ini'};
 var NAMES = [['Eclipse 8','Beat the game on Eclipse 8 with any survivor.',1.2,'Today 21:14'],['The Long Road','Clear the first stage three times in one run.',41,'26 Sep'],
   ['Mercenary','Unlock the Mercenary.',24,'21 Sep'],['Deicide','Defeat the twin titans in one run.',12,'18 Sep'],['Cosmic Explorer','Visit every environment in the cosmos.',3.8,'14 Sep'],
   ['Newtist','Discover and activate eight Newt Altars.',16,'2 Sep'],['Glorious Battle','Win a fight with no damage taken.',41,'30 Aug'],['Bookworm','Read every log in the logbook.',6.4,'28 Aug'],
   ['Learning Process','Die five times.',92,'27 Aug'],['Slaughter','Defeat 3,000 enemies.',58,'27 Aug'],['Huntress: Mastery','As Huntress, beat the game on Monsoon.',8.9,null],
   ['Engineer: Mastery','As Engineer, beat the game on Monsoon.',7.1,null],['One with the Void','Escape the void with every friend alive.',2.2,null],['Moon Shot','Reach the moon within 30 minutes.',18,null],
   ['Collector','Have 30 different items in one run.',27,null],['Pacifist','Clear a stage without attacking.',11,null],['Rapidfire','Fire 1,000 shots in ten seconds.',38,null]];
+// The hidden ones' words, shown only once one is unlocked, or shown on purpose to mark it by hand.
+var SECRETS = [['A Moment, Fractured','Complete the secret ending.',3.1],['Obliterated','Obliterate yourself at the Obelisk.',0.9],['Cleanup Duty','Destroy 20 flying rocks in one run.',14],['Mechanic','Repair every broken drone in one run.',5.5]];
+// On LAPTOP: unlocked there, and GameSync's record brings them to every PC.
+var ON_LAPTOP = {2:true, 4:true};
 function build(){
-  var list = NAMES.map(function(n,i){ var unlocked = MODE==='zenith' || !!n[3]; return {id:'a'+i,name:n[0],desc:n[1],pct:n[2],when:unlocked?(n[3]||'2 Oct'):null,state:unlocked?'unlocked':'locked',icon:achIcon(i)}; });
-  if (MODE !== 'zenith') [3.1,0.9,14,5.5].forEach(function(p,i){ list.push({id:'h'+i,state:'hidden',pct:p,hidden:true}); });
+  var list = NAMES.map(function(n,i){
+    var unlocked = MODE==='zenith' || (MARKING ? i < 3 : !!n[3]);
+    var by = !unlocked ? null : MARKING ? 'you' : ON_LAPTOP[i] ? 'LAPTOP' : null;
+    return {id:'a'+i,name:n[0],desc:n[1],pct:n[2],when:unlocked?(n[3]||'2 Oct'):null,by:by,state:unlocked?'unlocked':'locked',icon:achIcon(i)}; });
+  if (MODE !== 'zenith') SECRETS.forEach(function(s,i){ list.push({id:'h'+i,secret:{name:s[0],desc:s[1]},state:'hidden',pct:s[2],hidden:true,icon:achIcon(9+i)}); });
   else list.push({id:'h0',name:'A Moment, Fractured',desc:'Complete the secret ending.',pct:3.1,when:'2 Oct',state:'unlocked',icon:achIcon(9),hidden:true});
   return list; }
-var ALL = build();
 var SORTS = [{id:'recent',label:'Recently unlocked'},{id:'rarest',label:'Rarest first'},{id:'players',label:'Most players first'},{id:'name',label:'Name'}];
-var ORDER = {'Today 21:14':100,'2 Oct':99,'26 Sep':90,'21 Sep':85,'18 Sep':82,'14 Sep':78,'2 Sep':66,'30 Aug':64,'28 Aug':62,'27 Aug':61};
+var ORDER = {'Today':101,'Today 21:14':100,'2 Oct':99,'26 Sep':90,'21 Sep':85,'18 Sep':82,'14 Sep':78,'2 Sep':66,'30 Aug':64,'28 Aug':62,'27 Aug':61};
 function sorted(items, by){ var c = items.slice();
   if (by==='rarest') c.sort(function(a,b){return a.pct-b.pct}); else if (by==='players') c.sort(function(a,b){return b.pct-a.pct});
   else if (by==='name') c.sort(function(a,b){return (a.name||'￿').localeCompare(b.name||'￿')});
@@ -77,20 +106,40 @@ function cover(i){ return "data:image/svg+xml,"+encodeURIComponent("<svg xmlns='
 var LIBRARY = [{id:'fav',label:'Favourites',games:[{id:'sts2',name:'Slay the Spire 2',art:cover(2)},{id:'sekiro',name:'Sekiro: Shadows Die Twice',art:cover(0)}]},
   {id:'rest',label:'Games',games:[{id:'ror2',name:'Risk of Rain 2',art:cover(1)},{id:'valheim',name:'Valheim',art:cover(3)},{id:'core',name:'Core Keeper',art:cover(3)},{id:'apex',name:'Apex Legends',art:cover(0)},{id:'bloons',name:'Bloons TD 6',art:cover(2)},{id:'l4d2',name:'Left 4 Dead 2',art:cover(1)}]}];
 
+// Where GameSync saw it unlocked: Steam on this PC, Steam on another PC, or the person marking it.
+function seen(a){ return a.by==='you' ? 'Marked by you' : a.by ? 'In Steam on '+a.by : 'In Steam on this PC'; }
+
 function Details(p){
   var a = p.item;
   if (!a) return h('section',{className:'gs-card ac-detail'},h('div',{className:'ac-empty'},'Pick an achievement to see what it is.'));
-  var hiddenNow = a.state === 'hidden', tier = a.state==='unlocked' ? A.tierOf(a.pct) : null;
-  var mine = ALL.filter(function(x){return x.state==='unlocked'}).sort(function(x,y){return x.pct-y.pct});
+  var shownNow = a.state === 'hidden' && p.revealed;
+  var hiddenNow = a.state === 'hidden' && !shownNow, tier = a.state==='unlocked' ? A.tierOf(a.pct) : null;
+  var name = shownNow ? a.secret.name : a.name, desc = shownNow ? a.secret.desc : a.desc;
+  var mine = p.all.filter(function(x){return x.state==='unlocked'}).sort(function(x,y){return x.pct-y.pct});
   var rank = mine.indexOf(a) + 1;
   var glow = tier==='gold' ? 'rgba(255,215,110,.5)' : tier==='silver' ? 'rgba(227,232,238,.28)' : tier==='bronze' ? 'rgba(215,149,92,.35)' : 'transparent';
+  // Marking by hand (version 54): only for a copy that writes its unlocks nowhere GameSync can find. A hidden one stays
+  // secret until it's shown on purpose, so a person can find the one they earned.
+  var act = !p.marking ? null
+    : a.state === 'unlocked' && a.by === 'you' ? h('div',{className:'ac-act'},
+        h(G.Button,{size:'sm',variant:'secondary',icon:'reset',onClick:function(){p.onUnmark(a)}},'Unmark'),
+        h('span',{className:'ac-act-hint'},'Marked by mistake? Unmark it on every PC.'))
+    : a.state === 'locked' || shownNow ? h('div',{className:'ac-act'},
+        h(G.Button,{variant:'primary',icon:'check',onClick:function(){p.onMark(a)}},'Mark as unlocked'),
+        h('span',{className:'ac-act-hint'},'Unlocked today, marked by you. It counts like any other.'))
+    : hiddenNow ? h('div',{className:'ac-act'},
+        h(G.Button,{size:'sm',variant:'secondary',onClick:function(){p.onReveal(a)}},'Show it to mark it'),
+        h('span',{className:'ac-act-hint'},'Shows its name and what it asks, so you can find the one you earned.'))
+    : null;
   return h('section',{className:'gs-card ac-detail','aria-label':'Achievement details'},
-    h('div',{className:'ac-glow',style:{'--glow':glow}},h(G.AchievementBadge,{icon:a.icon,name:a.name,state:a.state,tier:tier,size:'lg'})),
-    h('h3',null,hiddenNow?'Hidden achievement':a.name),
-    h('p',null,hiddenNow?'Its name and what it asks stay secret until you unlock it.':a.desc),
+    h('div',{className:'ac-glow',style:{'--glow':glow}},h(G.AchievementBadge,{icon:a.icon,name:name,state:hiddenNow?'hidden':a.state==='hidden'?'locked':a.state,tier:tier,size:'lg'})),
+    h('h3',null,hiddenNow?'Hidden achievement':name),
+    h('p',null,hiddenNow?'Its name and what it asks stay secret until you unlock it.':desc),
     tier ? h(G.TierChip,{tier:tier}) : null,
+    act,
     h('div',{className:'ac-facts'},
       h('div',{className:'ac-fact'},h('span',{className:'ac-fact-label'},'Unlocked'),h('span',{className:'ac-fact-value'},a.when?(a.when.indexOf(':')>0?a.when:a.when+', 22:41'):'Not yet')),
+      a.state==='unlocked' ? h('div',{className:'ac-fact'},h('span',{className:'ac-fact-label'},'Seen'),h('span',{className:'ac-fact-value'},seen(a))) : null,
       h('div',{className:'gs-stack',style:{gap:6}},
         h('div',{className:'ac-fact'},h('span',{className:'ac-fact-label'},'Players who have it'),h('span',{className:'ac-fact-value gs-mono'},A.percent(a.pct))),
         h(G.ProgressBar,{value:Math.max(1,a.pct),ariaLabel:A.percent(a.pct)+' of players have it'})),
@@ -99,16 +148,25 @@ function Details(p){
 }
 
 function App(){
-  var start = MODE==='hidden' ? 'hidden' : MODE==='all' || MODE==='zenith' ? 'all' : 'unlocked';
-  var tab = useState(start), sort = useState('recent'), q = useState(''), sel = useState(null);
+  var start = MODE==='hidden' || MODE==='marking-hidden' ? 'hidden' : MODE==='marking' ? 'locked' : MODE==='all' || MODE==='zenith' ? 'all' : 'unlocked';
+  var items = useState(build), tab = useState(start), sort = useState('recent'), q = useState(''), sel = useState(null), shownSecret = useState(null);
+  var whyOpen = useState(MODE === 'marking-why'), whyAt = useState(null), whyRef = useRef(null), headRef = useRef(null);
+  // Where the ? is, so its tooltip opens under it, outside the header (whose art is cut to its corners).
+  useEffect(function(){ if (whyRef.current && headRef.current) { var b = whyRef.current.getBoundingClientRect(), w = headRef.current.getBoundingClientRect();
+    whyAt[1]({left: Math.max(0, b.left - w.left - 12), top: b.bottom - w.top + 8}); } }, [whyOpen[0]]);
+  var ALL = items[0];
+  function mark(a){ items[1](ALL.map(function(x){ return x.id!==a.id ? x : Object.assign({},x,x.secret?{name:x.secret.name,desc:x.secret.desc}:{}, {state:'unlocked',when:'Today',by:'you'}); })); sel[1](a.id); }
+  function unmark(a){ items[1](ALL.map(function(x){ return x.id!==a.id ? x : Object.assign({},x,{state:x.secret?'hidden':'locked',when:null,by:null}); })); }
   var counts = {all:ALL.length, unlocked:ALL.filter(function(a){return a.state==='unlocked'}).length, locked:ALL.filter(function(a){return a.state==='locked'}).length, hidden:ALL.filter(function(a){return a.state==='hidden'}).length};
   var done = counts.unlocked, total = ALL.length;
   var inTab = ALL.filter(function(a){ return tab[0]==='all' || a.state===tab[0]; });
   var needle = q[0].trim().toLowerCase();
   var shown = sorted(inTab.filter(function(a){ return !needle || (a.state!=='hidden' && ((a.name+' '+a.desc).toLowerCase().indexOf(needle)>=0)); }), sort[0]);
-  var current = shown.filter(function(a){return a.id===sel[0]})[0] || shown[0];
+  var current = shown.filter(function(a){return a.id===sel[0]})[0] || ALL.filter(function(a){return a.id===sel[0]})[0] || shown[0];
   var tiers = {gold:0,silver:0,bronze:0}; ALL.forEach(function(a){ if(a.state==='unlocked') tiers[A.tierOf(a.pct)]++; });
   var tabs = [{id:'all',label:'All',count:counts.all},{id:'unlocked',label:'Unlocked',count:counts.unlocked}].concat(counts.locked?[{id:'locked',label:'Locked',count:counts.locked}]:[]).concat(counts.hidden?[{id:'hidden',label:'Hidden',count:counts.hidden}]:[]);
+  var sub = MARKING ? 'Kept by GameSync · marked by you · how rare each is, from Steam’s players this week'
+    : 'Kept by GameSync · seen in Steam on this PC and on LAPTOP · how rare each is, from Steam’s players this week';
   return h(G.ThemeScope,{strength:'glass',art:HERO,style:{width:1280,height:800,display:'flex'}},
     rail('library'),
     h('main',{style:{flex:1,minWidth:0,padding:'20px 24px',display:'flex',gap:16}},
@@ -119,12 +177,20 @@ function App(){
         h('header',{className:'ac-top'},
           h(G.Button,{size:'sm',variant:'secondary',icon:'arrowLeft',title:'Back to Risk of Rain 2 (Esc)'},'Back'),
           h('nav',{'aria-label':'Breadcrumb',className:'lib-crumb'},h('button',{type:'button'},'My games'),h(G.Icon,{name:'chevronRight',size:14}),h('button',{type:'button'},'Risk of Rain 2'),h(G.Icon,{name:'chevronRight',size:14}),h('span',{'aria-current':'page'},'Achievements'))),
+        h('div',{className:'ac-head-wrap',ref:headRef},
         h('div',{className:'ac-head',style:{'--head-art':'url("'+HERO+'")'}},
           h('div',null,h('h2',{className:'ac-title'},'Achievements in Risk of Rain 2'),
-            h('p',{className:'ac-sub'},'From Steam on this PC · how rare each is, from Steam’s players this week')),
+            h('p',{className:'ac-sub'},sub,
+              MARKING ? h('button',{type:'button',className:'ac-why',ref:whyRef,'aria-label':WHY.title,'aria-describedby':whyOpen[0]?'ac-why-tip':null,
+                  onMouseEnter:function(){whyOpen[1](true)},onMouseLeave:function(){if(MODE!=='marking-why')whyOpen[1](false)},
+                  onFocus:function(){whyOpen[1](true)},onBlur:function(){if(MODE!=='marking-why')whyOpen[1](false)}},
+                h(G.Icon,{name:'help',size:16})) : null)),
           h(G.AchievementsOverview,{done:done,total:total,tiers:tiers,completedOn:'2 Oct'})),
+        MARKING && whyOpen[0] && whyAt[0] ? h('div',{id:'ac-why-tip',role:'tooltip',className:'ac-why-tip',style:{left:whyAt[0].left,top:whyAt[0].top}},
+          h('strong',null,WHY.title),h('span',null,WHY.text),h('span',{className:'gs-mono'},WHY.file)) : null),
         h('div',{className:'ac-body'},
           h('section',{className:'gs-card ac-list','aria-label':'Every achievement'},
+            MARKING ? h('div',{className:'gs-note'},h(G.Icon,{name:'info',size:16}),'This copy writes its unlocks nowhere GameSync can find, so mark each one as you earn it. GameSync looks for a record again each time you play it.') : null,
             h(G.PillTabs,{label:'Which achievements',items:tabs,value:tab[0],onChange:function(id){tab[1](id);sel[1](null);}}),
             h('div',{className:'ac-tools'},
               h(G.SearchField,{value:q[0],onChange:q[1],placeholder:'Find an achievement'}),
@@ -132,7 +198,7 @@ function App(){
             h('div',{className:'ac-rows',role:'list'},
               shown.length ? shown.map(function(a){ return h(G.AchievementRow,{key:a.id,item:a,selected:current&&a.id===current.id,onClick:function(){sel[1](a.id)}}); })
                 : h('div',{className:'ac-empty'},needle?'No achievement matches “'+q[0]+'”. Hidden ones aren’t searched: they stay secret.':'Nothing here yet.'))),
-          h(Details,{item:current})))));
+          h(Details,{item:current,all:ALL,marking:MARKING,revealed:current&&shownSecret[0]===current.id,onMark:mark,onUnmark:unmark,onReveal:function(a){shownSecret[1](a.id)}})))));
 }
 ReactDOM.createRoot(document.getElementById('root')).render(h(App));
 </script>

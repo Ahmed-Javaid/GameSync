@@ -49,7 +49,7 @@ public partial class TextSizeTests
             Assert.Equal(19.5, resources["fs-13"]);
             Assert.Equal(28.5, resources["lh-19"]);
             Assert.Equal(21.0, resources["ControlContentThemeFontSize"]);
-            Assert.Equal(new GridLength(354), resources["col-library-list"]);
+            Assert.Equal(new GridLength(374), resources["col-library-list"]);
             Assert.Equal(new GridLength(222), resources["cw-148"]);
             Assert.Equal(832.0, resources["dw-640"]);
 

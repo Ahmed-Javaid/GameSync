@@ -246,16 +246,47 @@ public static partial class Cli
         // A store link hands the launch to the store's own process, so there may be no new process to hold. R13: starting a
         // process gives a handle with full access, so only its ID is kept and the handle is closed at once; watching it
         // afterwards opens it with query-limited access only.
-        int? launchedId;
-        try
+        int? Start(ProcessStartInfo how)
         {
-            using var launched = Process.Start(start);
-            if (launched is null && !start.UseShellExecute)
+            using var launched = Process.Start(how);
+            if (launched is null && !how.UseShellExecute)
             {
                 throw new InvalidOperationException($"{title} didn't start.");
             }
 
-            launchedId = start.UseShellExecute ? null : launched?.Id;
+            return how.UseShellExecute && string.IsNullOrEmpty(how.Verb) ? null : launched?.Id;
+        }
+
+        // PLAY-16: a game that asks for administrator rights starts through Windows' own prompt, once Windows has refused
+        // it once; GameSync itself stays without them (R17), and only watches the game, as it does every game.
+        bool admin;
+        using (var state = new StateStore(dataDir))
+        {
+            admin = !start.UseShellExecute && GameLaunch.NeedsAdmin(state, game);
+        }
+
+        int? launchedId;
+        try
+        {
+            try
+            {
+                launchedId = Start(admin ? GameLaunch.AsAdmin(start) : start);
+            }
+            catch (System.ComponentModel.Win32Exception e) when (e.NativeErrorCode == GameLaunch.ElevationRequired && !admin && !start.UseShellExecute)
+            {
+                using (var state = new StateStore(dataDir))
+                {
+                    state.SetSetting(GameLaunch.AdminKey(game), "1");
+                }
+
+                output.Say($"{title} asks for administrator rights, so Windows asks you before it starts.");
+                launchedId = Start(GameLaunch.AsAdmin(start));
+            }
+        }
+        catch (System.ComponentModel.Win32Exception e) when (e.NativeErrorCode == GameLaunch.Cancelled)
+        {
+            output.Say($"{title} didn't start, as Windows wasn't given permission. Nothing changed.");
+            return 0;
         }
         catch (System.ComponentModel.Win32Exception e)
         {

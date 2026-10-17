@@ -13,9 +13,16 @@ public static partial class Cli
     /// </summary>
     private static async Task<int> AchievementsAsync(string dataDir, List<string> rest)
     {
-        if (rest.FirstOrDefault() == "popup")
+        switch (rest.FirstOrDefault())
         {
-            return await PopupAsync(dataDir, rest.Skip(1).ToList());
+            case "popup":
+                return await PopupAsync(dataDir, rest.Skip(1).ToList());
+            case "find":
+                return await FindRecordsAsync(dataDir);
+            case "mark" or "unmark":
+                return MarkAchievement(dataDir, rest);
+            case "cloud":
+                return AchievementsCloud(dataDir, rest);
         }
 
         var fetch = rest.Remove("--fetch");
@@ -37,7 +44,7 @@ public static partial class Cli
                 if (wanted is not null)
                 {
                     Console.WriteLine(game.SteamAppId is null
-                        ? $"{game.Title} has no achievements GameSync can read: it reads Steam's, and copies' own records named from Steam's list."
+                        ? $"{game.Title} has no list of achievements: GameSync names them from Steam's lists, and Steam has none for it."
                         : $"{game.Title}'s list of achievements comes from Steam: --fetch asks for it.");
                 }
 
@@ -55,12 +62,17 @@ public static partial class Cli
                 view = Achievements.For(dataDir, game)!;
             }
 
-            var from = view.From switch
+            // Design system version 54: what's unlocked is GameSync's own record; this says where it was seen when not Steam here.
+            var left = leftOut.Contains(game.Id) ? "; left out of your achievements: no popups, not counted" : "";
+            var from = view switch
             {
-                AchievementsFrom.ListNotSteamCopy => " (Steam's list: this copy isn't Steam's, so what you unlock in it doesn't show)",
-                AchievementsFrom.ListNotPlayedHere => " (Steam's list: Steam on this PC hasn't seen you play it)",
-                AchievementsFrom.CopyRecord => leftOut.Contains(game.Id) ? " (this copy's own record; left out of your achievements)" : " (this copy's own record)",
-                _ => leftOut.Contains(game.Id) ? " (left out of your achievements: no popups, not counted)" : "",
+                { From: AchievementsFrom.ListNotSteamCopy } => " (Steam's list: this copy writes its unlocks nowhere GameSync has found; mark them with 'gamesync achievements mark')",
+                { From: AchievementsFrom.ListNotPlayedHere } => " (Steam's list: none of your PCs has unlocked one yet)",
+                { From: AchievementsFrom.CopyRecord } => $" (this copy's own record{left})",
+                { From: AchievementsFrom.Kept, CanMark: true, Marked: > 0 } => $" (marked by you{left})",
+                { From: AchievementsFrom.Kept, KeptOn: { Count: > 0 } pcs } => $" (on {string.Join(" and ", pcs)}{left})",
+                { From: AchievementsFrom.Kept } => $" (seen on this PC before{left})",
+                _ => left.Length > 0 ? $" ({left[2..]})" : "",
             };
             shown++;
             var progress = view.IsComplete
@@ -72,22 +84,84 @@ public static partial class Cli
             Console.WriteLine($"{game.Title}: {progress}{tiers}{(view.Rarest is { } rarest ? $"; rarest {rarest.Name}, {rarest.Percent!.Value.ToString("0.#", CultureInfo.InvariantCulture)}% of players" : "")}{from}");
             if (wanted is not null)
             {
+                // Design system version 55: why GameSync can't see what's unlocked in a copy marked by hand, as its page's ? says.
+                if (view.Why is { } why)
+                {
+                    Console.WriteLine($"  Why: {why.Text}{(why.Path is { } path ? $" ({path})" : "")}");
+                }
+
                 foreach (var a in view.All.OrderByDescending(a => a.UnlockedUtc ?? DateTime.MinValue))
                 {
                     var when = a.KnownUnlockUtc is { } at ? at.ToLocalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture) : a.Unlocked ? "unlocked" : "locked";
                     var name = a.Secret ? "Hidden achievement (secret until unlocked)" : a.Name;
                     var tier = a is { Unlocked: true, Tier: { } metal } ? $"  {AchievementTiers.Word(metal)}" : "";
-                    Console.WriteLine($"  {when,-16}  {name}{(a.Percent is { } p ? $"  {p.ToString("0.#", CultureInfo.InvariantCulture)}%" : "")}{tier}");
+                    var by = a.Marked ? "  marked by you" : a.OnPc is { } pc ? $"  on {pc}" : "";
+                    Console.WriteLine($"  {when,-16}  {name}{(a.Percent is { } p ? $"  {p.ToString("0.#", CultureInfo.InvariantCulture)}%" : "")}{tier}{by}");
                 }
             }
         }
 
         if (wanted is null && shown == 0)
         {
-            Console.WriteLine("No game here has achievements GameSync can read: Steam copies that Steam has run on this PC do, and copies with their own record in a folder added with add-achievement-folder.");
+            Console.WriteLine("No game here has achievements kept yet: Steam games count once Steam has run them on this PC, copies once GameSync finds their own record ('gamesync achievements find') or you mark them, and any unlocked on another PC once the cloud has them.");
         }
 
         return 0;
+    }
+
+    /// <summary>Design system version 54: Look again, from the command line: the records copies Steam doesn't run keep themselves.</summary>
+    private static async Task<int> FindRecordsAsync(string dataDir)
+    {
+        var (games, _) = LauncherData.Read(dataDir, DateTime.Now);
+        var found = await Achievements.FindRecordsAsync(dataDir, games, CancellationToken.None);
+        using var state = new GameSync.Core.State.StateStore(dataDir);
+        foreach (var (app, path) in Achievements.FoundRecords(state))
+        {
+            var title = state.GetSetting(Achievements.FoundGameKey(app)) is { Length: > 0 } name ? name : $"Steam game {app.ToString(CultureInfo.InvariantCulture)}";
+            Console.WriteLine($"  {title}: {path}");
+        }
+
+        Console.WriteLine(found switch
+        {
+            0 => "No copy's own record found: a copy that writes nothing down can have its achievements marked with 'gamesync achievements mark'.",
+            1 => "Found the record of 1 copy: what you unlock in it counts.",
+            _ => $"Found the records of {found} copies: what you unlock in them counts.",
+        });
+        return 0;
+    }
+
+    /// <summary>Version 54: <c>achievements mark|unmark &lt;game&gt; &lt;achievement&gt;</c>, by Steam's name for it or its name as shown.</summary>
+    private static int MarkAchievement(string dataDir, List<string> rest)
+    {
+        if (rest.Count < 3)
+        {
+            throw new UsageException($"Usage: gamesync achievements {rest[0]} <game> <achievement>");
+        }
+
+        var (games, _) = LauncherData.Read(dataDir, DateTime.Now);
+        var id = GameSync.Core.Model.GameId.Parse(rest[1]);
+        var game = games.FirstOrDefault(g => g.Id == id) ?? throw new UsageException($"No game called {rest[1]} here: 'gamesync games' lists them.");
+        Console.WriteLine(Achievements.Mark(dataDir, game, string.Join(' ', rest.Skip(2)), rest[0] == "mark"));
+        return 0;
+    }
+
+    /// <summary>Version 54: <c>achievements cloud on|off</c>: GameSync's record of achievements on every PC, or on this one only.</summary>
+    private static int AchievementsCloud(string dataDir, List<string> rest)
+    {
+        switch (rest.ElementAtOrDefault(1))
+        {
+            case "on":
+                AchievementShare.SetOn(dataDir, true);
+                Console.WriteLine("Your achievements go to the cloud at the next sync, and every PC shows the same.");
+                return 0;
+            case "off":
+                AchievementShare.SetOn(dataDir, false);
+                Console.WriteLine("Your achievements are kept on this PC only now; what's in the cloud stays there.");
+                return 0;
+            default:
+                Console.WriteLine(AchievementShare.IsOn(dataDir) ? "Your achievements are kept in the cloud: every PC shows the same." : "Your achievements are kept on this PC only.");
+                return 0;
+        }
     }
 
     /// <summary>

@@ -63,6 +63,16 @@ public sealed partial class ShellViewModel : ObservableObject
 
     public bool HasDialog => Dialog is not null;
 
+    /// <summary>The tour over the window (ONB-08): after first run, or from the Guide's Take the tour again.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasTour))]
+    private TourViewModel? _tour;
+
+    public bool HasTour => Tour is not null;
+
+    /// <summary>The Guide's id in the rail (ONB-08).</summary>
+    public const string GuideId = "guide";
+
     public ShellViewModel(Dictionary<string, Func<object?>> pages, string current = "home")
         : this(id => pages.TryGetValue(id, out var make) ? make() : null, current)
     {
@@ -92,8 +102,8 @@ public sealed partial class ShellViewModel : ObservableObject
     }
 
     /// <summary>
-    /// Search at the top; Home, the library, Achievements (design system version 33), the save manager, the console, and
-    /// settings at the bottom; dots say a game runs or needs you.
+    /// Search at the top; Home, the library, Achievements (design system version 33), the save manager, the console; the
+    /// Guide (version 56) and settings at the bottom; dots say a game runs or needs you.
     /// </summary>
     public static IReadOnlyList<RailItem> DefaultRail(string? playing, int? needYou) =>
     [
@@ -104,6 +114,7 @@ public sealed partial class ShellViewModel : ObservableObject
         new RailItem("saves", "saves", "Save manager", Separator: true, Dot: needYou > 0 ? "warn" : null,
             DotLabel: needYou > 0 ? (needYou == 1 ? "1 conflict" : $"{needYou} conflicts") : null),
         new RailItem("log", "terminal", "Console"),
+        new RailItem(GuideId, "help", "Guide", Bottom: true),
         new RailItem("settings", "settings", "Settings", Bottom: true),
     ];
 

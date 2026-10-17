@@ -109,6 +109,44 @@ public sealed class DriveCloud : ICloud
         await PutSmallFileAsync(folder, device.Id.Value + ".json", "application/json", JsonSerializer.SerializeToUtf8Bytes(device, Json.Options), ct);
     }
 
+    // Design system version 54: GameSync's record of achievements, a file per PC in the GameSync folder's achievements
+    // folder, tagged by the MD5 Drive lists for each file, so a PC reads another's only when it changed.
+    public async Task<IReadOnlyList<CloudFileTag>> ListAchievementFilesAsync(CancellationToken ct)
+    {
+        var folder = await FolderAsync(null, "achievements", ct);
+        var files = new List<CloudFileTag>();
+        foreach (var item in await _drive.ListChildrenAsync(folder, ct))
+        {
+            var name = item.IsFolder || !item.Name.EndsWith(".json", StringComparison.Ordinal) ? null : item.Name[..^".json".Length];
+            if (name is { Length: > 0 and <= 40 } && name.All(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_') && !files.Any(f => f.Device.Value == name))
+            {
+                files.Add(new CloudFileTag(DeviceId.Parse(name), item.Md5 ?? $"{item.Size}-{item.Id}"));
+            }
+        }
+
+        return files;
+    }
+
+    public async Task<byte[]?> GetAchievementFileAsync(DeviceId device, long largest, CancellationToken ct)
+    {
+        var folder = await FolderAsync(null, "achievements", ct);
+        var item = (await _drive.ListChildrenAsync(folder, ct)).FirstOrDefault(c => !c.IsFolder && c.Name == device.Value + ".json");
+        if (item is null || item.Size > largest)
+        {
+            return null;
+        }
+
+        using var buffer = new MemoryStream();
+        await _drive.DownloadAsync(item.Id, buffer, ct);
+        return buffer.Length <= largest ? buffer.ToArray() : null;
+    }
+
+    public async Task SaveAchievementFileAsync(DeviceId device, byte[] content, CancellationToken ct)
+    {
+        var folder = await FolderAsync(null, "achievements", ct);
+        await PutSmallFileAsync(folder, device.Value + ".json", "application/json", content, ct);
+    }
+
     public async Task WriteLatestAsync(GameId game, VersionRecord version, Func<FileEntry, CancellationToken, Task<Stream>> open, CancellationToken ct)
     {
         var latest = await FolderAsync(game, "latest", ct);

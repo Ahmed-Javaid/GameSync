@@ -47,23 +47,18 @@ public sealed record LauncherActions(Action<GameId> Play, Action SyncNow, Action
     /// <summary>Keeps the library's order on this PC (LIB-16).</summary>
     public Action<LibrarySort>? SetSort { get; init; }
 
-    /// <summary>Keeps the library's Installed only on this PC (KAN-47).</summary>
-    public Action<bool>? SetInstalledOnly { get; init; }
+    /// <summary>Keeps the library's view on this PC, Installed or All games (LIB-31).</summary>
+    public Action<string>? SetView { get; init; }
 
     /// <summary>Scan a folder for games…: the folder joins the ones every scan looks in, and this PC is scanned now (LIB-23).</summary>
-    public Func<string, CancellationToken, Task<FolderScan>>? ScanFolder { get; init; }
+    /// <remarks>LIB-30: null when the person closed What's in the folder without adding anything.</remarks>
+    public Func<string, CancellationToken, Task<FolderScan?>>? ScanFolder { get; init; }
 
     /// <summary>Locate the game…: the program picked marks a game installed in its folder, and Play starts it (LIB-24).</summary>
     public Action<GameId, string>? Locate { get; init; }
 
     /// <summary>Add game: Add a game or folder over the library, for one of the person's own (LIB-13).</summary>
     public Action? OpenAddGame { get; init; }
-
-    /// <summary>SYNC-14: what the next sync would do for every game, and why, off the UI thread (the save manager's Plan).</summary>
-    public Func<CancellationToken, Task<SyncPlanView>>? CheckPlan { get; init; }
-
-    /// <summary>Runs the plan's ticked changes, exactly as they were planned.</summary>
-    public Func<IReadOnlyList<PlannedChange>, CancellationToken, Task<PlanRun>>? RunPlan { get; init; }
 
     /// <summary>The space the backups take on this PC's drive, and the drive's free space, off the UI thread (MGR-03).</summary>
     public Func<CancellationToken, Task<BackupSpace?>>? LoadSpace { get; init; }
@@ -94,6 +89,12 @@ public sealed record LauncherActions(Action<GameId> Play, Action SyncNow, Action
     /// list of every one shows (never a hidden one's) and rarity a week old; null for a game with none GameSync can read.
     /// </summary>
     public Func<GameId, bool, CancellationToken, Task<GameAchievementsView?>>? LoadAchievements { get; init; }
+
+    /// <summary>
+    /// Design system version 54: marks one of a game's achievements unlocked by hand (true) or takes the mark off (false),
+    /// for a copy that writes its unlocks nowhere GameSync can find; the game's achievements as they are after.
+    /// </summary>
+    public Func<GameId, string, bool, CancellationToken, Task<GameAchievementsView?>>? MarkAchievement { get; init; }
 
     /// <summary>The Achievements page: every game's achievements here, read off the UI thread as it says (design system → TrophyRoomScreen).</summary>
     public Func<AchievementsLoad, CancellationToken, Task<IReadOnlyList<GameAchievementsView>>>? LoadAllAchievements { get; init; }
@@ -212,9 +213,6 @@ public sealed record LauncherActions(Action<GameId> Play, Action SyncNow, Action
     /// <summary>Every game's saves at a glance, for the save manager's table, off the UI thread.</summary>
     public Func<CancellationToken, Task<IReadOnlyList<GameSaveSummary>>>? LoadSaves { get; init; }
 
-    /// <summary>MGR-08: every version of every game from every PC, for the save manager's Versions tab.</summary>
-    public Func<CancellationToken, Task<VersionsView>>? LoadVersions { get; init; }
-
     /// <summary>MGR-09: everything in the activity log, newest first, for the save manager's Log tab.</summary>
     public Func<CancellationToken, Task<IReadOnlyList<LogEntry>>>? LoadLog { get; init; }
 
@@ -223,6 +221,12 @@ public sealed record LauncherActions(Action<GameId> Play, Action SyncNow, Action
 
     /// <summary>Saves what the person changed in a game's Properties; the pages show it once it's done.</summary>
     public Action<GameId, GamePropertiesChange>? SaveProperties { get; init; }
+
+    /// <summary>
+    /// LIB-24 (design system version 57): Installed files' Change…, before anything changes: what the program picked says it
+    /// is, and whether GameSync takes it, off the UI thread.
+    /// </summary>
+    public Func<GameId, string, CancellationToken, Task<ProgramCheck>>? CheckProgram { get; init; }
 
     /// <summary>Closes the dialog over the page.</summary>
     public Action? CloseDialog { get; init; }
@@ -252,6 +256,9 @@ public sealed record TileItem(GameId Id, string Title, IImage? Art, GameStatus? 
 
     /// <summary>Installed on this PC; the list dims a game that isn't, and it can't be played from here.</summary>
     public bool Installed { get; init; } = true;
+
+    /// <summary>LIB-31: a library cover of a game not installed here, greyed with a SAVES ONLY tag (design system version 57).</summary>
+    public bool SavesOnly { get; init; }
 
     public bool IsHidden { get; init; }
 
@@ -317,13 +324,21 @@ public sealed record HomeAchievements(GameId Game, string Title, string Subtitle
         // The hero has none to show: said plainly (the owner, 3 Oct 2026, found "Bloodborne GOTY's copy keeps none" odd).
         // A copy Steam knows by its app ID but doesn't run here (the owner's Sons of the Forest, in its own folder): Steam keeps
         // no record of what's unlocked in it, which is why, rather than GameSync not finding them.
+        // Since design system version 54 a copy with nothing written down has its achievements marked on its page.
         var why = heroLeftOut ? "is left out of your achievements"
-            : hero?.Store == StoreKind.Steam ? "has none on Steam"
-            : hero?.SteamAppId is not null ? "isn't run by Steam here, so Steam keeps none of its achievements"
+            : hero?.Store == StoreKind.Steam ? "has none unlocked yet"
+            : hero?.SteamAppId is not null ? "writes its unlocks nowhere GameSync has found, so you mark them on its page"
             : "has none GameSync can read";
+        var where = view switch
+        {
+            { From: AchievementsFrom.CopyRecord } => " in its own record",
+            { From: AchievementsFrom.Kept, CanMark: true, Marked: > 0 } => " marked by you",
+            { From: AchievementsFrom.Kept, KeptOn: { Count: > 0 } pcs } => $" on {string.Join(" and ", pcs)}",
+            _ => "",
+        };
         var subtitle = heroHasNone && hero is not null
             ? $"{title}, played {Played(game?.LastPlayedUtc, nowLocal)}. {hero.Title} {why}."
-            : $"{title} · {view.Unlocked.ToString(CultureInfo.InvariantCulture)} of {view.Total.ToString(CultureInfo.InvariantCulture)}{(view.From == AchievementsFrom.CopyRecord ? " in its own record" : " on Steam")}";
+            : $"{title} · {view.Unlocked.ToString(CultureInfo.InvariantCulture)} of {view.Total.ToString(CultureInfo.InvariantCulture)}{where}";
         return new HomeAchievements(
             view.Game,
             title,
@@ -399,6 +414,14 @@ public sealed record HomeStatus(string Cloud, string CloudLine, string ThisPc, I
 
     /// <summary>First run skipped the cloud: the top bar offers Connect the cloud in place of the cloud button.</summary>
     public bool NoCloud { get; init; }
+
+    /// <summary>
+    /// The cloud button's words (ONB-08, design system version 56): "Google Drive", or the cloud folder, its last two
+    /// parts when it's long ("…\NAS\GameSync").
+    /// </summary>
+    public string CloudShort => Cloud.Length <= 24 || Cloud.Split('\\', StringSplitOptions.RemoveEmptyEntries) is not { Length: > 2 } parts
+        ? Cloud
+        : $"…\\{parts[^2]}\\{parts[^1]}";
 
     public bool HasCloud => !NoCloud;
 }
@@ -541,7 +564,7 @@ public sealed partial class HomeViewModel : ObservableObject, IPageSurface
             HeroStarting = Actions?.IsStarting?.Invoke(game) == true;
         });
         SyncNowCommand = new RelayCommand(() => Actions?.SyncNow());
-        OpenLibraryCommand = new RelayCommand(() => Actions?.Show("library", "all"));
+        OpenLibraryCommand = new RelayCommand(() => Actions?.Show("library", LibraryViewModel.KeptView));
         OpenSavesCommand = new RelayCommand(() => Actions?.Show("saves", SaveManagerViewModel.NeedsTab));
         OpenGameCommand = new RelayCommand<GameId>(game => Actions?.OpenGame?.Invoke(game));
         OpenGameSavesCommand = new RelayCommand<GameId>(game =>
@@ -919,14 +942,15 @@ public sealed partial class HomeViewModel : ObservableObject, IPageSurface
             return;
         }
 
-        // KAN-46: Needs you is the save manager's tab, where the save work is; My games is the library.
+        // KAN-46: Needs you is the save manager's tab, where the save work is; My games is the library, on the view kept
+        // on this PC (LIB-31: Installed until All games is picked).
         if (value == NeedsYouTab)
         {
             Actions.Show("saves", SaveManagerViewModel.NeedsTab);
         }
         else
         {
-            Actions.Show("library", value);
+            Actions.Show("library", value == "all" ? LibraryViewModel.KeptView : value);
         }
 
         SelectedTab = ThisPage;

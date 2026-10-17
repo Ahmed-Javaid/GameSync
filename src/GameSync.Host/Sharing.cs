@@ -48,7 +48,16 @@ public enum ImportMatch
 /// <param name="LocalId">The game here it goes to; null when this PC's library doesn't have it.</param>
 /// <param name="Warn">SHARE-12: a save made on another account, which may not load; for a game that can't be imported, why.</param>
 /// <param name="Programs">Program files in it, which are left out (SHARE-11, R1).</param>
-public sealed record ImportGamePreview(GameId Id, GameId? LocalId, string Title, ImportMatch Match, int Versions, long Bytes, string? Warn, int Programs);
+/// <param name="Installed">
+/// The game here is installed on this PC, so its save can be used now rather than only kept as a named save (design system
+/// version 57); false for a game this PC knows only by its saves, or doesn't have.
+/// </param>
+public sealed record ImportGamePreview(GameId Id, GameId? LocalId, string Title, ImportMatch Match, int Versions, long Bytes, string? Warn, int Programs,
+    bool Installed = true)
+{
+    /// <summary>Use it now is on offer: a game here, installed, whose saves can be imported.</summary>
+    public bool CanUseNow => Match is ImportMatch.Matched or ImportMatch.NotSyncing && Installed;
+}
 
 /// <summary>A shared zip, read before anything is imported: who packed it and when, and its games.</summary>
 public sealed record ImportPreview(string ZipPath, DateTime PackedUtc, string PackedOn, IReadOnlyList<ImportGamePreview> Games);
@@ -135,7 +144,7 @@ public static class Sharing
 
         using var state = new StateStore(dataDir);
         state.SetSetting(FolderKey, full);
-        return $"Shared zips go to {full} from now on.";
+        return $"Zips of shared saves go to {full} from now on.";
     }
 
     public static void SetAsk(string dataDir, bool ask)
@@ -204,20 +213,26 @@ public static class Sharing
                 : refused is null ? ImportMatch.NotInstalled : ImportMatch.Unknown;
             refused ??= staysWith;
             return new ImportGamePreview(game.Id, local, game.Title, match, game.Versions.Count, game.Versions.Sum(v => FileSet.TotalSize(v.Files)),
-                refused ?? AccountWarning(game, accounts), programs.GetValueOrDefault(game.Folder));
+                refused ?? AccountWarning(game, accounts), programs.GetValueOrDefault(game.Folder),
+                Installed: local is { } id && library.FirstOrDefault(e => e.Id == id) is not { Installed: false });
         }).ToList();
         return new ImportPreview(zipPath, manifest.PackedUtc, manifest.PackedOn, games);
     }
 
     /// <summary>
-    /// SHARE-10, SHARE-11, SHARE-13: adds the chosen games' saves from a shared zip to their histories, as pinned versions,
-    /// never current ones. A game GameSync knows but doesn't keep yet is kept first, backed up only, with the rules its saves
-    /// were taken with (R8); one this PC doesn't have joins the library that way, Not installed. Returns what the app says
-    /// once it's done.
+    /// SHARE-10, SHARE-11, SHARE-13: adds the chosen games' saves from a shared zip to their histories as named saves, never
+    /// current ones, unless a game's is to be used now (design system version 57): then its newest is put in place, after
+    /// the save there is kept as a named save, <see cref="BeforeImport"/>. A game GameSync knows but doesn't keep yet is kept
+    /// first, backed up only, with the rules its saves were taken with (R8); one this PC doesn't have joins the library that
+    /// way, Not installed. Returns what the app says once it's done.
     /// </summary>
     /// <param name="games">The games to import, by their IDs in the zip.</param>
-    public static async Task<string> ImportAsync(string dataDir, string zipPath, IReadOnlyList<GameId> games, IAgentOutput output, CancellationToken ct)
+    /// <param name="useNow">The games, of those, whose newest save goes in place now; only an installed game here can.</param>
+    /// <param name="tag">A word every save brings, shown after the PC's name, such as the friend's name.</param>
+    public static async Task<string> ImportAsync(string dataDir, string zipPath, IReadOnlyList<GameId> games, IAgentOutput output, CancellationToken ct,
+        IReadOnlyCollection<GameId>? useNow = null, string? tag = null)
     {
+        tag = SyncService.CleanTag(tag);
         var preview = Preview(dataDir, zipPath);
         var (manifest, _) = ReadManifest(zipPath);
         var chosen = preview.Games.Where(g => games.Contains(g.Id) && g.Match is not (ImportMatch.Unknown or ImportMatch.Blocked)).ToList();
@@ -242,6 +257,7 @@ public static class Sharing
 
         var temp = Path.Combine(Path.GetTempPath(), "GameSync", $"import-{Guid.NewGuid():N}");
         var notes = new List<string>();
+        var used = new List<string>();
         var (added, gamesAdded) = (0, 0);
         try
         {
@@ -257,13 +273,29 @@ public static class Sharing
                     continue;
                 }
 
-                var result = await service.ImportSharedAsync(game.LocalId!.Value, versions, DateTime.Now, ct);
+                var result = await service.ImportSharedAsync(game.LocalId!.Value, versions, DateTime.Now, ct, tag);
                 notes.AddRange(result.Notes.Select(n => $"{game.Title}: {n}"));
                 added += result.Added;
                 gamesAdded += result.Added > 0 ? 1 : 0;
                 if (result.Added > 0 && game.Match == ImportMatch.NotInstalled)
                 {
                     notes.Add($"{game.Title} isn't installed here, so its saves wait in GameSync: once it's installed, restore one from its saves.");
+                }
+
+                // Use it now: the newest goes in place, after the save there is kept as a named save. Refused, the imported
+                // saves stay named and the game's own save is as it was.
+                if (useNow?.Contains(game.Id) == true && game.CanUseNow && result.Saves.Count > 0)
+                {
+                    try
+                    {
+                        await service.UseSharedNowAsync(game.LocalId!.Value, result.Saves[^1], BeforeImport, ct);
+                        used.Add(game.Title);
+                    }
+                    catch (Exception e) when (e is UsageException or InvalidOperationException or IOException or Core.Storage.CloudException or UnauthorizedAccessException
+                        or Core.Scanning.InvalidGameDefinitionException or BlockedException or UnsafePathException)
+                    {
+                        notes.Add($"{game.Title}'s imported save wasn't put in place, so your own save is as it was: {e.Message}");
+                    }
                 }
             }
         }
@@ -272,12 +304,43 @@ public static class Sharing
             Core.Storage.LocalHistory.TryDelete(temp);
         }
 
-        var said = added == 0
-            ? "Nothing was added."
-            : $"Added {Count(added, "save")} to {Count(gamesAdded, "game")}, pinned in their histories; none of them replaces a save you have. Restore one from a game's saves.";
+        var said = Said(added, gamesAdded, tag, used);
         output.Say($"Import saves from {Path.GetFileName(zipPath)}: {said}");
         return notes.Count == 0 ? said : $"{said} {string.Join(" ", notes)}";
     }
+
+    /// <summary>The named save Use it now keeps the save in place as, before the shared one goes in (design system version 57).</summary>
+    public const string BeforeImport = "Before the import";
+
+    /// <summary>
+    /// What an import came to (design system version 57, ImportSavesDialog's Done): the saves added as named saves, the tag,
+    /// and the games using an imported save now with their own kept; nothing added and nothing used is a problem.
+    /// </summary>
+    internal static string Said(int added, int games, string? tag, IReadOnlyList<string> used)
+    {
+        if (added == 0 && used.Count == 0)
+        {
+            return NothingAdded;
+        }
+
+        var tagged = tag is null ? "" : $", tagged {tag}";
+        var first = added == 0
+            ? $"Nothing new was added{tagged}: the saves were in their histories already."
+            : $"Imported {Count(added, "save")} into {Count(games, "game")} as named saves{tagged}.";
+        if (used.Count == 0)
+        {
+            return $"{first} None of them replaces a save you have: restore one from its game's saves when you want it.";
+        }
+
+        var names = used.Count == 1 ? used[0] : $"{string.Join(", ", used.Take(used.Count - 1))} and {used[^1]}";
+        return $"{first} {names} {(used.Count == 1 ? "is" : "are")} using the imported save now; your own {(used.Count == 1 ? "is" : "are")} kept as {(used.Count == 1 ? "a named save" : "named saves")}, {BeforeImport}.";
+    }
+
+    /// <summary>
+    /// What an import that added nothing begins with: the app shows it as a problem, with the reasons after it, never as done
+    /// (the owner's friend, 8 Oct 2026: "Save import is not working").
+    /// </summary>
+    public const string NothingAdded = "Nothing was added.";
 
     /// <summary>The manifest, checked, and how many program files each game's folder holds, which are left out.</summary>
     private static (ShareManifest Manifest, Dictionary<string, int> Programs) ReadManifest(string zipPath)

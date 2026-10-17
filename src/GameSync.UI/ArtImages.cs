@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Avalonia;
 using Avalonia.Media.Imaging;
@@ -138,6 +139,134 @@ public static class ArtImages
         {
             // Art is untrusted (ART-08): whatever a picture that won't decode throws, it's treated as missing.
             return null;
+        }
+    }
+
+    // A grey copy lives as long as the picture it was made from; so does an icon with its drawn frame taken off.
+    private static readonly ConditionalWeakTable<Bitmap, Bitmap> Greys = new();
+    private static readonly ConditionalWeakTable<Bitmap, Bitmap> Unframed = new();
+
+    /// <summary>
+    /// An achievement's icon for its rounded badge: decoded like any picture, then, when the game drew a square frame into
+    /// it (Phasmophobia's), only the picture inside the frame, so the badge is filled with no square inside it (the owner,
+    /// 18 Oct 2026). Made once per picture; null when the file won't decode.
+    /// </summary>
+    public static Bitmap? LoadIcon(string? path, int width)
+    {
+        if (Load(path, width) is not { } picture)
+        {
+            return null;
+        }
+
+        lock (Unframed)
+        {
+            if (Unframed.TryGetValue(picture, out var made))
+            {
+                return made;
+            }
+        }
+
+        var icon = picture;
+        try
+        {
+            var size = picture.PixelSize;
+            var stride = size.Width * 4;
+            var pixels = new byte[stride * size.Height];
+            var pinned = GCHandle.Alloc(pixels, GCHandleType.Pinned);
+            try
+            {
+                picture.CopyPixels(new PixelRect(size), pinned.AddrOfPinnedObject(), pixels.Length, stride);
+            }
+            finally
+            {
+                pinned.Free();
+            }
+
+            if (IconFrame.Inset(pixels, size.Width, size.Height, bgra: picture.Format != PixelFormat.Rgba8888) is > 0 and var inset)
+            {
+                var side = size.Width - (2 * inset);
+                var inner = new byte[side * side * 4];
+                for (var y = 0; y < side; y++)
+                {
+                    Buffer.BlockCopy(pixels, (((y + inset) * size.Width) + inset) * 4, inner, y * side * 4, side * 4);
+                }
+
+                var held = GCHandle.Alloc(inner, GCHandleType.Pinned);
+                try
+                {
+                    icon = new Bitmap(picture.Format ?? PixelFormat.Bgra8888, picture.AlphaFormat ?? AlphaFormat.Premul, held.AddrOfPinnedObject(),
+                        new PixelSize(side, side), picture.Dpi, side * 4);
+                }
+                finally
+                {
+                    held.Free();
+                }
+            }
+        }
+        catch (Exception e) when (e is not OutOfMemoryException)
+        {
+            icon = picture;
+        }
+
+        lock (Unframed)
+        {
+            Unframed.AddOrUpdate(picture, icon);
+        }
+
+        return icon;
+    }
+
+    /// <summary>
+    /// LIB-31 (design system version 57): the cover of a game not installed on this PC, greyed and darkened as the design's
+    /// <c>grayscale(.9) brightness(.55)</c> does it; made once per picture, and the picture itself when it can't be read.
+    /// </summary>
+    public static Bitmap Greyed(Bitmap source)
+    {
+        lock (Greys)
+        {
+            if (Greys.TryGetValue(source, out var made))
+            {
+                return made;
+            }
+        }
+
+        try
+        {
+            var size = source.PixelSize;
+            var stride = size.Width * 4;
+            var pixels = new byte[stride * size.Height];
+            var pinned = GCHandle.Alloc(pixels, GCHandleType.Pinned);
+            Bitmap grey;
+            try
+            {
+                source.CopyPixels(new PixelRect(size), pinned.AddrOfPinnedObject(), pixels.Length, stride);
+                var (red, blue) = source.Format == PixelFormat.Rgba8888 ? (0, 2) : (2, 0);
+                for (var i = 0; i < pixels.Length; i += 4)
+                {
+                    var luma = (0.2126 * pixels[i + red]) + (0.7152 * pixels[i + 1]) + (0.0722 * pixels[i + blue]);
+                    for (var c = 0; c < 3; c++)
+                    {
+                        pixels[i + c] = (byte)Math.Clamp(Math.Round(0.55 * (luma + (0.1 * (pixels[i + c] - luma)))), 0, 255);
+                    }
+                }
+
+                grey = new Bitmap(source.Format ?? PixelFormat.Bgra8888, source.AlphaFormat ?? AlphaFormat.Premul, pinned.AddrOfPinnedObject(), size, source.Dpi, stride);
+            }
+            finally
+            {
+                pinned.Free();
+            }
+
+            lock (Greys)
+            {
+                Greys.AddOrUpdate(source, grey);
+            }
+
+            return grey;
+        }
+        catch (Exception e) when (e is not OutOfMemoryException)
+        {
+            return source;
         }
     }
 }

@@ -109,19 +109,16 @@
 
     <ScrollViewer Classes="page" HorizontalScrollBarVisibility="Disabled" IsVisible="{Binding ShowsRoom}">
       <StackPanel Spacing="16" Margin="0,0,0,8">
-        <Grid ColumnDefinitions="*,Auto" MinHeight="40">
-          <StackPanel VerticalAlignment="Center">
-            <TextBlock Text="{Binding Title}" FontSize="{DynamicResource fs-15}" LineHeight="{DynamicResource lh-20}" FontWeight="SemiBold" />
-            <TextBlock Classes="caption faint" Text="Every game's: from Steam on this PC, and your other copies' own records" TextTrimming="CharacterEllipsis" />
-          </StackPanel>
-          <c:GsButton Grid.Column="1" Classes="ghost sm" Icon="sync" Content="Refresh rarity" Command="{Binding RefreshRarityCommand}" IsVisible="{Binding CanRefresh}"
-                      IsBusy="{Binding Refreshing}" BusyText="Asking Steam" VerticalAlignment="Center"
-                      ToolTip.Tip="Asks Steam again how rare each achievement is, for every game. It's asked once a week by itself." />
-        </Grid>
+        <!-- Design system version 55 (the owner, 8 Oct 2026: "Refresh rarity shouldn't be on the main achievements page, but in
+             settings"): the page's name alone; asking rarity again now is Settings, Achievements, Rarity's Refresh now -->
+        <StackPanel VerticalAlignment="Center" MinHeight="40">
+          <TextBlock Text="{Binding Title}" FontSize="{DynamicResource fs-15}" LineHeight="{DynamicResource lh-20}" FontWeight="SemiBold" />
+          <TextBlock Classes="caption faint" Text="Every game's, kept by GameSync on every PC" TextTrimming="CharacterEllipsis" />
+        </StackPanel>
 
         <c:GsCard Title="No achievements here yet" IsVisible="{Binding NoGames}">
           <c:GsNote Icon="trophy" MaxWidth="640" HorizontalAlignment="Left"
-                    Text="Achievements show here for the Steam games you play on this PC: what you've unlocked, your Zeniths and what's closest to one. Steam keeps them once a game has run here." />
+                    Text="Achievements show here for the games you play: what you've unlocked, your Zeniths and what's closest to one. GameSync keeps them from Steam, from copies' own records and from your other PCs." />
         </c:GsCard>
 
         <!-- The band: how far you are in all, with trophies rising from its right edge (KAN-105), which narrow windows leave out -->

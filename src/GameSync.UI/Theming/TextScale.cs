@@ -50,7 +50,8 @@ public static class TextScale
         // The side columns of words (the library's list, Settings' sections) widen with the text, by less than it grows,
         // so the page beside them keeps its room: 30% wider at 150%.
         var widen = 1 + ((scale - 1) * 0.6);
-        resources["col-library-list"] = new GridLength(Math.Round(272 * widen));
+        // 288 since 18 Oct 2026, when the view joined the order as a dropdown beside it.
+        resources["col-library-list"] = new GridLength(Math.Round(288 * widen));
         resources["col-settings-nav"] = new GridLength(Math.Round(248 * widen));
         resources["col-setup-nav"] = new GridLength(Math.Round(280 * widen));
 

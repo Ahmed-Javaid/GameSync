@@ -22,7 +22,7 @@ public partial class Gallery : UserControl
         Rail.Items = RailItems;
         Tabs.ItemsSource = new NavItem[]
         {
-            new("saves", "Saves", "saves"), new("plan", "Plan", "chevronsRight"), new("versions", "Versions", "clock"), new("attn", "Needs you", "alert", "2", "warn"),
+            new("saves", "Saves", "saves"), new("attn", "Conflicts", "alert", "2", "warn"), new("log", "Log", "terminal"),
         };
         Sections.ItemsSource = new NavItem[]
         {

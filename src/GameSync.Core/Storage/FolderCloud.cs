@@ -128,6 +128,39 @@ public sealed class FolderCloud : ICloud
         }
     }
 
+    public Task<IReadOnlyList<CloudFileTag>> ListAchievementFilesAsync(CancellationToken ct)
+    {
+        EnsureReachable();
+        var folder = Path.Combine(_root, "achievements");
+        var files = new List<CloudFileTag>();
+        if (Directory.Exists(folder))
+        {
+            foreach (var file in new DirectoryInfo(folder).EnumerateFiles("*.json"))
+            {
+                if (IdRules.IsSafe(Path.GetFileNameWithoutExtension(file.Name), 40))
+                {
+                    files.Add(new CloudFileTag(DeviceId.Parse(Path.GetFileNameWithoutExtension(file.Name)),
+                        $"{file.Length.ToString(CultureInfo.InvariantCulture)}-{file.LastWriteTimeUtc.Ticks.ToString(CultureInfo.InvariantCulture)}"));
+                }
+            }
+        }
+
+        return Task.FromResult<IReadOnlyList<CloudFileTag>>(files);
+    }
+
+    public Task<byte[]?> GetAchievementFileAsync(DeviceId device, long largest, CancellationToken ct)
+    {
+        EnsureReachable();
+        var file = new FileInfo(Path.Combine(_root, "achievements", device.Value + ".json"));
+        return Task.FromResult(file.Exists && file.Length <= largest ? File.ReadAllBytes(file.FullName) : null);
+    }
+
+    public Task SaveAchievementFileAsync(DeviceId device, byte[] content, CancellationToken ct)
+    {
+        EnsureReachable();
+        return AtomicFile.WriteAllBytesAsync(Path.Combine(_root, "achievements", device.Value + ".json"), content, overwrite: true, ct);
+    }
+
     /// <summary>The text of <c>latest/VERSION.txt</c>: which version the plain copy holds.</summary>
     public static string Describe(VersionRecord version) =>
         $"This folder holds version {version.Id}, saved on {version.Device.Name} at " +

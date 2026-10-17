@@ -48,11 +48,11 @@ public partial class SaveManagerPage : UserControl
     /// <summary>
     /// A11Y-02 (design system → Shortcuts: Up and Down move through the list): each table is one Tab stop; Up, Down,
     /// Home, End, Page Up and Page Down go from row to row, Space ticks a game that syncs for sharing, and Enter opens
-    /// it, as the row's click does. The Versions tab's table moves the same way, and Enter opens a version's game.
+    /// it, as the row's click does.
     /// </summary>
     private void OnRowKey(object? sender, KeyEventArgs e)
     {
-        if (e.KeyModifiers != KeyModifiers.None || (e.Source as Control)?.FindAncestorOfType<Button>(includeSelf: true) is not { DataContext: SaveRow or VersionRow } button ||
+        if (e.KeyModifiers != KeyModifiers.None || (e.Source as Control)?.FindAncestorOfType<Button>(includeSelf: true) is not { DataContext: SaveRow } button ||
             button.FindAncestorOfType<ItemsControl>() is not { } table)
         {
             return;
@@ -77,7 +77,7 @@ public partial class SaveManagerPage : UserControl
             var index = Math.Clamp(to, 0, count - 1);
             table.ScrollIntoView(index);
             table.UpdateLayout();
-            if (table.ContainerFromIndex(index)?.GetVisualDescendants().OfType<Button>().FirstOrDefault(b => b.DataContext is SaveRow or VersionRow) is { } target)
+            if (table.ContainerFromIndex(index)?.GetVisualDescendants().OfType<Button>().FirstOrDefault(b => b.DataContext is SaveRow) is { } target)
             {
                 target.Focus(NavigationMethod.Directional);
                 target.BringIntoView();
