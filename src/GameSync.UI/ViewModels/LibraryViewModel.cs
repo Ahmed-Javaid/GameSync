@@ -322,24 +322,23 @@ public sealed partial class LibraryViewModel : ObservableObject, IRailPage, IPag
 
     public bool HasHidden => Tabs.Any(t => t.Id == "hidden");
 
-    /// <summary>Each view's line in the menu: "Installed · 37".</summary>
-    public string InstalledChoice => Choice(InstalledView, "Installed");
+    /// <summary>How many games each view holds, on the right of its line in the menu (GsMenuItem.Hint).</summary>
+    public string? InstalledCount => CountOf(InstalledView);
 
-    public string SavesChoice => Choice(SavesView, "Saves only");
+    public string? SavesCount => CountOf(SavesView);
 
-    public string AllChoice => Choice(AllView, "All games");
+    public string? AllCount => CountOf(AllView);
 
-    public string LocalChoice => Choice("local", "Local");
+    public string? LocalCount => CountOf("local");
 
-    public string SoftwareChoice => Choice("software", "Software");
+    public string? SoftwareCount => CountOf("software");
 
-    public string HiddenChoice => Choice("hidden", "Hidden");
+    public string? HiddenCount => CountOf("hidden");
 
     /// <summary>Picks a view from the dropdown's menu; Installed or All games is kept on this PC (LIB-31).</summary>
     public ICommand ViewCommand { get; }
 
-    private string Choice(string view, string label) =>
-        _viewCounts.TryGetValue(view, out var count) ? $"{label} · {count.ToString(CultureInfo.InvariantCulture)}" : label;
+    private string? CountOf(string view) => _viewCounts.TryGetValue(view, out var count) ? count.ToString(CultureInfo.InvariantCulture) : null;
 
     public bool IsScanning => Scanning is not null;
 
@@ -477,8 +476,8 @@ public sealed partial class LibraryViewModel : ObservableObject, IRailPage, IPag
             ["software"] = games.Count(g => g.IsSoftware && !g.IsHidden),
             ["hidden"] = games.Count(g => g.IsHidden),
         };
-        foreach (var name in new[] { nameof(ViewLabel), nameof(ViewName), nameof(HasSoftware), nameof(HasHidden), nameof(InstalledChoice), nameof(SavesChoice),
-                     nameof(AllChoice), nameof(LocalChoice), nameof(SoftwareChoice), nameof(HiddenChoice) })
+        foreach (var name in new[] { nameof(ViewLabel), nameof(ViewName), nameof(HasSoftware), nameof(HasHidden), nameof(InstalledCount), nameof(SavesCount),
+                     nameof(AllCount), nameof(LocalCount), nameof(SoftwareCount), nameof(HiddenCount) })
         {
             OnPropertyChanged(name);
         }

@@ -295,7 +295,8 @@ public sealed partial class SetupGroupViewModel : ObservableObject
     {
         Kind = group.Kind;
         _changed = changed;
-        var ticked = Kind is SetupGroupKind.Sync or SetupGroupKind.StoreCloud or SetupGroupKind.NotInstalled;
+        // The owner, 18 Oct 2026: games other launchers sync already start unticked ("It should also be unchecked by default").
+        var ticked = Kind is SetupGroupKind.Sync or SetupGroupKind.NotInstalled;
         Rows = group.Games.Select(g => new SetupGameRow(g, ticked && Tickable, Tickable, RowChanged)).ToList();
         (Title, Why) = Describe(Kind, group.Games);
         _isOpen = Kind == SetupGroupKind.Sync;
@@ -385,13 +386,17 @@ public sealed partial class SetupGroupViewModel : ObservableObject
         OnPropertyChanged(nameof(ToggleName));
     }
 
-    /// <summary>A group's name, and why its games are in it, naming a few when it helps.</summary>
+    /// <summary>
+    /// A group's name, and why its games are in it, naming a few when it helps. Names say what the games are, never what
+    /// will be done to them (the owner, 18 Oct 2026, of "Back up and sync": "That is ambiguous because the wording implies an
+    /// action"); the line above the groups says what a tick does.
+    /// </summary>
     private static (string Title, string Why) Describe(SetupGroupKind kind, IReadOnlyList<SetupGame> games) => kind switch
     {
-        SetupGroupKind.Sync => ("Back up and sync", "GameSync syncs them between your PCs"),
-        SetupGroupKind.StoreCloud => ("Synced by Steam or Epic already", "their store syncs them; GameSync keeps every version too"),
+        SetupGroupKind.Sync => ("Not synced by any launcher", "nothing else keeps a copy of these saves"),
+        SetupGroupKind.StoreCloud => ("Already synced by other launchers", "their own store syncs them; tick one to have GameSync keep every version too"),
         SetupGroupKind.OnlineOnly => ("Probably online-only", $"only settings found: the game keeps your progress on its servers · {Names(games, 2)}"),
-        SetupGroupKind.NotInstalled => ("Saves of games not installed", $"kept safe, ready if you install them again · {Names(games, 1)}"),
+        SetupGroupKind.NotInstalled => ("Games not installed", $"their saves are still on this PC, ready if you install them again · {Names(games, 1)}"),
         _ => ("No saves found yet", $"{Names(games, 3)} · GameSync watches them the first time you play"),
     };
 
@@ -409,11 +414,13 @@ public sealed partial class SetupGroupViewModel : ObservableObject
 }
 
 /// <summary>
-/// First run (design system → OnboardingScreen, version 56; ONB-01 to ONB-07): five steps down the left, Welcome, Your
-/// games, Choose saves, Where saves are kept, then Backups and startup, with no side rail until it's done. It says first
-/// that GameSync keeps saves, not games; asks for game folders before anything else; and goes on from Where saves are
-/// kept only once a choice is made (a friend clicked Next through every step, 8 Oct 2026). The scan starts when the page
-/// opens and only reads; nothing is copied until Start using GameSync.
+/// First run (design system → OnboardingScreen, versions 56 and 61; ONB-01 to ONB-07): five steps down the left, Welcome,
+/// Your games, Where saves are kept, Choose what to back up, then Backups and startup, with no side rail until it's done.
+/// It says first that GameSync keeps saves, not games; asks for game folders before anything else; and goes on from Where
+/// saves are kept only once a choice is made (a friend clicked Next through every step, 8 Oct 2026), which comes before the
+/// games are chosen, so choosing says where their saves go (the owner, 18 Oct 2026: "Then it must be AFTER the user selects
+/// where they want their saves"). The scan starts when the page opens and only reads; nothing is copied until Start using
+/// GameSync.
 /// </summary>
 public sealed partial class FirstRunViewModel : ObservableObject, IPageSurface, IWholeWindowPage
 {
@@ -421,8 +428,8 @@ public sealed partial class FirstRunViewModel : ObservableObject, IPageSurface, 
     [
         ("welcome", "Welcome", "logo"),
         ("folders", "Your games", "folder"),
-        ("saves", "Choose saves", "saves"),
         ("cloud", "Where saves are kept", "cloud"),
+        ("saves", "Choose what to back up", "saves"),
         ("daily", "Backups and startup", "clock"),
     ];
 
@@ -540,8 +547,10 @@ public sealed partial class FirstRunViewModel : ObservableObject, IPageSurface, 
         Cloud = new CloudSetupViewModel(actions.Cloud);
         Cloud.PropertyChanged += (_, e) =>
         {
-            if (e.PropertyName is nameof(CloudSetupViewModel.IsConnected) or nameof(CloudSetupViewModel.Picked) or nameof(CloudSetupViewModel.Ready))
+            if (e.PropertyName is nameof(CloudSetupViewModel.IsConnected) or nameof(CloudSetupViewModel.Picked) or nameof(CloudSetupViewModel.Ready)
+                or nameof(CloudSetupViewModel.Folder))
             {
+                OnPropertyChanged(nameof(TickedMeans));
                 OnPropertyChanged(nameof(CloudNextLabel));
                 OnPropertyChanged(nameof(CloudNextIsMain));
                 OnPropertyChanged(nameof(SetupKeptLine));
@@ -592,8 +601,8 @@ public sealed partial class FirstRunViewModel : ObservableObject, IPageSurface, 
     /// <summary>ONB-07: no game folder yet: Your games says what that costs, and going on without one is its own button.</summary>
     public bool NoFolders => Folders.Count == 0;
 
-    /// <summary>Choose saves' title: what was found, or that it's still looking.</summary>
-    public string SavesTitle => IsScanning || FoundTitle.Length == 0 ? "Looking for saves…" : FoundTitle;
+    /// <summary>Choose what to back up's first words: what was found, or that it's still looking.</summary>
+    public string SavesTitle => IsScanning || FoundTitle.Length == 0 ? "Still looking for saves" : FoundTitle;
 
     /// <summary>Choose saves goes on once every game has been looked at.</summary>
     public bool CanContinueSaves => !IsScanning && ScanError is null;
@@ -611,6 +620,22 @@ public sealed partial class FirstRunViewModel : ObservableObject, IPageSurface, 
         _ => "On this PC and in your Google Drive",
     };
 
+    /// <summary>
+    /// Choose what to back up says what a tick does before the games, for the place chosen just before (the owner, 18 Oct
+    /// 2026: "User needs to know, what are they ticking? what will happen to the unticked games? There should be locus of
+    /// control").
+    /// </summary>
+    public string TickedMeans => Cloud.Picked switch
+    {
+        CloudSetupViewModel.Local => "GameSync copies their saves into its backup folder on this PC when you finish, and again each time you stop playing, keeping every version.",
+        CloudSetupViewModel.InFolder when Cloud.Folder is { } folder =>
+            $"GameSync copies their saves to {folder} when you finish, and again each time you stop playing, keeping every version, and your other PCs get them.",
+        _ => "GameSync copies their saves to your Google Drive when you finish, and again each time you stop playing, keeping every version, and your other PCs get them.",
+    };
+
+    /// <summary>And what's left unticked.</summary>
+    public static string UntickedMeans => "Left as they are: GameSync copies nothing. Any game's page can start backing it up later.";
+
     /// <summary>Something missing?: Add a game or folder, for one of the person's own (LIB-13).</summary>
     public ICommand AddGameCommand { get; }
 
@@ -622,14 +647,8 @@ public sealed partial class FirstRunViewModel : ObservableObject, IPageSurface, 
     /// </summary>
     public async Task RegroupAsync(GameSync.Core.Model.GameId? added = null)
     {
-        var ticked = Groups.SelectMany(g => g.Rows).ToDictionary(r => r.Game.Id, r => r.IsChecked);
         var groups = await _actions.Groups(CancellationToken.None);
-        Groups = groups.Select(g => new SetupGroupViewModel(g, Recount)).ToList();
-        foreach (var row in Groups.SelectMany(g => g.Rows).Where(r => r.Tickable && ticked.ContainsKey(r.Game.Id)))
-        {
-            row.IsChecked = ticked[row.Game.Id];
-        }
-
+        Replace(groups);
         if (added is { } id && Groups.FirstOrDefault(g => g.Rows.Any(r => r.Game.Id == id)) is { } group)
         {
             group.IsOpen = true;
@@ -638,6 +657,35 @@ public sealed partial class FirstRunViewModel : ObservableObject, IPageSurface, 
 
         AntiCheatNote = AntiCheat(groups);
         Recount();
+    }
+
+    /// <summary>
+    /// The groups after a scan, or after Add a game or folder, as the person left the ones before: each game ticked or not
+    /// as they left it, and each group open or closed, in full or not, as it was. Only a game or a group new to the list
+    /// takes the defaults. A scan that finished while Choose saves was open (one started by a folder added on Your games)
+    /// used to make the groups again from nothing: Back up and sync opened by itself, the others closed, and every tick went
+    /// back to its default (the owner, 18 Oct 2026, of a group that wouldn't stay closed: "this doesn't retract at times").
+    /// </summary>
+    private void Replace(IReadOnlyList<SetupGroup> groups)
+    {
+        var ticked = Groups.SelectMany(g => g.Rows).Where(r => r.Tickable)
+            .GroupBy(r => r.Game.Id).ToDictionary(g => g.Key, g => g.First().IsChecked);
+        var shown = Groups.GroupBy(g => g.Kind).ToDictionary(g => g.Key, g => (g.First().IsOpen, g.First().ShowsAll));
+        // Games with no saves found aren't listed: there's nothing to tick for them, and learn mode watches them anyway (the
+        // owner, 18 Oct 2026: "No saves found yet on that screen is not useful").
+        Groups = groups.Where(g => g.Kind != SetupGroupKind.NoSaves).Select(g => new SetupGroupViewModel(g, Recount)).ToList();
+        foreach (var group in Groups)
+        {
+            if (shown.TryGetValue(group.Kind, out var was))
+            {
+                (group.IsOpen, group.ShowsAll) = was;
+            }
+
+            foreach (var row in group.Rows.Where(r => r.Tickable && ticked.ContainsKey(r.Game.Id)))
+            {
+                row.IsChecked = ticked[row.Game.Id];
+            }
+        }
     }
 
     public CloudSetupViewModel Cloud { get; }
@@ -823,7 +871,7 @@ public sealed partial class FirstRunViewModel : ObservableObject, IPageSurface, 
 
             Folders = scan.Folders.Select(f => new FolderItem(f.Path, f.Missing ? "not there right now" : FolderMeta(f))).ToList();
             var groups = await _actions.Groups(CancellationToken.None);
-            Groups = groups.Select(g => new SetupGroupViewModel(g, Recount)).ToList();
+            Replace(groups);
             ScanLabel = $"Scan finished in {Seconds(scan.Took)}: {Count(scan.Games)}, saves found for {scan.WithSaves.ToString(CultureInfo.InvariantCulture)}";
             ScanValue = 100;
             ScanRight = "100%";

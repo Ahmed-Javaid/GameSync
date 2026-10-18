@@ -41,6 +41,13 @@ public static class ThemeService
         app.Resources["OverlayCornerRadius"] = new CornerRadius(10);
         app.Resources["MenuFlyoutPresenterThemePadding"] = new Thickness(6);
         app.Resources["MenuFlyoutItemThemePadding"] = new Thickness(10, 8, 12, 8);
+
+        // Menus as the design draws them (design system → Menu): their rows 6px in from every edge, so a row lit under the
+        // pointer sits inside the menu with room round it; Fluent's menus pad only the top and bottom, 4px, there (the
+        // owner, 18 Oct 2026: "the dropdown doesn't fill the cell when selected. It infact feels like its bigger than teh
+        // slot"). A row: 8px before its check or icon, 12px after its words or count.
+        app.Resources["MenuFlyoutScrollerMargin"] = new Thickness(6);
+        app.Resources["MenuFlyoutItemThemePaddingNarrow"] = new Thickness(8, 4, 12, 7);
         return tokens;
     }
 

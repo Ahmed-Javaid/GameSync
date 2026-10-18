@@ -1,4 +1,4 @@
-<!-- @dsCard group="Screens" height=800 width=1280 page=true subtitle="First run: welcome, your games, choose saves, where saves are kept, backups and startup; click a step" -->
+<!-- @dsCard group="Screens" height=800 width=1280 page=true subtitle="First run: welcome, your games, where saves are kept, choose what to back up, backups and startup; click a step" -->
 <!doctype html>
 <html lang="en">
 <head><meta charset="utf-8"><title>preview</title>
@@ -29,7 +29,8 @@ var G = window.GameSync, h = React.createElement;
 var ART = "data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%201200%20500%27%20preserveAspectRatio%3D%27xMidYMid%20slice%27%3E%3Crect%20width%3D%271200%27%20height%3D%27500%27%20fill%3D%27%231b2a33%27/%3E%3Ccircle%20cx%3D%27860%27%20cy%3D%27150%27%20r%3D%2770%27%20fill%3D%27%237fe6f2%27%20opacity%3D%27.35%27/%3E%3Cpath%20d%3D%27M0%20330%20L180%20200%20L330%20300%20L520%20150%20L700%20290%20L880%20190%20L1200%20320%20V500%20H0Z%27%20fill%3D%27%23223640%27/%3E%3Cpath%20d%3D%27M0%20400%20L220%20290%20L420%20380%20L640%20270%20L860%20370%20L1040%20300%20L1200%20360%20V500%20H0Z%27%20fill%3D%27%23182730%27/%3E%3Cpath%20d%3D%27M0%20460%20L300%20390%20L600%20450%20L900%20380%20L1200%20440%20V500%20H0Z%27%20fill%3D%27%2310191f%27/%3E%3C/svg%3E";
 
 var COVERS = ["data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%20200%20300%27%3E%3Crect%20width%3D%27200%27%20height%3D%27300%27%20fill%3D%27%231d2a24%27/%3E%3Ccircle%20cx%3D%27140%27%20cy%3D%2790%27%20r%3D%2738%27%20fill%3D%27%237fd1a6%27%20opacity%3D%27.5%27/%3E%3Cpath%20d%3D%27M0%20220%20L70%20160%20L130%20210%20L200%20150%20V300%20H0Z%27%20fill%3D%27%237fd1a6%27%20opacity%3D%27.35%27/%3E%3C/svg%3E", "data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%20200%20300%27%3E%3Crect%20width%3D%27200%27%20height%3D%27300%27%20fill%3D%27%232b2220%27/%3E%3Ccircle%20cx%3D%27140%27%20cy%3D%2790%27%20r%3D%2738%27%20fill%3D%27%23e0b36a%27%20opacity%3D%27.5%27/%3E%3Cpath%20d%3D%27M0%20220%20L70%20160%20L130%20210%20L200%20150%20V300%20H0Z%27%20fill%3D%27%23e0b36a%27%20opacity%3D%27.35%27/%3E%3C/svg%3E", "data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%20200%20300%27%3E%3Crect%20width%3D%27200%27%20height%3D%27300%27%20fill%3D%27%23221f33%27/%3E%3Ccircle%20cx%3D%27140%27%20cy%3D%2790%27%20r%3D%2738%27%20fill%3D%27%23b9a3ff%27%20opacity%3D%27.5%27/%3E%3Cpath%20d%3D%27M0%20220%20L70%20160%20L130%20210%20L200%20150%20V300%20H0Z%27%20fill%3D%27%23b9a3ff%27%20opacity%3D%27.35%27/%3E%3C/svg%3E", "data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%20200%20300%27%3E%3Crect%20width%3D%27200%27%20height%3D%27300%27%20fill%3D%27%232c2519%27/%3E%3Ccircle%20cx%3D%27140%27%20cy%3D%2790%27%20r%3D%2738%27%20fill%3D%27%23f2b544%27%20opacity%3D%27.5%27/%3E%3Cpath%20d%3D%27M0%20220%20L70%20160%20L130%20210%20L200%20150%20V300%20H0Z%27%20fill%3D%27%23f2b544%27%20opacity%3D%27.35%27/%3E%3C/svg%3E"];
-var STEPS=[{id:'welcome',label:'Welcome',icon:'logo'},{id:'folders',label:'Your games',icon:'folder'},{id:'saves',label:'Choose saves',icon:'saves'},{id:'cloud',label:'Where saves are kept',icon:'cloud'},{id:'daily',label:'Backups and startup',icon:'clock'}];
+// Version 61 (the owner, 18 Oct 2026): where saves are kept comes before choosing what to back up.
+var STEPS=[{id:'welcome',label:'Welcome',icon:'logo'},{id:'folders',label:'Your games',icon:'folder'},{id:'cloud',label:'Where saves are kept',icon:'cloud'},{id:'saves',label:'Choose what to back up',icon:'saves'},{id:'daily',label:'Backups and startup',icon:'clock'}];
 var SYNC=[
   {name:'Terraria',art:COVERS[0],path:'Documents\\My Games\\Terraria',size:'4.2 MB',how:'save list'},
   {name:'Dark Souls III',art:COVERS[1],path:'AppData\\Roaming\\DarkSoulsIII',size:'11 MB',how:'save list'},
@@ -61,15 +62,20 @@ function Group(p){
   isOpen?h('div',{style:{display:'flex',flexDirection:'column',paddingTop:2}},
     h('div',{className:'ob-row ob-cols gs-overline'},h('span'),h('span'),h('span',null,'Game'),h('span',null,'Its saves are in'),h('span',{style:{textAlign:'right'}},'Size'),h('span',null,'Found by')),
     p.rows.map(function(g){return h('div',{key:g.name,className:'ob-row'},
-     h(G.Checkbox,{label:'Back up '+g.name,checked:true}),h(Cover,g),
+     h(G.Checkbox,{label:'Back up '+g.name,checked:!!p.on}),h(Cover,g),
      h('span',{className:'ob-cut',style:{fontWeight:500}},g.name),
      h('span',{className:'gs-mono gs-muted ob-cut',style:{fontSize:12},title:g.path},g.path),
      h('span',{className:'gs-mono',style:{fontSize:12,textAlign:'right'}},g.size),
      h('span',{className:'gs-faint',style:{fontSize:12}},g.how));}),
     h(G.Button,{size:'sm',variant:'ghost',iconAfter:'chevronDown',style:{alignSelf:'flex-start',marginLeft:18}},'Show 18 more')):null);
 }
-function Page(p){return h('div',{style:{display:'flex',flexDirection:'column',gap:16,flex:1,minWidth:0,minHeight:0}},h('header',null,h('h1',{className:'page-title',style:{margin:0}},p.title),p.sub?h('p',{className:'gs-muted',style:{margin:'6px 0 0',maxWidth:760}},p.sub):null),p.children);}
-function Foot(p){return h('div',{className:'gs-row',style:{marginTop:'auto',justifyContent:'space-between',gap:24,flexWrap:'nowrap',paddingTop:16}},
+// Version 61 (the owner, 18 Oct 2026: "use equal block spacing if there is alot of empty space"): a step's blocks share the
+// room left evenly, above the first, between them and below the last; its foot stays at the bottom.
+function Page(p){var kids=[].concat(p.children).filter(Boolean), foot=kids.pop();
+ return h('div',{style:{display:'flex',flexDirection:'column',gap:16,flex:1,minWidth:0,minHeight:0}},
+  h('header',null,h('h1',{className:'page-title',style:{margin:0}},p.title),p.sub?h('p',{className:'gs-muted',style:{margin:'6px 0 0',maxWidth:760}},p.sub):null),
+  h('div',{style:{flex:1,minHeight:0,display:'flex',flexDirection:'column',justifyContent:'space-evenly',gap:16}},kids),foot);}
+function Foot(p){return h('div',{className:'gs-row',style:{justifyContent:'space-between',gap:24,flexWrap:'nowrap'}},
   p.note?h('div',{className:'gs-note',style:{maxWidth:620}},h(G.Icon,{name:p.noteIcon||'info',size:16}),p.note):h('span'),
   h('div',{className:'gs-row',style:{gap:12,flexWrap:'nowrap'}},
    p.back?h(G.Button,{variant:'ghost',onClick:p.back},'Back'):null,
@@ -86,7 +92,7 @@ function Choice(p){
 }
 function Point(p){return h(G.Card,{style:{padding:'18px 18px 20px',gap:10}},h('span',{className:'ob-dot'},h(G.Icon,{name:p.icon,size:18})),h('div',{style:{fontWeight:600,fontSize:15}},p.title),h('div',{className:'gs-muted',style:{fontSize:13,lineHeight:'19px'}},p.text));}
 
-// A step by its id (#welcome, #folders, #saves, #cloud, #daily), or a state: #folders-added (E:\Games added),
+// A step by its id (#welcome, #folders, #cloud, #saves, #daily), or a state: #folders-added (E:\Games added),
 // #scan-folder (what GameSync found in a folder, to pick from), #scanning (saves still being looked for),
 // #cloud-drive (signed in), #cloud-folder (a folder chosen), #cloud-local (this PC only), #daily-time,
 // #add-game (Add a game or folder over Choose saves).
@@ -97,7 +103,7 @@ function App(){
  var where=React.useState({'cloud-drive':'drive','cloud-folder':'folder','cloud-local':'local'}[HASH]||null);
  var signed=React.useState(HASH==='cloud-drive'), folder=React.useState(HASH==='cloud-folder'?'D:\\GameSync':null);
  var added=React.useState(HASH==='folders-added'), picking=React.useState(HASH==='scan-folder'), picks=React.useState(FOUND.map(function(){return true;}).concat(NOT.map(function(){return false;})));
- var online=React.useState(false), startup=React.useState(true), daily=React.useState(true), timeOpen=React.useState(HASH==='daily-time'), adding=React.useState(HASH==='add-game');
+ var online=React.useState(false), store=React.useState(false), startup=React.useState(true), daily=React.useState(true), timeOpen=React.useState(HASH==='daily-time'), adding=React.useState(HASH==='add-game');
  var scanning=HASH==='scanning';
  var ready=where[0]==='drive'?signed[0]:where[0]==='folder'?!!folder[0]:where[0]==='local';
  var chosen=picks[0].filter(Boolean).length;
@@ -118,7 +124,7 @@ function App(){
        h('div',{style:{fontSize:13}},'25 GB. Install the game on each PC yourself, from its store; GameSync brings the saves.')))),
     h(Foot,{note:'Setting up takes about three minutes. Nothing is copied until the last step, and your saves stay where they are.',next:function(){go('folders')},label:'Get started'}));},
   folders:function(){var has=added[0];return h(Page,{title:'Where are your games?',sub:'GameSync looks for the saves of every game it finds. Games from Steam, Epic and the EA app are found by themselves. Games you installed another way, from GOG, an installer or a zip, are found only in a folder you add here.'},
-    h('div',{style:{display:'grid',gridTemplateColumns:'5fr 7fr',gap:16,alignItems:'start'}},
+    h('div',{style:{display:'grid',gridTemplateColumns:'5fr 7fr',gap:16,alignItems:'stretch'}},
      h(G.Card,{title:'Found by themselves'},
       h(G.SettingsRow,{title:'Steam',description:'E:\\Steam and G:\\SteamLibrary'},h('span',{className:'gs-mono'},'18 games')),
       h(G.SettingsRow,{title:'Epic Games',description:'C:\\Program Files\\Epic Games'},h('span',{className:'gs-mono'},'1 game')),
@@ -130,22 +136,31 @@ function App(){
          h('div',{className:'gs-muted',style:{fontSize:13,lineHeight:'18px',maxWidth:380,textAlign:'center'}},'Without one, GameSync can\u2019t find games outside Steam, Epic and the EA app, or their saves.'),
          h(G.Button,{variant:'primary',icon:'plus',onClick:function(){picking[1](true);}},'Add a game folder\u2026')))),
     has?null:h('div',{className:'gs-note'},h(G.Icon,{name:'info',size:16}),'Only use Steam, Epic or the EA app? Then you need no folder: carry on without one. You can add one later in the library or Settings.'),
-    h(Foot,{back:function(){go('welcome')},other:has?null:{label:'Carry on without a folder',go:function(){go('saves')}},label:has?'Find saves':null,next:function(){go('saves')}}));},
-  saves:function(){return h(Page,{title:scanning?'Looking for saves\u2026':'Saves found for 43 of 46 games',sub:'These are save files, your progress in each game, usually a few megabytes. GameSync keeps a copy of the ticked ones when you finish. Your games aren\u2019t copied.'},
+    h(Foot,{back:function(){go('welcome')},other:has?null:{label:'Carry on without a folder',go:function(){go('cloud')}},label:has?'Continue':null,next:function(){go('cloud')}}));},
+  saves:function(){var w=where[0], place=w==='folder'?(folder[0]||'your folder'):w==='local'?null:'your Google Drive';
+   return h(Page,{title:'Choose what to back up',sub:h(React.Fragment,null,h('span',{style:{color:'var(--ink)',fontWeight:600}},scanning?'Still looking for saves':'Saves found for 43 of 46 games'),'. Save files are your progress in each game, usually a few megabytes; your games themselves are never copied.')},
+     // What a tick does, said for the place just chosen, and what's left unticked, before any game (the owner, 18 Oct 2026:
+     // "User needs to know, what are they ticking? what will happen to the unticked games? There should be locus of control").
+     scanning?null:h(G.Card,{style:{padding:'12px 16px'}},
+      h('div',{style:{display:'grid',gridTemplateColumns:'auto auto minmax(0,1fr)',columnGap:12,rowGap:10,alignItems:'start'}},
+       h(G.Checkbox,{label:'Ticked',checked:true}),h('span',{style:{fontWeight:600}},'Ticked'),
+       h('span',{className:'gs-muted'},place?'GameSync copies their saves to '+place+' when you finish, and again each time you stop playing, keeping every version, and your other PCs get them.':'GameSync copies their saves into its backup folder on this PC when you finish, and again each time you stop playing, keeping every version.'),
+       h(G.Checkbox,{label:'Unticked',checked:false}),h('span',{style:{fontWeight:600}},'Unticked'),
+       h('span',{className:'gs-muted'},'Left as they are: GameSync copies nothing. Any game\u2019s page can start backing it up later.'))),
      scanning?h(G.ProgressBar,{value:40,label:'Looking for each game\u2019s saves: 18 of 46',right:'40%'}):
       h('div',{className:'gs-row',style:{justifyContent:'space-between',gap:12}},h('span',{className:'gs-muted'},h('span',{style:{color:'var(--ink)',fontWeight:600}},'31 games ticked'),' \u00b7 404 MB of saves'),h(G.Button,{size:'sm',variant:'ghost'},'Close every group')),
      h('div',{style:{display:'flex',flexDirection:'column',gap:10,overflow:'auto',minHeight:0,flex:'0 1 auto'}},
-      h(Group,{title:'Back up and sync',count:scanning?9:22,size:'380 MB',why:'GameSync syncs them between your PCs',on:true,open:true,rows:SYNC}),
-      h(Group,{title:'Synced by Steam or Epic already',count:9,size:'24 MB',why:'their store syncs them; GameSync keeps every version too',on:true,rows:SYNC}),
+      // Named for what their games are, never what will be done to them; games with no saves found aren't listed.
+      h(Group,{title:'Not synced by any launcher',count:scanning?9:22,size:'380 MB',why:'nothing else keeps a copy of these saves',on:true,open:true,rows:SYNC}),
+      h(Group,{title:'Already synced by other launchers',count:9,size:'24 MB',why:'their own store syncs them; tick one to have GameSync keep every version too',on:store[0],onTick:store[1],rows:SYNC}),
       h(Group,{title:'Probably online-only',count:12,why:'only settings found: the game keeps your progress on its servers',on:online[0],onTick:online[1],rows:SYNC}),
-      h(Group,{title:'Saves of games not installed',count:5,size:'61 MB',why:'kept safe, ready if you install them again',on:true,rows:SYNC}),
-      h(Group,{title:'No saves found yet',count:3,why:'ROUNDS, COD, OG \u00b7 GameSync watches them the first time you play',watch:true}),
+      h(Group,{title:'Games not installed',count:5,size:'61 MB',why:'their saves are still on this PC, ready if you install them again',on:true,rows:SYNC}),
       h(G.Card,{style:{padding:'10px 16px'}},
        h('div',{className:'gs-row',style:{flexWrap:'nowrap',gap:12}},
         h(G.Icon,{name:'folder',size:18,className:'gs-faint'}),
-        h('div',{style:{flex:1,minWidth:0}},h('div',{style:{fontWeight:600}},'A game missing?'),h('div',{className:'gs-muted',style:{fontSize:12,lineHeight:'16px'}},'Add its game folder on Back, or add one game or folder by hand, like a game server\u2019s world.')),
+        h('div',{style:{flex:1,minWidth:0}},h('div',{style:{fontWeight:600}},'A game missing?'),h('div',{className:'gs-muted',style:{fontSize:12,lineHeight:'16px'}},'Add its game folder in Your games, or add one game or folder by hand, like a game server\u2019s world.')),
         h(G.Button,{size:'sm',variant:'secondary',icon:'plus',onClick:function(){adding[1](true);}},'Add a game or folder')))),
-     h(Foot,{note:'Apex Legends, Helldivers 2 and Rocket League have an anti-cheat: they start only through their own launcher.',noteIcon:'shield',back:function(){go('folders')},label:'Continue',disabled:scanning,title:scanning?'Once every game has been looked at':null,next:function(){go('cloud')}}));},
+     h(Foot,{note:'Apex Legends, Helldivers 2 and Rocket League have an anti-cheat: they start only through their own launcher.',noteIcon:'shield',back:function(){go('cloud')},label:'Continue',disabled:scanning,title:scanning?'Once every game has been looked at':null,next:function(){go('daily')}}));},
   cloud:function(){var w=where[0];return h(Page,{title:'Where should your saves be kept?',sub:'GameSync keeps every version on this PC. Choose where a second copy goes, so a dead drive or a new PC doesn\u2019t cost you your progress, and so your other PCs get your saves.'},
     h('div',{role:'radiogroup','aria-label':'Where your saves are kept',style:{display:'flex',flexDirection:'column',gap:12}},
      h(Choice,{icon:'cloud',title:'Google Drive',tag:'Recommended',on:w==='drive',pick:function(){where[1]('drive');},
@@ -159,8 +174,8 @@ function App(){
      h(Choice,{icon:'monitor',title:'Only on this PC, for now',on:w==='local',pick:function(){where[1]('local');},
        text:'Nothing leaves this PC. Your saves show Not synced until you connect Google Drive or a folder, from Home whenever you like.'},
        h('div',{className:'gs-import-note gs-import-warn'},h(G.Icon,{name:'alert',size:14,strokeWidth:2}),'If this PC\u2019s drive fails, its backups go with it, and your other PCs won\u2019t get these saves.'))),
-    h(Foot,{back:function(){go('saves')},label:w==='local'?'Continue with this PC only':'Continue',disabled:!ready,
-      title:ready?null:!w?'Choose where your saves are kept first':w==='drive'?'Sign in with Google first':'Choose the folder first',next:function(){go('daily')}}));},
+    h(Foot,{back:function(){go('folders')},label:w==='local'?'Continue with this PC only':'Continue',disabled:!ready,
+      title:ready?null:!w?'Choose where your saves are kept first':w==='drive'?'Sign in with Google first':'Choose the folder first',next:function(){go('saves')}}));},
   daily:function(){var w=where[0];return h(Page,{title:'Backups and startup',sub:'GameSync backs a game up when you stop playing it. These two keep that going without you.'},
     h(G.Card,null,
      h(G.SettingsRow,{title:'Start GameSync when you sign in to Windows',description:'So it notices games however you start them, backs each one up after you play, and brings your other PCs\u2019 saves down.'},h(G.Switch,{label:'Start GameSync when you sign in to Windows',checked:startup[0],onChange:startup[1]})),
@@ -169,10 +184,10 @@ function App(){
        :h(G.Button,{size:'sm',variant:'secondary',icon:'clock',disabled:!daily[0],onClick:function(){timeOpen[1](true);}},'Change time'),
       h(G.Switch,{label:'Back up every day',checked:daily[0],onChange:daily[1]}))),
     h(G.Card,{title:'Your setup'},
-     h(G.SettingsRow,{title:'31 games\u2019 saves',description:'Backed up when you start, 404 MB, then each time you stop playing.'},h(G.Button,{size:'sm',variant:'ghost',onClick:function(){go('saves');}},'Change')),
      h(G.SettingsRow,{title:'Game folders',description:added[0]?'E:\\Games':'None: only games from Steam, Epic and the EA app are found.'},h(G.Button,{size:'sm',variant:'ghost',onClick:function(){go('folders');}},'Change')),
-     h(G.SettingsRow,{title:'Kept',description:w==='folder'?'On this PC and in D:\\GameSync':w==='local'?'On this PC only: not synced to your other PCs':'On this PC and in your Google Drive'},h(G.Button,{size:'sm',variant:'ghost',onClick:function(){go('cloud');}},'Change'))),
-    h(Foot,{note:'Both run as you, without admin rights. The first backup runs in the background; you can play meanwhile.',noteIcon:'shield',back:function(){go('cloud')},next:function(){},label:'Start using GameSync',done:true}));}
+     h(G.SettingsRow,{title:'Kept',description:w==='folder'?'On this PC and in D:\\GameSync':w==='local'?'On this PC only: not synced to your other PCs':'On this PC and in your Google Drive'},h(G.Button,{size:'sm',variant:'ghost',onClick:function(){go('cloud');}},'Change')),
+     h(G.SettingsRow,{title:'31 games\u2019 saves',description:'Backed up when you start, 404 MB, then each time you stop playing.'},h(G.Button,{size:'sm',variant:'ghost',onClick:function(){go('saves');}},'Change'))),
+    h(Foot,{note:'Both run as you, without admin rights. The first backup runs in the background; you can play meanwhile.',noteIcon:'shield',back:function(){go('saves')},next:function(){},label:'Start using GameSync',done:true}));}
  };
  var found=picks[0];
  return h(G.ThemeScope,{strength:'glow',art:ART,style:{width:1280,height:800,display:'flex',position:'relative'}},

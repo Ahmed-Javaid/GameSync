@@ -236,34 +236,62 @@ public class FirstRunTests
             });
         var page = new FirstRunViewModel(actions);
 
-        // ONB-07 (design system version 56): five steps, only the ones reached can be picked; Welcome comes first, and the
-        // scan runs behind it.
-        Assert.Equal(["welcome", "folders", "saves", "cloud", "daily"], page.Steps.Select(s => s.Id));
+        // ONB-07 (design system versions 56 and 61): five steps, only the ones reached can be picked; Welcome comes first, and
+        // the scan runs behind it; where saves are kept comes before choosing what to back up (the owner, 18 Oct 2026).
+        Assert.Equal(["welcome", "folders", "cloud", "saves", "daily"], page.Steps.Select(s => s.Id));
+        Assert.Equal("Choose what to back up", page.Steps[3].Label);
         Assert.True(page.IsWelcome);
         await page.ScanAsync();
         Assert.StartsWith("Scan finished in 12 seconds: 10 games, saves found for 9", page.ScanLabel, StringComparison.Ordinal);
         page.NextCommand.Execute(null);
         Assert.True(page.IsFolders);
         Assert.Equal((@"G:\", "3 games", true), (page.Folders[0].Path, page.Folders[0].Meta, page.HasFolders));
+
+        // Where saves are kept (ONB-07): a real choice Continue waits for. Without Google's client, a folder; only this PC
+        // says what it costs and keeps everything here.
+        page.NextCommand.Execute(null);
+        Assert.True(page.IsCloud);
+        Assert.Equal(("check", "check"), (page.Steps[0].Icon, page.Steps[1].Icon));
+        Assert.Equal((false, "Choose where your saves are kept first"), (page.Cloud.Ready, page.Cloud.NotReadyTip));
+        page.NextCommand.Execute(null);
+        Assert.True(page.IsCloud);
+        page.Cloud.PickCommand.Execute("local");
+        Assert.Equal((true, "Continue with this PC only", AppConfig.NoCloud), (page.Cloud.Ready, page.CloudNextLabel, page.Cloud.Remote));
+        Assert.Equal("On this PC only: not synced to your other PCs", page.SetupKeptLine);
+        Assert.StartsWith("GameSync copies their saves into its backup folder on this PC", page.TickedMeans, StringComparison.Ordinal);
+        page.Cloud.PickCommand.Execute("folder");
+        Assert.Equal((false, "Choose the folder first"), (page.Cloud.Ready, page.Cloud.NotReadyTip));
+        Assert.True(page.Cloud.CannotSignIn);
+        page.Cloud.ChooseFolder(@"D:\NAS");
+        Assert.Equal((folder, "Continue", true), (page.Cloud.Remote, page.CloudNextLabel, page.Cloud.Ready));
+        Assert.Contains("runs in the background", page.FirstBackupText, StringComparison.Ordinal);
+
+        // Choose what to back up: what a tick does, said for the place just chosen, before any game (the owner, 18 Oct 2026:
+        // "what are they ticking? what will happen to the unticked games?").
         page.NextCommand.Execute(null);
         Assert.True(page.IsChoose);
-        Assert.Equal(("check", "check"), (page.Steps[0].Icon, page.Steps[1].Icon));
         Assert.Equal("Saves found for 9 of 10 games", page.SavesTitle);
+        Assert.Equal($"GameSync copies their saves to {folder} when you finish, and again each time you stop playing, keeping every version, and your other PCs get them.", page.TickedMeans);
+        Assert.StartsWith("Left as they are", FirstRunViewModel.UntickedMeans, StringComparison.Ordinal);
 
-        // Groups: Back up and sync open with four rows and Show 2 more, its heading closing and opening it; online-only
-        // unticked; No saves found yet watched, with no box and nothing to open; each game's save size.
+        // Groups, named for what their games are: Not synced by any launcher, open with four rows and Show 2 more, its
+        // heading closing and opening it; Already synced by other launchers and online-only unticked; no group for games
+        // with no saves found; each game's save size.
         var sync = page.Groups[0];
         Assert.Equal((true, 4, true, "Show 2 more"), (sync.IsOpen, sync.VisibleRows.Count, sync.HasMore, sync.MoreLabel));
-        Assert.Equal(("Back up and sync", "6 games · 5.7 MB of saves · GameSync syncs them between your PCs"), (sync.Title, sync.Summary));
+        Assert.Equal(("Not synced by any launcher", "6 games · 5.7 MB of saves · nothing else keeps a copy of these saves"), (sync.Title, sync.Summary));
         Assert.Equal(Cli.FormatSize(1_000_000), sync.Rows[0].Size);
         sync.ToggleOpenCommand.Execute(null);
         Assert.Equal((false, "chevronRight", 0), (sync.IsOpen, sync.Chevron, sync.VisibleRows.Count));
         sync.ToggleOpenCommand.Execute(null);
         Assert.True(sync.IsOpen);
         Assert.Equal(true, sync.IsChecked);
+        var store = page.Groups[1];
+        Assert.Equal(("Already synced by other launchers", false), (store.Title, store.IsChecked));
+        Assert.Equal("their own store syncs them; tick one to have GameSync keep every version too", store.Why);
         Assert.Equal(false, page.Groups[2].IsChecked);
         Assert.Equal("only settings found: the game keeps your progress on its servers · Apex Legends and Rocket League", page.Groups[2].Why);
-        Assert.Equal((true, false), (page.Groups[3].IsWatch, page.Groups[3].CanOpen));
+        Assert.DoesNotContain(page.Groups, g => g.Kind == SetupGroupKind.NoSaves);
         page.CloseGroupsCommand.Execute(null);
         Assert.All(page.Groups, g => Assert.False(g.IsOpen));
         sync.IsOpen = true;
@@ -273,23 +301,8 @@ public class FirstRunTests
         sync.ToggleCommand.Execute(null);
         Assert.Equal(true, sync.IsChecked);
         sync.Rows[5].IsChecked = false;
-
-        // Where saves are kept (ONB-07): a real choice Continue waits for. Without Google's client, a folder; only this PC
-        // says what it costs and keeps everything here.
-        page.NextCommand.Execute(null);
-        Assert.True(page.IsCloud);
-        Assert.Equal((false, "Choose where your saves are kept first"), (page.Cloud.Ready, page.Cloud.NotReadyTip));
-        page.NextCommand.Execute(null);
-        Assert.True(page.IsCloud);
-        page.Cloud.PickCommand.Execute("local");
-        Assert.Equal((true, "Continue with this PC only", AppConfig.NoCloud), (page.Cloud.Ready, page.CloudNextLabel, page.Cloud.Remote));
-        Assert.Equal("On this PC only: not synced to your other PCs", page.SetupKeptLine);
-        page.Cloud.PickCommand.Execute("folder");
-        Assert.Equal((false, "Choose the folder first"), (page.Cloud.Ready, page.Cloud.NotReadyTip));
-        Assert.True(page.Cloud.CannotSignIn);
-        page.Cloud.ChooseFolder(@"D:\NAS");
-        Assert.Equal((folder, "Continue", true), (page.Cloud.Remote, page.CloudNextLabel, page.Cloud.Ready));
-        Assert.Contains("runs in the background", page.FirstBackupText, StringComparison.Ordinal);
+        store.ToggleCommand.Execute(null);
+        Assert.Equal(true, store.IsChecked);
 
         // Backups and startup: the time is checked; Start using GameSync takes it all.
         page.NextCommand.Execute(null);
@@ -313,6 +326,59 @@ public class FirstRunTests
         Assert.Equal(new TimeOnly(7, 30), finished.DailyAt);
         Assert.True(finished.StartAtSignIn);
         Assert.Equal(["game-1", "game-2", "game-3", "game-4", "game-5", "terraria"], finished.Games.Select(g => g.Value));
+    }
+
+    /// <summary>
+    /// The owner, 18 Oct 2026, of Choose saves' Back up and sync: "this doesn't retract at times". A scan that finishes
+    /// while Choose saves is open (one a folder added on Your games started) made the groups again from nothing: closed
+    /// groups opened, open ones closed, and every tick went back to its default. Now the groups come back as they were left,
+    /// and only a game new to the list takes its default.
+    /// </summary>
+    [Fact]
+    public async Task ONB_02_a_scan_finishing_on_Choose_saves_keeps_each_group_and_tick_as_they_were_left()
+    {
+        var sync = Enumerable.Range(1, 6).Select(n => Game($"game-{n}", $"Game {n}", 1_000_000)).ToList();
+        IReadOnlyList<SetupGroup> groups =
+        [
+            new(SetupGroupKind.Sync, sync),
+            new(SetupGroupKind.StoreCloud, [Game("terraria", "Terraria", 300_000_000)]),
+            new(SetupGroupKind.OnlineOnly, [Game("apex", "Apex Legends", 1000)]),
+        ];
+        var actions = new SetupActions(
+            (_, _) => Task.FromResult(new SetupScan([new StoreSummary("Steam", 8, @"E:\Steam")], [], 8, 8, TimeSpan.FromSeconds(3))),
+            _ => Task.FromResult(groups),
+            (_, _) => Task.FromResult<string?>(null),
+            new CloudActions(false, _ => Task.FromResult<string?>(null), _ => @"D:\NAS\GameSync"),
+            (_, _) => Task.FromResult(new SetupResult(0, 0, [])));
+        var page = new FirstRunViewModel(actions);
+        await page.ScanAsync();
+
+        // The person closes Back up and sync, opens Synced by Steam in full, unticks Game 2 and ticks Apex Legends.
+        page.Groups[0].ToggleOpenCommand.Execute(null);
+        page.Groups[1].ToggleOpenCommand.Execute(null);
+        page.Groups[1].ShowAllCommand.Execute(null);
+        page.Groups[0].Rows[1].IsChecked = false;
+        page.Groups[2].Rows[0].IsChecked = true;
+
+        // Another scan finishes, finding a seventh game to sync.
+        groups =
+        [
+            new(SetupGroupKind.Sync, [.. sync, Game("game-7", "Game 7", 1_000_000)]),
+            new(SetupGroupKind.StoreCloud, [Game("terraria", "Terraria", 300_000_000)]),
+            new(SetupGroupKind.OnlineOnly, [Game("apex", "Apex Legends", 1000)]),
+        ];
+        await page.ScanAsync();
+        Assert.Equal((false, true, true, false), (page.Groups[0].IsOpen, page.Groups[1].IsOpen, page.Groups[1].ShowsAll, page.Groups[2].IsOpen));
+        Assert.Equal([true, false, true, true, true, true, true], page.Groups[0].Rows.Select(r => r.IsChecked));
+        Assert.True(page.Groups[2].Rows[0].IsChecked);
+        Assert.StartsWith("7 games ticked", page.TickedText, StringComparison.Ordinal);
+
+        // Add a game or folder's regroup keeps them too, and opens the group of the game just added.
+        page.Groups[2].Rows[0].IsChecked = false;
+        await page.RegroupAsync(GameId.Parse("game-7"));
+        Assert.Equal((true, true, true), (page.Groups[0].IsOpen, page.Groups[0].ShowsAll, page.Groups[1].IsOpen));
+        Assert.False(page.Groups[0].Rows[1].IsChecked);
+        Assert.False(page.Groups[2].Rows[0].IsChecked);
     }
 
     [Fact]

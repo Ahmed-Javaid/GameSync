@@ -1,7 +1,8 @@
 A short list of choices over the page: a sort order, or what can be done to one game.
 
-Provide `items` and `onPick`. An item is `{id, label}` with an optional `icon`; `checked` makes the menu a choice of one (the sort), with a `check` in `secondary` on the chosen item; `{sep: true}` divides it and `{heading}` labels it in `overline`.
+Provide `items` and `onPick`. An item is `{id, label}` with an optional `icon`; `checked` makes the menu a choice of one (the sort), with a `check` in `secondary` on the chosen item; `hint` puts a count or a shortcut on its right, mono in `ink-faint` (how many games each of the library's views holds); `{sep: true}` divides it and `{heading}` labels it in `overline`.
 
 - It floats like a dialog, so it takes the dialog's surface: `surface-dialog`, `edge-dialog`, `shadow-dialog`, `radius-md`. Items are 36px rows on `radius-sm`, hovered on `bg-300`. A small ask that opens from its button (Swap's question, a named save's Rename) floats on the same surface.
+- **In Glossy it's cut from the page's glass** (version 60; the owner, 18 Oct 2026, of the library's view menu, Mono's grey over a game's red glass: "This should be more in theme"): the art behind it shows through the page's card surface (`bg-200`), inside `edge-dialog`, and its rows are hovered on the page's `bg-300`, so it takes the game's colour as the cards round it do. It covers what's under it, as frosted glass would, and keeps the contrast a card keeps there. Right-click menus and small asks are the same. Solid keeps `surface-dialog`.
 - A game's right-click menu: Play first (left out when the game isn't installed), then Add to favourites (the star, filled for Remove from favourites) and Hide from the launcher. Keep it that short; everything else is on the game's page.
 - The app shows the same menu for a right-click, the Menu key and Shift+F10; Esc or a click elsewhere closes it.

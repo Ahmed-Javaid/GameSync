@@ -4,8 +4,8 @@ param([switch]$Clean, [switch]$NoBuild)
 # it on a new, empty data folder, so first run starts from its first step. Its scan only reads your games folders; it
 # changes nothing that starts with Windows (first run's switches act only on GameSync's usual data folder); and it shows
 # as a second GameSync icon by the clock, beside your own, which keeps running. For where saves are kept, pick Only on
-# this PC, never your Google Drive: this is a test copy. Each run starts a fresh one; -Clean quits every test copy and
-# deletes their folders. tools\dev\shortcuts.ps1 puts it on the desktop and in the Start menu.
+# this PC, never your Google Drive: this is a test copy. Each run starts a fresh one, quitting any still open first;
+# -Clean quits every test copy and deletes their folders. tools\dev\shortcuts.ps1 puts it on the desktop and in the Start menu.
 #   powershell -ExecutionPolicy Bypass -File tools\dev\try-first-run.ps1 [-Clean] [-NoBuild]
 $ErrorActionPreference = 'Stop'
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
@@ -38,6 +38,13 @@ if ($Clean) {
 }
 
 if (-not $NoBuild) {
+    # A test copy still open holds the files the build replaces: it's quit first (its folder is kept until -Clean).
+    $open = @(TestCopies)
+    if ($open.Count -gt 0 -and (Test-Path $cli)) {
+        foreach ($folder in $open) { & $cli --data $folder.FullName quit 2>$null | Out-Null }
+        Start-Sleep -Seconds 2
+    }
+
     Write-Host 'Building a test copy of GameSync...'
     & dotnet build (Join-Path $root 'src\GameSync.App') -o $app -nologo -v q
     if ($LASTEXITCODE -ne 0) {

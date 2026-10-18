@@ -31,9 +31,9 @@
   ],
   "lastChange": {
     "by": "Vulsight",
-    "at": "2026-10-17T21:27:42Z",
+    "at": "2026-10-18T01:34:36Z",
     "via": "Claude Code",
-    "note": "Version 59: the owner's look at version 58 (18 Oct 2026). The library's views are a dropdown atop the list, beside the sort, each view with its count, and the row of pills is gone (\"Make it into a dropdown next to name with all these settings\"); the list is 288px. What Add game folder is doing, found, or why it couldn't is a notice card under the header, plain while looking, in the primary colour with Show them once it has found games, in warn on a problem (\"That information line is too bare\"; LibraryScreen #notice:looking, #notice:found, #notice:problem). An achievement icon with a frame its game drew into the art has the frame cropped off, so the art fills the badge, in the popup too (\"The achievements are squares inside the viewer\"; AchievementBadge, AchievementPopup)."
+    "note": "Version 61: the owner's look at first run on a test copy (18 Oct 2026), built the same day. Where saves are kept comes before choosing (\"Then it must be AFTER the user selects where they want their saves\"), and Choose saves is Choose what to back up. It says what a tick does for the place just chosen, and what's left unticked, before any game (\"There should be locus of control\"). Its groups are named for what their games are, not an action: Not synced by any launcher, Already synced by other launchers (unticked at first), Probably online-only, Games not installed; No saves found yet is gone. A step's blocks share the room left evenly, and cards side by side are the same height (\"use equal block spacing if there is alot of empty space\"). OnboardingScreen."
   },
   "layout": "files",
   "libraries": [

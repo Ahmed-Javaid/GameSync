@@ -73,6 +73,11 @@
   <Style Selector="MenuItem:checked c|GsIcon">
     <Setter Property="Foreground" Value="{DynamicResource secondary}" />
   </Style>
+  <!-- A count or a shortcut on an item's right: the design's hint, mono in ink-faint (GsMenuItem.Hint) -->
+  <Style Selector="MenuItem /template/ TextBlock#PART_InputGestureText">
+    <Setter Property="FontFamily" Value="{DynamicResource font-mono}" />
+    <Setter Property="FontSize" Value="{DynamicResource fs-12}" />
+  </Style>
 
   <!-- SearchField: a 40px text field on radius-md with the search icon in front (design system → SearchField). -->
   <Style Selector="TextBox.search">

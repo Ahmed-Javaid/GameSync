@@ -330,7 +330,9 @@ function App(){
   // A render can open a game, and its Properties: #core, or #ror2/saves; or a view of the covers: #view:local.
   var hash = (location.hash || '').slice(1).split('/'), view = hash[0].indexOf('view:') === 0 ? hash[0].slice(5) : null;
   var shownNotice = hash[0].indexOf('notice:') === 0 ? hash[0].slice(7) : null, note = useState(NOTICES[shownNotice] ? shownNotice : null), timer = useRef(null);
-  var sel = useState(view || shownNotice ? null : hash[0] || INITIAL), tab = useState(view || 'installed'), sort = useState('recent'), q = useState(''), menu = useState(null), props = useState(hash[1] ? {section:hash[1]} : null);
+  // #menu:view opens with the view's menu showing (version 60).
+  var shownMenu = hash[0] === 'menu:view';
+  var sel = useState(view || shownNotice || shownMenu ? null : hash[0] || INITIAL), tab = useState(view || 'installed'), sort = useState('recent'), q = useState(''), menu = useState(shownMenu ? {kind:'view',game:null,x:100,y:112} : null), props = useState(hash[1] ? {section:hash[1]} : null);
   var frame = useRef(null), search = useRef(null);
   function back(){ sel[1](null); }
   useEffect(function(){
@@ -359,7 +361,7 @@ function App(){
   if (menu[0]) {
     var m = menu[0], g = m.game;
     var items = m.kind==='sort' ? [{heading:'Sort by'}].concat(SORTS.map(function(s){return {id:s.id,label:s.label,checked:s.id===sort[0]}}))
-      : m.kind==='view' ? VIEWS.filter(function(v){return (v.id!=='software'&&v.id!=='hidden')||count(v.id)>0}).map(function(v){return {id:v.id,label:v.label+' \u00b7 '+count(v.id),checked:v.id===tab[0]}})
+      : m.kind==='view' ? VIEWS.filter(function(v){return (v.id!=='software'&&v.id!=='hidden')||count(v.id)>0}).map(function(v){return {id:v.id,label:v.label,hint:String(count(v.id)),checked:v.id===tab[0]}})
       : m.kind==='more' ? [{id:'hide',label:g.hidden?'Show in the library':'Hide from the library'},{id:'art',label:'Change the art\u2026',icon:'palette'}].concat(g.installed===false?[]:[{id:'folder',label:'Open the game\u2019s folder',icon:'folder'}],
           [{id:'saves-folder',label:'Open the save folder',icon:'saves'},{sep:true},{id:'props',label:'Properties',icon:'settings'}])
       : (g.installed===false ? [] : [{id:'play',label:'Play',icon:'play'},{sep:true}]).concat([
@@ -394,8 +396,9 @@ function App(){
           current ? h(GamePage,{key:current.id,game:current,onBack:back,onFav:function(g){update(g,{fav:!g.fav})},onMore:function(g,e){openMenu('more',g,e)},
               onProps:function(section){props[1]({section:section})},onSaves:function(){}})
           : h(Covers,{games:shown,tab:tab[0],onTab:tab[1],query:q[0],onOpen:sel[1],onMenu:function(g,e){openMenu('tile',g,e)},
-              notice:note[0],onScan:scan,onShowFound:function(){ note[1](null); q[1](''); tab[1]('local'); },onCloseNotice:function(){ note[1](null); }})))),
-    menuEl,
+              notice:note[0],onScan:scan,onShowFound:function(){ note[1](null); q[1](''); tab[1]('local'); },onCloseNotice:function(){ note[1](null); }}))),
+      // Inside the page's scope, so a menu in Glossy is cut from the page's glass (version 60).
+      menuEl),
     props[0] && current ? h('div',{className:'gs-scrim',style:{position:'absolute',inset:0,zIndex:30},onClick:function(){props[1](null)}},
       h('div',{onClick:function(e){e.stopPropagation()}},h(G.GamePropertiesDialog,{key:current.id+props[0].section,game:propsOf(current),section:props[0].section,
         onClose:function(){props[1](null)},onSave:function(v){update(current,{name:v.name,fav:v.favourite,hidden:!v.shown});props[1](null)}}))) : null);

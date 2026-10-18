@@ -70,17 +70,17 @@
             <TextBlock Text="{Binding ViewLabel}" TextTrimming="CharacterEllipsis" />
             <c:GsButton.Flyout>
               <MenuFlyout Placement="BottomEdgeAlignedLeft">
-                <c:GsMenuItem Header="{Binding InstalledChoice}" ToggleType="CheckBox" IsChecked="{Binding ViewIsInstalled, Mode=OneWay}"
+                <c:GsMenuItem Header="Installed" Hint="{Binding InstalledCount}" ToggleType="CheckBox" IsChecked="{Binding ViewIsInstalled, Mode=OneWay}"
                               Command="{Binding ViewCommand}" CommandParameter="installed" />
-                <c:GsMenuItem Header="{Binding SavesChoice}" ToggleType="CheckBox" IsChecked="{Binding ViewIsSaves, Mode=OneWay}"
+                <c:GsMenuItem Header="Saves only" Hint="{Binding SavesCount}" ToggleType="CheckBox" IsChecked="{Binding ViewIsSaves, Mode=OneWay}"
                               Command="{Binding ViewCommand}" CommandParameter="saves" />
-                <c:GsMenuItem Header="{Binding AllChoice}" ToggleType="CheckBox" IsChecked="{Binding ViewIsAll, Mode=OneWay}"
+                <c:GsMenuItem Header="All games" Hint="{Binding AllCount}" ToggleType="CheckBox" IsChecked="{Binding ViewIsAll, Mode=OneWay}"
                               Command="{Binding ViewCommand}" CommandParameter="all" />
-                <c:GsMenuItem Header="{Binding LocalChoice}" ToggleType="CheckBox" IsChecked="{Binding ViewIsLocal, Mode=OneWay}"
+                <c:GsMenuItem Header="Local" Hint="{Binding LocalCount}" ToggleType="CheckBox" IsChecked="{Binding ViewIsLocal, Mode=OneWay}"
                               Command="{Binding ViewCommand}" CommandParameter="local" />
-                <c:GsMenuItem Header="{Binding SoftwareChoice}" ToggleType="CheckBox" IsChecked="{Binding ViewIsSoftware, Mode=OneWay}"
+                <c:GsMenuItem Header="Software" Hint="{Binding SoftwareCount}" ToggleType="CheckBox" IsChecked="{Binding ViewIsSoftware, Mode=OneWay}"
                               Command="{Binding ViewCommand}" CommandParameter="software" IsVisible="{Binding HasSoftware}" />
-                <c:GsMenuItem Header="{Binding HiddenChoice}" ToggleType="CheckBox" IsChecked="{Binding ViewIsHidden, Mode=OneWay}"
+                <c:GsMenuItem Header="Hidden" Hint="{Binding HiddenCount}" ToggleType="CheckBox" IsChecked="{Binding ViewIsHidden, Mode=OneWay}"
                               Command="{Binding ViewCommand}" CommandParameter="hidden" IsVisible="{Binding HasHidden}" />
               </MenuFlyout>
             </c:GsButton.Flyout>

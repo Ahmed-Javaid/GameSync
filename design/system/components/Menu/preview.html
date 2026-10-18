@@ -1,4 +1,4 @@
-<!-- @dsCard group="Actions" height=330 -->
+<!-- @dsCard group="Actions" height=360 -->
 <!doctype html>
 <html lang="en">
 <head><meta charset="utf-8"><title>preview</title>
@@ -28,7 +28,14 @@ var IMPORT_ITEMS = [
   {id:'mystery', name:'Unknown game (a friend’s custom entry)', art:null, match:'unknown', versions:1, size:524288}
 ];
 
-ReactDOM.createRoot(document.getElementById('root')).render(h('div',{className:'gs-row',style:{alignItems:'flex-start',gap:24}},h(G.Menu,{label:'Sort by',items:[{heading:'Sort by'},{id:'recent',label:'Recently played',checked:true},{id:'name',label:'Name',checked:false},{id:'hours',label:'Hours played',checked:false},{id:'added',label:'Recently added',checked:false}]}),h(G.Menu,{label:'Terraria',items:[{id:'play',label:'Play',icon:'play'},{sep:true},{id:'fav',label:'Remove from favourites',icon:'star',filled:true},{id:'hide',label:'Hide from the launcher'},{sep:true},{id:'folder',label:'Open the game’s folder',icon:'folder'}]})));
+// Version 60: in Glossy a menu is cut from the page's glass, over a card of the page; the library's views with their counts as hints.
+var VIEWS = [{id:'installed',label:'Installed',checked:true,hint:'38'},{id:'saves',label:'Saves only',checked:false,hint:'23'},{id:'all',label:'All games',checked:false,hint:'61'},{id:'local',label:'Local',checked:false,hint:'21'},{id:'software',label:'Software',checked:false,hint:'3'}];
+var glossy = h(G.ThemeScope,{surface:'glossy',art:ART,strength:'glass',style:{width:300,height:300,borderRadius:12,overflow:'hidden',padding:16,flexShrink:0}},
+  h('div',{className:'gs-card',style:{height:'100%',padding:12,gap:10}},
+    h('div',{className:'gs-row gs-muted',style:{gap:4,fontSize:13}},'Installed',h(G.Icon,{name:'chevronDown',size:14})),
+    ['GeoGuessr Steam Edition','Sons of the Forest','Counter-Strike 2','Dark Souls III','Cuphead','Apex Legends','Bloodborne GOTY'].map(function(n){return h('div',{key:n,style:{fontSize:14,lineHeight:'20px'}},n);})),
+  h(G.Menu,{label:'Library view',items:VIEWS,style:{position:'absolute',left:24,top:44,minWidth:180}}));
+ReactDOM.createRoot(document.getElementById('root')).render(h('div',{className:'gs-row',style:{alignItems:'flex-start',gap:24}},h(G.Menu,{label:'Sort by',items:[{heading:'Sort by'},{id:'recent',label:'Recently played',checked:true},{id:'name',label:'Name',checked:false},{id:'hours',label:'Hours played',checked:false},{id:'added',label:'Recently added',checked:false}]}),h(G.Menu,{label:'Terraria',items:[{id:'play',label:'Play',icon:'play'},{sep:true},{id:'fav',label:'Remove from favourites',icon:'star',filled:true},{id:'hide',label:'Hide from the launcher'},{sep:true},{id:'folder',label:'Open the game’s folder',icon:'folder'}]}),glossy));
 </script>
 </body>
 </html>

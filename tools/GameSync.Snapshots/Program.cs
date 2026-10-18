@@ -1,5 +1,5 @@
 // Renders pages of GameSync's UI to PNG files, in the themes asked for, with Avalonia's headless platform and Skia:
-//   dotnet run --project tools/GameSync.Snapshots -- <output folder> [--data <data folder>] [--game <id>] [--size 1920x1128] [--hover x,y] [--click x,y] [--bench N] [--many N] [--tab N] [--text-scale 1.5] [page ...]
+//   dotnet run --project tools/GameSync.Snapshots -- <output folder> [--data <data folder>] [--game <id>] [--size 1920x1128] [--hover x,y] [--click x,y] [--context x,y] [--themes mono,mono-light] [--bench N] [--many N] [--tab N] [--text-scale 1.5] [page ...]
 // Pages: gallery, gallery2, gallery3, busy (KAN-80's busy buttons and job progress), zenith (the Zenith medal at every
 // size, earned and not, the badge alone and the monument, earned and not), and with --data, home, home-playing (the hero game running),
 // home-second (the banner moved on to the next game played, KAN-125), library, library-installed,
@@ -25,6 +25,8 @@
 // Glossy window (LOOK-17) over the last-played game's art: glossy-home, glossy-library, glossy-game, glossy-saves,
 // glossy-game-saves, glossy-conflict, glossy-properties, glossy-console, glossy-settings, glossy-setup, glossy-setup-choose.
 // Themes: every page in Arcade dark, Arcade light and Sakura dark; Glossy in light mode is light glass (design system version 35).
+// --themes mono,mono-light,light picks others: a preset's name, "-light" after it for its light mode, or "light" for Arcade's.
+// A menu --click opens floats in a window of its own, as in the app, and is laid over the page where it opened.
 // "icons" writes gamesync.ico (copy it to src/GameSync.Tray/Assets) and a sheet of the tray icon in every state.
 // Timings (KAN-124): "backdrop-timing" with --art <folder> says how long each picture's backdrop takes in each mode and
 // strength; "look-timing" with --data how long a change between Dark and Light takes in Glossy for the window's own work.
@@ -54,6 +56,10 @@ var hover = TakeOption(list, "--hover")?.Split(',') is [var hx, var hy] ? new Po
 
 // A click at x,y (window coordinates) before the render, to see what it opens, such as a flyout.
 var click = TakeOption(list, "--click")?.Split(',') is [var cx, var cy] ? new Point(double.Parse(cx), double.Parse(cy)) : (Point?)null;
+// A right-click at x,y before the render, to see a game's menu.
+var context = TakeOption(list, "--context")?.Split(',') is [var rx, var ry] ? new Point(double.Parse(rx), double.Parse(ry)) : (Point?)null;
+// The themes to render in, in place of Arcade dark, Arcade light and Sakura dark.
+var themeNames = TakeOption(list, "--themes")?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 // KAN-58: --bench N scrolls the page's biggest scroller N times, rendering a whole frame each time, and prints how long
 // the frames took (Skia on the CPU, as the app draws), in place of saving a picture.
 var bench = TakeOption(list, "--bench") is { } benchFrames ? int.Parse(benchFrames) : 0;
@@ -100,12 +106,16 @@ if (wanted.Remove("icons"))
 
 // Each render is one still frame: what moves as a page opens (the Achievements page's trophies, the Zenith medal's sheen) is
 // drawn where it comes to rest.
+var menus = new List<Control>();
 GameSync.UI.Controls.Motion.Still = true;
 AppBuilder.Configure<GsApp>()
     .UseSkia()
     .UseHeadless(new AvaloniaHeadlessPlatformOptions { UseHeadlessDrawing = false })
     .SetupWithoutStarting();
 GameSync.UI.Theming.TextScale.Apply(Application.Current!.Resources, textScale);
+Control.LoadedEvent.AddClassHandler<Avalonia.Controls.MenuFlyoutPresenter>((menu, _) => menus.Add(menu));
+Control.LoadedEvent.AddClassHandler<ContextMenu>((menu, _) => menus.Add(menu));
+Control.LoadedEvent.AddClassHandler<Avalonia.Controls.FlyoutPresenter>((menu, _) => menus.Add(menu));
 
 // KAN-124: how long a backdrop takes to make, for each picture in --art, in each mode and strength.
 if (wanted.Remove("backdrop-timing") && artFolder is not null)
@@ -767,19 +777,19 @@ if (dataDir is not null)
         });
         setup.Start();
 
-        // ONB-07: Welcome, Your games, Choose saves, Where saves are kept, Backups and startup. Where saves are kept goes on
-        // once a choice is made: a folder, here.
+        // ONB-07: Welcome, Your games, Where saves are kept, Choose what to back up, Backups and startup (since 18 Oct 2026).
+        // Where saves are kept goes on once a choice is made: a folder, here.
         var steps = state switch
         {
             "folders" or "folders-added" => 1,
-            "scanning" or "choose" => 2,
-            "cloud" or "cloud-folder" or "cloud-local" => 3,
+            "cloud" or "cloud-folder" or "cloud-local" => 2,
+            "scanning" or "choose" => 3,
             "daily" or "daily-time" => 4,
             _ => 0,
         };
         for (var i = 0; i < steps; i++)
         {
-            if (i == 3)
+            if (i == 2)
             {
                 setup.Cloud.PickCommand.Execute("folder");
                 setup.Cloud.ChooseFolder(@"D:\");
@@ -1156,8 +1166,9 @@ if (dataDir is not null)
         pages[step] = (() => Shell(step), size.Width, size.Height);
     }
 
-    // The app's window as it opens, Glossy or Solid by the theme, with the art the app would use.
-    var art = home.Hero?.HeroPath ?? home.Hero?.CoverPath;
+    // The app's window as it opens, Glossy or Solid by the theme, with the art the app would use: the hero game's, or the
+    // art of the game --game names, to see the glass over another game's colours.
+    var art = gameId is not null && (shown?.HeroPath ?? shown?.CoverPath) is { } picked ? picked : home.Hero?.HeroPath ?? home.Hero?.CoverPath;
     var console = new ConsoleViewModel();
     console.AddFile(
     [
@@ -1253,12 +1264,15 @@ if (dataDir is not null)
     }
 }
 
-var themes = new[]
-{
-    ("dark", new ThemeChoice()),
-    ("light", new ThemeChoice(Mode: ThemeMode.Light)),
-    ("sakura", new ThemeChoice("sakura")),
-};
+var themes = themeNames is null
+    ? new[]
+    {
+        ("dark", new ThemeChoice()),
+        ("light", new ThemeChoice(Mode: ThemeMode.Light)),
+        ("sakura", new ThemeChoice("sakura")),
+    }
+    : themeNames.Select(name => (name, name == "light" ? new ThemeChoice(Mode: ThemeMode.Light)
+        : name.EndsWith("-light", StringComparison.Ordinal) ? new ThemeChoice(name[..^"-light".Length], ThemeMode.Light) : new ThemeChoice(name))).ToArray();
 
 foreach (var (name, page) in pages.Where(p => wanted.Count == 0 || wanted.Contains(p.Key)))
 {
@@ -1359,11 +1373,47 @@ void Save(Window window, string fileName)
         Dispatcher.UIThread.RunJobs();
     }
 
+    if (context is { } right)
+    {
+        window.MouseMove(right);
+        window.MouseDown(right, Avalonia.Input.MouseButton.Right);
+        window.MouseUp(right, Avalonia.Input.MouseButton.Right);
+        Dispatcher.UIThread.RunJobs();
+    }
+
     var frame = window.CaptureRenderedFrame();
     var file = Path.Combine(output, fileName);
-    frame?.Save(file);
+    var floating = menus.Where(m => m.IsAttachedToVisualTree()).Select(TopLevel.GetTopLevel).OfType<TopLevel>()
+        .Where(top => !ReferenceEquals(top, window)).Distinct().ToList();
+    if (frame is not null && floating.Count > 0)
+    {
+        // An open menu's own window, laid over the page where it is on the screen.
+        using var whole = new Avalonia.Media.Imaging.RenderTargetBitmap(frame.PixelSize, frame.Dpi);
+        using (var context = whole.CreateDrawingContext())
+        {
+            context.DrawImage(frame, new Rect(frame.Size));
+            foreach (var top in floating)
+            {
+                if (top.CaptureRenderedFrame() is not { } shot)
+                {
+                    continue;
+                }
+
+                var (from, to) = (top.PointToScreen(default), window.PointToScreen(default));
+                context.DrawImage(shot, new Rect((from.X - to.X) / window.RenderScaling, (from.Y - to.Y) / window.RenderScaling, shot.Size.Width, shot.Size.Height));
+            }
+        }
+
+        whole.Save(file);
+    }
+    else
+    {
+        frame?.Save(file);
+    }
+
     window.Close();
-    Console.WriteLine(frame is null ? $"{file}: nothing rendered" : file);
+    menus.Clear();
+    Console.WriteLine(frame is null ? $"{file}: nothing rendered" : floating.Count > 0 ? $"{file} (with {floating.Count} menu{(floating.Count == 1 ? "" : "s")} open)" : file);
 }
 
 void Tabs(Window window, string name)

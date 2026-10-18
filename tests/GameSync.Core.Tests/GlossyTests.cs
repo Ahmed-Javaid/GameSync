@@ -252,6 +252,35 @@ public class GlossyTests
         static int Mix(byte over, byte under, double alpha) => (int)Math.Round(alpha * over + (1 - alpha) * under);
     }
 
+    /// <summary>
+    /// The owner, 18 Oct 2026, of the library's view menu, grey over a game's red glass: "This should be more in theme". A
+    /// menu in Glossy is cut from the backdrop where it lies: every point of it shows the very spot of the art the backdrop
+    /// draws under that point of the window, in a window of the design's size, a wide one and a tall one.
+    /// </summary>
+    [Fact]
+    public void LOOK_17_a_menu_in_glossy_shows_the_backdrop_where_it_lies()
+    {
+        var art = new Avalonia.Size(Backdrop.Width, Backdrop.Height);
+        foreach (var window in new[] { new Avalonia.Size(1280, 800), new Avalonia.Size(1920, 1080), new Avalonia.Size(900, 1000) })
+        {
+            // The backdrop, as GsBackdrop draws it: the art scaled to cover the window, the rest cut off evenly.
+            var scale = Math.Max(window.Width / art.Width, window.Height / art.Height);
+            var (fromX, fromY) = ((art.Width - window.Width / scale) / 2, (art.Height - window.Height / scale) / 2);
+            foreach (var menu in new[] { new Avalonia.Rect(100, 98, 156, 208), new Avalonia.Rect(window.Width - 240, window.Height - 300, 240, 300) })
+            {
+                var placed = GlassMenus.Placed(art, window, menu.Position);
+                foreach (var point in new[] { new Avalonia.Point(0, 0), new Avalonia.Point(menu.Width / 2, menu.Height / 3), new Avalonia.Point(menu.Width, menu.Height) })
+                {
+                    var (inWindowX, inWindowY) = (menu.X + point.X, menu.Y + point.Y);
+                    var (expectedX, expectedY) = (fromX + inWindowX / scale, fromY + inWindowY / scale);
+                    var (shownX, shownY) = ((point.X - placed.X) / placed.Width * art.Width, (point.Y - placed.Y) / placed.Height * art.Height);
+                    Assert.Equal(expectedX, shownX, 6);
+                    Assert.Equal(expectedY, shownY, 6);
+                }
+            }
+        }
+    }
+
     /// <summary>Every preset in dark mode (the accent preset with several accents), and Arcade with each secondary swatch.</summary>
     private static IEnumerable<ThemeChoice> DarkChoices()
     {

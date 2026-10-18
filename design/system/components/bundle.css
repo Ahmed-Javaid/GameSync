@@ -140,6 +140,9 @@
 
 /* ---------- Menu: over the page like a dialog, so it takes the dialog's surface ---------- */
 .gs-menu { min-width: 220px; padding: 6px; background: var(--surface-dialog); border: 1px solid var(--edge-dialog); border-radius: var(--radius-md); box-shadow: var(--shadow-dialog); display: flex; flex-direction: column; gap: 2px; }
+/* Glossy's menus (version 60): cut from the page's glass, the art behind them frosted under the page's card surface, as
+   the app cuts its menus from the window's backdrop. */
+.gs-glossy .gs-menu { background: var(--bg-200); border-color: var(--edge-dialog); -webkit-backdrop-filter: blur(40px) saturate(1.2); backdrop-filter: blur(40px) saturate(1.2); }
 .gs-menu-item { display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 var(--space-3) 0 var(--space-2); border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--ink); font: 400 14px/20px var(--font-sans); text-align: left; cursor: pointer; }
 .gs-menu-item:hover { background: var(--bg-300); }
 .gs-menu-item[disabled] { opacity: .45; cursor: not-allowed; }
